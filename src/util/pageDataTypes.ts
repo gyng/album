@@ -1,6 +1,6 @@
 import type { Content, OptimisedPhoto } from "../services/types";
 
-export type HomePageData = { albums: Content[] };
+export type HomePageData = { albums: Array<Content & { photoCount?: number }> };
 
 export type AlbumPageData = { album: Content };
 

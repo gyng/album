@@ -191,6 +191,11 @@ describe("PhotoBlockEl", () => {
     expect(screen.getByRole("link", { name: "Find photos with this focal length" })).toBeTruthy();
     expect(screen.getByRole("link", { name: "Find photos with this lens" })).toBeTruthy();
     expect(screen.getByRole("link", { name: "Find photos with this camera" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "night" })).toHaveAttribute("href", "/search?q=night");
+    expect(screen.getByRole("link", { name: "street" })).toHaveAttribute(
+      "href",
+      "/search?q=street",
+    );
     expect(
       screen.getByRole("link", { name: "Search photos with similar colour rgb(12, 34, 56)" }),
     ).toHaveAttribute("href", "/search?color=12,34,56");

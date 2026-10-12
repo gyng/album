@@ -418,8 +418,10 @@ describe("explore page", () => {
     fireEvent.click(screen.getByRole("button", { name: "Load more average photos" }));
     fireEvent.click(screen.getByRole("button", { name: "Load more distinct frames" }));
     fireEvent.click(screen.getByRole("button", { name: "Load more repeated motifs" }));
-    // The section opened with every pair it had, however long that made it.
-    fireEvent.click(screen.getByRole("button", { name: "Load more travelling looks" }));
+    // Pair sections reveal another complete row with each press.
+    for (let row = 0; row < 3; row++) {
+      fireEvent.click(screen.getByRole("button", { name: "Load more travelling looks" }));
+    }
     expect(
       screen.queryByRole("button", { name: "Load more travelling looks" }),
     ).not.toBeInTheDocument();

@@ -9,7 +9,6 @@ import {
   isSimilarityOrder,
   parseColorParam,
   parseSearchTerms,
-  similarSearchEmojiStyle,
 } from "./searchUtils";
 
 describe("searchUtils", () => {
@@ -38,7 +37,6 @@ describe("searchUtils", () => {
   it("recognises supported search modes and similarity directions", () => {
     expect(DEFAULT_SEARCH_MODE).toBe("hybrid");
     expect(DEFAULT_SIMILARITY_ORDER).toBe("most");
-    expect(similarSearchEmojiStyle).toEqual({ filter: "grayscale(100%)" });
     expect(["keyword", "semantic", "hybrid"].every(isSearchMode)).toBe(true);
     expect(isSearchMode("unknown")).toBe(false);
     expect(isSearchMode(null)).toBe(false);

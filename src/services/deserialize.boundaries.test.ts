@@ -207,6 +207,13 @@ describe("deserialisation adapter boundaries", () => {
     expect(db.rows).toHaveBeenCalledTimes(2);
   });
 
+  it("normalises stored tag text into distinct labels before sending it to the photo UI", async () => {
+    jest.spyOn(fs, "existsSync").mockReturnValue(true);
+    db.rows.mockReturnValue({ tags: "night, street, night, " });
+    const result = await deserializePhotoBlock(photo("tagged.jpg"), { dirname: "albums/trip" });
+    expect(result._build.tags.tags).toEqual(["night", "street"]);
+  });
+
   it("keeps rows without colour metadata unchanged", async () => {
     jest.spyOn(fs, "existsSync").mockReturnValue(true);
     db.rows.mockImplementationOnce(() => ({ geocode: "Tokyo" }));

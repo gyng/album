@@ -1,3 +1,4 @@
+import { Icon } from "../../components/ui/Icon";
 import { useState } from "react";
 import { SearchDrawPad } from "../../components/search/SearchDrawPad";
 import { SearchFilterPill } from "../../components/search/SearchFilterPill";
@@ -72,6 +73,7 @@ const motionTokens = [
 ];
 
 const sections = [
+  "icons",
   "controls",
   "surfaces",
   "filters",
@@ -193,6 +195,39 @@ const DesignPage = () => {
               <Caption>Soft accent surface; focus has its own ring.</Caption>
               <PillButton size="compact">View photographs</PillButton>
             </Card>
+          </div>
+        </section>
+
+        <section id="icons" className={styles.section}>
+          <div className={styles.sectionHeader}>
+            <Heading level={1}>Icons</Heading>
+          </div>
+          <div className={styles.controlDemo}>
+            {(
+              [
+                "search",
+                "dice",
+                "image",
+                "shuffle",
+                "clock",
+                "compass",
+                "sunrise",
+                "repeat",
+                "expand",
+                "sparkles",
+                "pin",
+                "paperclip",
+                "camera",
+                "pencil",
+                "settings",
+                "close",
+                "flame",
+              ] as const
+            ).map((kind) => (
+              <span key={kind}>
+                <Icon kind={kind} /> {kind}
+              </span>
+            ))}
           </div>
         </section>
 
@@ -490,7 +525,9 @@ const DesignPage = () => {
             </Caption>
           </div>
           <div className={styles.darkPreview}>
-            <OverlayButton>🔍 Similar</OverlayButton>
+            <OverlayButton>
+              <Icon kind="search" /> Similar
+            </OverlayButton>
             <OverlayButtonLink href="#">↗ Open</OverlayButtonLink>
             <OverlayButton size="small" aria-label="Close">
               <span aria-hidden="true">×</span>

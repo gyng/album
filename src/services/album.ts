@@ -323,7 +323,11 @@ const applyTitleKickerDefaults = (manifest: Content): void => {
   }
 
   const [earliest, latest] = getImageTimestampRange(manifest);
+  const count = manifest.blocks
+    .filter((block) => block.kind === "photo")
+    .length.toLocaleString("en-GB");
   if (earliest == null || latest == null) {
+    title.data.kicker = title.data.kicker ? `${title.data.kicker} · ${count}` : count;
     return;
   }
 
@@ -334,7 +338,7 @@ const applyTitleKickerDefaults = (manifest: Content): void => {
   // same EXIF wall-clock parser, so these years are guaranteed to exist.
   const from = parseExifLocalDateTime(earliest)!.year;
   const to = parseExifLocalDateTime(latest)!.year;
-  title.data.kicker = `${from}${to === from ? "" : `–${to}`}`;
+  title.data.kicker = `${from}${to === from ? "" : `–${to}`} · ${count}`;
 };
 
 const albumPromiseCache = new Map<string, Promise<Content>>();

@@ -466,7 +466,9 @@ describe("SlideshowToolbar", () => {
     expect(screen.queryByRole("button", { name: /Fullscreen/ })).toBeNull();
     expect(screen.queryByRole("button", { name: /longer cadences/i })).toBeNull();
     expect(screen.getByRole("button", { name: "3h" }).getAttribute("aria-pressed")).toBe("true");
-    expect(screen.getByRole("button", { name: /Right/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Cycle details alignment" })).toHaveTextContent(
+      "Right",
+    );
   });
 
   it("submits a trimmed topic and shows a busy state while it encodes", () => {

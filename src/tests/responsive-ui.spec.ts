@@ -520,4 +520,26 @@ test.describe("Responsive UI", () => {
     );
     await expectNoDocumentOverflow(page);
   });
+
+  test("guess lobby aligns option controls and start actions", async ({ page }) => {
+    for (const width of [1440, 390, 320]) {
+      await page.setViewportSize({ width, height: 900 });
+      await gotoHydrated(page, "/guess");
+      const region = page.getByRole("combobox", { name: "Region" });
+      const timer = page.getByRole("radiogroup", { name: "Timer per round" });
+      const rounds = page.getByRole("radiogroup", { name: "Number of rounds" });
+      const controls = await Promise.all(
+        [region, timer, rounds].map((control) => control.boundingBox()),
+      );
+      for (const box of controls.slice(1)) {
+        expect(Math.abs(box!.x - controls[0]!.x)).toBeLessThan(1);
+        expect(Math.abs(box!.width - controls[0]!.width)).toBeLessThan(1);
+      }
+      const daily = await page.getByRole("button", { name: "Daily challenge" }).boundingBox();
+      const play = await page.getByRole("button", { name: /^Play/ }).boundingBox();
+      expect(Math.abs(daily!.y - play!.y)).toBeLessThan(1);
+      expect(Math.abs(daily!.height - play!.height)).toBeLessThan(1);
+      await expectNoDocumentOverflow(page);
+    }
+  });
 });

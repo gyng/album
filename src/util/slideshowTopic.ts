@@ -7,8 +7,8 @@ import { SlideshowMode } from "./slideshowUrl";
 // here. This module reconciles those results against the in-memory photo pool
 // and decides how to seed the existing similar-mode flow — the async encode /
 // fetch and all ref/state mutations stay in the component, mirroring
-// slideshowRemix.ts. The topic seeds the flow; the existing image-similarity
-// drift takes over from the best match.
+// slideshowRemix.ts. The ranked text matches remain the playback boundary
+// until the topic is dismissed.
 
 // The pre-topic state a dismiss must restore. Only the playback mode is
 // restored — the album filter is deliberately NOT captured: topic seeding never
@@ -22,6 +22,24 @@ export type TopicSnapshot = {
 export const normaliseTopic = (raw: string): string | null => {
   const trimmed = raw.trim();
   return trimmed.length > 0 ? trimmed : null;
+};
+
+// Keep a topic anchored to a small ranked set, rather than chaining neighbours
+// across the entire archive. Exhausting recent matches starts another pass.
+export const TOPIC_MATCH_LIMIT = 48;
+export const chooseTopicPhoto = (
+  photos: RandomPhotoRow[],
+  recentPaths: readonly string[],
+  currentPath?: string,
+): RandomPhotoRow | null => {
+  const candidates = photos.filter((photo) => photo.path !== currentPath);
+  if (!candidates.length) return photos[0] ?? null;
+  return (
+    candidates.find((photo) => !recentPaths.includes(photo.path)) ??
+    candidates.reduce((oldest, photo) =>
+      recentPaths.indexOf(photo.path) > recentPaths.indexOf(oldest.path) ? photo : oldest,
+    )
+  );
 };
 
 // Whether the embeddings database must be loaded. Topic seeding ranks against
@@ -162,7 +180,7 @@ export type TopicSeedPlan =
       snapshot: TopicSnapshot;
       // Whether the caller should commit the best match as the current slide.
       // False when a `photo=` permalink is present: the topic still activates
-      // (chip, snapshot, mode=similar) but the flow must keep drifting from the
+      // (chip, snapshot, mode=similar) but the starting frame remains the
       // pinned photo rather than jumping to the topic's best match.
       commit: boolean;
     };

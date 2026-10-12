@@ -1,6 +1,7 @@
 import React from "react";
 import { AppLink as Link } from "./platform";
-import type { Content, PhotoBlock } from "../services/types";
+import type { PhotoBlock } from "../services/types";
+import type { HomePageData } from "../util/pageDataTypes";
 import { Picture } from "./Photo";
 import { Caption, Heading } from "./ui";
 import { parseExifLocalDateTime } from "../util/exifTime";
@@ -17,7 +18,7 @@ import styles from "./Album.module.css";
  */
 const HOVER_INTENT_MS = 200;
 
-export const Albums: React.FC<{ albums: Content[] }> = (props) => {
+export const Albums: React.FC<HomePageData> = (props) => {
   const firstCoveredAlbumIndex = props.albums.findIndex((album) =>
     album.blocks.some((block) => block.kind === "photo"),
   );
@@ -49,6 +50,12 @@ export const Albums: React.FC<{ albums: Content[] }> = (props) => {
         const timeRange = album._build.timeRange
           ?.filter(Boolean)
           .map((ts) => parseExifLocalDateTime(ts)?.year ?? 0) ?? [0, 0];
+        const years =
+          timeRange[0] && timeRange[1] && timeRange[0] !== timeRange[1]
+            ? timeRange.join("–")
+            : timeRange[0] || null;
+        const photoCount =
+          album.photoCount ?? album.blocks.filter((block) => block.kind === "photo").length;
 
         return (
           <li key={album._build.slug} className={styles.item}>
@@ -91,19 +98,10 @@ export const Albums: React.FC<{ albums: Content[] }> = (props) => {
                 </span>
               </Heading>
 
-              {timeRange[0] && timeRange[1] && timeRange[0] !== timeRange[1] ? (
-                <Caption as="span" size="sm" className={styles.date}>
-                  {timeRange.join("–")}
-                </Caption>
-              ) : timeRange[0] ? (
-                <Caption as="span" size="sm" className={styles.date}>
-                  {timeRange[0]}
-                </Caption>
-              ) : (
-                <Caption as="span" size="sm" className={styles.date}>
-                  &nbsp;
-                </Caption>
-              )}
+              <Caption as="span" size="sm" className={styles.date}>
+                {years ? `${years} · ` : ""}
+                {photoCount.toLocaleString("en-GB")}
+              </Caption>
             </div>
           </li>
         );

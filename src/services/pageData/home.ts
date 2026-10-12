@@ -51,6 +51,7 @@ export const loadHomePageData = async (): Promise<HomePageData> => {
           : coverBlocks;
       return {
         ...album,
+        photoCount: album.blocks.filter((block) => block.kind === "photo").length,
         blocks: previewBlocks.map(compactHomePreviewPhoto),
         _build: { ...album._build, timeRange: getImageTimestampRange(album) },
       };

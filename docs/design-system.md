@@ -102,6 +102,18 @@ look like a form control.
   Lobby/results use readable document widths. Timer urgency, score reveals and
   map-pin feedback may animate; ordinary game buttons use shared hover/selection
   states without decorative shimmer or perpetual readiness glow.
+- The Guess Where lobby aligns its option controls in one column and starts
+  both actions on the same baseline. Narrow screens stack each option label
+  above its control. Pair galleries open with up to three complete rows and
+  reveal another row per press; captions must not widen their photograph pairs.
+- UI icons use the shared `Icon` SVG set, inherit `currentColor`, and occupy a
+  fixed em-sized box. Keep decorative icons hidden from assistive technology
+  and name icon-only controls by their action. `/design` shows the full set.
+- Photo detail tags and colour swatches link to the corresponding search.
+  Secondary weather readings live under “Estimate details”; conditions and
+  temperature stay visible. Use ordinary reciprocal shutter fractions, with
+  three-significant-figure decimals for non-unit fractions. Album year captions
+  append photo counts; home previews carry totals before their covers are pruned.
 - The desktop search category rail scrolls within its bounded panel. Compact
   filter sheets wrap the categories and scroll the values. Long labels must not
   widen the page. Selection stays recognisable on hover.

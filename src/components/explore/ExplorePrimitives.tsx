@@ -1,3 +1,4 @@
+import { Icon } from "../ui/Icon";
 import { mergeCssModuleStyles } from "../../util/mergeCssModuleStyles";
 import { AppLink as Link } from "../platform";
 import React from "react";
@@ -235,7 +236,9 @@ export const VisualSimilarityThumb: React.FC<{
       aria-label={`Find photos semantically similar to ${photo.label}`}
       title="Open similarity search"
     >
-      <span aria-hidden="true">🔍</span>
+      <span aria-hidden="true">
+        <Icon kind="search" />
+      </span>
       <span>Similar</span>
       <span aria-hidden="true">↗</span>
     </OverlayButtonLink>

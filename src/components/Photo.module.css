@@ -296,6 +296,24 @@
 .colorswatches {
   display: flex;
   flex-direction: row;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.tagLinks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tagLink {
+  composes: compact from "./ui/Control.module.css";
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
 }
 
 .similarPhotosWrap {

@@ -55,6 +55,7 @@ import {
   ExploreArchiveGaps,
   ExploreThisDaySection,
 } from "../../components/explore/ExploreTimeSections";
+import { ExplorePairExamples } from "../../components/explore/ExplorePairExamples";
 import { ExploreLookYearPhotos } from "../../components/explore/ExploreLookYearPhotos";
 import { ExploreColourSection } from "../../components/explore/ExploreColourSection";
 import { ExploreGearSection } from "../../components/explore/ExploreGearSection";
@@ -70,20 +71,16 @@ export type ExploreScreenProps = (
 };
 
 /**
- * Four at a time, everywhere: one row on a desktop, and a button that keeps
+ * Single-photo sections expand four at a time, with a button that keeps
  * giving rather than one that empties after two presses. Two of these sections
  * opened with two examples and had eight to offer in total, so a reader who was
  * interested ran out mid-thought.
  */
 const INITIAL_AVERAGE_EXAMPLES = 4;
-const INITIAL_REPEATED_EXAMPLES = 4;
-const INITIAL_TRAVELLING_MOTIFS = 4;
 const INITIAL_DISTINCT_EXAMPLES = 4;
 const INITIAL_RECURRING_LOOKS = 4;
 const INITIAL_LOOK_TIMELINE = 4;
 const LOAD_MORE_AVERAGE_EXAMPLES = 4;
-const LOAD_MORE_REPEATED_EXAMPLES = 4;
-const LOAD_MORE_TRAVELLING_MOTIFS = 4;
 const LOAD_MORE_DISTINCT_EXAMPLES = 4;
 const LOAD_MORE_RECURRING_LOOKS = 4;
 const LOAD_MORE_LOOK_TIMELINE = 4;
@@ -102,8 +99,6 @@ const ExploreScreen = ({
   const [selectedTechnicalCamera, setSelectedTechnicalCamera] = useState("all");
   const [selectedTechnicalLens, setSelectedTechnicalLens] = useState("all");
   const [visibleAverageExamples, setVisibleAverageExamples] = useState(INITIAL_AVERAGE_EXAMPLES);
-  const [visibleRepeatedExamples, setVisibleRepeatedExamples] = useState(INITIAL_REPEATED_EXAMPLES);
-  const [visibleTravellingMotifs, setVisibleTravellingMotifs] = useState(INITIAL_TRAVELLING_MOTIFS);
   const [visibleDistinctExamples, setVisibleDistinctExamples] = useState(INITIAL_DISTINCT_EXAMPLES);
   const [visibleRecurringLooks, setVisibleRecurringLooks] = useState(INITIAL_RECURRING_LOOKS);
   const [visibleLookTimeline, setVisibleLookTimeline] = useState(INITIAL_LOOK_TIMELINE);
@@ -239,8 +234,6 @@ const ExploreScreen = ({
   const weatherFacets = stats.stringFacets.filter((facet) => facet.facetId.startsWith("weather-"));
   const weatherCoverage = findStringFacet(stats, "weather-condition")?.coverage ?? 0;
 
-  const repeatedExamples = visualSameness?.repeatedExamples.slice(0, visibleRepeatedExamples) ?? [];
-  const travellingMotifs = visualSameness?.travellingMotifs.slice(0, visibleTravellingMotifs) ?? [];
   const averageExamples = visualSameness?.averageExamples.slice(0, visibleAverageExamples) ?? [];
   const distinctExamples = visualSameness?.distinctExamples.slice(0, visibleDistinctExamples) ?? [];
   const recurringLooks = visualSameness?.visualEras.slice(0, visibleRecurringLooks) ?? [];
@@ -517,97 +510,14 @@ const ExploreScreen = ({
                         ) : null}
                       </section>
                     ) : null}
-                    {visualSameness.repeatedExamples.length > 0 ? (
-                      <section
-                        className={`${styles.visualExampleSection} ${styles.visualFullRowSection}`}
-                      >
-                        <div className={styles.sectionHeader}>
-                          <Heading level={2}>Repeated motifs</Heading>
-                          <Caption as="span">Closest recurring visual matches</Caption>
-                        </div>
-                        <div className={styles.visualPairs}>
-                          {repeatedExamples.map((example) => (
-                            <div
-                              key={`${example.left.path}-${example.right.path}`}
-                              className={styles.visualPairCard}
-                            >
-                              <div className={styles.visualPairImages}>
-                                <VisualSimilarityThumb photo={example.left} />
-                                <VisualSimilarityThumb photo={example.right} />
-                              </div>
-                              <div className={styles.visualExampleMeta}>
-                                <span>{example.similarityPercent}% match</span>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                        {visualSameness.repeatedExamples.length > repeatedExamples.length ? (
-                          <PillButton
-                            size="compact"
-                            className={styles.loadMoreButton}
-                            onClick={() => {
-                              setVisibleRepeatedExamples((count) =>
-                                Math.min(
-                                  count + LOAD_MORE_REPEATED_EXAMPLES,
-                                  visualSameness.repeatedExamples.length,
-                                ),
-                              );
-                            }}
-                          >
-                            <span>Load more repeated motifs</span>
-                          </PillButton>
-                        ) : null}
-                      </section>
-                    ) : null}
-                    {visualSameness.travellingMotifs.length > 0 ? (
-                      <section
-                        className={`${styles.visualExampleSection} ${styles.visualFullRowSection}`}
-                      >
-                        <div className={styles.sectionHeader}>
-                          <Heading level={2}>Same look, different place</Heading>
-                          <Caption as="span">
-                            The closest match each of these found somewhere else
-                          </Caption>
-                        </div>
-                        <div className={styles.visualPairs}>
-                          {travellingMotifs.map((example) => (
-                            <div
-                              key={`${example.left.path}-${example.right.path}`}
-                              className={styles.visualPairCard}
-                            >
-                              <div className={styles.visualPairImages}>
-                                <VisualSimilarityThumb photo={example.left} />
-                                <VisualSimilarityThumb photo={example.right} />
-                              </div>
-                              <div className={styles.visualExampleMeta}>
-                                <span>{example.similarityPercent}% match</span>
-                                {/* The places are the point of this pair, so
-                                    they are what it says. */}
-                                <span className={styles.travellingPlaces}>
-                                  {example.left.place} → {example.right.place}
-                                </span>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                        {visualSameness.travellingMotifs.length > travellingMotifs.length ? (
-                          <PillButton
-                            size="compact"
-                            className={styles.loadMoreButton}
-                            onClick={() => {
-                              setVisibleTravellingMotifs((count) =>
-                                Math.min(
-                                  count + LOAD_MORE_TRAVELLING_MOTIFS,
-                                  visualSameness.travellingMotifs.length,
-                                ),
-                              );
-                            }}
-                          >
-                            <span>Load more travelling looks</span>
-                          </PillButton>
-                        ) : null}
-                      </section>
-                    ) : null}
+                    <ExplorePairExamples
+                      kind="repeated"
+                      examples={visualSameness.repeatedExamples}
+                    />
+                    <ExplorePairExamples
+                      kind="travelling"
+                      examples={visualSameness.travellingMotifs}
+                    />
                     {visualSameness.visualEras.length > 0 ? (
                       <section
                         className={`${styles.visualExampleSection} ${styles.visualFullRowSection}`}

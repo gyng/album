@@ -8,6 +8,10 @@ it("shows estimated conditions, zero rainfall, units and attribution", () => {
   expect(screen.getByText("Overcast · 27.0°C")).toBeTruthy();
   expect(screen.getByText("0 mm")).toBeTruthy();
   expect(screen.getByText("8 km/h")).toBeTruthy();
+  const estimate = screen.getByText("Hour (UTC)").closest("details");
+  expect(estimate).not.toHaveAttribute("open");
+  expect(screen.getByText("Feels like").closest("details")).toBe(estimate);
+  expect(screen.getByText("0 mm").closest("details")).toBe(estimate);
   expect(screen.getByRole("link", { name: "Weather data by Open-Meteo" })).toHaveAttribute(
     "href",
     "https://open-meteo.com/",

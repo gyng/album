@@ -79,7 +79,7 @@ describe("SlideshowBottomBar", () => {
     expect(screen.getAllByText(/recently · January 2024/)).toHaveLength(2);
     expect(screen.getAllByText("14:05")).toHaveLength(2);
     expect(screen.getAllByText("Wednesday, 3 January 2024")).toHaveLength(2);
-    expect(screen.getAllByText("🌅 88% match")).toHaveLength(2);
+    expect(screen.getAllByText("88% match")).toHaveLength(2);
     expect(screen.getAllByTestId("slide-map")).toHaveLength(1);
     expect(mapProps).toHaveBeenCalledWith(
       expect.objectContaining({

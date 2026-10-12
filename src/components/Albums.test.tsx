@@ -73,7 +73,7 @@ describe("Albums", () => {
       "src",
       "chosen.jpg",
     );
-    expect(screen.getByText("2022–2024")).toBeTruthy();
+    expect(screen.getByText("2022–2024 · 2")).toBeTruthy();
   });
 
   it("shows single-year, missing, and malformed date ranges without inventing dates", () => {
@@ -90,8 +90,8 @@ describe("Albums", () => {
       />,
     );
 
-    expect(screen.getByText("2023")).toBeTruthy();
-    expect(screen.getByText("2021")).toBeTruthy();
+    expect(screen.getByText("2023 · 1")).toBeTruthy();
+    expect(screen.getByText("2021 · 1")).toBeTruthy();
     expect(screen.queryByText("0")).toBeNull();
   });
 

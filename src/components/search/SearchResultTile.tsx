@@ -1,3 +1,4 @@
+import { Icon } from "../ui/Icon";
 import { AppLink as Link } from "../platform";
 import { Thumb, OverlayButton } from "../ui";
 import styles from "./SearchResultTile.module.css";
@@ -139,7 +140,9 @@ export const SearchResultTile = (props: {
                 onFindSimilar(result.path, result.similarity);
               }}
             >
-              <span className={styles.similarButtonIcon}>🔍</span>
+              <span className={styles.similarButtonIcon}>
+                <Icon kind="search" />
+              </span>
             </OverlayButton>
           ) : null}
         </div>

@@ -1,3 +1,4 @@
+import { Icon } from "../ui/Icon";
 import { mergeCssModuleStyles } from "../../util/mergeCssModuleStyles";
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { AppLink as Link } from "../platform";
@@ -181,7 +182,7 @@ export const SimilarTrailBar: React.FC<Props> = ({
               title="Start similarity trail slideshow"
               onClick={(event) => forceDocumentNavigation(event, slideshowHref)}
             >
-              🖼️
+              <Icon kind="image" />
             </a>
             <button
               type="button"

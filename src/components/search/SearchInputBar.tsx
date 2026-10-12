@@ -1,3 +1,4 @@
+import { Icon } from "../ui/Icon";
 import { mergeCssModuleStyles } from "../../util/mergeCssModuleStyles";
 import React, { useEffect, useId, useRef, useSyncExternalStore } from "react";
 import { Input, Select, TooltipSurface } from "../ui";
@@ -161,7 +162,7 @@ export const SearchInputBar: React.FC<Props> = ({
               disabled={!databaseReady}
               title="Start with a random photo"
             >
-              🎲 Random starting photo
+              <Icon kind="dice" /> Random starting photo
             </button>
           ) : null}
           <div className={styles.imageQueryActions}>
@@ -188,7 +189,7 @@ export const SearchInputBar: React.FC<Props> = ({
               disabled={!databaseReady}
               title="Upload a photo and find visually similar ones"
             >
-              📷 Search by image
+              <Icon kind="camera" /> Search by image
             </button>
             <button
               type="button"
@@ -197,7 +198,7 @@ export const SearchInputBar: React.FC<Props> = ({
               disabled={!databaseReady}
               title="Draw a sketch and find photos that look like it"
             >
-              ✏️ Draw to search
+              <Icon kind="pencil" /> Draw to search
             </button>
           </div>
         </>

@@ -4,6 +4,7 @@ import {
   advanceUserNavCount,
   clampTopicProgress,
   decideTopicSeed,
+  chooseTopicPhoto,
   isSeedCurrent,
   isTopicActive,
   isTopicSeedStale,
@@ -18,6 +19,18 @@ const row = (path: string): RandomPhotoRow => ({
   exif: `exif:${path}`,
   geocode: `geo:${path}`,
   colors: `colors:${path}`,
+});
+
+describe("chooseTopicPhoto", () => {
+  const matches = [row("a"), row("b"), row("c")];
+  it("prefers unseen ranked matches and cycles the least recent when exhausted", () => {
+    expect(chooseTopicPhoto(matches, ["a"], "a")?.path).toBe("b");
+    expect(chooseTopicPhoto(matches, ["c", "b", "a"], "c")?.path).toBe("a");
+  });
+  it("retains the sole matching photo and returns nothing for an empty topic", () => {
+    expect(chooseTopicPhoto(matches.slice(0, 1), ["a"], "a")?.path).toBe("a");
+    expect(chooseTopicPhoto([], ["a"], "a")).toBeNull();
+  });
 });
 
 describe("normaliseTopic", () => {

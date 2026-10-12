@@ -1,3 +1,4 @@
+import { Icon } from "../ui/Icon";
 import { mergeCssModuleStyles } from "../../util/mergeCssModuleStyles";
 import React from "react";
 import sharedStyles from "./SlideshowShared.module.css";
@@ -169,7 +170,7 @@ export const SlideshowBottomBar: React.FC<SlideshowBottomBarProps> = (props) => 
 
         {props.timeAware && photoDate ? (
           <div className={[styles.detailsRow, styles.detailsAffinity].join(" ")}>
-            🌅 {Math.round(getTimeAffinityScore(photoDate) * 100)}% match
+            <Icon kind="sunrise" /> {Math.round(getTimeAffinityScore(photoDate) * 100)}% match
           </div>
         ) : null}
       </div>

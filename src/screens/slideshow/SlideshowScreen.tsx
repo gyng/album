@@ -1,3 +1,4 @@
+import { Icon } from "../../components/ui/Icon";
 import { AppLink as Link } from "../../components/platform";
 import React, { useEffect, useCallback } from "react";
 import {
@@ -107,6 +108,9 @@ import {
   advanceUserNavCount,
   clampTopicProgress,
   decideTopicSeed,
+  chooseTopicPhoto,
+  mapTopicSeedResults,
+  TOPIC_MATCH_LIMIT,
   isDeferredTopicStale,
   isSeedCurrent,
   isTopicActive,
@@ -328,10 +332,11 @@ export const Slideshow: React.FC<{
   // Cold-model download / encode progress (0–100) surfaced in the busy chip.
   const [topicProgress, setTopicProgress] = React.useState<number | null>(null);
   const topicSnapshotRef = React.useRef<TopicSnapshot | null>(null);
+  const topicMatchesRef = React.useRef<Array<{ path: string }> | null>(null);
   // An unconsumed `topic=` URL seed waiting for the pool and embeddings DB to
   // load, or null once consumed. `text` is the topic; `preserveCurrentPhoto`
   // records whether the initial URL also carried a `photo=` permalink, so the
-  // seed activates but drifts from the pinned slide rather than jumping to the
+  // seed activates but preserves the pinned slide rather than jumping to the
   // best match. A non-null value also pins the embeddings-DB enablement so a
   // shared topic frame can load the model it needs.
   const [pendingInitialTopic, setPendingInitialTopic] = React.useState<{
@@ -563,6 +568,15 @@ export const Slideshow: React.FC<{
   };
 
   const randomPhotoPoolRef = React.useRef<RandomPhotoRow[]>([]);
+  const getPlaybackPool = useCallback(() => {
+    const matches = topicMatchesRef.current;
+    return matches === null
+      ? randomPhotoPoolRef.current
+      : mapTopicSeedResults({ resultData: matches, pool: randomPhotoPoolRef.current }).slice(
+          0,
+          TOPIC_MATCH_LIMIT,
+        );
+  }, []);
   // Single shared queue state for random/weighted modes. Both the forward
   // advance and the preload peek consult it, so the buffered photo always
   // matches the one the next advance shows (see util/slideshowQueue).
@@ -823,11 +837,11 @@ export const Slideshow: React.FC<{
    *   - seed=<photo-path>           Similar mode only: backward-compatible alias for the starting photo
    *   - topic=<text>                Seed similar mode from a semantic topic (e.g. cat); the
    *                                 text tower encodes it and the library is ranked, then the
-   *                                 top matches seed the similar-mode drift. Shareable; degrades
+   *                                 top text matches anchor subsequent slides and remix companions. Shareable; degrades
    *                                 to the previous behaviour with an error if the model can't load
    *                                 (e.g. offline first use). Dismissing the chip restores the mode.
    *                                 With a `photo=` permalink present the show keeps that starting
-   *                                 photo — the topic only steers the drift and does NOT jump to the
+   *                                 photo — the topic controls subsequent slides and does NOT jump to the
    *                                 topic's best match.
    *   - align=left|center|right  Set details alignment
    *   - delay=<seconds>          Set slide duration in seconds (e.g., 60 = 60 seconds)
@@ -982,7 +996,9 @@ export const Slideshow: React.FC<{
         allowRemix: !!opts?.allowRemix,
         forced,
         remixEnabled,
-        vectorReady: !!(database && embeddingsDatabase),
+        // Archive-wide image neighbours can miss every topic match. Resolve
+        // topic remixes synchronously inside their text-ranked pool instead.
+        vectorReady: !!(database && embeddingsDatabase) && topicMatchesRef.current === null,
         probability: REMIX_PROBABILITY,
         rollLayoutCount: rollRemixLayoutCount,
         decideCount: decideRemixCompanionCount,
@@ -1024,7 +1040,7 @@ export const Slideshow: React.FC<{
                 path: row.path,
                 similarity: row.similarity ?? null,
               })),
-              pool: randomPhotoPoolRef.current,
+              pool: getPlaybackPool(),
               desiredCount,
             });
             if (mapped.companions.length === 0) return;
@@ -1048,7 +1064,7 @@ export const Slideshow: React.FC<{
         // walks to the best available sync strategy so the slide never stalls.
         const pick = pickRemixCompanions(
           candidatePhoto,
-          randomPhotoPoolRef.current,
+          getPlaybackPool(),
           plan.count,
           Math.random,
           plan.strategy,
@@ -1069,7 +1085,14 @@ export const Slideshow: React.FC<{
       setSlideshowError(null);
       scheduleNextChange();
     },
-    [database, embeddingsDatabase, remixEnabled, scheduleNextChange, shuffleHistorySize],
+    [
+      database,
+      embeddingsDatabase,
+      getPlaybackPool,
+      remixEnabled,
+      scheduleNextChange,
+      shuffleHistorySize,
+    ],
   );
 
   const showHistoryPhoto = useCallback(
@@ -1150,8 +1173,8 @@ export const Slideshow: React.FC<{
   // worker entry), ranks the library semantically, then hands the ranked paths
   // to the pure decideTopicSeed to reconcile against the pool/filter. On success
   // it switches to similar mode, commits the best match, and remembers the
-  // pre-topic mode for a later dismiss; the existing image-similarity drift
-  // takes over from there. The embeddings table lives in the split-out
+  // pre-topic mode for a later dismiss. Subsequent slides and remix companions
+  // stay inside the best text matches rather than chaining image neighbours. The embeddings table lives in the split-out
   // embeddings DB in production, so a topic submitted before it has loaded is
   // DEFERRED (not run against the fallback search.sqlite, which would return a
   // bogus empty result) and retried once the DB arrives. On failure (model
@@ -1262,11 +1285,11 @@ export const Slideshow: React.FC<{
         }
 
         topicSnapshotRef.current = plan.snapshot;
+        topicMatchesRef.current = result.data.map(({ path }) => ({ path }));
         setTopic(topicText);
         setSlideshowMode("similar");
-        // The existing similar-mode drift reseeds from the current slide on the
-        // next advance, so only commit the best match when we own the slide —
-        // a `photo=` permalink keeps its starting photo and drifts from there.
+        // A `photo=` permalink keeps its starting photo; subsequent advances
+        // come from the topic matches even when that pinned photo is unrelated.
         if (plan.commit) {
           commitNextPhoto(plan.seed, { trackRecent: true });
         }
@@ -1385,6 +1408,7 @@ export const Slideshow: React.FC<{
   const clearTopic = useCallback(() => {
     const snapshot = topicSnapshotRef.current;
     topicSnapshotRef.current = null;
+    topicMatchesRef.current = null;
     cancelTopicSeeding();
     setTopic(null);
     setTopicError(null);
@@ -1401,6 +1425,7 @@ export const Slideshow: React.FC<{
   // surfaced error and does not bump the seed token — see that effect.)
   const dismissTopic = useCallback(() => {
     topicSnapshotRef.current = null;
+    topicMatchesRef.current = null;
     cancelTopicSeeding();
     setPendingInitialTopic(null);
     setTopic(null);
@@ -1495,16 +1520,17 @@ export const Slideshow: React.FC<{
 
   const advanceRandomPhoto = useCallback(
     (opts?: { trackRecent?: boolean }): RandomPhotoRow | null => {
-      const nextPhoto = advanceQueued(
-        randomQueueStateRef.current,
-        randomPhotoPoolRef.current,
-        buildRandomQueue,
-      )!;
+      const pool = getPlaybackPool();
+      if (!pool.length) {
+        setSlideshowError("No photos match this topic in the selected album.");
+        return null;
+      }
+      const nextPhoto = advanceQueued(randomQueueStateRef.current, pool, buildRandomQueue)!;
 
       commitNextPhoto(nextPhoto, { ...opts, allowRemix: true });
       return nextPhoto;
     },
-    [buildRandomQueue, commitNextPhoto],
+    [buildRandomQueue, commitNextPhoto, getPlaybackPool],
   );
 
   useEffect(() => {
@@ -1609,6 +1635,18 @@ export const Slideshow: React.FC<{
 
         setSlideshowError(null);
 
+        // A data/filter refresh must preserve the topic boundary and the last
+        // photograph when its matching set is unavailable in the new pool.
+        if (topicMatchesRef.current !== null && previousEntry) {
+          const next = chooseTopicPhoto(getPlaybackPool(), [], previousSeedPath ?? undefined);
+          if (next) commitNextPhoto(next, { trackRecent: true });
+          else {
+            dispatchHistory({ type: "replaceSingle", seed: previousEntry.seed });
+            setSlideshowError("No photos match this topic in the selected album.");
+          }
+          return;
+        }
+
         if (
           slideshowMode === "similar" &&
           randomSimilarRequestedRef.current &&
@@ -1683,6 +1721,16 @@ export const Slideshow: React.FC<{
   }, [database, filter]);
 
   const advanceSimilarPhoto = useCallback(async (): Promise<RandomPhotoRow | null> => {
+    if (topicMatchesRef.current !== null) {
+      const next = chooseTopicPhoto(
+        getPlaybackPool(),
+        recentPhotoPathsRef.current,
+        currentEntry(historyStateRef.current)?.seed.path,
+      );
+      if (next) commitNextPhoto(next, { trackRecent: true, allowRemix: true });
+      else setSlideshowError("No photos match this topic in the selected album.");
+      return next;
+    }
     // Embeddings not ready yet (still loading, or failed to load): keep the
     // slideshow moving with a random advance rather than freezing on a
     // no-op. The next advance retries the similar trail once they arrive.
@@ -1743,6 +1791,7 @@ export const Slideshow: React.FC<{
     database,
     embeddingsDatabase,
     filter,
+    getPlaybackPool,
     resetSimilarQueue,
     shuffleHistorySize,
   ]);
@@ -1775,17 +1824,21 @@ export const Slideshow: React.FC<{
       if (!navigator.onLine || Date.now() < photoOutageUntilRef.current) {
         userNavCountRef.current = advanceUserNavCount(userNavCountRef.current, source);
         const history = historyStateRef.current;
-        const pool = randomPhotoPoolRef.current;
+        const archivePool = randomPhotoPoolRef.current;
+        const matches = topicMatchesRef.current;
+        const pool = getPlaybackPool();
         void readRecentSlideshowUrls().then((urls) => {
           if (
             token !== cacheAdvanceTokenRef.current ||
             history !== historyStateRef.current ||
-            pool !== randomPhotoPoolRef.current
+            archivePool !== randomPhotoPoolRef.current ||
+            matches !== topicMatchesRef.current
           )
             return;
           const next = chooseRecentSlideshowPhoto(pool, urls, currentEntry(history)?.seed.path);
           if (next) commitNextPhoto(next, { trackRecent: true });
-          else advanceRandomPhoto();
+          else if (topicMatchesRef.current === null) advanceRandomPhoto();
+          else setSlideshowError("No cached photos match this topic.");
         });
         return;
       }
@@ -1815,7 +1868,8 @@ export const Slideshow: React.FC<{
       // embeddings DB isn't ready, so the show never freezes waiting on it.
       advanceSimilarPhoto().catch((err) => {
         console.error(err);
-        advanceRandomPhoto({ trackRecent: true });
+        if (topicMatchesRef.current === null) advanceRandomPhoto({ trackRecent: true });
+        else setSlideshowError("Could not advance this topic.");
       });
     },
     [
@@ -1823,6 +1877,7 @@ export const Slideshow: React.FC<{
       advanceSimilarPhoto,
       commitNextPhoto,
       database,
+      getPlaybackPool,
       showHistoryPhoto,
       slideshowMode,
     ],
@@ -1845,6 +1900,13 @@ export const Slideshow: React.FC<{
     if (hasForwardEntry(historyStateRef.current)) {
       return upcomingSeed(historyStateRef.current);
     }
+    if (topicMatchesRef.current !== null) {
+      return chooseTopicPhoto(
+        getPlaybackPool(),
+        recentPhotoPathsRef.current,
+        currentEntry(historyStateRef.current)?.seed.path,
+      );
+    }
 
     if (slideshowMode === "random" || slideshowMode === "weighted") {
       // Peek through the SAME queue state the advance will consume — building
@@ -1858,7 +1920,7 @@ export const Slideshow: React.FC<{
     }
 
     return null;
-  }, [buildRandomQueue, slideshowMode]);
+  }, [buildRandomQueue, getPlaybackPool, slideshowMode]);
 
   useEffect(() => {
     if (slideshowMode === "similar") {
@@ -1880,16 +1942,16 @@ export const Slideshow: React.FC<{
 
   const playbackSubtitle =
     slideshowMode === "similar"
-      ? "🧭 Similar trail"
+      ? "Similar trail"
       : slideshowMode === "weighted"
-        ? "🕒 Recent-weighted shuffle"
-        : "🔀 Shuffle pass";
+        ? "Recent-weighted shuffle"
+        : "Shuffle pass";
   const playbackContextLabel =
     slideshowMode === "similar"
-      ? "🧭 similar trail"
+      ? "similar trail"
       : slideshowMode === "weighted"
-        ? "🕒 weighted shuffle"
-        : "🔀 shuffle pass";
+        ? "weighted shuffle"
+        : "shuffle pass";
 
   const cycleAlignment = () => {
     const next =
@@ -2858,7 +2920,7 @@ export const Slideshow: React.FC<{
               aria-label="Dismiss"
               onClick={() => setSlideshowError(null)}
             >
-              ✕
+              <Icon kind="close" />
             </button>
           </div>
         ) : null}

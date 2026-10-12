@@ -59,6 +59,12 @@ jest.mock("../../components/search/textEmbeddings", () => ({
   encodeSearchText: (...args: unknown[]) => mockEncodeSearchText(...args),
 }));
 
+jest.mock("../../util/slideshowAmbient", () => ({
+  ...jest.requireActual("../../util/slideshowAmbient"),
+  rollRemixStrategy: () => "similar",
+  rollRemixLayoutCount: () => 1,
+}));
+
 // Replace the cadence hook with a passive stub that hands us its onAdvance.
 jest.mock("../../components/useSlideshowCadence", () => ({
   useSlideshowCadence: (input: { onAdvance: () => void }) => {
@@ -188,6 +194,68 @@ describe("SlideshowScreen topic seeding (screen-level)", () => {
 
   afterEach(() => {
     global.fetch = originalFetch;
+  });
+
+  it("keeps consecutive topic advances inside the text matches rather than following an unrelated image neighbour", async () => {
+    mockFetchSemanticResults.mockResolvedValue({ data: [row(poolB.path), row(poolC.path)] });
+    mockFetchSimilarResults.mockResolvedValue({ data: [row(poolA.path)] });
+    render(<SlideshowScreen />);
+    await flush();
+    await act(async () => {
+      await submitTopic("cat");
+    });
+    await flush();
+    for (let index = 0; index < 5; index++) {
+      await act(async () => {
+        cadenceOnAdvance();
+      });
+      await flush();
+      const current = document.querySelector('img[alt]:not([aria-hidden="true"])');
+      expect(current?.getAttribute("src")).not.toContain("/a.jpg");
+      expect(current?.getAttribute("src")).toMatch(/\/(b|c)\.jpg/);
+    }
+    expect(screen.getByRole("button", { name: /Similar/ })).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("creates a forced remix from topic matches when image neighbours fall outside the topic", async () => {
+    mockFetchSemanticResults.mockResolvedValue({ data: [row(poolB.path), row(poolC.path)] });
+    mockFetchSimilarResults.mockResolvedValue({ data: [row(poolA.path)] });
+    render(<SlideshowScreen />);
+    await flush();
+    await act(async () => {
+      await submitTopic("cat");
+    });
+    await flush();
+    fireEvent.click(screen.getByRole("button", { name: /Remix now/ }));
+    await flush();
+    const seed = document.querySelector('img[alt]:not([aria-hidden="true"])');
+    const grid = seed?.closest("[data-count]");
+    expect(grid).toBeTruthy();
+    const sources = Array.from(grid?.querySelectorAll("img") ?? []).map((image) =>
+      image.getAttribute("src"),
+    );
+    expect(sources.some((source) => source?.includes("/b.jpg"))).toBe(true);
+    expect(sources.some((source) => source?.includes("/c.jpg"))).toBe(true);
+    expect(sources.some((source) => source?.includes("/a.jpg"))).toBe(false);
+  });
+
+  it("retains the presented topic photo when a refreshed pool has no matching paths", async () => {
+    mockFetchSemanticResults.mockResolvedValue({ data: [row(poolB.path), row(poolC.path)] });
+    const view = render(<SlideshowScreen />);
+    await flush();
+    await act(async () => {
+      await submitTopic("cat");
+    });
+    await flush();
+    mockFetchSlideshowPhotos.mockResolvedValue([poolA]);
+    mockUseDatabase.mockReturnValue([{ refreshed: true }, 100, null, null, mockRefreshDatabase]);
+    view.rerender(<SlideshowScreen />);
+    await flush();
+    expect(
+      document.querySelector('img[alt]:not([aria-hidden="true"])')?.getAttribute("src"),
+    ).toContain("/b.jpg");
+    expect(screen.getByText("No photos match this topic in the selected album.")).toBeTruthy();
+    expect(chipVisible()).toBe(true);
   });
 
   // Submitting a topic while the mode is still weighted must not be cancelled by

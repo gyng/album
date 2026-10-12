@@ -147,6 +147,11 @@
   align-content: start;
 }
 
+.visualPairCard {
+  inline-size: calc(var(--visual-thumb-size) * 2 + var(--m-s));
+  overflow-wrap: anywhere;
+}
+
 .visualEraCard {
   display: grid;
   gap: var(--m-s);

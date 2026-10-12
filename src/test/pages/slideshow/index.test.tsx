@@ -363,10 +363,12 @@ describe("slideshow page", () => {
     expect(screen.getByRole("button", { name: /shuffle/i }).getAttribute("aria-pressed")).toBe(
       "true",
     );
-    for (const name of [/show clock/i, /details/i, /^map$/i, /fill screen/i]) {
+    for (const name of [/show clock/i, /^details$/i, /^map$/i, /fill screen/i]) {
       expect(screen.getByRole("button", { name }).getAttribute("aria-pressed")).toBe("true");
     }
-    expect(screen.getByRole("button", { name: /right/i })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Cycle details alignment" })).toHaveTextContent(
+      "Right",
+    );
     expect(screen.getByRole("button", { name: "1m" }).getAttribute("aria-pressed")).toBe("true");
     expect(mockFetchSlideshowPhotos).toHaveBeenLastCalledWith({
       database,

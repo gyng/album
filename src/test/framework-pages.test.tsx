@@ -19,6 +19,5 @@ describe("framework pages", () => {
 
     expect(screen.getByRole("heading", { name: "404 — page not found" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Back to album list" })).toHaveAttribute("href", "/");
-    expect(screen.getByText("🔥")).toHaveAttribute("aria-hidden", "true");
   });
 });

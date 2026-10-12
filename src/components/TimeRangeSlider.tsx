@@ -1,3 +1,4 @@
+import { Icon } from "./ui/Icon";
 import React from "react";
 import {
   computeDateExtent,
@@ -267,7 +268,7 @@ export const TimeRangeSlider: React.FC<TimeRangeSliderProps> = ({
             onClick={handleReset}
             aria-label="Clear date filter"
           >
-            ✕ Clear dates
+            <Icon kind="close" /> Clear dates
           </button>
         ) : null}
         <span className={styles.label}>

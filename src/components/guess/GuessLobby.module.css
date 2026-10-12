@@ -2,167 +2,92 @@
   display: grid;
   gap: var(--space-5);
   max-inline-size: var(--content-width-compact);
-  margin: var(--m-xl) auto 0;
+  margin: var(--space-6) auto 0;
   padding: var(--space-5) var(--space-3);
 }
 
-/* Header — drops in first */
 .header {
   display: grid;
-  gap: var(--m-s);
+  gap: var(--space-2);
   text-align: center;
-  animation: dropIn var(--t-enter) var(--ease-spring);
 }
 
-@keyframes dropIn {
-  from {
-    opacity: 0;
-    transform: translateY(calc((var(--m-s) + var(--line-strong)) * -1));
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-/* Options — each row cascades in */
 .options {
   display: grid;
   gap: var(--space-4);
 }
 
 .optionRow {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 12rem);
   align-items: center;
-  justify-content: space-between;
-  gap: var(--m-m);
-  padding: var(--m-s) var(--m-m);
-  border-radius: var(--radius-control);
-  animation: slideIn var(--t-deliberate) var(--ease-out) both;
-  transition: background-color var(--t-theme);
-}
-
-/* Cascade each option row in (delays were inline styles). */
-.optionRow:nth-child(1) {
-  animation-delay: calc(var(--t-instant) / 2);
-}
-
-.optionRow:nth-child(2) {
-  animation-delay: var(--t-instant);
-}
-
-.optionRow:nth-child(3) {
-  animation-delay: var(--t-theme);
-}
-
-.optionRow:hover {
-  background-color: var(--c-surface-hover);
-}
-
-@keyframes slideIn {
-  from {
-    opacity: 0;
-    transform: translateX(calc(var(--m-s) * -1));
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
+  gap: var(--space-4);
 }
 
 .optionLabel {
   font-size: var(--fs-sm);
-  flex-shrink: 0;
+  line-height: var(--lh-label);
 }
 
-.regionSelect {
-  max-inline-size: calc(var(--m-l) * 11);
+.regionSelect,
+.optionControl {
+  inline-size: 100%;
+  min-inline-size: 0;
 }
 
-/* Photo count — subtle context */
+.optionControl > button {
+  flex: 1;
+  min-inline-size: 0;
+  padding-inline: var(--space-1);
+}
+
 .photoCount {
   text-align: center;
-  animation: fadeIn var(--t-enter) var(--t-base) var(--ease-out) both;
 }
 
-/* Inline error — e.g. no GPS-tagged photos, or a failed database load */
 .error {
   margin: 0;
   text-align: center;
   font-size: var(--fs-sm);
   color: var(--c-danger);
-  animation: fadeIn var(--t-slow) var(--ease-out) both;
 }
 
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-/* Button row — daily + play side by side */
 .buttonRow {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--m-m);
-  justify-content: center;
-  align-items: end;
-  animation: buttonEnter var(--t-enter) var(--t-medium) var(--ease-spring) both;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+  align-items: start;
 }
 
 .dailyAction {
   display: grid;
-  justify-items: center;
-  gap: var(--m);
-  max-inline-size: calc(var(--m-xl) * 4);
+  gap: var(--space-2);
+  min-inline-size: 0;
   text-align: center;
 }
 
 .dailyDescription {
-  line-height: 1.35;
+  line-height: var(--lh-caption);
 }
 
-/* Daily button — secondary, understated */
-.dailyButton {
-  transition-duration: var(--t-theme), var(--t-theme), var(--t-theme), var(--t-fast);
-}
-
-.dailyButton:hover {
-  background-color: var(--c-surface-hover);
-}
-
-/* Play button — prominent, accent-bordered */
+.dailyButton,
 .playButton {
-  position: relative;
-  overflow: clip;
-}
-
-@keyframes buttonEnter {
-  from {
-    opacity: 0;
-    transform: scale(0.9);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-
-.playButton:hover {
-  background-color: color-mix(in oklch, var(--c-accent) 10%, var(--c-bg));
-}
-
-.playButton:active {
-  box-shadow: none;
+  inline-size: 100%;
+  align-self: start;
+  justify-self: stretch;
+  padding-inline: var(--space-2);
 }
 
 @media (max-width: 480px) {
   .lobby {
-    margin-block-start: var(--m-l);
+    margin-block-start: var(--space-5);
     padding: var(--space-5) var(--space-2);
-    gap: var(--m-l);
+  }
+}
+
+@media (max-width: 360px) {
+  .optionRow {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-2);
   }
 }

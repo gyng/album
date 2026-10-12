@@ -1,3 +1,4 @@
+import { Icon } from "../ui/Icon";
 import { mergeCssModuleStyles } from "../../util/mergeCssModuleStyles";
 import React from "react";
 import { AppLink as Link } from "../platform";
@@ -413,7 +414,7 @@ export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
         }}
       >
         <span className={styles.brandLogo} aria-hidden="true">
-          🖼️
+          <Icon kind="image" />
         </span>
         <span className={styles.brandCopy}>
           <span className={styles.brandTitle}>{SITE_NAME}</span>
@@ -508,7 +509,7 @@ export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
               aria-pressed={props.slideshowMode === "random"}
               onClick={() => props.onSelectMode("random")}
             >
-              🔀 Shuffle
+              <Icon kind="shuffle" /> Shuffle
             </button>
 
             <button
@@ -520,7 +521,7 @@ export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
               aria-pressed={props.slideshowMode === "weighted"}
               onClick={() => props.onSelectMode("weighted")}
             >
-              🕒 Recent
+              <Icon kind="clock" /> Recent
             </button>
 
             <button
@@ -532,7 +533,7 @@ export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
               aria-pressed={props.slideshowMode === "similar"}
               onClick={() => props.onSelectMode("similar")}
             >
-              🧭 Similar
+              <Icon kind="compass" /> Similar
             </button>
           </div>
 
@@ -550,7 +551,7 @@ export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
               title="Bias the shuffle toward photos taken near the current hour and month"
               onClick={props.onToggleTimeAware}
             >
-              🌅 Time-of-day
+              <Icon kind="sunrise" /> Time-of-day
             </button>
 
             <button
@@ -683,7 +684,9 @@ export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
 
         <div className={styles.controlMeta}>
           <div className={[commonStyles.toast, styles.countdown].join(" ")}>
-            <span aria-hidden="true">🔁</span>
+            <span aria-hidden="true">
+              <Icon kind="repeat" />
+            </span>
             {/* The digits get the fixed width, not the whole pill: a floor on the
                 pill does nothing, because the emoji and the padding already make
                 it wider than any floor worth setting. */}
@@ -726,7 +729,7 @@ export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
         <div className={styles.controlGroup} role="group" aria-label="View controls">
           <div className={styles.controlHeader}>
             <span className={styles.controlLogo} aria-hidden="true">
-              ⛶
+              <Icon kind="expand" />
             </span>
             <span className={styles.controlCopy}>
               <span className={styles.controlTitle}>View</span>
@@ -745,7 +748,7 @@ export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
               }
               onClick={props.onToggleCover}
             >
-              ⛶ Fill screen
+              <Icon kind="expand" /> Fill screen
             </button>
 
             {!props.isFullscreenActive ? (
@@ -785,7 +788,7 @@ export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
         <div className={styles.controlGroup} role="group" aria-label="Topic">
           <div className={styles.controlHeader}>
             <span className={styles.controlLogo} aria-hidden="true">
-              🔎
+              <Icon kind="search" />
             </span>
             <span className={styles.controlCopy}>
               <span className={styles.controlTitle}>Topic</span>
@@ -854,7 +857,7 @@ export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
         <div className={styles.controlGroup} role="group" aria-label="Display controls">
           <div className={styles.controlHeader}>
             <span className={styles.controlLogo} aria-hidden="true">
-              ✦
+              <Icon kind="sparkles" />
             </span>
             <span className={styles.controlCopy}>
               <span className={styles.controlTitle}>Display</span>
@@ -870,7 +873,9 @@ export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
               title="Show clock"
               onClick={props.onToggleClock}
             >
-              <span aria-hidden="true">🕰️</span>
+              <span aria-hidden="true">
+                <Icon kind="clock" />
+              </span>
             </button>
 
             <button
@@ -900,8 +905,10 @@ export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
                 buttonStyles.base,
               ].join(" ")}
               onClick={props.onCycleAlignment}
+              aria-label="Cycle details alignment"
             >
-              📍 {props.detailsAlignment.charAt(0).toUpperCase() + props.detailsAlignment.slice(1)}
+              <Icon kind="pin" />{" "}
+              {props.detailsAlignment.charAt(0).toUpperCase() + props.detailsAlignment.slice(1)}
             </button>
           </div>
         </div>
@@ -938,7 +945,7 @@ export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
                 }
               }}
             >
-              📎
+              <Icon kind="paperclip" />
             </span>
             <span className={styles.controlCopy}>
               <span className={styles.controlTitle}>Context</span>

@@ -1,3 +1,4 @@
+import { Icon } from "../ui/Icon";
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   fetchRandomPhoto,
@@ -789,7 +790,9 @@ export const Search: React.FC<{
               aria-controls="search-filter-drawer"
               onClick={openFilterDrawer}
             >
-              <span aria-hidden="true">⚙</span>
+              <span aria-hidden="true">
+                <Icon kind="settings" />
+              </span>
               <span>Filters</span>
               {activeFilterCount > 0 ? (
                 <span className={styles.filterTriggerBadge}>{activeFilterCount}</span>

@@ -1,3 +1,4 @@
+import { Icon } from "./ui/Icon";
 import { AppLink as Link } from "./platform";
 import React from "react";
 import { MapWorldDeferred } from "./MapWorldDeferred";
@@ -114,7 +115,7 @@ export const TimelineDayGrid = ({
           ) : null}
           {onSelectRandomDate ? (
             <button type="button" className={buttonStyles.base} onClick={onSelectRandomDate}>
-              🎲 Random
+              <Icon kind="dice" /> Random
             </button>
           ) : null}
           {onSelectNewerDate ? (
@@ -164,7 +165,7 @@ export const TimelineDayGrid = ({
         ) : null}
         {onSelectRandomDate ? (
           <button type="button" className={buttonStyles.base} onClick={onSelectRandomDate}>
-            🎲 Random
+            <Icon kind="dice" /> Random
           </button>
         ) : null}
         {onSelectNewerDate ? (
@@ -226,7 +227,9 @@ export const TimelineDayGrid = ({
                     event.stopPropagation();
                   }}
                 >
-                  <span className={styles.similarButtonIcon}>🔍</span>
+                  <span className={styles.similarButtonIcon}>
+                    <Icon kind="search" />
+                  </span>
                 </Link>
               </div>
 

@@ -221,14 +221,16 @@ test.describe("Slideshow", () => {
     await gotoHydrated(page, "/slideshow?details=1");
     await waitForSlideshow(page);
 
-    const alignButton = page.locator('button:has-text("📍")');
+    const alignButton = page.getByRole("button", { name: "Cycle details alignment" });
     await alignButton.dispatchEvent("click"); // Centre -> Right
     await expect(alignButton).toContainText("Right");
 
     await page.reload({ waitUntil: "domcontentloaded" });
     await waitForHydration(page);
 
-    await expect(page.locator('button:has-text("📍")')).toContainText("Right");
+    await expect(page.getByRole("button", { name: "Cycle details alignment" })).toContainText(
+      "Right",
+    );
   });
 });
 

@@ -1,3 +1,4 @@
+import { Icon } from "../components/ui/Icon";
 import { AppLink as Link } from "../components/platform";
 import { GlobalNav } from "../components/GlobalNav";
 import { Seo } from "../components/Seo";
@@ -28,7 +29,7 @@ export default function FourOhFourScreen() {
       <GlobalNav />
       <main id="main-content" className={styles.error}>
         <span className={styles.glyph} aria-hidden="true">
-          🔥
+          <Icon kind="flame" />
         </span>
         <Heading level={1} as="h1" className={styles.heading}>
           404 — page not found

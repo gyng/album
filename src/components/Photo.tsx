@@ -1,4 +1,3 @@
-import Fraction from "fraction.js";
 import styles from "./Photo.module.css";
 import type { PhotoBlock } from "../services/types";
 import { MapDeferred } from "./MapDeferred";
@@ -9,12 +8,14 @@ import { HydratedRelativeTime } from "./HydratedRelativeTime";
 import { getPhotoAltText } from "../lib/alt";
 import { FacetLinkIcon } from "./FacetLinkIcon";
 import { Heading } from "./ui";
+import { AppLink } from "./platform";
 import commonStyles from "../styles/common.module.css";
 
 import type { JSX } from "react";
 import { rgbToString } from "../util/colorDistance";
 import {
   buildSearchFacetHref,
+  buildSearchHref,
   getBucketFacetSelection,
   getCameraFacetSelection,
   getLensFacetSelection,
@@ -30,8 +31,10 @@ import { exifRelativeTimestamp, formatExifWallClockDateTime } from "../util/exif
 import { PhotoSimilarPhotosDeferred } from "./PhotoSimilarPhotosDeferred";
 import { MediaDetailsIcon } from "./MediaDetailsIcon";
 import { formatAspectRatio } from "../util/formatAspectRatio";
+import { formatExposureTime } from "../util/formatExposureTime";
 import { getDisplayDimensions, isExifRotated } from "../util/photoDimensions";
 import { PhotoWeatherDetails } from "./PhotoWeatherDetails";
+import { forceDocumentNavigation } from "./search/searchUtils";
 
 type ExifCoordinatesRowProps = {
   kind: "coordinates";
@@ -340,7 +343,6 @@ export const PhotoBlockEl: React.FC<{
   block: PhotoBlock;
   currentIndex: number;
 }> = (props) => {
-  const FRACTION_SLASH = "⁄";
   const anchorRef = React.useRef<HTMLDivElement>(null);
   const { exif } = props.block._build;
 
@@ -448,12 +450,7 @@ export const PhotoBlockEl: React.FC<{
                       v: (() => {
                         const t = props.block._build.exif.ExposureTime;
                         if (!t) return undefined;
-                        // FRACTION_SLASH gives us nice ligatured fractions (eg,
-                        // 1⁄10). The fraction already communicates the value, so
-                        // drop the raw float to avoid 19 digits of noise.
-                        return t < 1
-                          ? `${new Fraction(t).toFraction().replace("/", FRACTION_SLASH)}s`
-                          : `${t}s`;
+                        return formatExposureTime(t);
                       })(),
                       valid: Boolean(props.block._build.exif.ExposureTime),
                     },
@@ -580,7 +577,23 @@ export const PhotoBlockEl: React.FC<{
                     {
                       kind: "kv",
                       k: "Tags",
-                      v: props.block._build.tags.tags,
+                      v: (
+                        <ul className={styles.tagLinks}>
+                          {props.block._build.tags.tags?.map((tag) => (
+                            <li key={tag}>
+                              <AppLink
+                                href={buildSearchHref({ query: [tag] })}
+                                onClick={(event) =>
+                                  forceDocumentNavigation(event, buildSearchHref({ query: [tag] }))
+                                }
+                                className={styles.tagLink}
+                              >
+                                {tag}
+                              </AppLink>
+                            </li>
+                          ))}
+                        </ul>
+                      ),
                       valid: Boolean(props.block._build.tags.tags?.length),
                       className: styles.narrowCell,
                     },
@@ -593,17 +606,20 @@ export const PhotoBlockEl: React.FC<{
                             const rgbStr = rgbToString(rgb as [number, number, number]);
                             const colorParam = `${rgb[0]},${rgb[1]},${rgb[2]}`;
                             return (
-                              <a
+                              <AppLink
                                 data-colour-swatch
                                 key={rgbStr}
                                 href={`/search?color=${colorParam}`}
+                                onClick={(event) =>
+                                  forceDocumentNavigation(event, `/search?color=${colorParam}`)
+                                }
                                 style={{
                                   backgroundColor: rgbStr,
                                 }}
                                 className={styles.colorswatch}
                                 title={`Search photos with similar colour: ${rgbStr}`}
                                 aria-label={`Search photos with similar colour ${rgbStr}`}
-                              ></a>
+                              />
                             );
                           })}
                         </div>

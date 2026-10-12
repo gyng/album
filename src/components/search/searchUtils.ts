@@ -21,10 +21,6 @@ export const DEFAULT_SEARCH_MODE: SearchMode = "hybrid";
 export type SimilarityOrder = "most" | "least";
 export const DEFAULT_SIMILARITY_ORDER: SimilarityOrder = "most";
 
-export const similarSearchEmojiStyle = {
-  filter: "grayscale(100%)",
-} as const;
-
 export const forceDocumentNavigation = (
   event: React.MouseEvent<HTMLAnchorElement>,
   href: string,

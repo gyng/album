@@ -338,7 +338,7 @@ describe("getAlbum", () => {
 
       expect(titleBlock?.kind).toBe("text");
       if (titleBlock?.kind === "text") {
-        expect(titleBlock.data.kicker).toBeUndefined();
+        expect(titleBlock.data.kicker).toBe("1");
       }
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
@@ -506,8 +506,8 @@ describe("getAlbum", () => {
   });
 
   it.each([
-    [["2023-01-01T00:00:00", "2024-01-01T00:00:00"], "2023–2024"],
-    [["2024-01-01T00:00:00", "2024-12-31T00:00:00"], "2024"],
+    [["2023-01-01T00:00:00", "2024-01-01T00:00:00"], "2023–2024 · 2"],
+    [["2024-01-01T00:00:00", "2024-12-31T00:00:00"], "2024 · 2"],
   ])("derives a chronological title kicker from photo years", async (dates, expected) => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "album-kicker-years-test-"));
     mockDeserialize.mockResolvedValueOnce(

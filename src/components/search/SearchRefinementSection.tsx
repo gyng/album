@@ -1,13 +1,13 @@
+import { Icon } from "../ui/Icon";
 import React from "react";
 import styles from "./Search.module.css";
 import { ProgressBar } from "../ProgressBar";
 import { SearchTag } from "./SearchTag";
-import { similarSearchEmojiStyle, Tag } from "./searchUtils";
+import { Tag } from "./searchUtils";
 
 const SharedTagsCaption = () => (
   <>
-    keep stacking keywords to narrow results, or click{" "}
-    <span style={similarSearchEmojiStyle}>🔍</span> to find similar photos
+    keep stacking keywords to narrow results, or click <Icon kind="search" /> to find similar photos
   </>
 );
 

@@ -380,14 +380,14 @@ describe("Search", () => {
 
     expect(
       screen.getByRole("button", {
-        name: "🎲 Random starting photo",
+        name: "Random starting photo",
       }),
     ).toBeTruthy();
 
     await act(async () => {
       fireEvent.click(
         screen.getByRole("button", {
-          name: "🎲 Random starting photo",
+          name: "Random starting photo",
         }),
       );
     });
@@ -1310,7 +1310,7 @@ describe("Search interaction edges", () => {
     );
 
     (fetchRandomPhoto as jest.Mock).mockResolvedValueOnce([]);
-    fireEvent.click(screen.getByRole("button", { name: "🎲 Random starting photo" }));
+    fireEvent.click(screen.getByRole("button", { name: "Random starting photo" }));
     await waitFor(() => {
       expect(onNavStateChange.mock.calls.at(-1)?.[0].randomExploreError).toBe(
         "No photos are available for random explore yet.",
@@ -1318,7 +1318,7 @@ describe("Search interaction edges", () => {
     });
 
     (fetchRandomPhoto as jest.Mock).mockRejectedValueOnce(new Error("search failed"));
-    fireEvent.click(screen.getByRole("button", { name: "🎲 Random starting photo" }));
+    fireEvent.click(screen.getByRole("button", { name: "Random starting photo" }));
     await waitFor(() => {
       expect(onNavStateChange.mock.calls.at(-1)?.[0].randomExploreError).toBe(
         "Couldn't start random explore right now.",

@@ -1,3 +1,4 @@
+import { Icon } from "../../components/ui/Icon";
 import DynamicSearchWithCoi from "../../components/search/DynamicSearchWithCoi";
 import { GlobalNav } from "../../components/GlobalNav";
 import { Footer, Heading } from "../../components/ui";
@@ -47,7 +48,7 @@ const SearchPage = () => {
               : "Start a similar-photo slideshow from a random photo"
           }
         >
-          {isRandomSimilarLoading ? "…" : "🎲"}
+          {isRandomSimilarLoading ? "…" : <Icon kind="dice" />}
         </button>
       ) : undefined,
     [isMounted, databaseReady, isRandomSimilarLoading, onStartRandomSimilarSlideshow],

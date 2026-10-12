@@ -279,6 +279,19 @@ const getPhotoDetailsFromSearchIndex = async (
         row.colors = parseColorPalette(row.colors);
       }
       if (row) {
+        // SQLite stores tag text; browser consumers use the typed label array.
+        if (typeof row.tags === "string") {
+          row.tags = Array.from(
+            new Set(
+              row.tags
+                .split(",")
+                .map((tag: string) => tag.trim())
+                .filter(Boolean),
+            ),
+          );
+        } else if (row.tags == null) {
+          delete row.tags;
+        }
         const weather = parseWeatherMetadata(row.weather_json);
         if (weather) row.weather = weather;
         delete row.weather_json;

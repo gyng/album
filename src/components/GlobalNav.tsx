@@ -1,3 +1,4 @@
+import { Icon } from "./ui/Icon";
 import { AppLink as Link } from "./platform";
 import { Nav } from "./Nav";
 import commonStyles from "../styles/common.module.css";
@@ -19,7 +20,7 @@ type Props = {
   currentPage?: GlobalNavPage;
   hasPadding?: boolean;
   /**
-   * Replaces the default slideshow 🎲 button. Used by the Search page to wire
+   * Replaces the default slideshow random button. Used by the Search page to wire
    * the random-similar-slideshow action into the database state.
    */
   slideshowAction?: React.ReactNode;
@@ -114,7 +115,7 @@ export const GlobalNav: React.FC<Props> = ({
                     aria-label="Start a similar-photo slideshow from a random photo"
                     title="Start a similar-photo slideshow from a random photo"
                   >
-                    🎲
+                    <Icon kind="dice" />
                   </Link>
                 )}
               </div>

@@ -35,21 +35,6 @@ export const PhotoWeatherDetails = ({ weather }: { weather: WeatherMetadata }) =
         <WeatherIcon kind={weatherTemperatureIcon(weather.temperature_2m)} />{" "}
         {weather.temperature_2m.toFixed(1)}°C
       </div>
-      <dl className={styles.metrics}>
-        {metrics
-          .filter(([, , value]) => value !== null)
-          .map(([label, kind, value, unit]) => (
-            <div key={label}>
-              <dt>
-                <WeatherIcon kind={kind} /> {label}
-              </dt>
-              <dd>
-                {value}
-                {unit}
-              </dd>
-            </div>
-          ))}
-      </dl>
       <div className={styles.source}>
         Estimated hourly weather · {weather.model === "era5" ? "ERA5" : "ECMWF IFS"}
         <br />
@@ -58,8 +43,21 @@ export const PhotoWeatherDetails = ({ weather }: { weather: WeatherMetadata }) =
         <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>
       </div>
       <details className={styles.provenance}>
-        <summary>Weather sample</summary>
+        <summary>Estimate details</summary>
         <dl className={styles.metrics}>
+          {metrics
+            .filter(([, , value]) => value !== null)
+            .map(([label, kind, value, unit]) => (
+              <div key={label}>
+                <dt>
+                  <WeatherIcon kind={kind} /> {label}
+                </dt>
+                <dd>
+                  {value}
+                  {unit}
+                </dd>
+              </div>
+            ))}
           <div>
             <dt>Hour (UTC)</dt>
             <dd>{weather.sampled_at.replace("T", " ").replace(":00Z", " UTC")}</dd>

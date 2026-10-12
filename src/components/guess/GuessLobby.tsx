@@ -124,6 +124,7 @@ export const GuessLobby: React.FC<GuessLobbyProps> = ({ database, defaults, onSt
         <div className={styles.optionRow}>
           <span className={styles.optionLabel}>Timer</span>
           <SegmentedToggle
+            className={styles.optionControl}
             options={TIMER_OPTIONS}
             value={timer}
             onChange={setTimer}
@@ -134,6 +135,7 @@ export const GuessLobby: React.FC<GuessLobbyProps> = ({ database, defaults, onSt
         <div className={styles.optionRow}>
           <span className={styles.optionLabel}>Rounds</span>
           <SegmentedToggle
+            className={styles.optionControl}
             options={ROUND_OPTIONS}
             value={rounds}
             onChange={setRounds}
@@ -167,7 +169,7 @@ export const GuessLobby: React.FC<GuessLobbyProps> = ({ database, defaults, onSt
             Five rounds · same photos for everyone today
           </Caption>
         </div>
-        <Button variant="primary" size="large" className={styles.playButton} onClick={handleStart}>
+        <Button variant="primary" className={styles.playButton} onClick={handleStart}>
           Play
           <KeyHint>Enter</KeyHint>
         </Button>

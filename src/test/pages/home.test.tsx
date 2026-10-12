@@ -107,6 +107,7 @@ describe("home page", () => {
     ]);
 
     const result = await loadHomePageData();
+    expect(result.albums.map((album) => album.photoCount)).toEqual([2, 2, 1, 0, 1]);
 
     expect(result.albums.map(({ name }) => name)).toEqual([
       "featured",
