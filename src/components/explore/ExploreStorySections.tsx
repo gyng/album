@@ -8,13 +8,16 @@ import { Caption, Card, Heading, Thumb, PillButton, pillStyles } from "../ui";
 import sharedStyles from "./ExploreShared.module.css";
 import localStyles from "./ExploreStorySections.module.css";
 import { ExploreStatGroup } from "./ExplorePrimitives";
-import type { FunStatCard } from "./exploreViewModel";
+import type { FunStatCard, OverviewCard } from "./exploreViewModel";
 import { buildYearSearchHref } from "./exploreViewModel";
 
 const styles = mergeCssModuleStyles(
   sharedStyles,
   localStyles,
   [
+    "archiveSummary",
+    "archiveSummaryItem",
+    "archiveSummaryValue",
     "funStatThumb",
     "funStatThumbLink",
     "funStatThumbYear",
@@ -39,9 +42,11 @@ const styles = mergeCssModuleStyles(
 
 export const ExploreFunStatsSection = ({
   cards,
+  overviewStats = [],
   deferContent = false,
 }: {
   cards: FunStatCard[];
+  overviewStats?: OverviewCard[];
   deferContent?: boolean;
 }) => (
   <ExploreStatGroup
@@ -54,6 +59,16 @@ export const ExploreFunStatsSection = ({
       .join(" · ")}
   >
     <section className={`${styles.section} ${styles.sectionWide}`}>
+      {overviewStats.length > 0 ? (
+        <dl className={styles.archiveSummary}>
+          {overviewStats.map((stat) => (
+            <div key={stat.label} className={styles.archiveSummaryItem}>
+              <Caption as="dt">{stat.label}</Caption>
+              <dd className={styles.archiveSummaryValue}>{stat.value}</dd>
+            </div>
+          ))}
+        </dl>
+      ) : null}
       <div className={styles.funStatsGrid}>
         {cards.map((stat) => (
           <Card as="article" key={stat.label}>

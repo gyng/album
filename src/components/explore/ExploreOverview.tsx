@@ -1,8 +1,7 @@
 import { mergeCssModuleStyles } from "../../util/mergeCssModuleStyles";
-import { Caption, Card, Heading, Pill } from "../ui";
+import { Caption, Heading, Pill } from "../ui";
 import sharedStyles from "./ExploreShared.module.css";
 import localStyles from "./ExploreOverview.module.css";
-import type { OverviewCard } from "./exploreViewModel";
 
 const sectionGroups = [
   { label: "Visuals", ids: ["#embedding-space", "#visual-sameness", "#colour"] },
@@ -27,17 +26,13 @@ const styles = mergeCssModuleStyles(sharedStyles, localStyles, [
   "jumpNavLinks",
   "jumpNavGroup",
   "jumpNavGroups",
-  "overview",
-  "overviewValue",
   "title",
 ]);
 
 export const ExploreOverview = ({
   sectionLinks,
-  cards,
 }: {
   sectionLinks: ReadonlyArray<{ href: string; label: string }>;
-  cards: OverviewCard[];
 }) => (
   <>
     <header className={styles.header}>
@@ -47,15 +42,6 @@ export const ExploreOverview = ({
         </Heading>
       </div>
     </header>
-
-    <section className={styles.overview}>
-      {cards.map((card) => (
-        <Card key={card.label} className={styles.overviewCard}>
-          <Caption as="div">{card.label}</Caption>
-          <div className={styles.overviewValue}>{card.value}</div>
-        </Card>
-      ))}
-    </section>
 
     <nav className={styles.jumpNav} aria-label="Jump to section">
       <div className={styles.jumpNavGroups}>

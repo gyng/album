@@ -349,7 +349,7 @@ const ExploreScreen = ({
       <main id="main-content" className={styles.main}>
         <GlobalNav currentPage="explore" hasPadding={false} />
 
-        <ExploreOverview sectionLinks={sectionLinks} cards={overviewCards} />
+        <ExploreOverview sectionLinks={sectionLinks} />
 
         <div className={styles.groups}>
           {/* Everything else on this page counts something. This one does not:
@@ -627,13 +627,13 @@ const ExploreScreen = ({
 
           <ExploreThisDaySection memories={stats.dayOfYearMemories} />
 
-          <ExploreFunStatsSection cards={funStats} deferContent />
+          <ExploreFunStatsSection cards={funStats} overviewStats={overviewCards} deferContent />
           <ExploreRecentTrendsSection data={stats.recentYearStats} deferContent />
           <ExploreRevisitedPlacesSection places={stats.revisitedPlaces} deferContent />
 
           <StatGroup
             id="when-you-shoot"
-            title="When you shoot"
+            title="Time"
             actions={renderScopeFilterControls("Time")}
             deferContent
             deferredSummary={[
@@ -680,7 +680,7 @@ const ExploreScreen = ({
 
           <StatGroup
             id="how-you-shoot"
-            title="How you shoot"
+            title="Shooting settings"
             actions={renderScopeFilterControls("Settings")}
             deferContent
             deferredSummary={`Camera settings span ${activeTechnicalFacets.length.toLocaleString("en")} technical facets${filteredTechnicalRelationships ? `; settings relationships cover ${filteredTechnicalRelationships.total.toLocaleString("en")} photos` : ""}.`}
@@ -704,7 +704,7 @@ const ExploreScreen = ({
 
           <StatGroup
             id="where-you-shoot"
-            title="Where you shoot"
+            title="Places"
             deferContent
             deferredSummary={`${stats.mapPoints.length.toLocaleString("en")} mapped photo locations are available as a map, location flow, and searchable place bars.`}
             actions={
@@ -759,7 +759,7 @@ const ExploreScreen = ({
 
           <StatGroup
             id="what-you-shoot-with"
-            title="What you shoot with"
+            title="Cameras and lenses"
             deferContent
             deferredSummary={`Camera and lens relationships are summarised across ${gearFacets.length.toLocaleString("en")} searchable gear facets.`}
           >

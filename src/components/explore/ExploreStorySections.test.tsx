@@ -25,6 +25,7 @@ describe("Explore story sections", () => {
   it("renders fun-stat copy and its optional search action", () => {
     render(
       <ExploreFunStatsSection
+        overviewStats={[{ label: "Photos", value: "12" }]}
         cards={[
           {
             label: "Colour mood",
@@ -37,6 +38,8 @@ describe("Explore story sections", () => {
     );
 
     expect(screen.getByRole("heading", { name: /fun stats/i })).toBeTruthy();
+    expect(screen.getByText("Photos").closest("section[id]")).toHaveAttribute("id", "fun-stats");
+    expect(screen.getByText("12").tagName).toBe("DD");
     expect(screen.getByText("Blue")).toBeTruthy();
     expect(screen.getByRole("link", { name: /open in search/i }).getAttribute("href")).toBe(
       "/search?color=blue",

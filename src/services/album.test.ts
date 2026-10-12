@@ -338,7 +338,7 @@ describe("getAlbum", () => {
 
       expect(titleBlock?.kind).toBe("text");
       if (titleBlock?.kind === "text") {
-        expect(titleBlock.data.kicker).toBe("1");
+        expect(titleBlock.data.kicker).toBe("1 snap");
       }
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
@@ -506,16 +506,19 @@ describe("getAlbum", () => {
   });
 
   it.each([
-    [["2023-01-01T00:00:00", "2024-01-01T00:00:00"], "2023–2024 · 2"],
-    [["2024-01-01T00:00:00", "2024-12-31T00:00:00"], "2024 · 2"],
-  ])("derives a chronological title kicker from photo years", async (dates, expected) => {
+    [["2023-01-01T00:00:00", "2024-01-01T00:00:00"], "oldest-first", "2023–2024 · 2 snaps"],
+    [["2011-01-01T00:00:00", "2026-10-12T00:00:00"], "newest-first", "2026–2011 · 2 snaps"],
+    [["2024-01-01T00:00:00", "2024-12-31T00:00:00"], "newest-first", "2024 · 2 snaps"],
+  ])("derives title years in the album's %s order", async (dates, sort, expected) => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "album-kicker-years-test-"));
     mockDeserialize.mockResolvedValueOnce(
       makeContent([makeText(), makePhoto(dates[1]), makePhoto(dates[0])]),
     );
+    fs.writeFileSync(path.join(root, "album.json"), JSON.stringify({ sort }));
 
     try {
       const result = await getAlbum(root);
+      expect(result.formatting.sort).toBe(sort);
       const title = result.blocks[0];
       expect(title?.kind).toBe("text");
       if (title?.kind === "text") expect(title.data.kicker).toBe(expected);

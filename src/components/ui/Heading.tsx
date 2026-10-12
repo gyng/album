@@ -20,7 +20,7 @@ export const Heading = (props: {
 };
 
 export const Caption = (props: {
-  as?: "p" | "span" | "div";
+  as?: "p" | "span" | "div" | "dt";
   size?: "sm";
   id?: string;
   className?: string | undefined;

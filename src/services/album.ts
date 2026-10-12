@@ -323,21 +323,19 @@ const applyTitleKickerDefaults = (manifest: Content): void => {
   }
 
   const [earliest, latest] = getImageTimestampRange(manifest);
-  const count = manifest.blocks
-    .filter((block) => block.kind === "photo")
-    .length.toLocaleString("en-GB");
+  const photoCount = manifest.blocks.filter((block) => block.kind === "photo").length;
+  const count = `${photoCount.toLocaleString("en-GB")} ${photoCount === 1 ? "snap" : "snaps"}`;
   if (earliest == null || latest == null) {
     title.data.kicker = title.data.kicker ? `${title.data.kicker} · ${count}` : count;
     return;
   }
 
-  // Always render the year range ascending (earliest–latest), regardless of the
-  // album's photo sort order, so the kicker matches the home page album list
-  // (Albums.tsx) rather than reading as a reversed "2026–2025".
+  // Display the range in the same direction as the photographs.
   // getImageTimestampRange only returns values accepted and normalised by the
   // same EXIF wall-clock parser, so these years are guaranteed to exist.
-  const from = parseExifLocalDateTime(earliest)!.year;
-  const to = parseExifLocalDateTime(latest)!.year;
+  const newestFirst = manifest.formatting.sort === "newest-first";
+  const from = parseExifLocalDateTime(newestFirst ? latest : earliest)!.year;
+  const to = parseExifLocalDateTime(newestFirst ? earliest : latest)!.year;
   title.data.kicker = `${from}${to === from ? "" : `–${to}`} · ${count}`;
 };
 
@@ -380,7 +378,9 @@ export const getAlbum = async (
       applyCoverSelection(manifest, v2Manifest.cover);
     }
 
-    manifest.blocks = sortBlocksByDate(manifest.blocks, v2Manifest?.sort ?? "oldest-first");
+    const sortOrder = v2Manifest?.sort ?? "oldest-first";
+    manifest.formatting.sort = sortOrder;
+    manifest.blocks = sortBlocksByDate(manifest.blocks, sortOrder);
     manifest.blocks = moveTextBlocksToTop(manifest.blocks);
     applyTitleKickerDefaults(manifest);
 

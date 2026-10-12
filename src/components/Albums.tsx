@@ -50,12 +50,14 @@ export const Albums: React.FC<HomePageData> = (props) => {
         const timeRange = album._build.timeRange
           ?.filter(Boolean)
           .map((ts) => parseExifLocalDateTime(ts)?.year ?? 0) ?? [0, 0];
+        if (album.formatting.sort === "newest-first") timeRange.reverse();
         const years =
           timeRange[0] && timeRange[1] && timeRange[0] !== timeRange[1]
             ? timeRange.join("–")
             : timeRange[0] || null;
         const photoCount =
           album.photoCount ?? album.blocks.filter((block) => block.kind === "photo").length;
+        const countLabel = `${photoCount.toLocaleString("en-GB")} ${photoCount === 1 ? "snap" : "snaps"}`;
 
         return (
           <li key={album._build.slug} className={styles.item}>
@@ -100,7 +102,7 @@ export const Albums: React.FC<HomePageData> = (props) => {
 
               <Caption as="span" size="sm" className={styles.date}>
                 {years ? `${years} · ` : ""}
-                {photoCount.toLocaleString("en-GB")}
+                {countLabel}
               </Caption>
             </div>
           </li>

@@ -72,6 +72,12 @@ controls wrap or scroll within their own region, never widen the page. Photo
 and map canvases keep their geometry; the design system styles their surrounding
 controls, panels and captions.
 
+Explore opens with section navigation. Archive totals belong in Fun stats as a
+plain definition list with horizontal separators, rather than card-shaped
+surfaces beside navigation buttons. Section labels describe the photographs
+without addressing the visitor as their photographer. Album year ranges follow
+the displayed photo order: newest-first albums show latest–earliest.
+
 The shared components cover gallery navigation, albums, Explore, search, maps,
 timeline/trips and slideshow controls. Screen-owned layout remains in screen
 CSS Modules. Do not replace photo presentation, map data layers or slideshow

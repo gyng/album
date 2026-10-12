@@ -39,12 +39,13 @@ const album = (
     blocks?: Content["blocks"];
     timeRange?: Content["_build"]["timeRange"];
     title?: string;
+    sort?: Content["formatting"]["sort"];
   } = {},
 ): Content => ({
   name: slug,
   title: options.title ?? `Album ${slug}`,
   blocks: options.blocks ?? [photo(`${slug}-first`)],
-  formatting: {},
+  formatting: options.sort ? { sort: options.sort } : {},
   _build: {
     slug,
     srcdir: `/albums/${slug}`,
@@ -53,6 +54,20 @@ const album = (
 });
 
 describe("Albums", () => {
+  it("shows newest-first album years in descending order", () => {
+    render(
+      <Albums
+        albums={[
+          album("recent", {
+            sort: "newest-first",
+            timeRange: ["2011-01-01T00:00:00", "2026-10-12T00:00:00"],
+          }),
+        ]}
+      />,
+    );
+    expect(screen.getByText("2026–2011 · 1 snap")).toBeTruthy();
+  });
+
   it("links album covers and prefers the photo explicitly marked as the cover", () => {
     render(
       <Albums
@@ -73,7 +88,7 @@ describe("Albums", () => {
       "src",
       "chosen.jpg",
     );
-    expect(screen.getByText("2022–2024 · 2")).toBeTruthy();
+    expect(screen.getByText("2022–2024 · 2 snaps")).toBeTruthy();
   });
 
   it("shows single-year, missing, and malformed date ranges without inventing dates", () => {
@@ -90,8 +105,8 @@ describe("Albums", () => {
       />,
     );
 
-    expect(screen.getByText("2023 · 1")).toBeTruthy();
-    expect(screen.getByText("2021 · 1")).toBeTruthy();
+    expect(screen.getByText("2023 · 1 snap")).toBeTruthy();
+    expect(screen.getByText("2021 · 1 snap")).toBeTruthy();
     expect(screen.queryByText("0")).toBeNull();
   });
 

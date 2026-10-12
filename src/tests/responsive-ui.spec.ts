@@ -401,7 +401,7 @@ test.describe("Responsive UI", () => {
 
     try {
       await gotoHydrated(mobilePage, "/explore");
-      await expect(mobilePage.getByRole("heading", { name: "How you shoot" })).toBeVisible();
+      await expect(mobilePage.getByRole("heading", { name: "Shooting settings" })).toBeVisible();
       await expectNoDocumentOverflow(mobilePage);
     } finally {
       await context.close();
