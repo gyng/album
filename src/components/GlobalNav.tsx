@@ -5,6 +5,8 @@ import commonStyles from "../styles/common.module.css";
 import { buttonStyles } from "./ui";
 import styles from "./GlobalNav.module.css";
 import { ExploreSubnav } from "./explore/ExploreSubnav";
+import { FunSubnav } from "./fun/FunSubnav";
+import type { FunPage } from "./fun/games";
 
 export type GlobalNavPage =
   | "home"
@@ -14,7 +16,7 @@ export type GlobalNavPage =
   | "slideshow"
   | "explore"
   | "trips"
-  | "guess";
+  | FunPage;
 
 type Props = {
   currentPage?: GlobalNavPage;
@@ -59,6 +61,12 @@ export const GlobalNav: React.FC<Props> = ({
 
   const exploreView =
     currentPage === "explore" || currentPage === "timeline" || currentPage === "trips";
+  const funView =
+    currentPage === "fun" ||
+    currentPage === "guess" ||
+    currentPage === "relay" ||
+    currentPage === "blind-frame" ||
+    currentPage === "oracle";
   return (
     <div className={styles.stack}>
       <Nav
@@ -122,11 +130,15 @@ export const GlobalNav: React.FC<Props> = ({
             </li>
             <li>
               <Link
-                href="/guess"
-                className={cx(buttonStyles.base, current("guess"))}
-                aria-current={ariaCurrent("guess")}
+                href="/fun"
+                className={cx(buttonStyles.base, funView && commonStyles.navCurrent)}
+                {...(funView
+                  ? {
+                      "aria-current": currentPage === "fun" ? ("page" as const) : ("true" as const),
+                    }
+                  : {})}
               >
-                Guess Where
+                Fun
               </Link>
             </li>
             {extraItems}
@@ -136,6 +148,7 @@ export const GlobalNav: React.FC<Props> = ({
       {exploreView ? (
         <ExploreSubnav current={currentPage as "explore" | "timeline" | "trips"} />
       ) : null}
+      {funView ? <FunSubnav current={currentPage as FunPage} /> : null}
     </div>
   );
 };

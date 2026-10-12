@@ -21,6 +21,7 @@ import {
   YEAR_FACET,
 } from "../../util/photoBuckets";
 import type { Exif } from "../../services/types";
+import { photoGameCaption, type PhotoGamePhoto } from "../../util/photoGames";
 import {
   getGeocodeCity,
   getGeocodeCountry,
@@ -1127,6 +1128,58 @@ const fetchEmbeddingsByModel = async (
     const decoded = decodeEmbeddingRow(row, hasBlobColumn);
     return decoded ? [decoded] : [];
   });
+};
+
+export const fetchPhotoGameArchive = async (opts: {
+  database: Database;
+  embeddingsDatabase?: Database | null;
+  game: "relay" | "blind-frame" | "oracle";
+}): Promise<PhotoGamePhoto[]> => {
+  const { database, game } = opts;
+  const vectorDatabase = opts.embeddingsDatabase ?? database;
+  let embeddings: EmbeddingRow[] = [];
+  if (game !== "oracle") {
+    try {
+      // Drawings come from the browser's v1 encoder. Never compare them to
+      // v2 image vectors, even when both spaces have the same dimensions.
+      embeddings = await fetchEmbeddingsByModel(
+        vectorDatabase,
+        game === "relay" ? PREFERRED_EMBEDDING_MODEL_ID : DEFAULT_EMBEDDING_MODEL_ID,
+      );
+      if (game === "relay" && !embeddings.length)
+        embeddings = await fetchEmbeddingsByModel(vectorDatabase, DEFAULT_EMBEDDING_MODEL_ID);
+    } catch (error) {
+      if (!isMissingEmbeddingsTableError(error)) throw error;
+      return [];
+    }
+    if (!embeddings.length) return [];
+    embeddings = embeddings.filter((row) => {
+      const values = Array.from(row.embedding);
+      return (
+        values.length === row.embedding_dim &&
+        values.length > 0 &&
+        values.every(Number.isFinite) &&
+        values.some((value) => value !== 0)
+      );
+    });
+  }
+  const rows =
+    game === "oracle"
+      ? await fetchRandomResults({ database, pageSize: 10000 })
+      : await fetchResultsByPaths(
+          database,
+          embeddings.map((row) => row.path),
+        );
+  const vectors = new Map(embeddings.map((row) => [row.path, row.embedding]));
+  return rows
+    .filter((row) => row.mediaKind !== "video" && sceneSecondsOf(row.path) === undefined)
+    .map((row) => ({
+      path: row.path,
+      href: row.album_relative_path,
+      caption: photoGameCaption(row.alt_text || row.subject || ""),
+      tags: row.tags,
+      vector: vectors.get(row.path) ?? [],
+    }));
 };
 
 export const fetchResults = async (opts: {

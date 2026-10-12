@@ -61,7 +61,7 @@ describe("Nav", () => {
     expect(scrollIntoView).toHaveBeenCalledWith({
       inline: "nearest",
       block: "nearest",
-      behavior: "smooth",
+      behavior: "auto",
     });
     expect(observe).toHaveBeenCalledWith(screen.getByRole("list"));
 

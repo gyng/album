@@ -23,6 +23,16 @@ jest.mock("./Nav", () => ({
 }));
 
 describe("GlobalNav", () => {
+  it("groups the games under Fun and identifies the active game", () => {
+    render(<GlobalNav currentPage="guess" />);
+    expect(screen.getByRole("link", { name: "Fun" })).toHaveAttribute("href", "/fun");
+    expect(screen.getByRole("link", { name: "Fun" })).toHaveAttribute("aria-current", "true");
+    expect(screen.getByRole("navigation", { name: "Fun games" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Guess Where" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+  });
   it("provides the default random slideshow action", () => {
     render(<GlobalNav currentPage="slideshow" />);
 

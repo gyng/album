@@ -178,7 +178,7 @@ describe("GuessPage", () => {
       JSON.stringify(settings),
     );
     expect(screen.getByTestId("guess-game")).toHaveAttribute("data-seed", "shared");
-    expect(screen.getByTestId("seo")).toHaveAttribute("data-pathname", "/guess?seed=shared");
+    expect(screen.getByTestId("seo")).toHaveAttribute("data-pathname", "/fun/guess?seed=shared");
     expect(screen.getByTestId("seo")).toHaveAttribute(
       "data-description",
       "Can you beat this score? Guess where each photo was taken.",
@@ -194,6 +194,6 @@ describe("GuessPage", () => {
     render(<GuessPage />);
 
     expect(screen.getByTestId("guess-game")).not.toHaveAttribute("data-seed");
-    expect(screen.getByTestId("seo")).toHaveAttribute("data-pathname", "/guess");
+    expect(screen.getByTestId("seo")).toHaveAttribute("data-pathname", "/fun/guess");
   });
 });

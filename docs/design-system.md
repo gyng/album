@@ -51,6 +51,9 @@ selector, never a grouped selector.
   16px text on touch devices to avoid Safari's focus zoom.
 - Navigation and theme/map pickers use standard density even when a picker has
   a compact visual variant. Icons have explicit boxes and do not set row height.
+  Reveal the active navigation item without animation on mount, then recheck
+  after theme fonts settle; opening a game or moving focus must not leave it
+  clipped. Scrolling game subnavs also keep their active link visible.
 - `Button` is an action. Primary fill is for the main action; quiet actions use
   minimal chrome. Legacy `Pill` action links/buttons use the same rounded control
   shape. Search tags remain chips, and photograph overlay controls remain pills.
@@ -82,6 +85,13 @@ The shared components cover gallery navigation, albums, Explore, search, maps,
 timeline/trips and slideshow controls. Screen-owned layout remains in screen
 CSS Modules. Do not replace photo presentation, map data layers or slideshow
 state machines to achieve a visual change.
+
+Fun groups the archive games behind one global navigation entry and a game
+subnav. Illustrated game cards use warm paper artwork, a heading, one short
+description and an explicit Play action. Game controls retain normal theme,
+focus and touch-target tokens; photo-choice buttons have a visible border and
+never depend on hover alone. Sketch canvases stay white. Results show their
+scoring basis alongside the score. See [game rules and illustration prompts](fun-games.md).
 
 ## Deliberate variants
 

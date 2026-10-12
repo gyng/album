@@ -96,7 +96,7 @@ test.describe("Responsive UI", () => {
 
       const lastLink = tabletPage
         .getByRole("navigation")
-        .getByRole("link", { name: "Guess Where", exact: true });
+        .getByRole("link", { name: "Fun", exact: true });
       await lastLink.scrollIntoViewIfNeeded();
       await expect(lastLink).toBeInViewport();
       await expect(picker).toBeInViewport();

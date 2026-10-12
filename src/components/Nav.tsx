@@ -51,18 +51,23 @@ export const Nav: React.FC<{
 
   // On narrow viewports the nav is a horizontal scroller; the active pill can
   // start off-screen (e.g. "Map" on /map). Bring it into view on mount so the
-  // current page is visible without scrolling. Honour reduced-motion for the
-  // JS-driven smooth scroll.
+  // current page is visible without scrolling. An animated mount-time reveal
+  // can be interrupted by focus moving into the page, leaving the pill clipped.
   useEffect(() => {
     const ul = ulRef.current!;
     const active = ul.querySelector<HTMLElement>('[aria-current="page"], [aria-current="true"]');
     if (!active) return;
-    const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    active.scrollIntoView({
-      inline: "nearest",
-      block: "nearest",
-      behavior: prefersReducedMotion ? "auto" : "smooth",
-    });
+    let cancelled = false;
+    const reveal = () => {
+      if (cancelled) return;
+      active.scrollIntoView({ inline: "nearest", block: "nearest", behavior: "auto" });
+    };
+    reveal();
+    // Theme fonts can change both pill widths and the pinned picker's width.
+    void document.fonts?.ready.then(reveal);
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const skipToContent: React.MouseEventHandler<HTMLAnchorElement> = (event) => {

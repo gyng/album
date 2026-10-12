@@ -1,0 +1,68 @@
+.page {
+  display: grid;
+  gap: var(--space-7);
+  max-inline-size: var(--size-1400);
+  margin-inline: auto;
+  padding: var(--page-gutter);
+}
+
+.games {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-6);
+}
+
+.game {
+  overflow: hidden;
+  display: grid;
+  align-content: start;
+  border: var(--line-hairline) solid var(--c-border);
+  border-radius: var(--radius-panel);
+  background: var(--c-surface);
+  color: var(--c-font);
+  text-decoration: none;
+  transition: border-color var(--t-fast);
+}
+
+.game:hover {
+  border-color: var(--c-accent);
+}
+
+.illustration {
+  display: block;
+  inline-size: 100%;
+  block-size: auto;
+  aspect-ratio: 3 / 2;
+  object-fit: cover;
+}
+
+.gameBody {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-5);
+}
+
+.gameBody p {
+  margin: 0;
+  color: var(--c-bg-contrast-light);
+  max-inline-size: 48ch;
+}
+
+.play {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--c-accent);
+  font-size: var(--fs-sm);
+}
+
+.game:hover .play {
+  text-decoration: underline;
+  text-underline-offset: var(--space-1);
+}
+
+@media (max-width: 720px) {
+  .games {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

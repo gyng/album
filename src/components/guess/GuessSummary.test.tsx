@@ -123,7 +123,7 @@ describe("GuessSummary", () => {
     fireEvent.click(screen.getByRole("button", { name: "Copy challenge link" }));
 
     expect(writeText).toHaveBeenCalledWith(
-      "http://localhost/guess?seed=challenge-seed&rounds=3&region=New+Zealand&timer=15",
+      "http://localhost/fun/guess?seed=challenge-seed&rounds=3&region=New+Zealand&timer=15",
     );
     expect(await screen.findByRole("button", { name: "Copied!" })).toBeInTheDocument();
 
@@ -141,7 +141,7 @@ describe("GuessSummary", () => {
     expect(screen.getByText("Daily challenge")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Copy challenge link" }));
 
-    expect(writeText).toHaveBeenCalledWith("http://localhost/guess?daily");
+    expect(writeText).toHaveBeenCalledWith("http://localhost/fun/guess?daily");
     expect(await screen.findByRole("button", { name: "Copied!" })).toBeInTheDocument();
   });
 

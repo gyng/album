@@ -26,9 +26,18 @@ const BRUSH_SIZES = [
 type Props = {
   onCancel: () => void;
   onSubmit: (blob: Blob) => void;
+  title?: string;
+  description?: string;
+  submitLabel?: string;
 };
 
-export const SearchDrawPad: React.FC<Props> = ({ onCancel, onSubmit }) => {
+export const SearchDrawPad: React.FC<Props> = ({
+  onCancel,
+  onSubmit,
+  title = "Draw to search",
+  description,
+  submitLabel = "Search",
+}) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const dialogRef = useRef<HTMLDialogElement | null>(null);
   const cancelRef = useRef<HTMLButtonElement | null>(null);
@@ -138,7 +147,7 @@ export const SearchDrawPad: React.FC<Props> = ({ onCancel, onSubmit }) => {
     <dialog
       ref={dialogRef}
       className={styles.dialog}
-      aria-label="Draw to search"
+      aria-label={title}
       onCancel={(event) => {
         event.preventDefault();
         onCancel();
@@ -150,7 +159,8 @@ export const SearchDrawPad: React.FC<Props> = ({ onCancel, onSubmit }) => {
       }}
     >
       <div className={styles.panel}>
-        <div className={styles.title}>Draw to search</div>
+        <div className={styles.title}>{title}</div>
+        {description ? <p className={styles.description}>{description}</p> : null}
         <canvas
           ref={canvasRef}
           className={styles.canvas}
@@ -201,7 +211,7 @@ export const SearchDrawPad: React.FC<Props> = ({ onCancel, onSubmit }) => {
             Cancel
           </Button>
           <Button variant="accent" onClick={handleSubmit} disabled={!hasStrokes}>
-            Search
+            {submitLabel}
           </Button>
         </div>
       </div>

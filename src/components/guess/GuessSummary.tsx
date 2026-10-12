@@ -45,13 +45,13 @@ const getGeocodeLabel = (geocode: string): string | null => {
 };
 
 const buildShareUrl = (seed: string, settings: GameSettings): string => {
-  if (settings.daily) return "/guess?daily";
+  if (settings.daily) return "/fun/guess?daily";
   const params = new URLSearchParams();
   params.set("seed", seed);
   if (settings.rounds !== 5) params.set("rounds", String(settings.rounds));
   if (settings.region) params.set("region", settings.region);
   if (settings.timeLimit) params.set("timer", String(settings.timeLimit));
-  return `/guess?${params.toString()}`;
+  return `/fun/guess?${params.toString()}`;
 };
 
 export const GuessSummary: React.FC<GuessSummaryProps> = ({

@@ -34,6 +34,7 @@ const nextConfig = {
     tsconfigPath: isE2eBuild ? "tsconfig.e2e.json" : "tsconfig.next.json",
   },
   redirects: async () => [
+    { source: "/guess", destination: "/fun/guess", permanent: true },
     { source: "/timeline", destination: "/explore/timeline", permanent: true },
     { source: "/trips", destination: "/explore/trips", permanent: true },
   ],

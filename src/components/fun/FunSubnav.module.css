@@ -1,0 +1,28 @@
+.nav {
+  display: flex;
+  gap: var(--space-5);
+  overflow-x: auto;
+  scrollbar-width: thin;
+  border-block-end: var(--line-hairline) solid var(--c-border);
+}
+
+.link {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  min-block-size: var(--tap-target);
+  padding-block: var(--space-2);
+  border-block-end: var(--size-2) solid transparent;
+  color: var(--c-bg-contrast-light);
+  font-size: var(--fs-sm);
+  text-decoration: none;
+}
+
+.link:hover {
+  color: var(--c-font);
+}
+
+.link[aria-current="page"] {
+  color: var(--c-font);
+  border-block-end-color: var(--c-accent);
+}

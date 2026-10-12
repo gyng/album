@@ -67,6 +67,13 @@
   font-weight: 600;
 }
 
+.description {
+  margin: 0;
+  max-inline-size: 40ch;
+  font-size: var(--fs-sm);
+  line-height: 1.5;
+}
+
 .canvas {
   /* The vh term keeps the square canvas small enough that the whole panel
      (canvas + tools + actions ≈ canvas + 195px) fits a landscape phone. */

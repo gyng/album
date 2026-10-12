@@ -57,7 +57,7 @@ const GuessScreen = () => {
       <Seo
         title={formatPageTitle("Guess Where")}
         description={description}
-        pathname={`/guess${seedFromUrl ? `?seed=${seedFromUrl}` : ""}`}
+        pathname={`/fun/guess${seedFromUrl ? `?seed=${seedFromUrl}` : ""}`}
       />
       <main id="main-content" className={styles.page}>
         <GlobalNav currentPage="guess" hasPadding={false} />
