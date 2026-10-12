@@ -4,7 +4,7 @@
 
 .row {
   display: grid;
-  grid-template-columns: minmax(var(--size-96), var(--size-180)) 1fr auto auto;
+  grid-template-columns: minmax(0, min(45%, var(--size-180))) minmax(var(--size-24), 1fr) auto auto;
   align-items: center;
   gap: var(--m-s);
   min-block-size: var(--size-28);
@@ -17,13 +17,16 @@
 .label {
   font-size: var(--fs-sm);
   color: var(--c-font);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: normal;
   display: inline-flex;
   align-items: center;
   gap: var(--m-s);
   min-inline-size: 0;
+}
+
+.label > span:last-child {
+  min-inline-size: 0;
+  overflow-wrap: anywhere;
 }
 
 .barTrack {
@@ -70,10 +73,6 @@
 }
 
 @container (max-width: 720px) {
-  .row {
-    grid-template-columns: minmax(var(--m-2xl), var(--size-96)) 1fr auto auto;
-  }
-
   .actionText {
     display: none;
   }

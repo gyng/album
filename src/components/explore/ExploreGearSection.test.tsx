@@ -209,6 +209,21 @@ const frames = [
 ];
 
 describe("the gear section's own reporting", () => {
+  it("shows the latest year first in both histories and their alternative views", () => {
+    render(<ExploreGearSection gear={gear()} frames={frames} />);
+    const years = (title: string) => {
+      const section = screen.getByRole("heading", { name: title }).closest("section")!;
+      return within(section)
+        .getAllByText(/^202[34]$/)
+        .map((node) => node.textContent);
+    };
+    expect(years("Gear over time")).toEqual(["2024", "2023"]);
+    expect(years("Focal length over time")).toEqual(["2024", "2023"]);
+    fireEvent.click(screen.getByRole("radio", { name: "Stacked" }));
+    fireEvent.click(screen.getByRole("radio", { name: "By band" }));
+    expect(years("Gear over time")).toEqual(["2024", "2023"]);
+    expect(years("Focal length over time")).toEqual(["2024", "2023"]);
+  });
   it("gives a body its settings, its company and its own frame", () => {
     render(<ExploreGearSection gear={gear()} frames={frames} />);
 

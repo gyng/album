@@ -96,6 +96,9 @@ const kitSearchHref = (profile: GearProfile): string =>
 const INITIAL_KIT_CARDS = 8;
 const LOAD_MORE_KIT_CARDS = 8;
 
+const newestYearFirst = (left: { label: string }, right: { label: string }) =>
+  Number(right.label) - Number(left.label);
+
 /**
  * What the camera and lens counts cannot say.
  *
@@ -314,7 +317,7 @@ export const ExploreGearSection = ({
           </GearSectionHeader>
           <GearLegend items={legend} selected={onlyKit} onSelect={setOnlyKit} />
           <div className={styles.gearYears}>
-            {gear.cameraYears.map((year) => (
+            {[...gear.cameraYears].sort(newestYearFirst).map((year) => (
               <GearYearRow key={year.label} label={year.label} total={kitTotal(year)}>
                 {yearView === "stacked" ? (
                   <GearStackedBar
@@ -384,7 +387,7 @@ export const ExploreGearSection = ({
             onSelect={setOnlyBand}
           />
           <div className={styles.gearYears}>
-            {gear.focalYears.map((year) => (
+            {[...gear.focalYears].sort(newestYearFirst).map((year) => (
               <GearYearRow key={year.label} label={year.label} total={focalTotal(year)}>
                 {focalView === "bands" ? (
                   <GearStackedBar
