@@ -15,8 +15,10 @@ export const SegmentedToggle = <T extends string>(props: {
    * happened to land there.
    */
   variant?: "surface" | "overlay";
+  size?: "compact";
 }) => {
-  const { options, value, onChange, ariaLabel, className, variant = "surface" } = props;
+  const { options, value, onChange, ariaLabel, className, variant = "surface", size } = props;
+  const compact = size === "compact";
   const overlay = variant === "overlay";
   const groupRef = useRef<HTMLDivElement>(null);
 
@@ -55,7 +57,12 @@ export const SegmentedToggle = <T extends string>(props: {
     // oxlint-disable-next-line jsx-a11y/interactive-supports-focus
     <div
       ref={groupRef}
-      className={[styles.toggle, overlay ? styles.toggleOverlay : "", className]
+      className={[
+        styles.toggle,
+        overlay ? styles.toggleOverlay : "",
+        compact ? styles.toggleCompact : "",
+        className,
+      ]
         .filter(Boolean)
         .join(" ")}
       role="radiogroup"
@@ -74,6 +81,7 @@ export const SegmentedToggle = <T extends string>(props: {
             className={[
               styles.button,
               overlay ? styles.buttonOverlay : "",
+              compact ? styles.buttonCompact : "",
               selected ? (overlay ? styles.buttonActiveOverlay : styles.buttonActive) : "",
             ]
               .filter(Boolean)

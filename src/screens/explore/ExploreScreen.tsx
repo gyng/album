@@ -467,6 +467,7 @@ const ExploreScreen = ({
                         </div>
                         {visualSameness.averageExamples.length > averageExamples.length ? (
                           <PillButton
+                            size="compact"
                             className={styles.loadMoreButton}
                             onClick={() => {
                               setVisibleAverageExamples((count) =>
@@ -500,6 +501,7 @@ const ExploreScreen = ({
                         </div>
                         {visualSameness.distinctExamples.length > distinctExamples.length ? (
                           <PillButton
+                            size="compact"
                             className={styles.loadMoreButton}
                             onClick={() => {
                               setVisibleDistinctExamples((count) =>
@@ -541,6 +543,7 @@ const ExploreScreen = ({
                         </div>
                         {visualSameness.repeatedExamples.length > repeatedExamples.length ? (
                           <PillButton
+                            size="compact"
                             className={styles.loadMoreButton}
                             onClick={() => {
                               setVisibleRepeatedExamples((count) =>
@@ -589,6 +592,7 @@ const ExploreScreen = ({
                         </div>
                         {visualSameness.travellingMotifs.length > travellingMotifs.length ? (
                           <PillButton
+                            size="compact"
                             className={styles.loadMoreButton}
                             onClick={() => {
                               setVisibleTravellingMotifs((count) =>
@@ -639,6 +643,7 @@ const ExploreScreen = ({
                         </div>
                         {visualSameness.visualEras.length > recurringLooks.length ? (
                           <PillButton
+                            size="compact"
                             className={styles.loadMoreButton}
                             onClick={() => {
                               setVisibleRecurringLooks((count) =>
@@ -687,6 +692,7 @@ const ExploreScreen = ({
                         </div>
                         {visualSameness.lookTimeline.length > lookTimeline.length ? (
                           <PillButton
+                            size="compact"
                             className={styles.loadMoreButton}
                             aria-label="More years"
                             onClick={() => {
@@ -740,7 +746,10 @@ const ExploreScreen = ({
                     Archive cadence
                   </Heading>
                   <Caption as="span">{formatCoverage(activeCalendarCoverage)}</Caption>
-                  <Link href="/timeline" className={`${pillStyles.base} ${pillStyles.ghost}`}>
+                  <Link
+                    href="/timeline"
+                    className={`${pillStyles.base} ${pillStyles.ghost} ${pillStyles.compact}`}
+                  >
                     <span>Open Timeline</span>
                     <span aria-hidden="true">↗</span>
                   </Link>
@@ -785,11 +794,15 @@ const ExploreScreen = ({
             deferredSummary={`${stats.mapPoints.length.toLocaleString("en")} mapped photo locations are available as a map, location flow, and searchable place bars.`}
             actions={
               <div className={styles.groupActionsStack}>
-                <Link href="/map" className={`${pillStyles.base} ${pillStyles.ghost}`}>
+                <Link
+                  href="/map"
+                  className={`${pillStyles.base} ${pillStyles.ghost} ${pillStyles.compact}`}
+                >
                   <span>Open Map</span>
                   <span aria-hidden="true">↗</span>
                 </Link>
                 <SegmentedToggle
+                  size="compact"
                   options={[
                     { value: "map" as const, label: "Map" },
                     { value: "sankey" as const, label: "Sankey" },
@@ -848,6 +861,7 @@ const ExploreScreen = ({
                     control a screen away from its own chart is a control a
                     reader has to remember pressing. */}
                 <SegmentedToggle
+                  size="compact"
                   options={[
                     { value: "sankey" as const, label: "Sankey" },
                     { value: "bars" as const, label: "Bars" },

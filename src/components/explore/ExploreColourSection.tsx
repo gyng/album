@@ -167,14 +167,14 @@ export const ExploreColourSection = ({
                         {familyHref ? (
                           <Link
                             href={familyHref}
-                            className={`${pillStyles.base} ${pillStyles.ghost}`}
+                            className={`${pillStyles.base} ${pillStyles.ghost} ${pillStyles.compact}`}
                           >
                             <span>Search</span>
                             <span aria-hidden="true">↗</span>
                           </Link>
                         ) : null}
                       </div>
-                      <div>
+                      <div className={localStyles.familyPhotos}>
                         <div className={styles.colorFamilyThumbs}>
                           {family.photos.slice(0, visiblePhotos[family.label] ?? 6).map((photo) => (
                             <Link
@@ -196,7 +196,7 @@ export const ExploreColourSection = ({
                         </div>
                         {family.photos.length > (visiblePhotos[family.label] ?? 6) ? (
                           <PillButton
-                            className={localStyles.morePhotos}
+                            size="compact"
                             aria-label={`More photos with ${family.label.toLowerCase()} tones`}
                             onClick={() =>
                               setVisiblePhotos((current) => ({
@@ -215,6 +215,7 @@ export const ExploreColourSection = ({
               </div>
               {stats.colorFamilyExamples.length > visibleFamilies ? (
                 <PillButton
+                  size="compact"
                   className={localStyles.moreFamilies}
                   aria-label="More colour families"
                   onClick={() => setVisibleFamilies((count) => count + 4)}
@@ -232,6 +233,7 @@ export const ExploreColourSection = ({
                   Colour over time
                 </Heading>
                 <SegmentedToggle
+                  size="compact"
                   ariaLabel="How to show colour over time"
                   value={colourView}
                   onChange={setColourView}

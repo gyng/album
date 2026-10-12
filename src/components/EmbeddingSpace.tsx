@@ -1644,6 +1644,7 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
               canvas sizes itself from its container every frame, so there is
               nothing to tell it — it simply has more to fill. */}
           <OverlayButton
+            size="compact"
             aria-pressed={fullscreen}
             className={fullscreen ? styles.toolActive : ""}
             onClick={() => {
@@ -1668,6 +1669,7 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
           <SegmentedToggle
             ariaLabel="How to arrange the photographs"
             variant="overlay"
+            size="compact"
             value={arrangement}
             onChange={(next) => {
               // Flat means straight on: a view left half-turned would be an
@@ -1692,6 +1694,7 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
             ]}
           />
           <OverlayButton
+            size="compact"
             aria-pressed={!drifting}
             className={drifting ? "" : styles.toolActive}
             onClick={() => setDrifting((current) => !current)}
@@ -1711,6 +1714,7 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
             // cloud: a name is a control, and it should look like the app's.
             className={[
               overlayButtonStyles.base,
+              overlayButtonStyles.compact,
               styles.clusterName,
               chosen === index ? styles.clusterNameChosen : "",
             ]
@@ -1784,7 +1788,7 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
           <div className={styles.actions}>
             {selectionTags[0] ? (
               <AppLink
-                className={pillStyles.base + " " + pillStyles.surface}
+                className={[pillStyles.base, pillStyles.surface, pillStyles.compact].join(" ")}
                 href={buildSearchHref({ query: [selectionTags[0]] })}
               >
                 {`Search “${selectionTags[0].replaceAll("_", " ")}”`}
@@ -1792,7 +1796,7 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
             ) : null}
             {medoidPath ? (
               <AppLink
-                className={pillStyles.base + " " + pillStyles.surface}
+                className={[pillStyles.base, pillStyles.surface, pillStyles.compact].join(" ")}
                 href={buildSimilaritySearchHref(medoidPath)}
               >
                 Find more like these
@@ -1800,7 +1804,7 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
             ) : null}
             <button
               type="button"
-              className={[pillStyles.base, pillStyles.ghost].join(" ")}
+              className={[pillStyles.base, pillStyles.ghost, pillStyles.compact].join(" ")}
               onClick={() => setChosen(null)}
             >
               Clear

@@ -442,7 +442,6 @@
 
 .loadMoreButton {
   inline-size: fit-content;
-  padding: var(--m-s) var(--m-m);
 }
 
 .sectionHeader {

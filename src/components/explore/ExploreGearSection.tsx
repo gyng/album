@@ -233,6 +233,7 @@ export const ExploreGearSection = ({
   // count should not be something a reader has to scroll back for.
   const groupingToggle = (
     <SegmentedToggle
+      size="compact"
       ariaLabel="What to count as one piece of kit"
       value={grouping}
       onChange={(next) => {
@@ -264,7 +265,11 @@ export const ExploreGearSection = ({
           {/* A different frame from each of them. Offset by the card's own
               position as well as the roll, so one press changes every picture
               rather than marching them all through the same order. */}
-          <PillButton className={styles.loadMoreButton} onClick={() => setRoll((at) => at + 1)}>
+          <PillButton
+            size="compact"
+            className={styles.loadMoreButton}
+            onClick={() => setRoll((at) => at + 1)}
+          >
             <span>Reroll</span>
           </PillButton>
         </GearSectionHeader>
@@ -300,6 +305,7 @@ export const ExploreGearSection = ({
         </div>
         {profiles.length > visibleCards ? (
           <PillButton
+            size="compact"
             className={styles.loadMoreButton}
             onClick={() => {
               setVisibleCards((count) => Math.min(count + LOAD_MORE_KIT_CARDS, profiles.length));
@@ -315,6 +321,7 @@ export const ExploreGearSection = ({
           <GearSectionHeader title="Gear over time">
             {groupingToggle}
             <SegmentedToggle
+              size="compact"
               ariaLabel="How to show gear over time"
               value={yearView}
               onChange={setYearView}
@@ -370,6 +377,7 @@ export const ExploreGearSection = ({
         <section className={`${styles.section} ${styles.sectionWide}`}>
           <GearSectionHeader title="Focal length over time">
             <SegmentedToggle
+              size="compact"
               ariaLabel="How to show focal length over time"
               value={focalView}
               onChange={setFocalView}

@@ -169,6 +169,7 @@ export const ExploreStatGroup: React.FC<{
       ) : null}
       {isNarrowViewport ? (
         <PillButton
+          size="compact"
           className={styles.groupToggle}
           aria-expanded={!isCollapsed}
           {

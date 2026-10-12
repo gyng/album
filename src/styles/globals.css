@@ -180,6 +180,7 @@ textarea {
   --radius-pill: 999px;
   --focus-offset: 2px;
   --tap-target: 44px;
+  --compact-control-size: 32px;
   --thumb-size: 150px;
   --thumb-size-small: 112px;
   --content-width-wide: 960px;
@@ -403,6 +404,12 @@ textarea {
     color-mix(in oklch, var(--c-bg-contrast-light) 45%, transparent);
   --popup-radius: var(--m-s);
   --popup-shadow: 0 10px 30px rgb(0 0 0 / 0.18);
+}
+
+@media (hover: none), (pointer: coarse) {
+  :root {
+    --compact-control-size: var(--tap-target);
+  }
 }
 
 /* Responsive widths are intentionally written directly in media queries because

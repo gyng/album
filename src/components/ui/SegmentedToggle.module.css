@@ -90,3 +90,21 @@
   box-shadow: inset 0 0 0 var(--line-hairline) var(--c-accent);
   color: var(--c-accent);
 }
+
+.toggleCompact {
+  min-block-size: var(--compact-control-size);
+  margin: 0;
+  padding: var(--size-2);
+  gap: var(--size-2);
+  border-width: var(--line-hairline);
+}
+
+.buttonCompact {
+  min-block-size: calc(var(--compact-control-size) - var(--size-6));
+  min-inline-size: var(--compact-control-size);
+  margin: 0;
+  padding: var(--m) var(--m-m);
+  font-family: inherit;
+  font-size: var(--fs-s);
+  line-height: 1.2;
+}

@@ -198,6 +198,7 @@ export const GearProfileCard = ({
         </Link>
         {onRandom ? (
           <PillButton
+            size="compact"
             className={styles.gearBodyRandom}
             aria-label={`Random photo for ${profile.label}`}
             onClick={onRandom}

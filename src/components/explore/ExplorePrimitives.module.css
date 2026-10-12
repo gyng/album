@@ -80,7 +80,6 @@
 /* Only rendered on narrow viewports, where each group starts collapsed. */
 .groupToggle {
   justify-self: start;
-  margin-block-start: var(--m-s);
 }
 
 .groupDeferredPlaceholder {

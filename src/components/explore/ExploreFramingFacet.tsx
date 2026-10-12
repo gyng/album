@@ -46,6 +46,7 @@ export const ExploreFramingFacet = ({ facet }: { facet: StringFacetStat }) => {
       </div>
       {collapsible ? (
         <PillButton
+          size="compact"
           className={styles.toggle}
           aria-expanded={expanded}
           aria-controls={`${facet.facetId}-buckets`}

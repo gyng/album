@@ -54,10 +54,20 @@
 
 .tools {
   position: absolute;
-  inset-block-start: var(--m-s);
-  inset-inline-end: var(--m-s);
+  z-index: var(--z-control);
+  inset-block-start: var(--m-m);
+  inset-inline: var(--m-m);
   display: flex;
-  gap: var(--m-xs);
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--m-s);
+  pointer-events: none;
+}
+
+.tools > * {
+  flex-shrink: 0;
+  pointer-events: auto;
 }
 
 /* The same pressed state the arrangement control shows: accent ink, an accent
@@ -79,7 +89,7 @@
   position: absolute;
   inset-block-start: 0;
   inset-inline-start: 0;
-  gap: var(--m-xs);
+  gap: var(--m-s);
   font-weight: 600;
   letter-spacing: 0.03em;
   white-space: nowrap;
@@ -105,16 +115,6 @@
   background-color: var(--c-accent);
   border-color: var(--c-accent);
   color: var(--c-white);
-}
-
-/* A finger has the whole cloud to aim at and the names are over it, so they
-   give a little height back where every pixel of picture counts. They stay
-   well past the smallest comfortable target. */
-@media (hover: none), (pointer: coarse) {
-  .clusterName {
-    min-block-size: calc(var(--tap-target) * 0.78);
-    font-size: var(--fs-s);
-  }
 }
 
 .clusterCount {
@@ -229,7 +229,8 @@
 .actions {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--m-xs);
+  align-items: center;
+  gap: var(--m-s);
 }
 
 /* Reachable by keyboard and by a screen reader, invisible to everyone else:

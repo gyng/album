@@ -32,3 +32,14 @@
 .ghost:hover {
   background: color-mix(in oklch, var(--c-bg) 97%, var(--c-bg-contrast-dark));
 }
+
+.compact {
+  appearance: none;
+  justify-content: center;
+  min-block-size: var(--compact-control-size);
+  margin: 0;
+  padding: var(--m) var(--m-m);
+  gap: var(--m-s);
+  font-family: inherit;
+  line-height: 1.2;
+}

@@ -35,6 +35,7 @@ export const ExploreLookYearPhotos = ({
       {hasMore ? (
         <div className={styles.actions}>
           <PillButton
+            size="compact"
             aria-label={`More photos from ${year}`}
             aria-controls={`look-year-${year}-photos`}
             onClick={() => setVisible((count) => Math.min(count + 3, photos.length))}
@@ -42,6 +43,7 @@ export const ExploreLookYearPhotos = ({
             More
           </PillButton>
           <PillButton
+            size="compact"
             aria-label={`Random photos from ${year}`}
             aria-controls={`look-year-${year}-photos`}
             onClick={() =>
