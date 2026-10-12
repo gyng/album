@@ -6,6 +6,7 @@ import {
   type PhotoGamePhoto,
   type RelayPuzzle,
 } from "../../util/photoGames";
+import { GameProgress, GameScore } from "./GameFeedback";
 import { GamePhoto, PhotoChain } from "./GamePhoto";
 import styles from "./PhotoGames.module.css";
 
@@ -72,8 +73,17 @@ export const PhotoRelay = ({ photos }: { photos: PhotoGamePhoto[] }) => {
               <GamePhoto photo={puzzle.end} />
             </figure>
           </div>
-          <p role="status">{order.length} of 5 links placed</p>
-          {order.length > 0 ? <PhotoChain photos={order} linked={false} /> : null}
+          <div className={styles.roundProgress}>
+            <p role="status">{order.length} of 5 links placed</p>
+            <GameProgress current={order.length} total={5} />
+          </div>
+          <ol className={styles.relaySlots} aria-label="Your relay links">
+            {Array.from({ length: 5 }, (_, index) => (
+              <li key={index} data-filled={!!order[index]}>
+                {order[index] ? <GamePhoto photo={order[index]!} /> : <span>{index + 1}</span>}
+              </li>
+            ))}
+          </ol>
           <div className={styles.choices}>
             {puzzle.tiles.map((photo, index) => {
               const position = order.findIndex((item) => item.path === photo.path);
@@ -87,6 +97,7 @@ export const PhotoRelay = ({ photos }: { photos: PhotoGamePhoto[] }) => {
                     if (element) choiceRefs.current.set(photo.path, element);
                     else choiceRefs.current.delete(photo.path);
                   }}
+                  aria-pressed={position >= 0}
                   disabled={position >= 0}
                   onClick={(event) => {
                     const next = [...order, photo];
@@ -141,13 +152,14 @@ export const PhotoRelay = ({ photos }: { photos: PhotoGamePhoto[] }) => {
           aria-label="Relay result"
         >
           <Heading level={1}>{gaveUp ? "The suggested route" : "Your relay"}</Heading>
-          {!gaveUp ? (
-            <p className={styles.score}>Visual flow: {scoreRelay(puzzle, order)} / 100</p>
-          ) : null}
+          {!gaveUp ? <GameScore label="Visual flow" score={scoreRelay(puzzle, order)} /> : null}
           <PhotoChain photos={[puzzle.start, ...(gaveUp ? puzzle.solution : order), puzzle.end]} />
           {!gaveUp ? (
             <>
-              <Caption>Scored by visual similarity between neighbouring photographs.</Caption>
+              <Caption>
+                Your route’s rank among all 120 possible orders, using similarity between
+                neighbouring photographs.
+              </Caption>
               <details>
                 <summary>Compare the suggested route</summary>
                 <PhotoChain photos={[puzzle.start, ...puzzle.solution, puzzle.end]} />

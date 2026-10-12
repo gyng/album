@@ -141,11 +141,14 @@ export const scoreRelay = (puzzle: RelayPuzzle, order: PhotoGamePhoto[]): number
     route.order.every((photo, i) => photo.path === order[i]?.path),
   );
   if (!matching) return null;
-  const best = routes[0]!.smoothness;
-  const worst = routes.at(-1)!.smoothness;
-  return best - worst < 1e-9
-    ? 100
-    : Math.round((100 * (matching.smoothness - worst)) / (best - worst));
+  // Relative rank makes scores comparable across puzzles. Tied routes share
+  // their midpoint rank; a tray with no measurable flow difference is unscored.
+  const worse = routes.filter((route) => route.smoothness < matching.smoothness - 1e-9).length;
+  const tied = routes.filter(
+    (route) => Math.abs(route.smoothness - matching.smoothness) <= 1e-9,
+  ).length;
+  if (tied === routes.length) return null;
+  return Math.round((100 * (worse + (tied - 1) / 2)) / (routes.length - 1));
 };
 
 export const rankDrawing = (vector: number[], photos: PhotoGamePhoto[], targetPath: string) => {
@@ -166,19 +169,20 @@ export const rankDrawing = (vector: number[], photos: PhotoGamePhoto[], targetPa
   // penalise a drawing that matches several photographs equally well.
   const rank = ranked.filter((item) => item.similarity > targetSimilarity + 1e-9).length + 1;
   const middle = Math.floor(ranked.length / 2);
-  const typicalSimilarity =
+  let typicalSimilarity =
     ranked.length % 2
       ? ranked[middle]!.similarity
       : (ranked[middle - 1]!.similarity + ranked[middle]!.similarity) / 2;
   const bestSimilarity = ranked[0]!.similarity;
+  // A majority of tied best matches can put the median at the maximum.
+  // Use the remaining range when it exists; only a flat archive is unscored.
+  if (bestSimilarity - typicalSimilarity < 1e-9) typicalSimilarity = ranked.at(-1)!.similarity;
   // A high archive percentile can still be a weak match: most photographs
   // are unrelated to any one sketch. Reward similarity above a typical match,
   // scaled against the closest match, rather than the number of worse photos.
   const score =
     bestSimilarity - typicalSimilarity < 1e-9
-      ? targetSimilarity >= bestSimilarity - 1e-9
-        ? 100
-        : 0
+      ? null
       : Math.round(
           100 *
             Math.max(

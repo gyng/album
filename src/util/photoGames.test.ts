@@ -52,7 +52,9 @@ it("uses a compatible group of vectors and avoids near-duplicate relay frames wh
 
 it("does not penalise tied sketch matches or accept non-finite drawing vectors", () => {
   const target = photo("z", [1, 0]);
-  expect(rankDrawing([1, 0], [photo("a", [1, 0]), target], target.path)).toMatchObject({
+  expect(
+    rankDrawing([1, 0], [photo("a", [1, 0]), photo("other", [0, 1]), target], target.path),
+  ).toMatchObject({
     rank: 1,
     score: 100,
   });
@@ -135,4 +137,29 @@ it("uses a balanced visual question and learns from answers without being given 
   expect(updated[0]!.weight).toBeGreaterThan(updated[1]!.weight);
   expect(answerOracle(candidates, question, "unsure")).toEqual(candidates);
   expect(chooseOracleQuestion(candidates, [question.id])?.id).not.toBe(question.id);
+});
+
+it("withholds a drawing score when the archive cannot distinguish matches", () => {
+  expect(rankDrawing([1, 0], [photo("a", [0, 1]), photo("b", [0, 1])], "a")?.score).toBeNull();
+});
+it("grades relay orders against all possible routes with a neutral random-order baseline", () => {
+  const puzzle = buildRelayPuzzle(arc, () => 0.3)!;
+  const permutations = (items: PhotoGamePhoto[]): PhotoGamePhoto[][] =>
+    items.length
+      ? items.flatMap((item, i) =>
+          permutations(items.filter((_, j) => i !== j)).map((tail) => [item, ...tail]),
+        )
+      : [[]];
+  const scores = permutations(puzzle.tiles).map((order) => scoreRelay(puzzle, order)!);
+  expect(Math.min(...scores)).toBe(0);
+  expect(Math.max(...scores)).toBe(100);
+  expect(scores.reduce((sum, score) => sum + score, 0) / scores.length).toBeCloseTo(50, 0);
+});
+
+it("withholds relay scores when every route is equally similar", () => {
+  const puzzle = buildRelayPuzzle(
+    Array.from({ length: 7 }, (_, i) => photo(String(i), [1, 0])),
+    () => 0.4,
+  )!;
+  expect(scoreRelay(puzzle, puzzle.solution)).toBeNull();
 });

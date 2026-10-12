@@ -19,8 +19,8 @@ undo restores focus to the returned photograph. Pointer selections keep the
 reader's current position.
 All 120 possible orders are evaluated by the sum of adjacent cosine similarities;
 the suggested route is the best.
-The visual-flow score scales the player's sum between the worst and best orders
-of this same tray. Give up reveals the complete suggested chain. Undo and replay
+The visual-flow score is the player's percentile among all 120 orders of this
+same tray (0–100). Ties share a midpoint rank; an entirely tied tray is unscored. Give up reveals the complete suggested chain. Undo and replay
 do not require new network requests. This measures embedding similarity rather
 than editorial quality.
 
@@ -32,7 +32,9 @@ shows the sketch, hidden target, and closest archive photograph. The score
 scales the target's similarity above the archive median against the closest
 match. Rank is shown separately: a large archive must not turn a weak match
 into a high score just because many photographs rank below it. It is not the
-raw cosine expressed as a percentage. Ties share a rank. Model loading
+raw cosine expressed as a percentage. Ties share a rank. If the median is tied
+with the best match, the remaining similarity range supplies the baseline; if
+all matches tie, no score is awarded. Model loading
 reports progress; a failed encode retains the submitted blob for retry.
 Closing the drawing pad preserves a PNG draft that is restored when reopened.
 Blank canvases are rejected before inference. Give up reveals the target and
@@ -118,3 +120,22 @@ Photo Oracle prompt:
 > generous empty margins, sophisticated playful sketchbook style rather than
 > corporate clip art. Landscape composition approximately 3:2, one clear central
 > vignette readable at card size. No words, letters, logos or watermarks.
+
+
+## Game feel and scoring — 13 October 2026
+
+Relay links now fill five persistent frame slots, so the evolving route stays
+visible from the first move. Filled choices retain their selected state; progress
+pips track the route and Oracle questions. Result panels and score bars reveal
+with short animations; reduced-motion preferences disable these transitions.
+Scores remain immediately readable and do not animate screen-reader text.
+
+A seeded real-archive sample of 20 random relay orders averaged 29.35 under the
+old similarity-range formula and 37.55 under percentile scoring. The exact
+120-order regression verifies a 50-point mean across every possible order,
+with 0 and 100 at the extremes. This removes puzzle-dependent compression;
+a small random sample is not expected to land exactly on 50. Drawing regression
+coverage now also rejects the misleading 100 points previously awarded to a
+flat set of equally unrelated matches, while preserving tied best matches when
+other photographs provide a meaningful comparison. Oracle reports questions
+rather than inventing an accuracy score from approximate caption matching.

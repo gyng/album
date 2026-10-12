@@ -4,6 +4,7 @@ import { SearchDrawPad } from "../search/SearchDrawPad";
 import { useImageQuery } from "../search/useImageQuery";
 import { ProgressBar } from "../ProgressBar";
 import { rankDrawing, shuffleGamePhotos, type PhotoGamePhoto } from "../../util/photoGames";
+import { GameScore } from "./GameFeedback";
 import { GamePhoto } from "./GamePhoto";
 import styles from "./PhotoGames.module.css";
 
@@ -88,7 +89,7 @@ export const BlindFrame = ({ photos }: { photos: PhotoGamePhoto[] }) => {
           <Heading level={1}>The reveal</Heading>
           {result && !gaveUp ? (
             <>
-              <p className={styles.score}>{result.score} / 100</p>
+              <GameScore label="" score={result.score} />
               <Caption>
                 The hidden photograph ranked {result.rank.toLocaleString("en-GB")} of{" "}
                 {result.total.toLocaleString("en-GB")} archive matches for your sketch. The score

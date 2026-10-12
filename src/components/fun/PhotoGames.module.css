@@ -66,6 +66,10 @@
   padding: var(--space-2);
   cursor: pointer;
   text-align: start;
+  transition:
+    transform 150ms ease,
+    border-color 150ms ease,
+    background 150ms ease;
 }
 
 .choice:hover:not(:disabled) {
@@ -132,6 +136,7 @@
 .result {
   display: grid;
   gap: var(--space-4);
+  animation: frameIn 300ms ease-out;
 }
 .error {
   color: var(--c-font);
@@ -146,5 +151,120 @@
   }
   .endpoints {
     gap: var(--space-3);
+  }
+}
+
+.roundProgress {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-3);
+}
+.progressDots {
+  display: flex;
+  gap: var(--space-2);
+}
+.progressDots span {
+  inline-size: 0.65rem;
+  block-size: 0.65rem;
+  border: 1px solid var(--c-bg-contrast-light);
+  border-radius: 50%;
+  transition:
+    background 180ms ease,
+    transform 180ms ease;
+}
+.progressDots span[data-filled="true"] {
+  background: var(--c-accent);
+  border-color: var(--c-accent);
+  transform: scale(1.15);
+}
+.relaySlots {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: var(--space-3);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.relaySlots li {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 4 / 3;
+  border: 1px dashed var(--c-bg-contrast-light);
+  border-radius: var(--radius-preview);
+  color: var(--c-bg-contrast-light);
+  font-variant-numeric: tabular-nums;
+  min-inline-size: 0;
+}
+.relaySlots li[data-filled="true"] {
+  border-style: solid;
+  border-color: var(--c-accent);
+  animation: frameIn 240ms ease-out;
+}
+.scoreCard {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border-inline-start: 3px solid var(--c-accent);
+  background: var(--c-surface);
+  border-radius: var(--radius-preview);
+  max-inline-size: 28rem;
+}
+.scoreTrack {
+  block-size: 0.35rem;
+  background: var(--c-bg-contrast-light);
+  border-radius: 1rem;
+  overflow: hidden;
+}
+.scoreTrack span {
+  display: block;
+  block-size: 100%;
+  background: var(--c-accent);
+  transform-origin: left;
+  animation: scoreIn 650ms ease-out;
+}
+.result {
+  animation: frameIn 300ms ease-out;
+}
+.choice {
+  transition:
+    transform 150ms ease,
+    border-color 150ms ease,
+    background 150ms ease;
+}
+.choice:active:not(:disabled) {
+  transform: scale(0.97);
+}
+.choice[aria-pressed="true"] {
+  opacity: 0.7;
+}
+@keyframes frameIn {
+  from {
+    opacity: 0;
+    transform: translateY(0.4rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes scoreIn {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .result,
+  .relaySlots li,
+  .scoreTrack span {
+    animation: none;
+  }
+  .choice,
+  .progressDots span {
+    transition: none;
   }
 }

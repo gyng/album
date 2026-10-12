@@ -7,6 +7,7 @@ import {
   type OracleCandidate,
   type PhotoGamePhoto,
 } from "../../util/photoGames";
+import { GameProgress } from "./GameFeedback";
 import { GamePhoto } from "./GamePhoto";
 import styles from "./PhotoGames.module.css";
 
@@ -110,6 +111,10 @@ export const PhotoOracle = ({ photos }: { photos: PhotoGamePhoto[] }) => {
       ) : null}
       {stage === "questions" ? (
         <>
+          <div className={styles.roundProgress}>
+            <Caption>{answers.length} of 8 questions answered</Caption>
+            <GameProgress current={answers.length} total={8} />
+          </div>
           {isGuess && top ? (
             <>
               <Heading level={1}>Is this your photograph?</Heading>
