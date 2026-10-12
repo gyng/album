@@ -12,3 +12,4 @@ export { SegmentedToggle } from "./SegmentedToggle";
 export { Select } from "./Select";
 export { Thumb } from "./Thumb";
 export { Icon, type IconKind } from "./Icon";
+export { LoadingIndicator } from "./LoadingIndicator";

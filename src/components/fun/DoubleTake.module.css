@@ -1,0 +1,113 @@
+.game {
+  display: grid;
+  gap: var(--space-5);
+  min-inline-size: 0;
+}
+.game p {
+  margin: 0;
+}
+.actions,
+.progress {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+.stage {
+  position: relative;
+  inline-size: 100%;
+  display: grid;
+  place-items: center;
+  background: var(--c-surface);
+  border-radius: var(--radius-preview);
+  aspect-ratio: 3 / 2;
+  max-block-size: 65dvh;
+  overflow: hidden;
+}
+.lookLabel {
+  position: absolute;
+  inset-block-start: var(--space-3);
+  inset-inline-start: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  background: var(--c-surface);
+  border-radius: var(--radius-control);
+  font-size: var(--fs-s);
+}
+.clock {
+  position: absolute;
+  inset-inline: 0;
+  inset-block-end: 0;
+  block-size: 3px;
+  background: var(--c-accent);
+  transform-origin: left;
+  animation: remaining linear forwards;
+}
+@keyframes remaining {
+  to {
+    transform: scaleX(0);
+  }
+}
+.flash {
+  position: absolute;
+  inset: 0;
+  inline-size: 100%;
+  block-size: 100%;
+  object-fit: contain;
+  animation: arrive 120ms ease-out;
+}
+.placeholder {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  text-align: center;
+}
+.reveal {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+.reveal figure {
+  margin: 0;
+  min-inline-size: 0;
+}
+.reveal figcaption {
+  display: grid;
+  gap: var(--space-2);
+  margin-block-start: var(--space-3);
+}
+.spinner {
+  inline-size: 1.5rem;
+  block-size: 1.5rem;
+  border: 2px solid var(--c-border);
+  border-block-start-color: var(--c-accent);
+  border-radius: 50%;
+  animation: spin 800ms linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes arrive {
+  from {
+    opacity: 0.5;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .flash {
+    animation: none;
+  }
+  .spinner,
+  .clock {
+    animation: none;
+  }
+}
+@media (max-width: 480px) {
+  .reveal {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

@@ -52,7 +52,7 @@ it("keeps the target hidden until the sketch is submitted, then compares all thr
     fireEvent.click(screen.getByRole("button", { name: "Submit sketch" }));
   });
   expect(screen.getByRole("region", { name: "Blind Frame result" })).toBeTruthy();
-  expect(screen.getByText("100 / 100")).toBeTruthy();
+  expect(screen.getByText("Resemblance to the original: 100 / 100")).toBeTruthy();
   expect(screen.getAllByRole("img")).toHaveLength(4);
   fireEvent.click(screen.getByRole("button", { name: "Play again" }));
   expect(screen.queryByRole("img")).toBeNull();
@@ -106,4 +106,19 @@ it("opens the drawing pad as soon as a desktop round starts", () => {
   } finally {
     match.mockRestore();
   }
+});
+
+it("keeps a busy comparison status after the image model reports ready", () => {
+  jest.mocked(encodeSearchImage).mockImplementation((_blob, progress) => {
+    progress?.(100, "Image search model ready");
+    return new Promise(() => {});
+  });
+  render(<BlindFrame photos={photos} />);
+  fireEvent.click(screen.getByRole("button", { name: "Start Blind Frame" }));
+  fireEvent.click(screen.getByRole("button", { name: "Draw this scene" }));
+  fireEvent.click(screen.getByRole("button", { name: "Submit sketch" }));
+  const status = screen.getByRole("status");
+  expect(status).toHaveAttribute("aria-busy", "true");
+  expect(status).toHaveTextContent("Comparing your drawing");
+  expect(status).not.toHaveTextContent("model ready");
 });

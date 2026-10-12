@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { Button } from "../ui";
+import { Button, LoadingIndicator } from "../ui";
 import { warmSearchImageModel } from "./imageEmbeddings";
 import styles from "./SearchDrawPad.module.css";
 
@@ -59,6 +59,7 @@ export const SearchDrawPad: React.FC<Props> = ({
   const [hasStrokes, setHasStrokes] = useState(false);
   const [restoring, setRestoring] = useState(!!initialDrawing);
   const warmedRef = useRef(false);
+  const [warming, setWarming] = useState(false);
   const undoRef = useRef<Array<{ pixels: ImageData; hasStrokes: boolean }>>([]);
   const redoRef = useRef<Array<{ pixels: ImageData; hasStrokes: boolean }>>([]);
   const [historyVersion, setHistoryVersion] = useState(0);
@@ -175,9 +176,12 @@ export const SearchDrawPad: React.FC<Props> = ({
     saveUndo();
     if (!warmedRef.current) {
       warmedRef.current = true;
-      void warmSearchImageModel().catch(() => {
-        warmedRef.current = false;
-      });
+      setWarming(true);
+      void warmSearchImageModel()
+        .catch(() => {
+          warmedRef.current = false;
+        })
+        .finally(() => setWarming(false));
     }
     event.currentTarget.focus();
     event.currentTarget.setPointerCapture(event.pointerId);
@@ -311,6 +315,11 @@ export const SearchDrawPad: React.FC<Props> = ({
         aria-label="Drawing canvas"
       />
       <div className={styles.tools}>
+        {warming ? (
+          <div role="status" aria-busy="true">
+            <LoadingIndicator label="Preparing image matching…" />
+          </div>
+        ) : null}
         {restoring ? (
           <p className={styles.status} role="status">
             Restoring sketch…

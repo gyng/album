@@ -1,0 +1,28 @@
+.indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--fs-sm);
+}
+
+.spinner {
+  inline-size: 1em;
+  block-size: 1em;
+  flex: 0 0 auto;
+  border: 2px solid var(--c-border);
+  border-block-start-color: var(--c-accent);
+  border-radius: 50%;
+  animation: spin 800ms linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation: none;
+  }
+}

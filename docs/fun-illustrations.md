@@ -1,5 +1,17 @@
 # Fun illustrations
 
+## Double Take — `public/fun/double-take.avif`
+
+Generated with the built-in imagegen tool; transparent 960×640 AVIF.
+
+> Use case: illustration-story. Create a decorative illustration for a photo archive game named Double Take (no text). Nineteenth-century hand-drawn copperplate / wood engraving, antique natural-history technical-book cover style. Fine pure black ink contour lines, dense delicate cross-hatching and stippling, skilled visibly handmade. Subject: a Victorian stereoscope viewer beside two photographic prints showing two deceptively similar winding streets, one with a stone arch and the other a different arch, a small compass beside them. Single centred vignette, landscape 3:2 canvas, generous transparent margins, whole subject visible. Genuinely transparent background INCLUDING gaps between hatch marks and uninked areas. No white paper background, no opaque fills, no gradients, no lettering, border or watermark. App recolours the ink with a luminance mask. Match a detailed antique engraving rather than a cartoon or modern vector.
+
+## Cross Exposure — `public/fun/cross-exposure.avif`
+
+Generated with the built-in imagegen tool; transparent 960×640 AVIF.
+
+> Use case: illustration-story. Decorative illustration for a photo crossword game, no words. Nineteenth-century hand-drawn copperplate / wood engraving matching antique natural-history technical-book covers. Pure black fine ink contour lines, delicate dense cross-hatching and stippling, visibly handmade, no modern vector style. Subject: an antique photographer's hand using tweezers to place a small photographic print into a neatly arranged three by three grid of photographic prints on a table, with a fountain pen beside the grid. Prints depict tiny recognisable birds, trees, arches and boats. Single centred vignette in landscape 3:2 canvas with generous transparent margins and whole subject in frame. Genuinely transparent background including empty areas between hatching. No white paper background, no coloured fills, no gradients, no lettering, border or watermark. App recolours fine ink via a luminance mask.
+
 Replacement set generated on 13 October 2026 using the built-in imagegen tool,
 with `transparent_background: true`, one generation per asset. The old set has
 been replaced at the existing URLs. Encoded with Sharp to 960×640 AVIF, quality

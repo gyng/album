@@ -70,3 +70,45 @@ it("discovers a photograph through answers without asking the player to remember
   fireEvent.click(screen.getByRole("button", { name: "Play again" }));
   expect(screen.queryByRole("button", { name: /Remember photograph/ })).toBeNull();
 });
+
+it("keeps asking useful tag questions after eight answers", () => {
+  const tagged = Array.from({ length: 20 }, (_, i) => ({
+    ...photos[0]!,
+    path: `../albums/test-simple/tagged-${i}.jpg`,
+    caption: "A photograph",
+    tags: `subject_${String.fromCharCode(97 + Math.floor(i / 2))}`,
+  }));
+  render(<PhotoOracle photos={tagged} />);
+  fireEvent.click(screen.getByRole("button", { name: "Find me a photograph" }));
+  for (let i = 0; i < 8; i++) fireEvent.click(screen.getByRole("button", { name: "Not sure" }));
+  expect(screen.getByRole("button", { name: "Yes" })).toBeTruthy();
+  expect(screen.getByRole("status")).toHaveTextContent("subject");
+  expect(screen.queryByRole("button", { name: "Keep this one" })).toBeNull();
+});
+
+it("acknowledges indistinguishable matches and lets the player browse them", () => {
+  render(
+    <PhotoOracle
+      photos={[photos[0]!, { ...photos[0]!, path: "../albums/test-simple/twin.jpg" }]}
+    />,
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Find me a photograph" }));
+  expect(screen.getByRole("status")).toHaveTextContent("2 matches");
+  const first = screen.getByRole("img").getAttribute("src");
+  fireEvent.click(screen.getByRole("button", { name: "Another match" }));
+  expect(screen.getByRole("img").getAttribute("src")).not.toBe(first);
+  expect(screen.getByRole("button", { name: "Another match" })).toBeDisabled();
+});
+
+it("narrows discovery to a single matching photograph and restores the pool on Back", () => {
+  render(<PhotoOracle photos={photos} />);
+  fireEvent.click(screen.getByRole("button", { name: "Find me a photograph" }));
+  const question = screen.getByRole("status").textContent;
+  fireEvent.click(screen.getByRole("button", { name: "Yes" }));
+  expect(screen.getByRole("img")).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "Yes" })).toBeNull();
+  expect(screen.getByRole("button", { name: "Another match" })).toBeDisabled();
+  fireEvent.click(screen.getByRole("button", { name: "Back" }));
+  expect(screen.getByRole("status")).toHaveTextContent(question!);
+  expect(screen.queryByRole("img")).toBeNull();
+});

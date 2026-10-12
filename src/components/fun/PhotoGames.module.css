@@ -59,6 +59,7 @@
 }
 
 .choice {
+  position: relative;
   composes: base from "../ui/Control.module.css";
   display: grid;
   align-content: start;
@@ -237,7 +238,9 @@
   transform: scale(0.97);
 }
 .choice[aria-pressed="true"] {
-  opacity: 0.7;
+  opacity: 1;
+  border-color: var(--c-accent);
+  box-shadow: inset 0 0 0 2px var(--c-accent);
 }
 @keyframes frameIn {
   from {
@@ -271,7 +274,7 @@
 
 .connectionChoices {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(var(--connection-columns, 4), minmax(0, 1fr));
   gap: var(--space-3);
 }
 .connectionGroup {
@@ -288,6 +291,14 @@
   }
   .connectionChoices .choice {
     padding: var(--space-1);
+  }
+  .connectionChoices .selectionMark {
+    inset-block-start: var(--space-1);
+    inset-inline-end: var(--space-1);
+    inline-size: 1rem;
+    block-size: 1rem;
+    border-width: 1px;
+    font-size: 0.65rem;
   }
 }
 
@@ -323,4 +334,19 @@
   .selectionPreview {
     display: none;
   }
+}
+
+.selectionMark {
+  position: absolute;
+  inset-block-start: var(--space-2);
+  inset-inline-end: var(--space-2);
+  display: grid;
+  place-items: center;
+  inline-size: 1.75rem;
+  block-size: 1.75rem;
+  background: var(--c-accent);
+  color: light-dark(var(--c-white), var(--c-black));
+  border: 2px solid var(--c-bg);
+  border-radius: 50%;
+  font-weight: 700;
 }

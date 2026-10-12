@@ -34,9 +34,29 @@ export const FUN_GAMES = [
     href: "/fun/connections",
     title: "Connect the Shots",
     illustration: "/fun/connect-the-shots.avif",
-    description: "Sixteen photographs. Four hidden connections. Find the groups of four.",
+    description: "Find the hidden connections in a grid of photographs.",
+  },
+  {
+    id: "double-take",
+    href: "/fun/double-take",
+    title: "Double Take",
+    illustration: "/fun/double-take.avif",
+    description: "Two fleeting photographs. Same look. Same place?",
+  },
+  {
+    id: "cross-exposure",
+    href: "/fun/cross-exposure",
+    title: "Cross Exposure",
+    illustration: "/fun/cross-exposure.avif",
+    description: "Every photograph has two connections. Find its place in the grid.",
   },
 ] as const;
 
-export type PhotoGameKind = "relay" | "blind-frame" | "oracle" | "connections";
+export type PhotoGameKind =
+  | "relay"
+  | "blind-frame"
+  | "oracle"
+  | "connections"
+  | "double-take"
+  | "cross-exposure";
 export type FunPage = "fun" | "guess" | PhotoGameKind;

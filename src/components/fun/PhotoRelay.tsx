@@ -4,6 +4,7 @@ import {
   buildRelayPuzzle,
   scoreRelay,
   relayLinkSimilarities,
+  relayLinkClues,
   type PhotoGamePhoto,
   type RelayPuzzle,
 } from "../../util/photoGames";
@@ -56,7 +57,8 @@ export const PhotoRelay = ({ photos }: { photos: PhotoGamePhoto[] }) => {
         {error ? <p role="alert">{error}</p> : null}
         <p>
           Arrange five photographs between a start and a finish. Aim for a smooth visual change from
-          one frame to the next.
+          one frame to the next: connect subjects, colours or shapes. The model scores how closely
+          neighbouring photographs resemble each other, then compares all 120 possible orders.
         </p>
         <Button variant="primary" onClick={start}>
           Start relay
@@ -67,6 +69,10 @@ export const PhotoRelay = ({ photos }: { photos: PhotoGamePhoto[] }) => {
     <div className={styles.game}>
       {!finished ? (
         <>
+          <Caption>
+            Make each neighbouring pair resemble each other. Shared subjects, colours or shapes can
+            bridge the start and finish; the whole chain earns the score.
+          </Caption>
           <div className={styles.endpoints} ref={boardRef} tabIndex={-1}>
             <figure className={styles.frame}>
               <Caption as="figcaption">Start</Caption>
@@ -237,6 +243,13 @@ export const PhotoRelay = ({ photos }: { photos: PhotoGamePhoto[] }) => {
         >
           <Heading level={1}>{gaveUp ? "The suggested route" : "Your relay"}</Heading>
           {!gaveUp ? <GameScore label="Visual flow" score={scoreRelay(puzzle, order)} /> : null}
+          <Caption>
+            {gaveUp
+              ? "This order gives the closest overall resemblance between neighbours. "
+              : "The score ranks your chain against all 120 possible orders: higher is smoother, and around 50 is the middle. "}
+            Each link shows the model’s resemblance percentage; higher means a closer match. Caption
+            clues name shared subjects, rather than the reason for the model’s score.
+          </Caption>
           <PhotoChain
             photos={[puzzle.start, ...(gaveUp ? puzzle.solution : order), puzzle.end]}
             similarities={relayLinkSimilarities([
@@ -244,15 +257,30 @@ export const PhotoRelay = ({ photos }: { photos: PhotoGamePhoto[] }) => {
               ...(gaveUp ? puzzle.solution : order),
               puzzle.end,
             ])}
+            clues={relayLinkClues([
+              puzzle.start,
+              ...(gaveUp ? puzzle.solution : order),
+              puzzle.end,
+            ])}
           />
           {!gaveUp ? (
             <>
-              <Caption>
-                Your route’s rank among all 120 possible orders. Link percentages show cosine
-                similarity between image embeddings.
-              </Caption>
+              {(() => {
+                const links = relayLinkSimilarities([puzzle.start, ...order, puzzle.end]);
+                const measured = links.filter((value): value is number => value !== null);
+                if (!measured.length) return null;
+                const weakest = links.indexOf(Math.min(...measured));
+                return (
+                  <Caption>
+                    Biggest jump: photographs {weakest + 1} → {weakest + 2} ({links[weakest]}%
+                    resemblance). Average across your chain:{" "}
+                    {Math.round(measured.reduce((sum, value) => sum + value, 0) / measured.length)}
+                    %.
+                  </Caption>
+                );
+              })()}
               <details>
-                <summary>Compare the suggested route</summary>
+                <summary>Compare the smoothest route</summary>
                 <PhotoChain
                   photos={[puzzle.start, ...puzzle.solution, puzzle.end]}
                   similarities={relayLinkSimilarities([
@@ -260,6 +288,7 @@ export const PhotoRelay = ({ photos }: { photos: PhotoGamePhoto[] }) => {
                     ...puzzle.solution,
                     puzzle.end,
                   ])}
+                  clues={relayLinkClues([puzzle.start, ...puzzle.solution, puzzle.end])}
                 />
               </details>
             </>

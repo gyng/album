@@ -4,6 +4,7 @@ export type PhotoGamePhoto = {
   caption: string;
   tags: string;
   vector: number[] | Float32Array;
+  location?: { lat: number; lng: number; date: string; label: string };
 };
 
 export const photoGameCaption = (value: string): string =>
@@ -319,11 +320,12 @@ export const buildOracleCohort = (
 export const chooseOracleQuestion = (
   candidates: OracleCandidate[],
   asked: readonly string[],
+  questions: readonly OracleQuestion[] = ORACLE_QUESTIONS,
 ): OracleQuestion | null => {
   const total = candidates.reduce((sum, item) => sum + item.weight, 0);
   let best: OracleQuestion | null = null;
   let balance = Infinity;
-  for (const question of ORACLE_QUESTIONS) {
+  for (const question of questions) {
     if (asked.includes(question.id)) continue;
     const yes = candidates.reduce(
       (sum, item) => sum + (question.matches(item.photo) ? item.weight : 0),
@@ -412,70 +414,157 @@ const CONNECTION_LABELS: Record<string, string> = {
 export type ConnectionGroup = { id: string; label: string; photos: PhotoGamePhoto[] };
 export type ConnectionsPuzzle = { groups: ConnectionGroup[]; tiles: PhotoGamePhoto[] };
 
+// Indexed subject tags provide finer distinctions than the broad caption topics.
+export const taggedOracleQuestions = (photos: PhotoGamePhoto[]): OracleQuestion[] => {
+  const counts = new Map<string, number>();
+  for (const photo of photos)
+    for (const tag of new Set(photo.tags.split(",").map((t) => t.trim().toLowerCase()))) {
+      if (/^[a-z][a-z_-]{2,29}$/.test(tag)) counts.set(tag, (counts.get(tag) ?? 0) + 1);
+    }
+  return [...counts]
+    .filter(([, count]) => count >= 2 && count < photos.length * 0.7)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 160)
+    .map(([tag]) => ({
+      id: `tag:${tag}`,
+      label: `Does it feature ${tag.replaceAll("_", " ").replaceAll("-", " ")}?`,
+      matches: (photo: PhotoGamePhoto) =>
+        photo.tags.split(",").some((t) => t.trim().toLowerCase() === tag),
+    }));
+};
+export const oracleDiscoveryCandidates = (
+  candidates: OracleCandidate[],
+  question: OracleQuestion,
+  answer: "yes" | "no" | "unsure",
+): OracleCandidate[] => {
+  if (answer === "unsure") return candidates;
+  const matching = candidates.filter((item) => question.matches(item.photo) === (answer === "yes"));
+  return matching.map((item) => ({ ...item, weight: 1 / matching.length }));
+};
+
+export type ConnectionSize = 4 | 5 | 6;
 export const buildConnectionsPuzzle = (
   photos: PhotoGamePhoto[],
   random: () => number = Math.random,
+  size: ConnectionSize = 4,
+  detail: "broad" | "specific" = "broad",
 ): ConnectionsPuzzle | null => {
   const unique = [...new Map(photos.map((photo) => [photo.path, photo])).values()];
-  if (unique.length < 16) return null;
+  if (unique.length < size * size) return null;
+  const broadTags = new Set([
+    "sky",
+    "trees",
+    "tree",
+    "building",
+    "buildings",
+    "night",
+    "mountain",
+    "mountains",
+    "water",
+    "architecture",
+    "street",
+    "outdoor",
+    "outdoors",
+    "indoor",
+    "indoors",
+    "interior",
+    "people",
+    "person",
+    "animal",
+    "animals",
+    "plant",
+    "plants",
+    "food",
+    "nature",
+    "landscape",
+    "urban",
+    "city",
+    "japan",
+    "japanese",
+    "winter",
+    "autumn",
+    "summer",
+    "spring",
+    "red",
+    "blue",
+    "yellow",
+    "green",
+  ]);
+  const subjects =
+    detail === "specific"
+      ? taggedOracleQuestions(unique).filter((question) => !broadTags.has(question.id.slice(4)))
+      : ORACLE_QUESTIONS;
   const signatures = unique.map((photo) => ({
     photo,
-    bits: ORACLE_QUESTIONS.reduce((bits, q, i) => (q.matches(photo) ? bits | (1 << i) : bits), 0),
+    bits: subjects.reduce(
+      (bits, q, i) => (q.matches(photo) ? bits | (BigInt(1) << BigInt(i)) : bits),
+      BigInt(0),
+    ),
   }));
   const bitsByPath = new Map(signatures.map((item) => [item.photo.path, item.bits]));
   const questions = shuffleGamePhotos(
-    ORACLE_QUESTIONS.map((question, index) => ({ question, bit: 1 << index })).filter(
-      (item) => signatures.filter((photo) => photo.bits & item.bit).length >= 4,
-    ),
+    subjects
+      .map((question, index) => ({ question, bit: BigInt(1) << BigInt(index) }))
+      .filter((item) => signatures.filter((photo) => photo.bits & item.bit).length >= size),
     random,
   );
-  // Each frame matches exactly one of the four chosen captioned subjects.
-  // Precomputed bit signatures keep overlap checking independent of regex work.
-  for (let a = 0; a < questions.length - 3; a++)
-    for (let b = a + 1; b < questions.length - 2; b++)
-      for (let c = b + 1; c < questions.length - 1; c++)
-        for (let d = c + 1; d < questions.length; d++) {
-          const selected = [questions[a]!, questions[b]!, questions[c]!, questions[d]!];
-          const mask = selected.reduce((bits, item) => bits | item.bit, 0);
-          const pools = selected.map((item) =>
-            signatures.filter((photo) => (photo.bits & mask) === item.bit),
-          );
-          if (pools.some((pool) => pool.length < 4)) continue;
-          const groups = selected.map((item, index) => ({
-            id: item.question.id,
-            label: CONNECTION_LABELS[item.question.id] ?? item.question.id,
-            photos: shuffleGamePhotos(pools[index]!, random)
-              .slice(0, 4)
-              .map((item) => item.photo),
-          }));
-          const tiles = groups.flatMap((group) => group.photos);
-          // Another visible subject that singles out four different photographs
-          // would be a plausible competing answer. Keep only clear partitions.
-          const competing = ORACLE_QUESTIONS.some((_, index) => {
-            const matching = tiles.filter((photo) => bitsByPath.get(photo.path)! & (1 << index));
-            return (
-              matching.length === 4 &&
-              !groups.some((group) => group.photos.every((photo) => matching.includes(photo)))
-            );
-          });
-          if (competing) continue;
-          return { groups, tiles: shuffleGamePhotos(tiles, random) };
+  type Candidate = (typeof questions)[number];
+  const visit = (selected: Candidate[], from: number, mask: bigint): ConnectionsPuzzle | null => {
+    const pools = selected.map((item) =>
+      signatures.filter((photo) => (photo.bits & mask) === item.bit),
+    );
+    // Adding a subject can only shrink the existing exclusive pools.
+    if (pools.some((pool) => pool.length < size)) return null;
+    if (selected.length === size) {
+      const groups = selected.map((item, index) => ({
+        id: item.question.id,
+        label:
+          CONNECTION_LABELS[item.question.id] ??
+          item.question.id.replace("tag:", "").replaceAll("_", " "),
+        photos: shuffleGamePhotos(pools[index]!, random)
+          .slice(0, size)
+          .map((item) => item.photo),
+      }));
+      const tiles = groups.flatMap((group) => group.photos);
+      const competing = subjects.some((_, index) => {
+        const bit = BigInt(1) << BigInt(index);
+        const partialCounts = groups
+          .map((group) => group.photos.filter((photo) => bitsByPath.get(photo.path)! & bit).length)
+          .filter((count) => count > 0 && count < size);
+        // Solved groups leave the tray. A competing subject must not become
+        // a full-sized answer after any subset of those groups disappears.
+        let sums = 1; // Bit zero represents the empty subset.
+        for (const count of partialCounts) {
+          sums |= sums << count;
+          if (sums & (1 << size)) return true;
         }
-  return null;
+        return false;
+      });
+      return competing ? null : { groups, tiles: shuffleGamePhotos(tiles, random) };
+    }
+    for (let i = from; i <= questions.length - (size - selected.length); i++) {
+      const next = questions[i]!;
+      const puzzle = visit([...selected, next], i + 1, mask | next.bit);
+      if (puzzle) return puzzle;
+    }
+    return null;
+  };
+  return visit([], 0, BigInt(0));
 };
 
 export const checkConnection = (
   puzzle: ConnectionsPuzzle,
   paths: string[],
 ): { kind: "match"; group: ConnectionGroup } | { kind: "near" | "miss" } => {
-  if (paths.length !== 4 || new Set(paths).size !== 4) return { kind: "miss" };
+  const size = puzzle.groups[0]?.photos.length ?? 4;
+  if (paths.length !== size || new Set(paths).size !== size) return { kind: "miss" };
   const group = puzzle.groups.find((group) =>
     group.photos.every((photo) => paths.includes(photo.path)),
   );
   if (group) return { kind: "match", group };
   return {
     kind: puzzle.groups.some(
-      (group) => group.photos.filter((photo) => paths.includes(photo.path)).length === 3,
+      (group) => group.photos.filter((photo) => paths.includes(photo.path)).length === size - 1,
     )
       ? "near"
       : "miss",
@@ -483,4 +572,17 @@ export const checkConnection = (
 };
 
 export const oracleDiscoveryQuestion = (question: OracleQuestion): string =>
-  `Would you like a photograph featuring ${(CONNECTION_LABELS[question.id] ?? question.id).toLowerCase()}?`;
+  `Would you like a photograph featuring ${(CONNECTION_LABELS[question.id] ?? question.id.replace("tag:", "").replaceAll("_", " ")).toLowerCase()}?`;
+
+export const relayLinkClues = (photos: PhotoGamePhoto[]): string[] =>
+  photos.slice(0, -1).map((photo, index) => {
+    const shared = ORACLE_QUESTIONS.filter(
+      (q) => q.matches(photo) && q.matches(photos[index + 1]!),
+    );
+    return shared.length
+      ? shared
+          .slice(0, 2)
+          .map((q) => CONNECTION_LABELS[q.id] ?? q.id)
+          .join(" · ")
+      : "No shared caption clue";
+  });

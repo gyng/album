@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Button, Caption, Heading } from "../ui";
 import {
   answerOracle,
@@ -6,10 +6,12 @@ import {
   buildOracleCohort,
   shuffleGamePhotos,
   oracleDiscoveryQuestion,
+  oracleDiscoveryCandidates,
+  taggedOracleQuestions,
+  ORACLE_QUESTIONS,
   type OracleCandidate,
   type PhotoGamePhoto,
 } from "../../util/photoGames";
-import { GameProgress } from "./GameFeedback";
 import { GamePhoto } from "./GamePhoto";
 import { GameIntro } from "./GameIllustration";
 import styles from "./PhotoGames.module.css";
@@ -30,7 +32,11 @@ export const PhotoOracle = ({ photos }: { photos: PhotoGamePhoto[] }) => {
     Array<{ candidates: OracleCandidate[]; answers: typeof answers }>
   >([]);
   const [error, setError] = useState<string | null>(null);
-  const eligible = photos.filter((photo) => photo.caption || photo.tags);
+  const eligible = useMemo(() => photos.filter((photo) => photo.caption || photo.tags), [photos]);
+  const questions = useMemo(
+    () => [...ORACLE_QUESTIONS, ...taggedOracleQuestions(eligible)],
+    [eligible],
+  );
   const start = (nextMode: "mind" | "discover" = mode) => {
     const selection =
       nextMode === "mind"
@@ -53,11 +59,13 @@ export const PhotoOracle = ({ photos }: { photos: PhotoGamePhoto[] }) => {
   const question = chooseOracleQuestion(
     candidates,
     answers.map((answer) => answer.id),
+    questions,
   );
   const ranked = [...candidates].sort((a, b) => b.weight - a.weight);
   const top = ranked[0];
   const total = candidates.reduce((sum, item) => sum + item.weight, 0);
-  const isGuess = !question || answers.length >= 8 || (top && top.weight / total >= 0.85);
+  const isGuess =
+    !question || candidates.length === 1 || (mode === "mind" && top && top.weight / total >= 0.85);
   const gameRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (stage !== "lobby") gameRef.current?.focus();
@@ -79,7 +87,8 @@ export const PhotoOracle = ({ photos }: { photos: PhotoGamePhoto[] }) => {
           <Button onClick={() => start("discover")}>Find me a photograph</Button>
         </div>
         <Caption>
-          Discovery mode finds a photograph from your answers, without a hidden target.
+          Discovery follows your preferences until one photograph remains, or the archive cannot
+          distinguish the remaining matches.
         </Caption>
       </GameIntro>
     );
@@ -126,14 +135,22 @@ export const PhotoOracle = ({ photos }: { photos: PhotoGamePhoto[] }) => {
       {stage === "questions" ? (
         <>
           <div className={styles.roundProgress}>
-            <Caption>{answers.length} of 8 questions answered</Caption>
-            <GameProgress current={answers.length} total={8} />
+            <Caption>
+              {answers.length} {answers.length === 1 ? "question" : "questions"} answered ·{" "}
+              {candidates.length} {candidates.length === 1 ? "photograph" : "photographs"} remaining
+            </Caption>
           </div>
           {isGuess && top ? (
             <>
               <Heading level={1}>
                 {mode === "mind" ? "Is this your photograph?" : "A photograph for you"}
               </Heading>
+              {mode === "discover" && candidates.length > 1 ? (
+                <p role="status">
+                  Your answers leave {candidates.length} matches. No further questions can separate
+                  them; browse the matches or go back to change an answer.
+                </p>
+              ) : null}
               <div className={styles.secret}>
                 <GamePhoto photo={top.photo} />
               </div>
@@ -148,6 +165,7 @@ export const PhotoOracle = ({ photos }: { photos: PhotoGamePhoto[] }) => {
                   {mode === "mind" ? "That's it" : "Keep this one"}
                 </Button>
                 <Button
+                  disabled={candidates.length <= 1}
                   onClick={() => {
                     setHistory([...history, { candidates, answers }]);
                     setCandidates(candidates.filter((item) => item.photo.path !== top.photo.path));
@@ -172,7 +190,11 @@ export const PhotoOracle = ({ photos }: { photos: PhotoGamePhoto[] }) => {
                     variant={answer === "unsure" ? "quiet" : "surface"}
                     onClick={() => {
                       setHistory([...history, { candidates, answers }]);
-                      setCandidates(answerOracle(candidates, question, answer));
+                      setCandidates(
+                        mode === "discover"
+                          ? oracleDiscoveryCandidates(candidates, question, answer)
+                          : answerOracle(candidates, question, answer),
+                      );
                       setAnswers([
                         ...answers,
                         {

@@ -52,3 +52,25 @@ it("loads oracle photographs without requiring embeddings", async () => {
     await fetchPhotoGameArchive({ database: createDatabase([]) as never, game: "oracle" }),
   ).toHaveLength(1);
 });
+
+it("joins stored local dates and coordinates to double-take photographs", async () => {
+  const base = createDatabase(["google/siglip2-base-patch16-224"]);
+  const database = {
+    exec: (args: Parameters<typeof base.exec>[0]) => {
+      if (args.sql.startsWith("SELECT path, lat_deg"))
+        args.callback(["../albums/test-simple/a.jpg", 35, 139, "2024-03-22T16:55:00"]);
+      else base.exec(args);
+    },
+  };
+  const photos = await fetchPhotoGameArchive({ database: database as never, game: "double-take" });
+  expect(photos[0]).toMatchObject({
+    vector: [1, 0],
+    location: { lat: 35, lng: 139, date: "2024-03-22T16:55:00" },
+  });
+});
+
+it("loads crossword photographs from the core archive without embeddings", async () => {
+  expect(
+    await fetchPhotoGameArchive({ database: createDatabase([]) as never, game: "cross-exposure" }),
+  ).toHaveLength(1);
+});

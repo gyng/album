@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Button, Caption, Heading } from "../ui";
+import { Button, Caption, Heading, LoadingIndicator } from "../ui";
 import { SearchDrawPad } from "../search/SearchDrawPad";
 import { useImageQuery } from "../search/useImageQuery";
 import { ProgressBar } from "../ProgressBar";
@@ -79,8 +79,8 @@ export const BlindFrame = ({ photos }: { photos: PhotoGamePhoto[] }) => {
     return (
       <GameIntro game="blind-frame">
         <p>
-          Sketch a hidden photograph from its AI description. Afterwards, see the original and the
-          photograph most closely matched by your drawing.
+          A photograph from this archive stays out of sight. Draw what its AI description brings to
+          mind, then discover the original and what your drawing resembles.
         </p>
         <Button variant="primary" onClick={start}>
           Start Blind Frame
@@ -103,11 +103,13 @@ export const BlindFrame = ({ photos }: { photos: PhotoGamePhoto[] }) => {
           <Heading level={1}>The reveal</Heading>
           {result && !gaveUp ? (
             <>
-              <GameScore label="" score={result.score} />
+              <GameScore label="Resemblance to the original" score={result.score} />
               <Caption>
-                The hidden photograph ranked {result.rank.toLocaleString("en-GB")} of{" "}
-                {result.total.toLocaleString("en-GB")} archive matches for your sketch. The score
-                compares its similarity with the closest and typical matches.
+                The original came {result.rank.toLocaleString("en-GB")} of{" "}
+                {result.total.toLocaleString("en-GB")} photographs when matched to your drawing. A
+                score of 100 means it matched as closely as the best result; 0 means no closer than
+                a typical archive photograph. This is the model’s judgement, not a mark for drawing
+                skill.
               </Caption>
             </>
           ) : null}
@@ -119,7 +121,7 @@ export const BlindFrame = ({ photos }: { photos: PhotoGamePhoto[] }) => {
             {imageQuery && !gaveUp ? (
               <>
                 <figure className={styles.frame}>
-                  <Caption as="figcaption">Your sketch</Caption>
+                  <Caption as="figcaption">Your drawing</Caption>
                   <img
                     className={styles.photo}
                     src={imageQuery.previewUrl}
@@ -129,19 +131,26 @@ export const BlindFrame = ({ photos }: { photos: PhotoGamePhoto[] }) => {
               </>
             ) : null}
             <figure className={styles.frame}>
-              <Caption as="figcaption">Hidden photograph</Caption>
+              <Caption as="figcaption">The original photograph</Caption>
               <GamePhoto photo={target} link />
+              <Caption size="sm">The archive photograph behind the description.</Caption>
             </figure>
             {result && !gaveUp ? (
               <figure className={styles.frame}>
-                <Caption as="figcaption">Closest archive match</Caption>
+                <Caption as="figcaption">What your drawing resembles</Caption>
                 <GamePhoto photo={result.nearest} link />
+                <Caption size="sm">
+                  {result.nearest.path === target.path
+                    ? "Your drawing’s closest match was the original."
+                    : "The archive photograph the model matched most closely to your drawing."}
+                </Caption>
               </figure>
             ) : null}
           </div>
           <section className={styles.result}>
-            <Heading level={2}>Close to the hidden photograph</Heading>
-            <PhotoChain photos={nearestGamePhotos(target, photos, 4)} />
+            <Heading level={2}>More like the original</Heading>
+            <Caption>These resemble the original photograph, rather than your drawing.</Caption>
+            <PhotoChain photos={nearestGamePhotos(target, photos, 4)} numbered={false} />
           </section>
           <div className={styles.actions}>
             <Button variant="primary" onClick={start}>
@@ -161,8 +170,14 @@ export const BlindFrame = ({ photos }: { photos: PhotoGamePhoto[] }) => {
       ) : (
         <>
           {imageQuery && !imageQuery.vector ? (
-            <div ref={feedbackRef} tabIndex={-1} role="status">
-              <p>{imageModelStage}</p>
+            <div ref={feedbackRef} tabIndex={-1} role="status" aria-busy="true">
+              <LoadingIndicator
+                label={
+                  /ready|encod|compar/i.test(imageModelStage)
+                    ? "Comparing your drawing…"
+                    : imageModelStage
+                }
+              />
               <ProgressBar progress={imageModelProgress} />
             </div>
           ) : null}

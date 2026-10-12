@@ -216,3 +216,61 @@ it("rejects a connections board when another subject forms a competing four-phot
   );
   expect(buildConnectionsPuzzle(photos, () => 0.4)).toBeNull();
 });
+
+it.each([5, 6] as const)("builds and checks a %i-square connections board", (size) => {
+  const archive = ["A cat", "A lake", "A train", "A person", "A mountain", "A staircase"]
+    .slice(0, size)
+    .flatMap((caption, group) =>
+      Array.from({ length: size + 1 }, (_, i) => photo(`${group}-${i}`, [], caption)),
+    );
+  const puzzle = buildConnectionsPuzzle(archive, () => 0.4, size)!;
+  expect(puzzle.groups).toHaveLength(size);
+  expect(new Set(puzzle.tiles.map((p) => p.path)).size).toBe(size * size);
+  expect(
+    checkConnection(
+      puzzle,
+      puzzle.groups[0]!.photos.map((p) => p.path),
+    ).kind,
+  ).toBe("match");
+  expect(
+    checkConnection(
+      puzzle,
+      [...puzzle.groups[0]!.photos.slice(0, size - 1), puzzle.groups[1]!.photos[0]!].map(
+        (p) => p.path,
+      ),
+    ).kind,
+  ).toBe("near");
+  expect(checkConnection(puzzle, Array(size).fill(puzzle.tiles[0]!.path)).kind).toBe("miss");
+});
+
+it("uses finer indexed subjects for specific connections", () => {
+  const archive = ["lantern", "bicycle", "statue", "doorway"].flatMap((tag, group) =>
+    Array.from({ length: 5 }, (_, i) => ({
+      ...photo(`${group}-${i}`, [], "An archive photograph"),
+      tags: tag,
+    })),
+  );
+  const puzzle = buildConnectionsPuzzle(archive, () => 0.4, 4, "specific")!;
+  expect(puzzle.groups.map((group) => group.label).sort()).toEqual([
+    "bicycle",
+    "doorway",
+    "lantern",
+    "statue",
+  ]);
+  expect(
+    puzzle.groups.every((group) => group.photos.every((photo) => photo.tags === group.label)),
+  ).toBe(true);
+});
+
+it("rejects competing connections that emerge after another group is solved", () => {
+  const archive = ["cat", "lake", "person", "train"].flatMap((subject, group) =>
+    Array.from({ length: 4 }, (_, index) =>
+      photo(
+        `${group}-${index}`,
+        [],
+        `A ${(group < 2 && index < 2) || (group === 2 && index === 0) ? "red " : ""}${subject}`,
+      ),
+    ),
+  );
+  expect(buildConnectionsPuzzle(archive, () => 0.4)).toBeNull();
+});

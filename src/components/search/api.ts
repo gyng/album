@@ -23,6 +23,7 @@ import {
 import type { Exif } from "../../services/types";
 import { photoGameCaption, type PhotoGamePhoto } from "../../util/photoGames";
 import {
+  getGeocodeLabel,
   getGeocodeCity,
   getGeocodeCountry,
   getGeocodeRegion,
@@ -1133,20 +1134,20 @@ const fetchEmbeddingsByModel = async (
 export const fetchPhotoGameArchive = async (opts: {
   database: Database;
   embeddingsDatabase?: Database | null;
-  game: "relay" | "blind-frame" | "oracle" | "connections";
+  game: "relay" | "blind-frame" | "oracle" | "connections" | "double-take" | "cross-exposure";
 }): Promise<PhotoGamePhoto[]> => {
   const { database, game } = opts;
   const vectorDatabase = opts.embeddingsDatabase ?? database;
   let embeddings: EmbeddingRow[] = [];
-  if (game === "relay" || game === "blind-frame") {
+  if (game === "relay" || game === "blind-frame" || game === "double-take") {
     try {
       // Drawings come from the browser's v1 encoder. Never compare them to
       // v2 image vectors, even when both spaces have the same dimensions.
       embeddings = await fetchEmbeddingsByModel(
         vectorDatabase,
-        game === "relay" ? PREFERRED_EMBEDDING_MODEL_ID : DEFAULT_EMBEDDING_MODEL_ID,
+        game !== "blind-frame" ? PREFERRED_EMBEDDING_MODEL_ID : DEFAULT_EMBEDDING_MODEL_ID,
       );
-      if (game === "relay" && !embeddings.length)
+      if (game !== "blind-frame" && !embeddings.length)
         embeddings = await fetchEmbeddingsByModel(vectorDatabase, DEFAULT_EMBEDDING_MODEL_ID);
     } catch (error) {
       if (!isMissingEmbeddingsTableError(error)) throw error;
@@ -1164,12 +1165,25 @@ export const fetchPhotoGameArchive = async (opts: {
     });
   }
   const rows =
-    game === "oracle" || game === "connections"
+    game === "oracle" || game === "connections" || game === "cross-exposure"
       ? await fetchRandomResults({ database, pageSize: 10000 })
       : await fetchResultsByPaths(
           database,
           embeddings.map((row) => row.path),
         );
+  const locations = new Map<string, NonNullable<PhotoGamePhoto["location"]>>();
+  if (game === "double-take") {
+    const result = await exec(
+      database,
+      "SELECT path, lat_deg, lng_deg, iso8601 FROM metadata WHERE lat_deg IS NOT NULL AND lng_deg IS NOT NULL",
+      [],
+    );
+    for (const [path, lat, lng, date] of result.data as unknown as Array<
+      [string, number, number, string]
+    >)
+      if (typeof lat === "number" && typeof lng === "number" && typeof date === "string")
+        locations.set(path, { lat, lng, date, label: "" });
+  }
   const vectors = new Map(embeddings.map((row) => [row.path, row.embedding]));
   return rows
     .filter((row) => row.mediaKind !== "video" && sceneSecondsOf(row.path) === undefined)
@@ -1179,6 +1193,14 @@ export const fetchPhotoGameArchive = async (opts: {
       caption: photoGameCaption(row.alt_text || row.subject || ""),
       tags: row.tags,
       vector: vectors.get(row.path) ?? [],
+      ...(locations.has(row.path)
+        ? {
+            location: {
+              ...locations.get(row.path)!,
+              label: getGeocodeLabel(row.geocode) ?? "Recorded location",
+            },
+          }
+        : {}),
     }));
 };
 

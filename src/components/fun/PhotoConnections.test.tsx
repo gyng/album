@@ -51,3 +51,28 @@ it("ends after four different mistakes and reveals the groups", () => {
   expect(screen.getByRole("region", { name: "Connections result" })).toBeTruthy();
   expect(screen.queryByRole("button", { name: "Check connection" })).toBeNull();
 });
+
+it("lets players choose a six-by-six board and reveals all six groups", () => {
+  const archive = ["A cat", "A lake", "A train", "A person", "A mountain", "A staircase"].flatMap(
+    (caption, group) =>
+      Array.from({ length: 6 }, (_, i) => ({
+        path: `${group}-${i}.jpg`,
+        href: "/album/test-simple",
+        caption,
+        tags: "",
+        vector: [],
+      })),
+  );
+  render(<PhotoConnections photos={archive} />);
+  fireEvent.click(screen.getByRole("button", { name: "6×6" }));
+  fireEvent.click(screen.getByRole("button", { name: "Start connecting" }));
+  expect(screen.getAllByRole("button", { name: /Select photograph/ })).toHaveLength(36);
+  choose("A cat", 6);
+  expect(screen.getByRole("button", { name: "Check connection" })).toBeEnabled();
+  fireEvent.click(screen.getByRole("button", { name: "Check connection" }));
+  expect(screen.getAllByRole("button", { name: /Select photograph/ })).toHaveLength(30);
+  fireEvent.click(screen.getByRole("button", { name: "Give up" }));
+  expect(
+    within(screen.getByRole("region", { name: "Connections result" })).getAllByRole("img"),
+  ).toHaveLength(36);
+});

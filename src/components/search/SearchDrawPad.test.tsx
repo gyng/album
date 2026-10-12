@@ -2,7 +2,7 @@
  * @jest-environment jsdom
  */
 
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { warmSearchImageModel } from "./imageEmbeddings";
 jest.mock("./imageEmbeddings", () => ({ warmSearchImageModel: jest.fn(() => Promise.resolve()) }));
 import { SearchDrawPad } from "./SearchDrawPad";
@@ -259,5 +259,26 @@ describe("SearchDrawPad focus management", () => {
     expect(context.putImageData).toHaveBeenCalled();
     unmount();
     trigger.remove();
+  });
+
+  it("shows a busy status during background warm-up and removes it when matching is ready", async () => {
+    let ready!: () => void;
+    jest.mocked(warmSearchImageModel).mockReturnValueOnce(
+      new Promise<void>((resolve) => {
+        ready = resolve;
+      }),
+    );
+    const { container } = render(
+      <SearchDrawPad inline onCancel={jest.fn()} onSubmit={jest.fn()} />,
+    );
+    expect(screen.queryByRole("status")).toBeNull();
+    const canvas = container.querySelector("canvas")!;
+    canvas.getBoundingClientRect = () => ({ left: 0, top: 0, width: 448, height: 448 }) as DOMRect;
+    fireEvent.pointerDown(canvas, { clientX: 20, clientY: 20, pointerId: 1 });
+    fireEvent.pointerUp(canvas, { pointerId: 1 });
+    expect(screen.getByRole("status")).toHaveAttribute("aria-busy", "true");
+    expect(screen.getByRole("button", { name: "Search" })).toBeEnabled();
+    await act(async () => ready());
+    expect(screen.queryByRole("status")).toBeNull();
   });
 });

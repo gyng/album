@@ -1,5 +1,6 @@
 .illustration {
   display: block;
+  color: var(--c-accent);
   inline-size: 100%;
   block-size: auto;
   aspect-ratio: 3 / 2;

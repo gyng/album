@@ -55,7 +55,7 @@ it("supports moving and removing links with buttons and reveals transition simil
   fireEvent.click(screen.getByRole("button", { name: "Give up" }));
   expect(
     within(screen.getByRole("region", { name: "Relay result" })).getAllByText(
-      /Next link · .*% similarity/,
+      /\d+ → \d+ · .*% similarity/,
     ),
   ).toHaveLength(6);
 });

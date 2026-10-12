@@ -88,11 +88,11 @@ bonsai target 42 instead of 89, and a daffodil-portrait target 26 instead of 78.
 
 ## Illustrations
 
-The five game illustrations are antique-style hand engravings with transparent
+The seven game illustrations are antique-style hand engravings with transparent
 outer backgrounds, generated using the built-in imagegen tool. Final 960×640
 AVIFs preserve alpha in `src/public/fun/`. The shared `GameIllustration` component renders their inverted
 luminance through an SVG mask, removing pale paper interiors as well as the
-outer background, then supplies the theme’s `currentColor` ink. There is no
+outer background, then supplies the theme’s accent-colour ink. There is no
 fixed cream card illustration or theme-specific bitmap variant.
 
 The full generation prompts and asset mapping are recorded in
@@ -146,18 +146,15 @@ Move-earlier, move-later and remove buttons provide equivalent keyboard and
 touch controls. Reveals show the cosine similarity (×100) of each neighbouring
 pair, distinct from the overall relative route score.
 
-Connect the Shots uses sixteen photographs and four groups of four captioned
-visual subjects. Each chosen photograph matches exactly one of the four selected
-subjects, reducing overlaps such as boats also being vehicles. A tray is also
-rejected if another caption predicate forms a competing group of exactly four
-photographs that crosses the intended groups. Colour subjects
-are explicit caption/tag mentions, not inferred dominant colours. Players select
-four, submit a connection, shuffle the remaining tray or give up. Four different
-mistakes reveal the groups; repeated submissions of the same wrong selection
-are not charged again. Three correct photographs receive a “one photograph
-away” hint. Solved groups leave the tray and remain visible. Small screens also show larger
-previews of selected shots before submission. Small or insufficiently
-diverse archives explain why a round cannot be constructed.
+Connect the Shots offers 4×4, 5×5 and 6×6 boards with matching group sizes.
+Broad subjects use caption topics; Specific subjects use finer indexed tags,
+excluding generic scene/place labels. Each frame matches exactly one selected
+subject, and competing same-sized partitions are rejected, including those that would
+emerge after removing solved groups. Selection has an
+accent outline and a tick badge without dimming the photograph. One-away hints
+can be switched off. Four different mistakes reveal the groups; repeated wrong
+submissions are not charged again. Solved groups remain visible, and phone
+screens also show larger previews of the selected photographs.
 
 A seeded audit of 30 rounds over 1,514 real archive photographs built every round,
 used 23 different subjects and found no overlap among the four chosen caption
@@ -181,3 +178,47 @@ warm-up took about 5.5 seconds in that run; this is an observation, not a
 network-independent latency guarantee. The nav regression records real native
 animations in both map-to-page directions and checks reduced-motion behaviour
 when Guess Where changes its shell.
+
+
+## Double Take and Cross Exposure
+
+Double Take flashes two decoded photographs in sequence, then asks Same place
+or Different places. Nearby pairs are within 75 metres on different camera-local
+days; distant pairs are at least 5 km apart. Invalid coordinates, ambiguous
+separations, same-day nearby bursts and near-duplicate vectors are excluded.
+Both answer classes have comparable similarity ranges: ranking only distant
+pairs by maximum resemblance would leak the answer. Eight rounds use distinct
+photographs, with fewer rounds when the archive supports fewer balanced pairs.
+Correctness earns 100 points; a streak adds up to 100. Replay removes the bonus.
+A longer-look option gives each photograph three seconds. Hidden tabs interrupt
+the sequence; both frames must be watched again. Image load/decode failures and
+15-second stalls offer retry. Reveals show full photographs, dates, locations
+and actual separation; GPS proximity labels an area, not proof of a building.
+
+Cross Exposure dynamically creates 3×3 or 4×4 crossing grids from captions and
+subject tags. Distinct row/column predicates must have usable intersections;
+augmenting-path matching proves a complete arrangement with unique photographs.
+Equivalent clue families and duplicate board signatures are excluded. The tray
+contains exactly the solution photographs, shuffled; any alternative arrangement
+that satisfies both predicates for every square is accepted.
+Players choose Visible clues or Hidden connections. Hidden mode starts with two
+fixed photographs per row and column, with an optional clue reveal. Clear keeps
+the starting photographs; swaps and removal apply only to movable shots. Check
+marks which photographs fit both clues. On mobile, the board scrolls within its
+own region and row clues remain visible. Give up reveals one valid arrangement.
+
+Oracle now uses indexed subject tags as well as broad caption topics, without an
+eight-question cap. Discovery narrows candidates directly by preferences until
+one remains or no unasked question distinguishes the remaining photographs.
+Ties are explained and can be browsed; Back restores the preceding candidates.
+Remembered-photo mode retains probabilistic answers because captions can omit
+visible objects. Relay explains the overall ordering percentile separately from
+link resemblance, supplies caption-based common subjects, and identifies the
+largest jump. Blind Frame labels the original target, player drawing and the
+model's nearest drawing match explicitly; target neighbours form a separate
+section. Pending warm-up and comparison use the shared LoadingIndicator.
+
+Validation: all board sizes and subject modes generate against the real archive;
+20 generated crossing grids were valid (10 per size). Native browser reviews
+cover desktop and phone layouts, both crossing modes, complete Double Take
+sessions, replay/interruption, and Oracle singleton/tied results.

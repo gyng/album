@@ -10,6 +10,8 @@ import { FUN_GAMES, type PhotoGameKind } from "../../components/fun/games";
 import { PhotoRelay } from "../../components/fun/PhotoRelay";
 import { BlindFrame } from "../../components/fun/BlindFrame";
 import { PhotoConnections } from "../../components/fun/PhotoConnections";
+import { PhotoCrossword } from "../../components/fun/PhotoCrossword";
+import { DoubleTake } from "../../components/fun/DoubleTake";
 import { PhotoOracle } from "../../components/fun/PhotoOracle";
 import type { PhotoGamePhoto } from "../../util/photoGames";
 import { formatPageTitle } from "../../lib/seo";
@@ -17,7 +19,7 @@ import styles from "./PhotoGameScreen.module.css";
 
 export const PhotoGameScreen = ({ game }: { game: PhotoGameKind }) => {
   const [database, progress, , databaseError, retryDatabase] = useDatabase();
-  const needsVectors = game === "relay" || game === "blind-frame";
+  const needsVectors = game === "relay" || game === "blind-frame" || game === "double-take";
   const [embeddings, vectorProgress, , vectorError, retryVectors] =
     useEmbeddingsDatabase(needsVectors);
   const [photos, setPhotos] = useState<PhotoGamePhoto[] | null>(null);
@@ -96,6 +98,10 @@ export const PhotoGameScreen = ({ game }: { game: PhotoGameKind }) => {
           <PhotoRelay photos={photos} />
         ) : game === "blind-frame" ? (
           <BlindFrame photos={photos} />
+        ) : game === "double-take" ? (
+          <DoubleTake photos={photos} />
+        ) : game === "cross-exposure" ? (
+          <PhotoCrossword photos={photos} />
         ) : game === "connections" ? (
           <PhotoConnections photos={photos} />
         ) : (
@@ -111,3 +117,7 @@ export const BlindFrameScreen = () => <PhotoGameScreen game="blind-frame" />;
 export const PhotoOracleScreen = () => <PhotoGameScreen game="oracle" />;
 
 export const PhotoConnectionsScreen = () => <PhotoGameScreen game="connections" />;
+
+export const DoubleTakeScreen = () => <PhotoGameScreen game="double-take" />;
+
+export const PhotoCrosswordScreen = () => <PhotoGameScreen game="cross-exposure" />;

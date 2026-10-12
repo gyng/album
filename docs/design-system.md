@@ -227,3 +227,13 @@ loads stay still and reduced-motion preferences skip the translation. Guess
 Where’s lobby keeps the regular page gutter and maximum width until play starts.
 Weather provenance and attribution live inside the left-aligned Estimate details
 disclosure; only the condition and temperature occupy the compact summary.
+
+
+Game illustrations inherit the theme accent rather than body text colour, on
+both cards and illustrated starts. Fun! uses three desktop columns, two on
+medium screens and one on phones. Selected photographic tiles retain full
+image opacity and combine an accent outline with a tick badge. Dynamic image
+game grids keep overflow inside a keyboard-scrollable region, with sticky row
+clues. Full-frame flash stages contain their images without cropping. Use the
+shared LoadingIndicator for model warm-up and pending image comparisons;
+respect reduced-motion preferences for its spinner and game countdowns.

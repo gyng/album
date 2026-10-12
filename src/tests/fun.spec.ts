@@ -107,6 +107,8 @@ test("Fun cards have illustrations and launch each game; old Guess Where challen
     "Blind Frame",
     "Photo Oracle",
     "Connect the Shots",
+    "Double Take",
+    "Cross Exposure",
   ]) {
     const card = page.getByRole("link", { name: new RegExp(`${title}.*Play`) });
     await expect(card).toBeVisible();
@@ -209,10 +211,8 @@ test("Blind Frame reuses the drawing canvas and reveals the sketch, target and n
   const result = page.getByRole("region", { name: "Blind Frame result" });
   await expect(result).toBeVisible();
   await expect(result.locator("figure img")).toHaveCount(3);
-  await expect(
-    result.getByRole("heading", { name: "Close to the hidden photograph" }),
-  ).toBeVisible();
-  await expect(result.getByRole("figure", { name: "Hidden photograph" })).toBeVisible();
+  await expect(result.getByRole("heading", { name: "More like the original" })).toBeVisible();
+  await expect(result.getByRole("figure", { name: "The original photograph" })).toBeVisible();
   await expect(result.getByText(/\d+ \/ 100/)).toBeVisible();
 });
 

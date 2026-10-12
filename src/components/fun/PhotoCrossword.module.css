@@ -1,0 +1,103 @@
+.game {
+  display: grid;
+  gap: var(--space-4);
+  min-inline-size: 0;
+}
+.game p {
+  margin: 0;
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+.boardScroll {
+  overflow-x: auto;
+  min-inline-size: 0;
+  max-inline-size: 100%;
+  border-radius: var(--radius-preview);
+}
+.board {
+  inline-size: 100%;
+  table-layout: fixed;
+  border-spacing: var(--space-2);
+  min-inline-size: calc((var(--crossword-size) + 1) * 7rem);
+}
+.board th {
+  padding: var(--space-2);
+  font-size: var(--fs-s);
+  font-weight: 600;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+.board th[scope="row"],
+.board thead td {
+  position: sticky;
+  inset-inline-start: 0;
+  z-index: 1;
+  background: var(--c-bg);
+}
+.cell,
+.tile {
+  composes: base from "../ui/Control.module.css";
+  position: relative;
+  display: grid;
+  inline-size: 100%;
+  padding: var(--space-1);
+  cursor: pointer;
+  transition:
+    border-color 150ms ease,
+    background 150ms ease;
+}
+.cell {
+  aspect-ratio: 4 / 3;
+  place-items: center;
+  font-size: var(--fs-xl);
+}
+.cell img {
+  block-size: 100%;
+  object-fit: contain;
+}
+.cell[aria-pressed="true"],
+.tile[aria-pressed="true"] {
+  border-color: var(--c-accent);
+  outline: 3px solid var(--c-accent);
+  outline-offset: 1px;
+  background: var(--c-selected);
+}
+.incorrect {
+  border-color: var(--c-accent);
+  border-style: dashed;
+}
+.correct {
+  background: var(--c-selected);
+}
+.cell:disabled {
+  cursor: default;
+}
+.tray {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr));
+  gap: var(--space-3);
+}
+.mark {
+  position: absolute;
+  inset-block-start: var(--space-1);
+  inset-inline-end: var(--space-1);
+  display: grid;
+  place-items: center;
+  inline-size: 1.5rem;
+  block-size: 1.5rem;
+  border-radius: 50%;
+  background: var(--c-accent);
+  color: light-dark(var(--c-white), var(--c-black));
+  font-size: var(--fs-s);
+  font-weight: 700;
+}
+@media (prefers-reduced-motion: reduce) {
+  .cell,
+  .tile {
+    transition: none;
+  }
+}

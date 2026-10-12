@@ -26,11 +26,13 @@ export const PhotoChain = ({
   linked = true,
   similarities,
   numbered = true,
+  clues,
 }: {
   photos: PhotoGamePhoto[];
   linked?: boolean;
   similarities?: Array<number | null>;
   numbered?: boolean;
+  clues?: string[];
 }) => (
   <ol className={styles.chain}>
     {photos.map((photo, index) => (
@@ -38,7 +40,12 @@ export const PhotoChain = ({
         <GamePhoto photo={photo} link={linked} />
         {numbered ? <span className={styles.step}>{index + 1}</span> : null}
         {similarities?.[index] !== undefined && similarities[index] !== null ? (
-          <span className={styles.step}>Next link · {similarities[index]}% similarity</span>
+          <span className={styles.step}>
+            {index + 1} → {index + 2} · {similarities[index]}% similarity
+          </span>
+        ) : null}
+        {clues?.[index] ? (
+          <span className={styles.step}>Caption clues · {clues[index]}</span>
         ) : null}
       </li>
     ))}
