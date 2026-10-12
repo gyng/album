@@ -14,8 +14,8 @@
   /* Tall enough on a desktop to be a place rather than a strip, and still a
      sensible fraction of a phone. */
   block-size: clamp(var(--size-420), 68vh, var(--size-760));
-  border: solid var(--line-hairline) var(--c-bg-contrast-light);
-  border-radius: var(--m-s);
+  border: solid var(--line-hairline) var(--c-border);
+  border-radius: var(--radius-panel);
   background:
     radial-gradient(
       circle at 50% 45%,

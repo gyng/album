@@ -70,7 +70,7 @@
 .container :global(.maplibregl-ctrl-attrib) {
   background: var(--map-chrome-surface);
   color: var(--c-font);
-  border-radius: var(--m-s);
+  border-radius: var(--radius-panel);
   box-shadow:
     0 0 0 var(--size-1) var(--map-chrome-border),
     var(--map-chrome-shadow);
@@ -96,7 +96,7 @@
 }
 
 .container :global(.maplibregl-ctrl-group) {
-  border-radius: var(--m-s);
+  border-radius: var(--radius-control);
   overflow: hidden;
 }
 
@@ -145,6 +145,7 @@
    it has to keep that line's height whatever the search is doing, which is what
    the fixed-width count and the out-of-flow actions are for. */
 .mapSearch {
+  composes: base from "../../components/ui/Control.module.css";
   position: relative;
   display: flex;
   align-items: center;
@@ -153,9 +154,10 @@
      radius — so the row reads as one set of controls rather than a field that
      happens to sit among them. */
   min-block-size: var(--tap-target);
-  padding-inline: var(--m-s);
-  border: solid var(--line-strong) var(--c-bg-contrast-light);
-  border-radius: var(--m-s);
+  padding-block: 0;
+  padding-inline: var(--control-padding-inline);
+  border: solid var(--line-hairline) var(--c-border);
+  border-radius: var(--radius-control);
   background: var(--c-bg);
 }
 
@@ -169,6 +171,7 @@
   font-family: inherit;
   /* Match the search page's canonical Input sizing for a consistent field. */
   font-size: var(--fs-sm);
+  line-height: var(--lh-label);
 }
 
 /* 16px on touch devices stops iOS Safari zooming the page on focus */
@@ -179,7 +182,7 @@
 }
 
 .mapSearchInput:focus-visible {
-  outline: solid var(--size-2) var(--c-bg-contrast-light);
+  outline: var(--focus-ring);
   outline-offset: var(--size-1);
 }
 
@@ -213,16 +216,17 @@
 }
 
 .mapSearchAction {
+  composes: compact from "../../components/ui/Control.module.css";
   display: inline-flex;
   align-items: center;
   gap: var(--m);
-  padding: var(--m) var(--m-s);
-  border: solid var(--size-1) var(--c-bg-contrast-light);
-  border-radius: var(--m);
+  padding: var(--space-1) var(--space-3);
+  border: solid var(--line-hairline) var(--c-border);
+  border-radius: var(--radius-control);
   background: var(--c-bg);
   color: var(--c-font);
   cursor: pointer;
-  font-size: var(--fs-xs);
+  font-size: var(--fs-s);
   white-space: nowrap;
 }
 
@@ -232,7 +236,7 @@
 }
 
 .mapSearchAction:focus-visible {
-  outline: solid var(--size-2) var(--c-bg-contrast-light);
+  outline: var(--focus-ring);
   outline-offset: var(--size-1);
 }
 

@@ -62,7 +62,7 @@
   align-self: center;
   color: var(--c-bg-contrast-light);
   font-size: var(--fs-s);
-  font-style: italic;
+  line-height: var(--lh-caption);
 }
 
 .searchInputRow {
@@ -147,7 +147,7 @@
   z-index: var(--z-float);
   inline-size: max-content;
   max-inline-size: min(80dvw, var(--size-280));
-  border-radius: var(--m-s);
+  border-radius: var(--radius-control);
   font-size: var(--fs-s);
   line-height: 1.4;
   opacity: 0;
@@ -238,6 +238,6 @@
     padding: var(--m) var(--m-s);
     font-size: var(--fs-s);
     border-width: var(--size-1);
-    border-radius: var(--m-s);
+    border-radius: var(--radius-control);
   }
 }

@@ -5,7 +5,7 @@
   inline-size: var(--size-150);
   block-size: var(--size-150);
   background-color: transparent;
-  border-radius: var(--m-m);
+  border-radius: var(--radius-panel);
   border-style: solid;
   border-color: var(--c-bg-contrast-light);
   cursor: pointer;
@@ -127,7 +127,12 @@
 }
 
 .filterTrigger {
+  composes: base from "../ui/Control.module.css";
   display: none;
+}
+
+.filterDrawerClose {
+  composes: icon from "../ui/Control.module.css";
 }
 
 .filterDrawer {
@@ -152,8 +157,8 @@
     align-self: flex-start;
     margin-block-end: var(--m-l);
     padding: var(--m-s) var(--m-m);
-    border: solid var(--size-1) var(--c-border-on-dark);
-    border-radius: var(--m-s);
+    border: solid var(--line-hairline) var(--c-border);
+    border-radius: var(--radius-control);
     background: transparent;
     color: inherit;
     font-size: var(--fs-sm);
@@ -161,7 +166,7 @@
   }
 
   .filterTrigger:focus-visible {
-    outline: solid var(--size-2) var(--c-bg-contrast-light);
+    outline: var(--focus-ring);
     outline-offset: var(--size-2);
   }
 
@@ -190,7 +195,7 @@
     margin: auto 0 0;
     padding: 0 var(--m-l) calc(env(safe-area-inset-bottom, 0) + var(--m-l));
     border: 0;
-    border-radius: var(--m-l) var(--m-l) 0 0;
+    border-radius: var(--radius-sheet) var(--radius-sheet) 0 0;
     background: var(--c-bg);
     color: inherit;
     box-shadow: 0 calc(var(--size-8) * -1) var(--size-32)
@@ -258,9 +263,9 @@
   }
 
   .filterDrawerClose {
-    padding: var(--m-s) var(--m-m);
-    border: solid var(--size-1) var(--c-border-on-dark);
-    border-radius: var(--radius-pill);
+    padding: 0;
+    border: solid var(--line-hairline) var(--c-border);
+    border-radius: var(--radius-control);
     background: transparent;
     color: inherit;
     font-size: var(--fs-sm);
@@ -268,7 +273,7 @@
   }
 
   .filterDrawerClose:focus-visible {
-    outline: solid var(--size-2) var(--c-bg-contrast-light);
+    outline: var(--focus-ring);
     outline-offset: var(--size-2);
   }
 
@@ -318,6 +323,7 @@
 }
 
 .retryButton {
+  composes: compact from "../ui/Control.module.css";
   margin-inline-start: var(--m-s);
   padding: var(--m) var(--m-s);
   background-color: transparent;
@@ -334,11 +340,11 @@
 
 .link:focus-visible,
 .moreButton:focus-visible {
-  outline: solid var(--size-2) var(--c-bg-contrast-light);
+  outline: var(--focus-ring);
 }
 
 .searchHint {
-  font-style: italic;
+  line-height: var(--lh-caption);
   color: var(--c-bg-contrast-light);
 }
 
@@ -361,7 +367,7 @@
 .modeColorSwatch {
   inline-size: var(--tap-target);
   block-size: var(--tap-target);
-  border-radius: var(--m-s);
+  border-radius: var(--radius-control);
   flex-shrink: 0;
 }
 
@@ -402,7 +408,7 @@
 }
 
 .modeColorSwatchLabel:hover .modeColorSwatch {
-  outline: solid var(--size-2) var(--c-bg-contrast-light);
+  outline: var(--focus-ring);
   outline-offset: var(--size-2);
 }
 
@@ -466,8 +472,8 @@
   align-items: center;
   gap: var(--m);
   padding: var(--m-s) var(--m-m);
-  border: solid var(--size-2) var(--c-bg-contrast-light);
-  border-radius: var(--m-s);
+  border: solid var(--line-hairline) var(--c-border);
+  border-radius: var(--radius-control);
   background-color: var(--c-bg);
   inline-size: 100%;
   max-inline-size: min(80dvw, var(--mode-input-max-width));
@@ -503,7 +509,7 @@
 }
 
 .modeClearButton:focus-visible {
-  outline: solid var(--size-2) var(--c-bg-contrast-light);
+  outline: var(--focus-ring);
 }
 
 .breadcrumbsBar {

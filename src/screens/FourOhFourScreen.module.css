@@ -10,9 +10,9 @@
   display: grid;
   place-content: center;
   justify-items: center;
-  gap: var(--m-l);
+  gap: var(--space-5);
   text-align: center;
-  padding: var(--m-xl);
+  padding: var(--page-gutter);
 }
 
 .glyph {
@@ -23,8 +23,12 @@
 .heading {
   margin: 0;
   font-size: var(--fs-l);
+  line-height: var(--lh-heading);
 }
 
 .homeLink {
-  font-size: var(--fs-m);
+  composes: base from "../components/ui/Control.module.css";
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
 }

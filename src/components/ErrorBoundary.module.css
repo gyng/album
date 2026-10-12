@@ -3,7 +3,7 @@
   align-items: center;
   justify-content: center;
   min-block-size: 100dvh;
-  padding: var(--m-l);
+  padding: var(--page-gutter);
   background: var(--c-bg);
   color: var(--c-font);
 }
@@ -13,18 +13,21 @@
   flex-direction: column;
   gap: var(--m-m);
   max-inline-size: calc(var(--m-l) * 21);
-  padding: var(--m-xl);
-  border: var(--line-hairline) solid var(--c-bg-contrast-light);
+  padding: var(--space-5);
+  border: var(--line-hairline) solid var(--c-border);
+  border-radius: var(--radius-panel);
+  background: var(--c-surface);
   text-align: center;
 }
 
 .heading {
   margin: 0;
   font-size: var(--fs-l);
+  line-height: var(--lh-heading);
 }
 
 .body {
   margin: 0;
   font-size: var(--fs-sm);
-  color: var(--c-bg-contrast-dark);
+  color: var(--c-bg-contrast-light);
 }

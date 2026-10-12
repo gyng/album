@@ -1,11 +1,11 @@
 .pill {
-  composes: base from "../ui/Control.module.css";
+  composes: compact from "../ui/Control.module.css";
   min-block-size: var(--compact-control-size);
   display: inline-flex;
   align-items: center;
   padding: var(--space-1) var(--space-2);
   font-size: var(--fs-s);
-  border-radius: var(--m-s);
+  border-radius: var(--radius-control);
   border: solid var(--line-hairline) var(--c-border);
   cursor: pointer;
   user-select: none;
@@ -22,8 +22,13 @@
   }
 }
 
-.pill:hover,
+.pill:hover {
+  background-color: var(--c-surface-hover);
+}
+
 .pill.active {
+  --c-border-hover: var(--c-selected-border);
+  --c-surface-hover: var(--c-selected);
   background-color: var(--c-selected);
   border-color: var(--c-selected-border);
   color: var(--c-font);

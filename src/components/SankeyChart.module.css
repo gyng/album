@@ -8,7 +8,7 @@
 .chartShell {
   block-size: var(--sankey-height, var(--size-460));
   border: var(--size-1) solid var(--c-bg-contrast-dark);
-  border-radius: var(--m-s);
+  border-radius: var(--radius-panel);
   padding: var(--m);
   background: color-mix(in oklch, var(--c-bg) 96%, var(--c-bg-contrast-dark));
   overflow: clip;

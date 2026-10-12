@@ -19,8 +19,8 @@
   min-block-size: var(--size-24);
   justify-content: center;
   padding-inline: var(--m-s);
-  border: var(--line-hairline) solid var(--map-chrome-border, var(--c-bg-contrast-light));
-  border-radius: var(--m-s);
+  border: var(--line-hairline) solid var(--map-chrome-border, var(--c-border));
+  border-radius: var(--radius-panel);
   background: var(--map-chrome-surface, var(--c-bg));
   box-shadow: var(--map-chrome-shadow, none);
   color: var(--c-font);

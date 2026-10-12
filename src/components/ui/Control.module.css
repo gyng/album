@@ -1,5 +1,5 @@
-/* Shared control geometry; variants only change emphasis or density. */
-.base {
+/* Low-specificity foundations keep variants stable regardless of CSS chunk order. */
+:where(.base) {
   appearance: none;
   box-sizing: border-box;
   margin: 0;
@@ -19,12 +19,36 @@
     border-color var(--t-fast);
 }
 
-.base:hover:not(:disabled):not([aria-disabled="true"]) {
+:where(.base:hover:not(:disabled):not([aria-disabled="true"])) {
   border-color: var(--c-border-hover);
 }
 
-.base:disabled,
-.base[aria-disabled="true"] {
+:where(.base:disabled, .base[aria-disabled="true"]) {
   cursor: not-allowed;
   opacity: 0.45;
+}
+
+.compact {
+  composes: base;
+}
+
+:where(.compact) {
+  min-block-size: var(--compact-control-size);
+  padding-block: var(--space-1);
+  font-size: var(--fs-s);
+  line-height: var(--lh-caption);
+}
+
+.icon {
+  composes: base;
+}
+
+:where(.icon) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: var(--tap-target);
+  min-inline-size: var(--tap-target);
+  block-size: var(--tap-target);
+  padding: 0;
 }

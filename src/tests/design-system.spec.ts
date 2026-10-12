@@ -1,6 +1,18 @@
 import { expect, test, type Page } from "@playwright/test";
 import { gotoHydrated } from "./hydrated";
 
+test("unknown document URLs use the themed gallery recovery page", async ({ page, request }) => {
+  const response = await page.goto("/missing-design-review-page?theme=darkroom");
+  expect(response?.status()).toBe(404);
+  await expect(page.getByRole("link", { name: "Back to album list" })).toBeVisible();
+  await expect(page.locator("html")).toHaveAttribute("data-app-hydrated", "true");
+  await expect(page.locator("html")).toHaveClass(/theme-darkroom/);
+  const resource = await request.get("/data/missing-design-review.json", {
+    headers: { accept: "application/json" },
+  });
+  expect(resource.status()).toBe(404);
+});
+
 const expectDensity = async (page: Page, density: string, height: number) => {
   const controls = page.locator(`[data-control-density="${density}"]`).locator(":scope > *");
   expect(await controls.count()).toBeGreaterThan(3);
@@ -37,6 +49,26 @@ test.describe("touch density", () => {
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
       390,
     );
+  });
+
+  test("drawing tools stay inside the viewport with full touch targets", async ({ page }) => {
+    await gotoHydrated(page, "/design?theme=light");
+    await page.getByRole("button", { name: "Preview drawing tools" }).click();
+    const dialog = page.getByRole("dialog", { name: "Draw to search" });
+    await expect(dialog).toBeVisible();
+    const brushes = dialog.getByRole("group", { name: "Brush colour" }).getByRole("button");
+    expect(await brushes.count()).toBe(8);
+    for (const brush of await brushes.all()) {
+      const box = await brush.boundingBox();
+      expect(box).not.toBeNull();
+      expect(box!.width).toBe(44);
+      expect(box!.height).toBe(44);
+      expect(box!.x).toBeGreaterThanOrEqual(0);
+      expect(box!.x + box!.width).toBeLessThanOrEqual(390);
+    }
+    await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
+    await expect(dialog).toBeHidden();
+    await expect(page.getByRole("button", { name: "Preview drawing tools" })).toBeFocused();
   });
 });
 

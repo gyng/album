@@ -6,8 +6,8 @@
   z-index: var(--z-fullscreen-underlay);
   pointer-events: auto;
   background: var(--map-chrome-surface, var(--c-bg));
-  border: solid var(--line-hairline) var(--map-chrome-border, var(--c-bg-contrast-light));
-  border-radius: var(--m-s);
+  border: solid var(--line-hairline) var(--map-chrome-border, var(--c-border));
+  border-radius: var(--radius-panel);
   box-shadow: var(--map-chrome-shadow, none);
   color: var(--c-font);
   font-family: var(--font-sans);
@@ -129,15 +129,16 @@
 }
 
 .resetButton {
+  composes: compact from "./ui/Control.module.css";
   appearance: none;
-  border: solid var(--line-hairline) var(--map-chrome-border, var(--c-bg-contrast-light));
+  border: solid var(--line-hairline) var(--map-chrome-border, var(--c-border));
   min-block-size: var(--tap-target);
   background: transparent;
   color: var(--c-font);
   font: inherit;
   cursor: pointer;
   padding: calc(var(--line-hairline) * 2) var(--m-s);
-  border-radius: var(--m-s);
+  border-radius: var(--radius-control);
   line-height: 1;
 }
 

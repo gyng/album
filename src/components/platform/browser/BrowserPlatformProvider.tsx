@@ -16,8 +16,12 @@ const BrowserLink = React.forwardRef<HTMLAnchorElement, React.ComponentProps<"a"
   },
 );
 
-const BrowserHead = ({ children }: React.PropsWithChildren) =>
-  typeof document === "undefined" ? null : createPortal(children, document.head);
+const BrowserHead = ({ children }: React.PropsWithChildren) => {
+  const [mounted, setMounted] = React.useState(false);
+  React.useEffect(() => setMounted(true), []);
+  // Match the server's empty portal during hydration before updating its head.
+  return mounted ? createPortal(children, document.head) : null;
+};
 
 export const BrowserPlatformProvider = ({
   children,

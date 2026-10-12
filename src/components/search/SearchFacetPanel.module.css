@@ -21,12 +21,16 @@
 }
 
 .facetCategoryRail {
+  min-block-size: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
   display: grid;
   align-content: start;
   gap: var(--m-s);
 }
 
 .facetCategoryTab {
+  composes: compact from "../ui/Control.module.css";
   display: inline-flex;
   align-items: center;
   justify-content: flex-start;
@@ -35,7 +39,7 @@
   font-family: inherit;
   line-height: var(--lh-caption);
   border: solid var(--size-1) var(--c-border);
-  border-radius: var(--m-s);
+  border-radius: var(--radius-control);
   background: transparent;
   color: var(--c-bg-contrast-light);
   cursor: pointer;
@@ -60,6 +64,7 @@
 }
 
 .facetCategoryTabActive {
+  --c-border-hover: var(--c-selected-border);
   background: var(--c-selected);
   color: var(--c-font);
   border-color: var(--c-selected-border);

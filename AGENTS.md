@@ -24,7 +24,7 @@ Personal photo gallery — Next.js 16, TypeScript, CSS Modules, MapLibre GL. Pho
 - `src/components/platform/` — injectable renderer ports for links, document metadata, navigation, and public configuration; Next's implementation lives only in `platform/next/`
 - `src/pages/` — thin Next.js route/build `.tsx` adapters; do not put rendered screen implementations or application-owned styles here
 - `src/screens/` — framework-neutral route-level React screens (`map`, `search`, `explore`, `timeline`, `slideshow`, `design`, etc.) with screen-owned CSS Modules
-- `src/app/` — build-only Next.js route adapters for stable data URLs; do not put application UI here
+- `src/app/` — build-only Next.js route adapters for stable data URLs; do not put application UI here. `global-not-found.tsx` only re-exports the renderer error-document adapter; recovery UI remains in `screens/`
 - `src/util/` — pure utility functions (no React)
 - `src/services/` — build-time data: album/photo loading, serialisation, EXIF extraction (Node only, never imported client-side)
 - `src/services/pageData/` — route-sized, framework-neutral loaders used by page build adapters
@@ -33,7 +33,7 @@ Personal photo gallery — Next.js 16, TypeScript, CSS Modules, MapLibre GL. Pho
 - `src/components/mapRoute.ts` — all route/journey logic
 - `index/` — Python indexing pipeline (Gemma 4 captions, SigLIP, EXIF, geocoding → SQLite)
 
-Data-backed display pages use `getStaticProps`; client-only pages are statically optimised without it. The App Router is used only for build-generated payloads at stable URLs, currently `/data/map-search-index.json`; it is not a runtime application API. Client state is UI-only (filters, view toggles).
+Data-backed display pages use `getStaticProps`; client-only pages are statically optimised without it. The App Router supplies build-generated payloads at stable URLs and the static missing-page document; it is not a runtime application API. Next otherwise overwrites the Pages Router's generated 404 with its bare App Router fallback. `platform/next/NextNotFoundDocument` installs the shared theme bootstrap and `NextNotFoundRuntime` renders the portable recovery screen through the browser platform provider. Client state is UI-only (filters, view toggles).
 
 ## Conventions
 - **British English** in all user-facing copy and comments: colour, centre, favourite, licence

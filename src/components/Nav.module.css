@@ -105,14 +105,15 @@
 /* Visually hidden until focused, then surfaces as a standard pill at the top
    of the nav so keyboard users can jump past the repeated links. */
 .skipLink {
+  composes: base from "./ui/Control.module.css";
   position: absolute;
   inset-inline-start: var(--m-s);
   inset-block-start: var(--m-s);
   z-index: var(--z-sticky);
   padding: var(--m-s) var(--m-m);
-  border-radius: var(--m-s);
+  border-radius: var(--radius-control);
   background-color: var(--c-bg);
-  border: solid var(--size-2) var(--c-bg-contrast-light);
+  border: solid var(--line-hairline) var(--c-border);
   color: var(--c-font);
   font-size: var(--fs-sm);
   text-decoration: none;
@@ -125,6 +126,6 @@
   transform: translateY(0);
   opacity: 1;
   pointer-events: auto;
-  outline: solid var(--size-2) var(--c-bg-contrast-light);
+  outline: var(--focus-ring);
   outline-offset: var(--size-2);
 }

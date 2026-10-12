@@ -1,8 +1,7 @@
 .key {
   padding: 0 var(--m);
-  border: var(--line-hairline) solid
-    color-mix(in oklch, var(--c-bg-contrast-light) 40%, transparent);
-  border-radius: var(--m);
+  border: var(--line-hairline) solid var(--c-border);
+  border-radius: var(--radius-preview);
   color: var(--c-bg-contrast-light);
   font-family: inherit;
   font-size: var(--fs-xs);

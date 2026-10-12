@@ -81,13 +81,14 @@
 
 /* Each day is a way into the day view this page already has. */
 .day {
+  composes: compact from "./ui/Control.module.css";
   display: inline-flex;
   align-items: baseline;
   gap: var(--m);
   padding: var(--m-xs) var(--m-s);
-  border: var(--size-1) solid color-mix(in oklch, var(--c-bg-contrast-light) 45%, transparent);
-  border-radius: var(--radius-pill);
-  background: transparent;
+  border: var(--line-hairline) solid var(--c-border);
+  border-radius: var(--radius-control);
+  background: var(--c-surface);
   color: inherit;
   font: inherit;
   font-size: var(--fs-s);

@@ -29,7 +29,8 @@ These are design references; the CSS is authored for this gallery.
   These derive from each theme's own background and text colours.
 - Selection: `--c-selected` and `--c-selected-border` describe a soft accent
   surface. Focus uses the existing accent ring; focus and selection are distinct.
-- Radius: controls 8px, panels 12px; photograph overlays and badges may be pills.
+- Radius: controls 8px, panels 12px, sheets 16px and image previews 4px.
+  Photograph overlays and badges may be pills.
 - Keep photographs dominant. Use the accent for actions, selection and data;
   ordinary controls use neutral surfaces. Avoid decorative glow on page controls.
 
@@ -37,7 +38,12 @@ These are design references; the CSS is authored for this gallery.
 
 `components/ui/Control.module.css` supplies shared form/action geometry through
 CSS Modules composition. `Button`, `Pill`, `Input` and `Select` inherit it.
-`SegmentedToggle` uses the same tokens for its grouped structure.
+`SegmentedToggle` uses the same tokens for its grouped structure. The shared
+`compact` and `icon` classes also cover screen-owned controls, including filter
+chips, map actions, recovery actions and drawing tools. Shared foundations use
+`:where()` to keep specificity low: a component variant or touch rule must win
+regardless of CSS chunk/import order. Compose only within a single local class
+selector, never a grouped selector.
 
 - Standard controls have a 44px minimum height and 12px horizontal padding.
 - Compact controls use 32px, with 12px labels and 16px line height. Coarse-pointer
@@ -71,6 +77,48 @@ timeline/trips and slideshow controls. Screen-owned layout remains in screen
 CSS Modules. Do not replace photo presentation, map data layers or slideshow
 state machines to achieve a visual change.
 
+## Deliberate variants
+
+Consistency follows the role of the surface, rather than making every element
+look like a form control.
+
+- Photograph and kiosk overlays use fixed dark glass, on-dark text/borders and
+  pill-shaped media controls. Their geometry still follows the shared touch
+  target and spacing rules. A light site theme must not turn overlay labels dark.
+- Drawing uses white paper because the submitted raster is filled white. Colour
+  swatches remain round, 44px and never shrink; tools wrap when space runs out.
+  Brush selection uses an accent border, separate from the keyboard focus ring.
+- Maps, contact sheets, photo frames and visualisation canvases keep their own
+  geometry and data colours. Panel framing uses the shared border/radius tokens.
+  A route drawing's square frame, heatmap cells and focal dots are data marks.
+- Compact badges, attribution, keyboard hints and chart annotations are read-only
+  metadata, not 44px controls. A photograph/grid pagination tile can match the
+  image tile it sits among. Continuation placeholders may use a dashed border.
+- Guess Where keeps its full-height photo/map layout and narrow canvas gutters.
+  Lobby/results use readable document widths. Timer urgency, score reveals and
+  map-pin feedback may animate; ordinary game buttons use shared hover/selection
+  states without decorative shimmer or perpetual readiness glow.
+- The desktop search category rail scrolls within its bounded panel. Compact
+  filter sheets wrap the categories and scroll the values. Long labels must not
+  widen the page. Selection stays recognisable on hover.
+
+## Screen coverage
+
+| Screen or state | Shared rules and deliberate treatment |
+| --- | --- |
+| Albums and individual albums | Standard navigation; photograph geometry; readable metadata panels |
+| Explore overview and sections | Shared cards, compact controls, bar rows and chart framing |
+| Timeline and trips | Shared navigation, filters and day actions; data rails remain specialised |
+| Search, image queries and active filters | Compact chips, selected states, bounded rails and consistent clear/retry actions |
+| Filter sheet and drawing dialog | Sheet/panel radii; reachable actions; full touch targets and wrapping tools |
+| Map search, menus and time range | Standard search frame; compact Fit/Tour actions; shared panel borders |
+| Guess lobby, round and results | Shared actions and surfaces; full-height gameplay and semantic game feedback |
+| Slideshow, remix and media controls | Shared geometry on fixed dark glass; photo presentation remains specialised |
+| Slideshow shell and diagnostics | Compact kiosk overlay versus readable document cards, rows and actions |
+| Design catalogue | Live standard/compact/filter states and the real drawing dialog |
+| Missing page, render error and update banner | Readable status copy, shared recovery actions and visible focus |
+| Legacy timeline/trips routes | Redirect to the corresponding Explore screen |
+
 ## Maintaining the system
 
 Use semantic tokens and shared components before adding screen-specific rules.
@@ -98,3 +146,36 @@ emulation also keeps standard and compact controls aligned at 44px.
 This is an adaptation of the design foundations, rather than installation of a
 second component/theme runtime. New complex interactions can adopt an accessible
 primitive behind the existing UI API when there is a concrete need.
+
+## Site-wide refinement review
+
+The follow-up passes cover the remaining screen-owned controls, game lobby and
+results, map framing, diagnostics, recovery screens and drawing tools. The
+catalogue now includes live filter states and the real drawing dialog. Shared
+control defaults use low specificity so compact sizes and touch input fonts
+remain stable when production CSS chunks arrive in a different order.
+
+Phone drawing swatches retain their full 44px width and wrap; desktop search
+categories scroll inside their panel. Selected filters preserve their emphasis
+on hover. Gear photograph actions use the same dark glass as other media
+overlays. Game actions use quiet shared states, while meaningful timer, score
+and map feedback retain their own treatment.
+
+The missing-page document uses a renderer adapter because Next's build-only
+App Router otherwise replaces the gallery's generated 404. The adapter installs
+the shared pre-paint theme bootstrap and reuses the portable recovery screen;
+it does not introduce a second screen implementation or a runtime data API.
+The [Next global missing-page convention](https://nextjs.org/docs/app/api-reference/file-conventions/not-found)
+is isolated to that adapter; the browser head port waits until mount so its
+metadata updates agree with the server markup during hydration.
+
+The full archive was reviewed at 1440px in Light and 390px in Darkroom across
+albums, Explore, timeline, trips, search, map, Guess Where, diagnostics, the
+catalogue and recovery page. No document overflow was found. WebKit iPad
+emulation also checks the catalogue, game, diagnostics and drawing dialog.
+
+Validation: 2,976 Jest tests and all lint/type/format gates pass. The production
+Chromium suite passes its 100 existing checks; after the final recovery adapter
+correction, all 26 catalogue, hydration and route smoke checks pass, including
+the new unknown-URL regression and HTTP 404 status. Three redundant Chromium
+smoke cases remain intentionally skipped by the existing suite.

@@ -1,9 +1,9 @@
 .lobby {
   display: grid;
-  gap: var(--m-xl);
-  max-inline-size: calc(var(--m-l) * 21);
+  gap: var(--space-5);
+  max-inline-size: var(--content-width-compact);
   margin: var(--m-xl) auto 0;
-  padding: var(--m-xl) var(--m-l);
+  padding: var(--space-5) var(--space-3);
 }
 
 /* Header — drops in first */
@@ -28,7 +28,7 @@
 /* Options — each row cascades in */
 .options {
   display: grid;
-  gap: var(--m-l);
+  gap: var(--space-4);
 }
 
 .optionRow {
@@ -37,7 +37,7 @@
   justify-content: space-between;
   gap: var(--m-m);
   padding: var(--m-s) var(--m-m);
-  border-radius: var(--m-s);
+  border-radius: var(--radius-control);
   animation: slideIn var(--t-deliberate) var(--ease-out) both;
   transition: background-color var(--t-theme);
 }
@@ -56,7 +56,7 @@
 }
 
 .optionRow:hover {
-  background-color: color-mix(in oklch, var(--c-bg-contrast-light) 8%, transparent);
+  background-color: var(--c-surface-hover);
 }
 
 @keyframes slideIn {
@@ -131,12 +131,7 @@
 }
 
 .dailyButton:hover {
-  background-color: var(--c-bg-contrast-light);
-  transform: scale(1.03);
-}
-
-.dailyButton:active {
-  transform: scale(0.97);
+  background-color: var(--c-surface-hover);
 }
 
 /* Play button — prominent, accent-bordered */
@@ -158,45 +153,16 @@
 
 .playButton:hover {
   background-color: color-mix(in oklch, var(--c-accent) 10%, var(--c-bg));
-  box-shadow: 0 0 0 var(--m) color-mix(in oklch, var(--c-accent) 15%, transparent);
-  transform: scale(1.03);
 }
 
 .playButton:active {
-  transform: scale(0.97);
   box-shadow: none;
-}
-
-/* Shimmer sweep across the play button */
-.playButton::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  background: linear-gradient(
-    105deg,
-    transparent 40%,
-    color-mix(in oklch, var(--c-accent) 12%, transparent) 50%,
-    transparent 60%
-  );
-  animation: shimmer var(--t-shimmer) var(--ease-in-out) infinite;
-  pointer-events: none;
-}
-
-@keyframes shimmer {
-  0%,
-  100% {
-    transform: translateX(-120%);
-  }
-  50% {
-    transform: translateX(120%);
-  }
 }
 
 @media (max-width: 480px) {
   .lobby {
     margin-block-start: var(--m-l);
-    padding: var(--m-l) var(--m-s);
+    padding: var(--space-5) var(--space-2);
     gap: var(--m-l);
   }
 }

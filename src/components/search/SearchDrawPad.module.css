@@ -7,7 +7,7 @@
   block-size: 100dvh;
   max-block-size: none;
   margin: 0;
-  padding: var(--m-l);
+  padding: var(--panel-padding);
   border: 0;
   background: transparent;
   color: inherit;
@@ -56,10 +56,10 @@
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-gutter: stable;
-  padding: var(--m-l);
-  border: solid var(--line-hairline) var(--c-bg-contrast-light);
-  border-radius: var(--m-s);
-  background-color: var(--c-bg);
+  padding: var(--panel-padding);
+  border: solid var(--line-hairline) var(--c-border);
+  border-radius: var(--radius-panel);
+  background-color: var(--c-surface);
 }
 
 .title {
@@ -73,8 +73,8 @@
   inline-size: min(70dvw, 45dvh, var(--size-320));
   block-size: min(70dvw, 45dvh, var(--size-320));
   flex: 0 0 auto;
-  border: solid var(--line-hairline) var(--c-bg-contrast-light);
-  border-radius: var(--m);
+  border: solid var(--line-hairline) var(--c-border);
+  border-radius: var(--radius-preview);
   background-color: var(--c-canvas);
   cursor: crosshair;
   touch-action: none;
@@ -82,11 +82,13 @@
 
 .toolRow {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: var(--m);
+  gap: var(--space-2);
 }
 
 .swatch {
+  flex: 0 0 var(--tap-target);
   inline-size: var(--tap-target);
   block-size: var(--tap-target);
   padding: 0;
@@ -96,15 +98,16 @@
 }
 
 .swatchActive {
-  outline: var(--focus-ring);
-  outline-offset: var(--focus-offset);
+  border-width: var(--line-strong);
+  border-color: var(--c-accent);
 }
 
 .sizeButton {
+  composes: compact from "../ui/Control.module.css";
   min-block-size: var(--tap-target);
   padding: var(--m) var(--m-s);
-  border: solid var(--line-hairline) var(--c-bg-contrast-light);
-  border-radius: var(--m-s);
+  border: solid var(--line-hairline) var(--c-border);
+  border-radius: var(--radius-control);
   background-color: transparent;
   color: inherit;
   font-size: var(--fs-s);
@@ -112,8 +115,9 @@
 }
 
 .sizeButtonActive {
-  border-color: var(--c-accent);
-  outline: solid var(--line-hairline) var(--c-accent);
+  --c-border-hover: var(--c-selected-border);
+  border-color: var(--c-selected-border);
+  background: var(--c-selected);
 }
 
 .actionRow {

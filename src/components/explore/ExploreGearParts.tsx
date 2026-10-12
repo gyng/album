@@ -6,7 +6,7 @@ import type {
   GearProfile,
   LensFocalRange,
 } from "../../util/computeGearStats";
-import { Caption, Heading, PillButton, Thumb } from "../ui";
+import { Caption, Heading, OverlayButton, Thumb } from "../ui";
 import sharedStyles from "./ExploreShared.module.css";
 import localStyles from "./ExploreGearSection.module.css";
 
@@ -199,14 +199,14 @@ export const GearProfileCard = ({
           />
         </Link>
         {onRandom ? (
-          <PillButton
+          <OverlayButton
             size="compact"
             className={styles.gearBodyRandom}
             aria-label={`Random photo for ${profile.label}`}
             onClick={onRandom}
           >
             Random
-          </PillButton>
+          </OverlayButton>
         ) : null}
       </div>
     ) : null}

@@ -54,7 +54,7 @@
   block-size: var(--size-56);
   object-fit: cover;
   object-position: bottom;
-  border-radius: var(--m-s);
+  border-radius: var(--radius-panel);
   border: solid var(--size-1) color-mix(in oklch, var(--c-white) 50%, transparent);
   isolation: isolate;
   opacity: 0;

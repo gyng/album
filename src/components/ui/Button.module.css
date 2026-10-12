@@ -73,6 +73,6 @@
   inline-size: var(--tap-target);
   min-inline-size: var(--tap-target);
   padding: 0;
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-control);
   font-size: var(--fs-m);
 }

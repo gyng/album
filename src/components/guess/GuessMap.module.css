@@ -4,10 +4,9 @@
   block-size: 100%;
   flex: 1;
   min-block-size: 0;
-  border-radius: var(--m-s);
+  border-radius: var(--radius-panel);
   overflow: clip;
-  border: var(--line-hairline) solid
-    color-mix(in oklch, var(--c-bg-contrast-light) 30%, transparent);
+  border: var(--line-hairline) solid var(--c-border);
 }
 
 .mapContainer > :global(.maplibregl-map) {
@@ -107,7 +106,7 @@
   background-color: var(--c-overlay-dark);
   color: var(--c-on-dark);
   padding: var(--m-s) var(--m-m);
-  border-radius: var(--m-s);
+  border-radius: var(--radius-panel);
   font-size: var(--fs-s);
   pointer-events: none;
   white-space: nowrap;

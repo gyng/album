@@ -4,11 +4,11 @@
 .page {
   max-inline-size: var(--content-width-section);
   margin-inline: auto;
-  padding: var(--m-l) var(--m-m) var(--m-2xl);
-  padding-block-start: calc(env(safe-area-inset-top, 0px) + var(--m-l));
+  padding: var(--page-gutter) var(--page-gutter) var(--space-9);
+  padding-block-start: max(env(safe-area-inset-top, 0px), var(--page-gutter));
   display: flex;
   flex-direction: column;
-  gap: var(--m-l);
+  gap: var(--space-5);
 }
 
 .header {
@@ -32,9 +32,10 @@
 }
 
 .backLink {
+  composes: base from "../../components/ui/Control.module.css";
   padding-inline: var(--m-m);
-  border: solid var(--size-1) var(--c-bg-contrast-light);
-  border-radius: var(--radius-pill);
+  border: solid var(--line-hairline) var(--c-border);
+  border-radius: var(--radius-control);
   color: inherit;
   font-size: var(--fs-sm);
   text-decoration: none;
@@ -58,7 +59,7 @@
   justify-content: space-between;
   gap: var(--m-m);
   padding-block: var(--m-s);
-  border-block-start: solid var(--size-1) var(--c-bg-contrast-light);
+  border-block-start: solid var(--line-hairline) var(--c-border);
   font-size: var(--fs-sm);
 }
 
@@ -71,6 +72,8 @@
 }
 
 .row dd {
+  min-inline-size: 0;
+  overflow-wrap: anywhere;
   margin: 0;
   display: flex;
   flex-direction: column;
@@ -88,6 +91,7 @@
 }
 
 .settingText {
+  min-inline-size: 0;
   display: flex;
   flex-direction: column;
   gap: var(--m);
@@ -114,7 +118,7 @@
   justify-content: space-between;
   gap: var(--m-s);
   padding-block: var(--m-s);
-  border-block-start: solid var(--size-1) var(--c-bg-contrast-light);
+  border-block-start: solid var(--line-hairline) var(--c-border);
   font-size: var(--fs-sm);
 }
 

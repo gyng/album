@@ -24,10 +24,12 @@
 }
 
 .updateReloadButton {
+  --c-border-hover: var(--c-accent);
+  composes: compact from "./ui/Control.module.css";
   padding: var(--m) var(--m-m);
   background-color: transparent;
   border: solid var(--size-1) var(--c-accent);
-  border-radius: var(--m);
+  border-radius: var(--radius-control);
   color: var(--c-accent);
   font-size: inherit;
   cursor: pointer;
@@ -38,6 +40,7 @@
 }
 
 .updateDismissButton {
+  composes: icon from "./ui/Control.module.css";
   padding: var(--m) var(--m-s);
   background-color: transparent;
   border: none;

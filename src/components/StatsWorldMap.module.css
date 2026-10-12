@@ -4,7 +4,7 @@
 
 .shell {
   position: relative;
-  border-radius: calc(var(--m) + var(--m-s));
+  border-radius: var(--radius-panel);
   overflow: clip;
   background: color-mix(in oklch, var(--c-bg) 82%, var(--c-black));
 }

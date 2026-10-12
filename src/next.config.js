@@ -68,6 +68,7 @@ const nextConfig = {
     },
   ],
   experimental: {
+    globalNotFound: true,
     scrollRestoration: true,
     useLightningcss: true,
     lightningCssFeatures: {

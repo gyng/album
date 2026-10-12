@@ -11,7 +11,7 @@
   /* A quiet ground so the line reads as a drawing rather than as an image that
      failed to load. */
   background: color-mix(in oklch, var(--c-bg-contrast-dark) 22%, transparent);
-  border: var(--size-1) solid color-mix(in oklch, var(--c-bg-contrast-light) 22%, transparent);
+  border: var(--line-hairline) solid var(--c-border);
 }
 
 .line {

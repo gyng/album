@@ -163,7 +163,7 @@
   margin-block-start: var(--m);
   padding: var(--m-m);
   border: solid var(--size-1) var(--c-border-on-dark);
-  border-radius: var(--m-m);
+  border-radius: var(--radius-panel);
   background: color-mix(in oklch, var(--c-overlay-dark) 92%, transparent);
   backdrop-filter: blur(var(--glass-blur-panel));
   box-shadow: 0 var(--m-s) var(--m-xl) color-mix(in oklch, var(--c-black) 40%, transparent);
@@ -233,11 +233,12 @@
   min-block-size: var(--tap-target);
   padding: var(--m) var(--m-s);
   border: solid var(--size-1) var(--c-border-on-dark);
-  border-radius: var(--m-s);
+  border-radius: var(--radius-control);
   background: color-mix(in oklch, var(--c-white) 8%, transparent);
   color: inherit;
   font: inherit;
   font-size: var(--fs-s);
+  line-height: var(--lh-caption);
 }
 
 .wakeAction,
@@ -253,7 +254,7 @@
   min-block-size: var(--tap-target);
   padding: var(--m) var(--m-s);
   border: solid var(--size-1) var(--c-border-on-dark);
-  border-radius: var(--m-s);
+  border-radius: var(--radius-control);
   background: color-mix(in oklch, var(--c-white) 8%, transparent);
   color: inherit;
   font-size: var(--fs-s);
@@ -273,7 +274,7 @@
   }
 
   .diagnosticActions button {
-    min-block-size: var(--size-36);
+    min-block-size: var(--compact-control-size);
   }
 
   .diagnosticsToggle:hover,

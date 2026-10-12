@@ -186,6 +186,8 @@ textarea {
   --control-padding-block: var(--space-2);
   --radius-control: 8px;
   --radius-panel: 12px;
+  --radius-sheet: 16px;
+  --radius-preview: 4px;
   --lh-body: 1.5;
   --lh-label: 20px;
   --lh-caption: 16px;
@@ -432,9 +434,8 @@ textarea {
   --c-warning: light-dark(oklch(67% 0.16 75), oklch(80% 0.17 85));
   --c-danger: light-dark(oklch(58% 0.22 28), oklch(64% 0.21 25));
   --c-today: oklch(61% 0.22 260);
-  --popup-border: solid var(--line-hairline)
-    color-mix(in oklch, var(--c-bg-contrast-light) 45%, transparent);
-  --popup-radius: var(--m-s);
+  --popup-border: solid var(--line-hairline) var(--c-border);
+  --popup-radius: var(--radius-panel);
   --popup-shadow: 0 10px 30px rgb(0 0 0 / 0.18);
 }
 

@@ -1,4 +1,7 @@
 import { useState } from "react";
+import { SearchDrawPad } from "../../components/search/SearchDrawPad";
+import { SearchFilterPill } from "../../components/search/SearchFilterPill";
+import { WeatherIcon } from "../../components/WeatherIcon";
 import { GlobalNav } from "../../components/GlobalNav";
 import { Seo } from "../../components/Seo";
 import {
@@ -71,6 +74,8 @@ const motionTokens = [
 const sections = [
   "controls",
   "surfaces",
+  "filters",
+  "drawing",
   "spacing",
   "typography",
   "colours",
@@ -94,6 +99,8 @@ const DesignPage = () => {
   const [toggleValue, setToggleValue] = useState("a");
   const [overlayToggleValue, setOverlayToggleValue] = useState("a");
   const [inputValue, setInputValue] = useState("");
+  const [filterSelected, setFilterSelected] = useState(true);
+  const [drawingOpen, setDrawingOpen] = useState(false);
 
   return (
     <div className={styles.page}>
@@ -107,7 +114,7 @@ const DesignPage = () => {
               Design
             </Heading>
             <p className={styles.intro}>
-              Shared components and design tokens. Import from{" "}
+              Adapted Radix foundations, photographic themes and shared components. Import from{" "}
               <code className={styles.codeHint}>components/ui</code>.
             </p>
           </div>
@@ -187,6 +194,44 @@ const DesignPage = () => {
               <PillButton size="compact">View photographs</PillButton>
             </Card>
           </div>
+        </section>
+
+        <section id="filters" className={styles.section}>
+          <div className={styles.sectionHeader}>
+            <Heading level={1}>Filter states</Heading>
+            <Caption>
+              Selected surfaces stay distinct from keyboard focus and disabled controls.
+            </Caption>
+          </div>
+          <div className={styles.controlDemo}>
+            <SearchFilterPill
+              label="Mostly clear"
+              labelPrefix={<WeatherIcon kind="mostly-clear" />}
+              count={204}
+              isActive={filterSelected}
+              onClick={() => setFilterSelected((selected) => !selected)}
+            />
+            <SearchFilterPill
+              label="30°C and above"
+              count={150}
+              onClick={() => setFilterSelected(false)}
+            />
+            <SearchFilterPill label="Unavailable range" count={0} disabled onClick={() => {}} />
+          </div>
+        </section>
+
+        <section id="drawing" className={styles.section}>
+          <div className={styles.sectionHeader}>
+            <Heading level={1}>Drawing tools</Heading>
+            <Caption>The submitted drawing uses white paper in every theme.</Caption>
+          </div>
+          <Button onClick={() => setDrawingOpen(true)}>Preview drawing tools</Button>
+          {drawingOpen ? (
+            <SearchDrawPad
+              onCancel={() => setDrawingOpen(false)}
+              onSubmit={() => setDrawingOpen(false)}
+            />
+          ) : null}
         </section>
 
         {/* Tokens: Spacing */}

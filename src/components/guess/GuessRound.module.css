@@ -34,11 +34,14 @@
 
 .progressDots {
   display: flex;
+  flex-wrap: wrap;
+  min-inline-size: 0;
   gap: var(--m-xs);
   align-items: center;
 }
 
 .dot {
+  flex: 0 0 var(--m-s);
   inline-size: var(--m-s);
   block-size: var(--m-s);
   border-radius: var(--radius-pill);
@@ -129,7 +132,7 @@
 .photoPanel {
   position: relative;
   overflow: clip;
-  border-radius: var(--m-s);
+  border-radius: var(--radius-panel);
   background-color: var(--c-bg-contrast-dark);
   display: flex;
   align-items: center;
@@ -254,7 +257,7 @@
   flex: 1;
   min-block-size: 0;
   background-color: var(--c-bg-contrast-dark);
-  border-radius: var(--m-s);
+  border-radius: var(--radius-panel);
 }
 
 /* Controls bar */
@@ -282,7 +285,7 @@
 
 .confirmButton:hover:not(:disabled),
 .nextButton:hover {
-  background-color: var(--c-bg-contrast-light);
+  background-color: var(--c-surface-hover);
 }
 
 .confirmButton:active:not(:disabled),
@@ -290,20 +293,10 @@
   transform: scale(0.96);
 }
 
-/* Pulse glow when a guess is placed and confirm is ready */
+/* A placed guess enables the ordinary selected surface, distinct from focus. */
 .confirmReady {
-  border-color: var(--c-accent);
-  animation: confirmPulse var(--t-pulse) var(--ease-in-out) infinite;
-}
-
-@keyframes confirmPulse {
-  0%,
-  100% {
-    box-shadow: 0 0 0 0 transparent;
-  }
-  50% {
-    box-shadow: 0 0 0 var(--m) color-mix(in oklch, var(--c-accent) 25%, transparent);
-  }
+  border-color: var(--c-selected-border);
+  background-color: var(--c-selected);
 }
 
 .nextButton {

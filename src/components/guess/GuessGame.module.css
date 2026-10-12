@@ -12,7 +12,7 @@
   block-size: 100%;
   flex: 1;
   min-block-size: 0;
-  border-radius: var(--m-s);
+  border-radius: var(--radius-panel);
   background-color: var(--c-bg-contrast-dark);
-  border: var(--line-hairline) solid color-mix(in oklch, var(--c-on-dark) 30%, transparent);
+  border: var(--line-hairline) solid var(--c-border);
 }

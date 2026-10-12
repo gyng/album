@@ -72,7 +72,7 @@ test.describe("Responsive UI", () => {
     expect(hovered).toEqual(resting);
   });
 
-  test("iPad portrait keeps the theme picker visible beside the scrolling navigation", async ({
+  test("iPad portrait keeps the theme picker visible and all navigation links reachable", async ({
     browser,
     baseURL,
   }) => {
@@ -94,11 +94,12 @@ test.describe("Responsive UI", () => {
       expect(pickerBox!.x + pickerBox!.width).toBeLessThanOrEqual(834);
       expect(pickerBox!.height).toBeGreaterThanOrEqual(44);
 
-      const navigation = await tabletPage.locator("nav ul").evaluate((list) => ({
-        clientWidth: list.clientWidth,
-        scrollWidth: list.scrollWidth,
-      }));
-      expect(navigation.scrollWidth).toBeGreaterThan(navigation.clientWidth);
+      const lastLink = tabletPage
+        .getByRole("navigation")
+        .getByRole("link", { name: "Guess Where", exact: true });
+      await lastLink.scrollIntoViewIfNeeded();
+      await expect(lastLink).toBeInViewport();
+      await expect(picker).toBeInViewport();
       await expectNoDocumentOverflow(tabletPage);
     } finally {
       await context.close();

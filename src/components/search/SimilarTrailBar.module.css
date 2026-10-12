@@ -81,7 +81,7 @@
 .breadcrumbPreview {
   inline-size: var(--size-56);
   block-size: var(--size-56);
-  border-radius: var(--m-s);
+  border-radius: var(--radius-control);
   object-fit: cover;
   object-position: center;
   background: var(--c-bg-contrast-dark);
@@ -97,8 +97,8 @@
 }
 
 .breadcrumbButton:focus-visible {
-  outline: solid var(--size-2) var(--c-bg-contrast-light);
-  border-radius: var(--m-s);
+  outline: var(--focus-ring);
+  border-radius: var(--radius-control);
 }
 
 /* Smaller-size variant of the shared overlay badge
@@ -189,11 +189,11 @@
 }
 
 .modeSourceSlideshowButton:focus-visible {
-  outline: solid var(--size-2) var(--c-bg-contrast-light);
+  outline: var(--focus-ring);
 }
 
 .breadcrumbRemoveButton:focus-visible {
-  outline: solid var(--size-2) var(--c-bg-contrast-light);
+  outline: var(--focus-ring);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -220,7 +220,7 @@
 .modeSourcePreview {
   inline-size: var(--size-56);
   block-size: var(--size-56);
-  border-radius: var(--m-s);
+  border-radius: var(--radius-control);
   object-fit: cover;
   object-position: center;
   background: var(--c-bg-contrast-dark);
