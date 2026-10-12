@@ -67,8 +67,16 @@ export const ExploreColourSection = ({
   // Every photograph as its own sliver, or every year as one stacked bar. The
   // first is the archive as it happened; the second is the only one that
   // answers whether a year was greener than the one before.
-  const [visibleFamilies, setVisibleFamilies] = React.useState(4);
   const [colourView, setColourView] = React.useState<"photos" | "families">("photos");
+  const colourFamilies = [...stats.colorFamilyExamples].sort((left, right) => {
+    const leftIndex = COLOR_FAMILY_ORDER.findIndex((label) => label === left.label);
+    const rightIndex = COLOR_FAMILY_ORDER.findIndex((label) => label === right.label);
+    return (
+      (leftIndex < 0 ? COLOR_FAMILY_ORDER.length : leftIndex) -
+        (rightIndex < 0 ? COLOR_FAMILY_ORDER.length : rightIndex) ||
+      left.label.localeCompare(right.label)
+    );
+  });
   const colourStacks = React.useMemo(
     () => buildColourYearStacks(stats.colorYearRibbons, COLOR_FAMILY_ORDER),
     [stats.colorYearRibbons],
@@ -188,7 +196,7 @@ export const ExploreColourSection = ({
                 </Heading>
               </div>
               <div className={styles.colorFamilyRows}>
-                {stats.colorFamilyExamples.slice(0, visibleFamilies).map((family) => {
+                {colourFamilies.map((family) => {
                   const familyHref = buildColorSearchHref(family.label);
                   return (
                     <div key={family.label} className={styles.colorFamilyRow}>
@@ -223,16 +231,6 @@ export const ExploreColourSection = ({
                   );
                 })}
               </div>
-              {stats.colorFamilyExamples.length > visibleFamilies ? (
-                <PillButton
-                  size="compact"
-                  className={localStyles.moreFamilies}
-                  aria-label="More colour families"
-                  onClick={() => setVisibleFamilies((count) => count + 4)}
-                >
-                  More
-                </PillButton>
-              ) : null}
             </section>
           ) : null}
 

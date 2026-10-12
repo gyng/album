@@ -28,10 +28,6 @@
   min-inline-size: 0;
 }
 
-.moreFamilies {
-  justify-self: start;
-}
-
 .colourFamilyPanel,
 .colourFullRowPanel {
   grid-column: 1 / -1;
@@ -75,7 +71,8 @@
 
 .colorFamilyThumbs {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 96px), 1fr));
+  /* Keep empty columns so sparse families use the same tile width as full rows. */
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 96px), 1fr));
   inline-size: 100%;
   gap: var(--m-s);
 }

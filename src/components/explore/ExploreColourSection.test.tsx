@@ -74,7 +74,7 @@ describe("ExploreColourSection", () => {
     expect(searchLinks[0]).toHaveAttribute("href", "/search?color=93%2C132%2C214");
   });
 
-  it("reveals additional colour families without resetting expanded photos", () => {
+  it("shows every colour family in colour order and keeps photo expansion", () => {
     const stats = {
       colorCoverage: 1,
       colorStats: [],
@@ -91,9 +91,17 @@ describe("ExploreColourSection", () => {
       })),
     } as unknown as PhotoStats;
     render(<ExploreColourSection stats={stats} />);
-    expect(screen.queryByRole("img", { name: "Cyan 0" })).toBeNull();
+    expect(screen.getByRole("img", { name: "Cyan 0" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "More colour families" })).toBeNull();
+    const familySearchLinks = screen.getAllByRole("link", { name: "Search" });
+    expect(familySearchLinks.map((link) => link.getAttribute("href"))).toEqual([
+      "/search?color=217%2C83%2C79",
+      "/search?color=223%2C139%2C57",
+      "/search?color=104%2C163%2C107",
+      "/search?color=79%2C168%2C174",
+      "/search?color=93%2C132%2C214",
+    ]);
     fireEvent.click(screen.getByRole("button", { name: "More photos with blue tones" }));
-    fireEvent.click(screen.getByRole("button", { name: "More colour families" }));
     expect(screen.getByRole("img", { name: "Cyan 0" })).toBeInTheDocument();
     expect(screen.getByRole("img", { name: "Blue 6" })).toBeInTheDocument();
   });
