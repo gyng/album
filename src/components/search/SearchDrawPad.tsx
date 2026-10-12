@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "../ui";
+import { warmSearchImageModel } from "./imageEmbeddings";
 import styles from "./SearchDrawPad.module.css";
 
 // Canvas backing resolution. SigLIP downsamples to 224×224, so 448 keeps
@@ -24,6 +25,7 @@ const BRUSH_SIZES = [
 ];
 
 type Props = {
+  inline?: boolean;
   onCancel: () => void;
   onSubmit: (blob: Blob) => void;
   title?: string;
@@ -37,6 +39,7 @@ type Props = {
 export const SearchDrawPad: React.FC<Props> = ({
   onCancel,
   onSubmit,
+  inline = false,
   title = "Draw to search",
   description,
   submitLabel = "Search",
@@ -44,6 +47,7 @@ export const SearchDrawPad: React.FC<Props> = ({
   initialDrawing,
   onDraft,
 }) => {
+  const initialBlobRef = useRef(initialDrawing);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const dialogRef = useRef<HTMLDialogElement | null>(null);
   const cancelRef = useRef<HTMLButtonElement | null>(null);
@@ -54,6 +58,11 @@ export const SearchDrawPad: React.FC<Props> = ({
   const [brushWidth, setBrushWidth] = useState(BRUSH_SIZES[1]!.width);
   const [hasStrokes, setHasStrokes] = useState(false);
   const [restoring, setRestoring] = useState(!!initialDrawing);
+  const warmedRef = useRef(false);
+  const undoRef = useRef<Array<{ pixels: ImageData; hasStrokes: boolean }>>([]);
+  const redoRef = useRef<Array<{ pixels: ImageData; hasStrokes: boolean }>>([]);
+  const [historyVersion, setHistoryVersion] = useState(0);
+  const [eraser, setEraser] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const fillBackground = useCallback(() => {
@@ -66,16 +75,17 @@ export const SearchDrawPad: React.FC<Props> = ({
   }, []);
 
   useEffect(() => {
+    const saved = initialBlobRef.current;
     fillBackground();
     setHasStrokes(false);
     setError(null);
-    if (!initialDrawing) {
+    if (!saved) {
       setRestoring(false);
       return;
     }
     setRestoring(true);
     let cancelled = false;
-    const url = URL.createObjectURL(initialDrawing);
+    const url = URL.createObjectURL(saved);
     const image = new Image();
     image.onload = () => {
       if (cancelled) return;
@@ -99,9 +109,10 @@ export const SearchDrawPad: React.FC<Props> = ({
       image.onerror = null;
       URL.revokeObjectURL(url);
     };
-  }, [fillBackground, initialDrawing]);
+  }, [fillBackground]);
 
   useEffect(() => {
+    if (inline) return;
     const previouslyFocused =
       document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const dialog = dialogRef.current;
@@ -121,7 +132,33 @@ export const SearchDrawPad: React.FC<Props> = ({
         previouslyFocused.focus();
       }
     };
-  }, []);
+  }, [inline]);
+
+  const snapshot = () => {
+    const context = canvasRef.current?.getContext("2d");
+    return context
+      ? { pixels: context.getImageData(0, 0, CANVAS_SIZE, CANVAS_SIZE), hasStrokes }
+      : null;
+  };
+  const saveUndo = () => {
+    const current = snapshot();
+    if (!current) return;
+    undoRef.current = [...undoRef.current.slice(-19), current];
+    redoRef.current = [];
+    setHistoryVersion((version) => version + 1);
+  };
+  const restoreHistory = (source: typeof undoRef, destination: typeof redoRef) => {
+    const previous = source.current.pop();
+    const current = snapshot();
+    const context = canvasRef.current?.getContext("2d");
+    if (!previous || !current || !context) return;
+    destination.current.push(current);
+    context.putImageData(previous.pixels, 0, 0);
+    setHasStrokes(previous.hasStrokes);
+    setError(null);
+    setHistoryVersion((version) => version + 1);
+    saveInlineDraft();
+  };
 
   const canvasPoint = (event: React.PointerEvent<HTMLCanvasElement>) => {
     const canvas = event.currentTarget;
@@ -134,6 +171,15 @@ export const SearchDrawPad: React.FC<Props> = ({
 
   const handlePointerDown = (event: React.PointerEvent<HTMLCanvasElement>) => {
     if (restoring) return;
+    if (event.button !== 0 || isDrawingRef.current) return;
+    saveUndo();
+    if (!warmedRef.current) {
+      warmedRef.current = true;
+      void warmSearchImageModel().catch(() => {
+        warmedRef.current = false;
+      });
+    }
+    event.currentTarget.focus();
     event.currentTarget.setPointerCapture(event.pointerId);
     isDrawingRef.current = true;
     lastPointRef.current = canvasPoint(event);
@@ -150,7 +196,7 @@ export const SearchDrawPad: React.FC<Props> = ({
     }
     const from = lastPointRef.current!;
     const to = canvasPoint(event);
-    context.strokeStyle = brushColour;
+    context.strokeStyle = eraser ? "#ffffff" : brushColour;
     context.lineWidth = brushWidth;
     context.lineCap = "round";
     context.lineJoin = "round";
@@ -165,14 +211,18 @@ export const SearchDrawPad: React.FC<Props> = ({
   };
 
   const handlePointerUp = () => {
+    const changed = isDrawingRef.current;
     isDrawingRef.current = false;
     lastPointRef.current = null;
+    if (changed) saveInlineDraft();
   };
 
   const handleClear = () => {
+    saveUndo();
     fillBackground();
     setHasStrokes(false);
     setError(null);
+    if (inline) onDraft?.(null);
   };
 
   const hasInk = () => {
@@ -184,6 +234,17 @@ export const SearchDrawPad: React.FC<Props> = ({
       if (pixels[i]! < 250 || pixels[i + 1]! < 250 || pixels[i + 2]! < 250) return true;
     }
     return false;
+  };
+
+  const saveInlineDraft = () => {
+    if (!inline || !onDraft) return;
+    if (!hasInk()) {
+      onDraft(null);
+      return;
+    }
+    canvasRef.current?.toBlob((blob) => {
+      if (blob) onDraft(blob);
+    }, "image/png");
   };
 
   const handleCancel = () => {
@@ -215,37 +276,41 @@ export const SearchDrawPad: React.FC<Props> = ({
     }, "image/png");
   };
 
-  return (
-    // Native dialog backdrop clicks target the dialog itself; keyboard users
-    // receive equivalent dismissal through the native cancel event.
-    // oxlint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions
-    <dialog
-      ref={dialogRef}
-      className={styles.dialog}
-      aria-label={title}
-      onCancel={(event) => {
+  // History refs hold bounded pixel snapshots; the version makes availability reactive.
+  void historyVersion;
+  const panel = (
+    // Shortcuts bubble from the canvas and toolbar controls within this group.
+    // oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions
+    <div
+      role="group"
+      aria-label="Drawing tools"
+      className={[styles.panel, inline ? styles.inlinePanel : ""].filter(Boolean).join(" ")}
+      onKeyDown={(event) => {
+        if (!(event.ctrlKey || event.metaKey) || !["z", "y"].includes(event.key.toLowerCase()))
+          return;
         event.preventDefault();
-        handleCancel();
-      }}
-      onClick={(event) => {
-        if (event.target === event.currentTarget) {
-          handleCancel();
-        }
+        if (event.shiftKey || event.key.toLowerCase() === "y") restoreHistory(redoRef, undoRef);
+        else restoreHistory(undoRef, redoRef);
       }}
     >
-      <div className={styles.panel}>
-        <div className={styles.title}>{title}</div>
-        {description ? <p className={styles.description}>{description}</p> : null}
-        <canvas
-          ref={canvasRef}
-          className={styles.canvas}
-          width={CANVAS_SIZE}
-          height={CANVAS_SIZE}
-          onPointerDown={handlePointerDown}
-          onPointerMove={drawTo}
-          onPointerUp={handlePointerUp}
-          onPointerCancel={handlePointerUp}
-        />
+      <div className={styles.title}>{title}</div>
+      {description ? <p className={styles.description}>{description}</p> : null}
+      {/* A focusable canvas scopes undo/redo to the active sketch. */}
+      {/* oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex */}
+      <canvas
+        tabIndex={0}
+        ref={canvasRef}
+        className={styles.canvas}
+        width={CANVAS_SIZE}
+        height={CANVAS_SIZE}
+        onPointerDown={handlePointerDown}
+        onPointerMove={drawTo}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerUp}
+        onLostPointerCapture={handlePointerUp}
+        aria-label="Drawing canvas"
+      />
+      <div className={styles.tools}>
         {restoring ? (
           <p className={styles.status} role="status">
             Restoring sketch…
@@ -256,6 +321,26 @@ export const SearchDrawPad: React.FC<Props> = ({
             {error}
           </p>
         ) : null}
+        <div className={styles.toolRow}>
+          <Button active={!eraser} aria-pressed={!eraser} onClick={() => setEraser(false)}>
+            Brush
+          </Button>
+          <Button active={eraser} aria-pressed={eraser} onClick={() => setEraser(true)}>
+            Eraser
+          </Button>
+          <Button
+            disabled={!undoRef.current.length || restoring}
+            onClick={() => restoreHistory(undoRef, redoRef)}
+          >
+            Undo
+          </Button>
+          <Button
+            disabled={!redoRef.current.length || restoring}
+            onClick={() => restoreHistory(redoRef, undoRef)}
+          >
+            Redo
+          </Button>
+        </div>
         <div className={styles.toolRow} role="group" aria-label="Brush colour">
           {BRUSH_COLOURS.map((colour) => (
             <button
@@ -268,7 +353,10 @@ export const SearchDrawPad: React.FC<Props> = ({
               data-colour-swatch
               aria-label={`Brush colour ${colour}`}
               aria-pressed={colour === brushColour}
-              onClick={() => setBrushColour(colour)}
+              onClick={() => {
+                setBrushColour(colour);
+                setEraser(false);
+              }}
             />
           ))}
         </div>
@@ -286,6 +374,11 @@ export const SearchDrawPad: React.FC<Props> = ({
               aria-pressed={size.width === brushWidth}
               onClick={() => setBrushWidth(size.width)}
             >
+              <span
+                className={styles.brushPreview}
+                style={{ width: size.width, height: size.width }}
+                aria-hidden="true"
+              />
               {size.label}
             </button>
           ))}
@@ -294,14 +387,34 @@ export const SearchDrawPad: React.FC<Props> = ({
           <Button onClick={handleClear} disabled={restoring}>
             Clear
           </Button>
-          <Button ref={cancelRef} onClick={handleCancel}>
-            {cancelLabel}
-          </Button>
+          {!inline ? (
+            <Button ref={cancelRef} onClick={handleCancel}>
+              {cancelLabel}
+            </Button>
+          ) : null}
           <Button variant="accent" onClick={handleSubmit} disabled={!hasStrokes || restoring}>
             {submitLabel}
           </Button>
         </div>
       </div>
+    </div>
+  );
+  if (inline) return <section aria-label={title}>{panel}</section>;
+  return (
+    // oxlint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions
+    <dialog
+      ref={dialogRef}
+      className={styles.dialog}
+      aria-label={title}
+      onCancel={(event) => {
+        event.preventDefault();
+        handleCancel();
+      }}
+      onClick={(event) => {
+        if (event.target === event.currentTarget) handleCancel();
+      }}
+    >
+      {panel}
     </dialog>
   );
 };

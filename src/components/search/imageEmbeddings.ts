@@ -11,3 +11,7 @@ export const encodeSearchImage = async (
 
   return result;
 };
+
+export const warmSearchImageModel = async (): Promise<void> => {
+  await sendEmbeddingWorkerRequest({ type: "warmup-image" });
+};

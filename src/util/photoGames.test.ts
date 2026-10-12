@@ -1,5 +1,9 @@
 import {
   buildRelayPuzzle,
+  nearestGamePhotos,
+  relayLinkSimilarities,
+  buildConnectionsPuzzle,
+  checkConnection,
   rankDrawing,
   scoreRelay,
   chooseOracleQuestion,
@@ -162,4 +166,53 @@ it("withholds relay scores when every route is equally similar", () => {
     () => 0.4,
   )!;
   expect(scoreRelay(puzzle, puzzle.solution)).toBeNull();
+});
+
+it("finds target neighbours without returning the target or incompatible vectors", () => {
+  const target = photo("target", [1, 0]);
+  expect(
+    nearestGamePhotos(
+      target,
+      [target, photo("near", [0.9, 0.1]), photo("far", [0, 1]), photo("wrong", [1, 0, 0])],
+      2,
+    ).map((p) => p.path),
+  ).toEqual(["near", "far"]);
+});
+
+it("reports the actual cosine similarity of every relay transition", () => {
+  expect(
+    relayLinkSimilarities([photo("a", [1, 0]), photo("b", [1, 0]), photo("c", [0, 1])]),
+  ).toEqual([100, 0]);
+});
+
+it("builds four exclusive photo connections without duplicate paths", () => {
+  const archive = ["A cat", "A lake", "A red flower", "A train"].flatMap((caption, group) =>
+    Array.from({ length: 5 }, (_, i) => photo(`${group}-${i}`, [], caption)),
+  );
+  const puzzle = buildConnectionsPuzzle(archive, () => 0.4)!;
+  expect(puzzle.groups).toHaveLength(4);
+  expect(puzzle.groups.every((group) => group.photos.length === 4)).toBe(true);
+  expect(new Set(puzzle.tiles.map((p) => p.path)).size).toBe(16);
+  expect(
+    checkConnection(
+      puzzle,
+      puzzle.groups[0]!.photos.map((p) => p.path),
+    ),
+  ).toMatchObject({ kind: "match", group: puzzle.groups[0] });
+  expect(
+    checkConnection(
+      puzzle,
+      [...puzzle.groups[0]!.photos.slice(0, 3), puzzle.groups[1]!.photos[0]!].map((p) => p.path),
+    ),
+  ).toEqual({ kind: "near" });
+  expect(buildConnectionsPuzzle(archive.slice(0, 8))).toBeNull();
+});
+
+it("rejects a connections board when another subject forms a competing four-photo group", () => {
+  const photos = ["cat", "lake", "person", "train"].flatMap((subject, group) =>
+    Array.from({ length: 4 }, (_, index) =>
+      photo(`${group}-${index}`, [], `A ${group < 2 && index < 2 ? "red " : ""}${subject}`),
+    ),
+  );
+  expect(buildConnectionsPuzzle(photos, () => 0.4)).toBeNull();
 });

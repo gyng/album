@@ -29,7 +29,14 @@ export const FUN_GAMES = [
     illustration: "/fun/photo-oracle.avif",
     description: "Keep a photograph in mind. Can the oracle find it with yes-or-no questions?",
   },
+  {
+    id: "connections",
+    href: "/fun/connections",
+    title: "Connect the Shots",
+    illustration: "/fun/connect-the-shots.avif",
+    description: "Sixteen photographs. Four hidden connections. Find the groups of four.",
+  },
 ] as const;
 
-export type PhotoGameKind = "relay" | "blind-frame" | "oracle";
+export type PhotoGameKind = "relay" | "blind-frame" | "oracle" | "connections";
 export type FunPage = "fun" | "guess" | PhotoGameKind;

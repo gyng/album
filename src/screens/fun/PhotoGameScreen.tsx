@@ -9,6 +9,7 @@ import { fetchPhotoGameArchive } from "../../components/search/api";
 import { FUN_GAMES, type PhotoGameKind } from "../../components/fun/games";
 import { PhotoRelay } from "../../components/fun/PhotoRelay";
 import { BlindFrame } from "../../components/fun/BlindFrame";
+import { PhotoConnections } from "../../components/fun/PhotoConnections";
 import { PhotoOracle } from "../../components/fun/PhotoOracle";
 import type { PhotoGamePhoto } from "../../util/photoGames";
 import { formatPageTitle } from "../../lib/seo";
@@ -16,7 +17,7 @@ import styles from "./PhotoGameScreen.module.css";
 
 export const PhotoGameScreen = ({ game }: { game: PhotoGameKind }) => {
   const [database, progress, , databaseError, retryDatabase] = useDatabase();
-  const needsVectors = game !== "oracle";
+  const needsVectors = game === "relay" || game === "blind-frame";
   const [embeddings, vectorProgress, , vectorError, retryVectors] =
     useEmbeddingsDatabase(needsVectors);
   const [photos, setPhotos] = useState<PhotoGamePhoto[] | null>(null);
@@ -95,6 +96,8 @@ export const PhotoGameScreen = ({ game }: { game: PhotoGameKind }) => {
           <PhotoRelay photos={photos} />
         ) : game === "blind-frame" ? (
           <BlindFrame photos={photos} />
+        ) : game === "connections" ? (
+          <PhotoConnections photos={photos} />
         ) : (
           <PhotoOracle photos={photos} />
         )}
@@ -106,3 +109,5 @@ export const PhotoGameScreen = ({ game }: { game: PhotoGameKind }) => {
 export const PhotoRelayScreen = () => <PhotoGameScreen game="relay" />;
 export const BlindFrameScreen = () => <PhotoGameScreen game="blind-frame" />;
 export const PhotoOracleScreen = () => <PhotoGameScreen game="oracle" />;
+
+export const PhotoConnectionsScreen = () => <PhotoGameScreen game="connections" />;

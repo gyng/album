@@ -35,15 +35,16 @@ export const PhotoWeatherDetails = ({ weather }: { weather: WeatherMetadata }) =
         <WeatherIcon kind={weatherTemperatureIcon(weather.temperature_2m)} />{" "}
         {weather.temperature_2m.toFixed(1)}°C
       </div>
-      <div className={styles.source}>
-        Estimated hourly weather · {weather.model === "era5" ? "ERA5" : "ECMWF IFS"}
-        <br />
-        <a href="https://open-meteo.com/">Weather data by Open-Meteo</a>
-        {" · "}
-        <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>
-      </div>
       <details className={styles.provenance}>
         <summary>Estimate details</summary>
+        <div className={styles.source}>
+          Estimated hourly weather · {weather.model === "era5" ? "ERA5" : "ECMWF IFS"}
+          <br />
+          <a href="https://open-meteo.com/">Weather data by Open-Meteo</a>
+          {" · "}
+          <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>
+        </div>
+
         <dl className={styles.metrics}>
           {metrics
             .filter(([, , value]) => value !== null)

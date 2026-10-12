@@ -14,6 +14,7 @@ type GuessGameProps = {
   initialSettings?: GameSettings;
   seed?: string;
   onSeedGenerated?: (seed: string) => void;
+  onActiveChange?: (active: boolean) => void;
 };
 
 const generateSeed = (): string => Math.random().toString(36).slice(2, 8);
@@ -131,6 +132,7 @@ export const GuessGame: React.FC<GuessGameProps> = ({
   initialSettings,
   seed: seedProp,
   onSeedGenerated,
+  onActiveChange,
 }) => {
   const skipLobby = Boolean(initialSettings);
 
@@ -144,6 +146,10 @@ export const GuessGame: React.FC<GuessGameProps> = ({
     activeSeed: "",
     loadKey: skipLobby ? 1 : 0,
   });
+
+  useEffect(() => {
+    onActiveChange?.(state.phase !== "lobby");
+  }, [state.phase, onActiveChange]);
 
   // Guess state lifted here so the map (rendered persistently) and round can share it
   const [guess, setGuess] = useState<{ lat: number; lng: number } | null>(null);

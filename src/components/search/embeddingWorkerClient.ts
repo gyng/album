@@ -5,6 +5,7 @@
 
 export type EmbeddingWorkerRequestPayload =
   | { type: "warmup" }
+  | { type: "warmup-image" }
   | { type: "encode"; text: string }
   | { type: "encode-image"; blob: Blob };
 

@@ -24,15 +24,22 @@ export const GamePhoto = ({ photo, link = false }: { photo: PhotoGamePhoto; link
 export const PhotoChain = ({
   photos,
   linked = true,
+  similarities,
+  numbered = true,
 }: {
   photos: PhotoGamePhoto[];
   linked?: boolean;
+  similarities?: Array<number | null>;
+  numbered?: boolean;
 }) => (
   <ol className={styles.chain}>
     {photos.map((photo, index) => (
       <li key={photo.path}>
         <GamePhoto photo={photo} link={linked} />
-        <span className={styles.step}>{index + 1}</span>
+        {numbered ? <span className={styles.step}>{index + 1}</span> : null}
+        {similarities?.[index] !== undefined && similarities[index] !== null ? (
+          <span className={styles.step}>Next link · {similarities[index]}% similarity</span>
+        ) : null}
       </li>
     ))}
   </ol>

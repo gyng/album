@@ -133,6 +133,20 @@ describe("embedding worker", () => {
     });
   });
 
+  it("warms the vision runtime without encoding or loading the text tower, then reuses it", async () => {
+    const { handler, postMessage } = loadWorker({});
+    const warming = handler({ data: { id: 40, type: "warmup-image" } });
+    expect(visionModel).not.toHaveBeenCalled();
+    const encoding = handler({
+      data: { id: 41, type: "encode-image", blob: new Blob(["drawing"]) },
+    });
+    await Promise.all([warming, encoding]);
+    expect(postMessage).toHaveBeenCalledWith({ id: 40, ok: true });
+    expect(mockTextModelFromPretrained).not.toHaveBeenCalled();
+    expect(mockVisionModelFromPretrained).toHaveBeenCalledTimes(1);
+    expect(postMessage).toHaveBeenCalledWith({ id: 41, ok: true, vector: [0, 1] });
+  });
+
   it("encodes images in the same vector space with vision-only progress", async () => {
     const blob = new Blob(["image"]);
     const { handler, postMessage } = loadWorker({});

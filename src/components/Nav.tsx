@@ -1,5 +1,6 @@
 import { AppLink as Link } from "./platform";
 import { useEffect, useRef, useState } from "react";
+import { useNavPositionMotion } from "./useNavPositionMotion";
 import styles from "./Nav.module.css";
 import commonStyles from "../styles/common.module.css";
 import { ThemeToggle } from "./ThemeToggle";
@@ -22,6 +23,8 @@ export const Nav: React.FC<{
   themeAdjacentItem?: React.ReactNode;
   isHome?: boolean;
 }> = (props) => {
+  const navRef = useRef<HTMLElement>(null);
+  useNavPositionMotion(navRef);
   const ulRef = useRef<HTMLUListElement>(null);
   // Whether the scrolling nav has hidden content beyond the left/right edges.
   // Drives the edge-fade overlays on .nav.
@@ -81,6 +84,7 @@ export const Nav: React.FC<{
 
   return (
     <nav
+      ref={navRef}
       className={[
         styles.nav,
         hasMoreLeft ? styles.scrollableLeft : "",

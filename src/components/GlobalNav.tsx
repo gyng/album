@@ -66,7 +66,8 @@ export const GlobalNav: React.FC<Props> = ({
     currentPage === "guess" ||
     currentPage === "relay" ||
     currentPage === "blind-frame" ||
-    currentPage === "oracle";
+    currentPage === "oracle" ||
+    currentPage === "connections";
   return (
     <div className={styles.stack}>
       <Nav
@@ -138,7 +139,7 @@ export const GlobalNav: React.FC<Props> = ({
                     }
                   : {})}
               >
-                Fun
+                Fun!
               </Link>
             </li>
             {extraItems}

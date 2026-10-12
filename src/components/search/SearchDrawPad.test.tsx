@@ -3,6 +3,8 @@
  */
 
 import { fireEvent, render, screen } from "@testing-library/react";
+import { warmSearchImageModel } from "./imageEmbeddings";
+jest.mock("./imageEmbeddings", () => ({ warmSearchImageModel: jest.fn(() => Promise.resolve()) }));
 import { SearchDrawPad } from "./SearchDrawPad";
 
 // jsdom has no canvas implementation — getContext returns null and the
@@ -20,6 +22,7 @@ describe("SearchDrawPad focus management", () => {
     lineTo: jest.fn(),
     stroke: jest.fn(),
     drawImage: jest.fn(),
+    putImageData: jest.fn(),
     getImageData: jest.fn(() => ({ data: new Uint8ClampedArray([0, 0, 0, 255]) })),
   };
   let getContext: jest.SpyInstance;
@@ -233,5 +236,28 @@ describe("SearchDrawPad focus management", () => {
     expect(screen.getByRole("alert")).toBeTruthy();
     expect(onSubmit).not.toHaveBeenCalled();
     expect(screen.getByRole("button", { name: "Search" })).toBeDisabled();
+  });
+  it("shows an inline pad without taking focus, warms on the first stroke and supports undo/redo", () => {
+    const trigger = document.createElement("button");
+    document.body.appendChild(trigger);
+    trigger.focus();
+    const { container, unmount } = render(
+      <SearchDrawPad inline onCancel={jest.fn()} onSubmit={jest.fn()} />,
+    );
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(trigger).toHaveFocus();
+    const canvas = container.querySelector("canvas")!;
+    canvas.getBoundingClientRect = () => ({ left: 0, top: 0, width: 448, height: 448 }) as DOMRect;
+    fireEvent.pointerDown(canvas, { clientX: 20, clientY: 20, pointerId: 1 });
+    fireEvent.pointerUp(canvas, { pointerId: 1 });
+    expect(warmSearchImageModel).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("button", { name: "Search" })).toBeEnabled();
+    fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+    expect(screen.getByRole("button", { name: "Search" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "Redo" }));
+    expect(screen.getByRole("button", { name: "Search" })).toBeEnabled();
+    expect(context.putImageData).toHaveBeenCalled();
+    unmount();
+    trigger.remove();
   });
 });

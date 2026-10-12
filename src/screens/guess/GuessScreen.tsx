@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import { AppLink, useUrlSearchParams } from "../../components/platform";
 import { useDatabase } from "../../components/database/useDatabase";
 import { ProgressBar } from "../../components/ProgressBar";
@@ -45,6 +45,7 @@ const GuessScreen = () => {
     [seedFromUrl],
   );
 
+  const [active, setActive] = useState(false);
   const isChallenge = Boolean(seedFromUrl) || isDaily;
   const description = isDaily
     ? "Today's daily challenge — guess where each photo was taken."
@@ -59,7 +60,10 @@ const GuessScreen = () => {
         description={description}
         pathname={`/fun/guess${seedFromUrl ? `?seed=${seedFromUrl}` : ""}`}
       />
-      <main id="main-content" className={styles.page}>
+      <main
+        id="main-content"
+        className={[styles.page, active ? styles.playing : ""].filter(Boolean).join(" ")}
+      >
         <GlobalNav currentPage="guess" hasPadding={false} />
 
         {/* Without the error branch a missing database left this page showing a
@@ -87,6 +91,7 @@ const GuessScreen = () => {
         ) : (
           <GuessGame
             database={database}
+            onActiveChange={setActive}
             {...(initialSettings ? { initialSettings } : {})}
             {...(seedFromUrl ? { seed: seedFromUrl } : {})}
             onSeedGenerated={handleSeedGenerated}

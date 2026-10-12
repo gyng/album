@@ -88,39 +88,15 @@ bonsai target 42 instead of 89, and a daffodil-portrait target 26 instead of 78.
 
 ## Illustrations
 
-Generated with the built-in image generation tool through the imagegen skill.
-Final project assets are 960×640 AVIFs in `src/public/fun/`, encoded at quality
-65 from the generated PNGs. The full composition is preserved. Their cream
-paper remains consistent across site themes; surrounding UI follows site tokens.
+The five game illustrations are antique-style hand engravings with transparent
+outer backgrounds, generated using the built-in imagegen tool. Final 960×640
+AVIFs preserve alpha in `src/public/fun/`. The shared `GameIllustration` component renders their inverted
+luminance through an SVG mask, removing pale paper interiors as well as the
+outer background, then supplies the theme’s `currentColor` ink. There is no
+fixed cream card illustration or theme-specific bitmap variant.
 
-Shared prompt for the first three assets:
-
-> Use case: illustration-story. Asset type: hand-drawn editorial illustration
-> for a personal photographic archive's Fun page. A small coherent
-> ink-and-coloured-pencil drawing, imperfect lively strokes, restrained darkroom
-> red accents, warm cream paper background, charcoal contours, generous empty
-> margins, no text, letters, logos or watermarks. Landscape composition
-> approximately 3:2, one clear central vignette, readable at card size,
-> sophisticated playful sketchbook style rather than corporate clip art.
-
-| Asset | Subject appended to the shared prompt |
-| --- | --- |
-| `guess-where.avif` | A little photographic print of a street corner resting on an unfolded map, with a hand-drawn red map pin and a small magnifying glass; the map lines echo the street in the print. |
-| `photo-relay.avif` | Five small photographic prints connected by a wandering red pencil line: a doorway changes into an arch, an arch into a curved bridge, a bridge into a hillside. Show the idea of a visual journey between two pictures; handmade paper prints and sketchy recognisable scenes. |
-| `blind-frame.avif` | An open sketchbook with a partly drawn street scene, pencil and red crayon beside it; a little photographic print peeks from behind the sketchbook, suggesting a hidden original photograph. A small curling speech bubble contains only a few abstract scribble lines, no letters. |
-
-Photo Oracle prompt:
-
-> Use case: illustration-story. Asset type: hand-drawn editorial illustration
-> for a personal photographic archive's Fun page, matching a set of small ink-and-coloured-pencil drawings. A photo oracle: a sketchy crystal ball on a simple
-> stand with a tiny photographic street scene visible inside, three small
-> photographic prints scattered around it, a few playful question-mark-like
-> curved strokes without letters. Imperfect lively charcoal ink strokes,
-> restrained darkroom red coloured-pencil accents, warm cream paper background,
-> generous empty margins, sophisticated playful sketchbook style rather than
-> corporate clip art. Landscape composition approximately 3:2, one clear central
-> vignette readable at card size. No words, letters, logos or watermarks.
-
+The full generation prompts and asset mapping are recorded in
+[fun-illustrations.md](fun-illustrations.md).
 
 ## Game feel and scoring — 13 October 2026
 
@@ -139,3 +115,69 @@ coverage now also rejects the misleading 100 points previously awarded to a
 flat set of equally unrelated matches, while preserving tied best matches when
 other photographs provide a meaningful comparison. Oracle reports questions
 rather than inventing an accuracy score from approximate caption matching.
+
+
+## Expanded play — 13 October 2026
+
+All five starts reuse the themed engraving from the Fun! cards. The Guess
+Where lobby retains regular navigation geometry; starting play switches to the
+compact viewport shell, with the same short nav translation used between map
+and regular pages. Reduced-motion preferences disable it.
+
+Blind Frame shows the shared drawing pad inline on desktop (721px and wider)
+as soon as a round starts; smaller screens retain the modal. The pad offers
+bounded twenty-step stroke/clear history, undo/redo with scoped keyboard
+shortcuts, a separate eraser, brush previews and a larger desktop canvas.
+Inline drafts are saved after each stroke and history change. Submission still
+rejects blank/erased canvases before inference. The first stroke warms only the
+vision tower through `warmup-image`; encoding joins the cached runtime and
+errors remain recoverable through the normal submit/retry flow. The reveal
+also shows up to four nearest photographs to the hidden target in SigLIP 1
+space, excluding the target itself.
+
+Photo Oracle keeps its remembered-photo mode and adds discovery: answer
+preferences about visible subjects, then keep a suggested photograph or ask
+for another match. Discovery considers the full captioned archive without
+receiving a secret target. Back restores an answer or rejected match; replay
+retains the mode, while Change mode returns to the illustrated lobby.
+
+Photo Relay supports native drag/drop into its slots and between placed frames.
+Move-earlier, move-later and remove buttons provide equivalent keyboard and
+touch controls. Reveals show the cosine similarity (×100) of each neighbouring
+pair, distinct from the overall relative route score.
+
+Connect the Shots uses sixteen photographs and four groups of four captioned
+visual subjects. Each chosen photograph matches exactly one of the four selected
+subjects, reducing overlaps such as boats also being vehicles. A tray is also
+rejected if another caption predicate forms a competing group of exactly four
+photographs that crosses the intended groups. Colour subjects
+are explicit caption/tag mentions, not inferred dominant colours. Players select
+four, submit a connection, shuffle the remaining tray or give up. Four different
+mistakes reveal the groups; repeated submissions of the same wrong selection
+are not charged again. Three correct photographs receive a “one photograph
+away” hint. Solved groups leave the tray and remain visible. Small screens also show larger
+previews of selected shots before submission. Small or insufficiently
+diverse archives explain why a round cannot be constructed.
+
+A seeded audit of 30 rounds over 1,514 real archive photographs built every round,
+used 23 different subjects and found no overlap among the four chosen caption
+predicates. This is a metadata consistency check; captions can still overlook
+subjects visible in a photograph. Component tests cover correct groups, near
+misses, repeated mistakes, exhaustion and complete reveals.
+
+
+Final validation: 3,031 Jest tests passed; the full Chromium suite passed 109
+checks (three intentional skips), followed by nine fresh game/navigation checks
+on the final build in both Chromium and iPad-style WebKit. Real-archive browser
+reviews completed all four connections at 390px and 1440px and returned an
+Oracle discovery after eight preference questions. The five engravings were
+checked in light, darkroom, terminal and watercolour themes.
+
+A native browser-worker run (no inference mock) loaded the vision model after
+the first stroke, received the warm-up acknowledgement before Reveal, then
+encoded and scored the submitted mountain sketch. Its unrelated autumn-tree
+target scored 17/100; the reveal also displayed four target neighbours. The
+warm-up took about 5.5 seconds in that run; this is an observation, not a
+network-independent latency guarantee. The nav regression records real native
+animations in both map-to-page directions and checks reduced-motion behaviour
+when Guess Where changes its shell.

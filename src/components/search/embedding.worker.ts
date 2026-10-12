@@ -26,6 +26,7 @@ self.postMessage({ boot: true });
 
 type EmbeddingWorkerRequest =
   | { id: number; type: "warmup" }
+  | { id: number; type: "warmup-image" }
   | { id: number; type: "encode"; text: string }
   | { id: number; type: "encode-image"; blob: Blob };
 
@@ -287,6 +288,12 @@ self.addEventListener("message", async (event: MessageEvent<EmbeddingWorkerReque
   try {
     if (data.type === "warmup") {
       await loadTextRuntime(requestId);
+      self.postMessage({ id: requestId, ok: true });
+      return;
+    }
+
+    if (data.type === "warmup-image") {
+      await loadVisionRuntime(requestId);
       self.postMessage({ id: requestId, ok: true });
       return;
     }

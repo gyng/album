@@ -3,13 +3,27 @@ import { Button, Caption, Heading } from "../ui";
 import { SearchDrawPad } from "../search/SearchDrawPad";
 import { useImageQuery } from "../search/useImageQuery";
 import { ProgressBar } from "../ProgressBar";
-import { rankDrawing, shuffleGamePhotos, type PhotoGamePhoto } from "../../util/photoGames";
+import {
+  nearestGamePhotos,
+  rankDrawing,
+  shuffleGamePhotos,
+  type PhotoGamePhoto,
+} from "../../util/photoGames";
 import { GameScore } from "./GameFeedback";
-import { GamePhoto } from "./GamePhoto";
+import { GamePhoto, PhotoChain } from "./GamePhoto";
+import { GameIntro } from "./GameIllustration";
 import styles from "./PhotoGames.module.css";
 
 export const BlindFrame = ({ photos }: { photos: PhotoGamePhoto[] }) => {
   const [target, setTarget] = useState<PhotoGamePhoto | null>(null);
+  const [inlinePad, setInlinePad] = useState(false);
+  useEffect(() => {
+    const query = window.matchMedia("(min-width: 721px)");
+    const update = () => setInlinePad(query.matches);
+    update();
+    query.addEventListener("change", update);
+    return () => query.removeEventListener("change", update);
+  }, []);
   const [drawing, setDrawing] = useState(false);
   const [gaveUp, setGaveUp] = useState(false);
   const roundRef = useRef(0);
@@ -63,7 +77,7 @@ export const BlindFrame = ({ photos }: { photos: PhotoGamePhoto[] }) => {
     );
   if (!target)
     return (
-      <div className={styles.game}>
+      <GameIntro game="blind-frame">
         <p>
           Sketch a hidden photograph from its AI description. Afterwards, see the original and the
           photograph most closely matched by your drawing.
@@ -71,7 +85,7 @@ export const BlindFrame = ({ photos }: { photos: PhotoGamePhoto[] }) => {
         <Button variant="primary" onClick={start}>
           Start Blind Frame
         </Button>
-      </div>
+      </GameIntro>
     );
   return (
     <div className={styles.game}>
@@ -125,6 +139,10 @@ export const BlindFrame = ({ photos }: { photos: PhotoGamePhoto[] }) => {
               </figure>
             ) : null}
           </div>
+          <section className={styles.result}>
+            <Heading level={2}>Close to the hidden photograph</Heading>
+            <PhotoChain photos={nearestGamePhotos(target, photos, 4)} />
+          </section>
           <div className={styles.actions}>
             <Button variant="primary" onClick={start}>
               Play again
@@ -166,13 +184,15 @@ export const BlindFrame = ({ photos }: { photos: PhotoGamePhoto[] }) => {
             </p>
           ) : null}
           <div className={styles.actions}>
-            <Button
-              variant="primary"
-              disabled={!!imageQuery && !imageQuery.vector}
-              onClick={() => setDrawing(true)}
-            >
-              Draw this scene
-            </Button>
+            {!inlinePad ? (
+              <Button
+                variant="primary"
+                disabled={!!imageQuery && !imageQuery.vector}
+                onClick={() => setDrawing(true)}
+              >
+                Draw this scene
+              </Button>
+            ) : null}
             <Button variant="quiet" onClick={start}>
               Another description
             </Button>
@@ -188,10 +208,12 @@ export const BlindFrame = ({ photos }: { photos: PhotoGamePhoto[] }) => {
           </div>
         </>
       )}
-      {drawing ? (
+      {drawing || (inlinePad && !result && !gaveUp && !imageQuery) ? (
         <SearchDrawPad
+          key={round}
+          inline={inlinePad}
           title="Blind Frame sketch"
-          description={target.caption}
+          {...(!inlinePad ? { description: target.caption } : {})}
           submitLabel="Reveal"
           cancelLabel="Close sketch"
           {...(blobRef.current ? { initialDrawing: blobRef.current } : {})}

@@ -2,6 +2,8 @@
   display: grid;
   gap: var(--space-3);
   max-width: 32rem;
+  justify-items: start;
+  text-align: start;
 }
 
 .summary {
@@ -38,5 +40,13 @@
 
 .provenance > summary {
   cursor: pointer;
-  text-align: left;
+  text-align: start;
+  justify-content: flex-start;
+}
+
+.provenance {
+  inline-size: 100%;
+}
+.source {
+  margin-block: var(--space-3);
 }

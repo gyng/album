@@ -319,7 +319,14 @@ const generateSitemap = (albumEntries) => {
     { url: getCanonicalUrl("/explore/timeline"), lastmod: latestLastmod },
     { url: getCanonicalUrl("/explore/trips"), lastmod: latestLastmod },
     { url: getCanonicalUrl("/explore"), lastmod: latestLastmod },
-    ...["/fun", "/fun/guess", "/fun/relay", "/fun/blind-frame", "/fun/oracle"].map((route) => ({
+    ...[
+      "/fun",
+      "/fun/guess",
+      "/fun/relay",
+      "/fun/blind-frame",
+      "/fun/oracle",
+      "/fun/connections",
+    ].map((route) => ({
       url: getCanonicalUrl(route),
       lastmod: latestLastmod,
     })),

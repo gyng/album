@@ -86,15 +86,19 @@ timeline/trips and slideshow controls. Screen-owned layout remains in screen
 CSS Modules. Do not replace photo presentation, map data layers or slideshow
 state machines to achieve a visual change.
 
-Fun groups the archive games behind one global navigation entry and a game
-subnav. Illustrated game cards use warm paper artwork, a heading, one short
-description and an explicit Play action. Game controls retain normal theme,
+Fun! groups the archive games behind one global navigation entry and a game
+subnav. Illustrated game cards use transparent antique engravings tinted with
+the theme’s ink colour, a heading, one short description and an explicit Play action. Game controls retain normal theme,
 focus and touch-target tokens; photo-choice buttons have a visible border and
 never depend on hover alone. Sketch canvases stay white. Results show their
 scoring basis alongside the score. See [game rules and illustration prompts](fun-games.md).
 Allow a final review before scoring a photo sequence. Drawing dialogs preserve
 their draft on close and use short action labels that fit a phone's control row.
-Comparison images use semantic figure captions. Matching progress, errors and
+Game lobbies reuse the card illustration. Desktop drawing rounds expose the
+shared pad immediately; the same controls provide undo/redo and an eraser in
+both inline and modal layouts. The model warms after the first stroke, never
+merely because the game page loaded. Comparison images use semantic figure captions.
+Matching progress, errors and
 reveals receive focus so keyboard users can continue from the current game state.
 
 ## Deliberate variants
@@ -215,3 +219,11 @@ Chromium suite passes its 100 existing checks; after the final recovery adapter
 correction, all 26 catalogue, hydration and route smoke checks pass, including
 the new unknown-URL regression and HTTP 404 status. Three redundant Chromium
 smoke cases remain intentionally skipped by the existing suite.
+
+
+Navigation position changes use a measured 180ms translation, including the
+map-to-page switch and Guess Where’s move into its viewport layout. Initial
+loads stay still and reduced-motion preferences skip the translation. Guess
+Where’s lobby keeps the regular page gutter and maximum width until play starts.
+Weather provenance and attribution live inside the left-aligned Estimate details
+disclosure; only the condition and temperature occupy the compact summary.

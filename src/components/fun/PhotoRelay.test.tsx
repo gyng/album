@@ -40,3 +40,22 @@ it("supports undo, prevents duplicate links and shows a scored chain after all f
   expect(within(result).getByText(/Visual flow: \d+ \/ 100/)).toBeTruthy();
   expect(within(result).getAllByRole("list")[0]?.children).toHaveLength(7);
 });
+
+it("supports moving and removing links with buttons and reveals transition similarities", () => {
+  render(<PhotoRelay photos={photos} />);
+  fireEvent.click(screen.getByRole("button", { name: "Start relay" }));
+  fireEvent.click(screen.getByRole("button", { name: "Choose photograph 1" }));
+  fireEvent.click(screen.getByRole("button", { name: "Choose photograph 2" }));
+  const links = screen.getByRole("list", { name: "Your relay links" });
+  const first = within(links).getAllByRole("img")[0]!.getAttribute("src");
+  fireEvent.click(screen.getByRole("button", { name: "Move link 1 later" }));
+  expect(within(links).getAllByRole("img")[1]).toHaveAttribute("src", first);
+  fireEvent.click(screen.getByRole("button", { name: "Remove link 2" }));
+  expect(screen.getByRole("status")).toHaveTextContent("1 of 5");
+  fireEvent.click(screen.getByRole("button", { name: "Give up" }));
+  expect(
+    within(screen.getByRole("region", { name: "Relay result" })).getAllByText(
+      /Next link · .*% similarity/,
+    ),
+  ).toHaveLength(6);
+});

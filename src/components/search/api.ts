@@ -1133,12 +1133,12 @@ const fetchEmbeddingsByModel = async (
 export const fetchPhotoGameArchive = async (opts: {
   database: Database;
   embeddingsDatabase?: Database | null;
-  game: "relay" | "blind-frame" | "oracle";
+  game: "relay" | "blind-frame" | "oracle" | "connections";
 }): Promise<PhotoGamePhoto[]> => {
   const { database, game } = opts;
   const vectorDatabase = opts.embeddingsDatabase ?? database;
   let embeddings: EmbeddingRow[] = [];
-  if (game !== "oracle") {
+  if (game === "relay" || game === "blind-frame") {
     try {
       // Drawings come from the browser's v1 encoder. Never compare them to
       // v2 image vectors, even when both spaces have the same dimensions.
@@ -1164,7 +1164,7 @@ export const fetchPhotoGameArchive = async (opts: {
     });
   }
   const rows =
-    game === "oracle"
+    game === "oracle" || game === "connections"
       ? await fetchRandomResults({ database, pageSize: 10000 })
       : await fetchResultsByPaths(
           database,

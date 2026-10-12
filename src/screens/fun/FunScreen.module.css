@@ -28,14 +28,6 @@
   border-color: var(--c-accent);
 }
 
-.illustration {
-  display: block;
-  inline-size: 100%;
-  block-size: auto;
-  aspect-ratio: 3 / 2;
-  object-fit: cover;
-}
-
 .gameBody {
   display: grid;
   gap: var(--space-3);

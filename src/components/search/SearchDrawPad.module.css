@@ -140,3 +140,66 @@
   gap: var(--m-s);
   margin-block-start: var(--m-s);
 }
+
+.inlinePanel {
+  max-block-size: none;
+  overflow: visible;
+  scrollbar-gutter: auto;
+}
+.inlinePanel .canvas {
+  inline-size: min(100%, 28rem);
+  block-size: auto;
+  aspect-ratio: 1;
+  align-self: center;
+}
+.brushPreview {
+  display: inline-block;
+  border-radius: 50%;
+  background: currentColor;
+}
+.sizeButton {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.actionRow {
+  flex-wrap: wrap;
+}
+@media (min-width: 721px) {
+  .canvas {
+    inline-size: min(45dvw, 48dvh, 28rem);
+    block-size: min(45dvw, 48dvh, 28rem);
+  }
+}
+
+@media (min-width: 721px) {
+  .inlinePanel {
+    display: grid;
+    grid-template-columns: minmax(0, 28rem) minmax(0, 1fr);
+    align-content: start;
+    gap: var(--space-4);
+  }
+  .inlinePanel .title {
+    grid-column: 1 / -1;
+  }
+  .inlinePanel .canvas {
+    grid-column: 1;
+    align-self: start;
+  }
+  .inlinePanel .tools {
+    grid-column: 2;
+    align-self: start;
+  }
+  .inlinePanel .description {
+    grid-column: 1 / -1;
+  }
+  .inlinePanel .actionRow {
+    justify-content: flex-start;
+  }
+}
+
+.tools {
+  display: grid;
+  gap: var(--space-3);
+  align-content: start;
+}

@@ -1,0 +1,32 @@
+.illustration {
+  display: block;
+  inline-size: 100%;
+  block-size: auto;
+  aspect-ratio: 3 / 2;
+}
+.inkMask {
+  mask-type: luminance;
+}
+.intro {
+  display: grid;
+  grid-template-columns: minmax(0, 24rem) minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-6);
+}
+.artwork {
+  min-inline-size: 0;
+}
+.introBody {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-5);
+  max-inline-size: 50ch;
+}
+@media (max-width: 720px) {
+  .intro {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .artwork {
+    max-inline-size: 24rem;
+  }
+}

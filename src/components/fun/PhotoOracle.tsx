@@ -4,14 +4,18 @@ import {
   answerOracle,
   chooseOracleQuestion,
   buildOracleCohort,
+  shuffleGamePhotos,
+  oracleDiscoveryQuestion,
   type OracleCandidate,
   type PhotoGamePhoto,
 } from "../../util/photoGames";
 import { GameProgress } from "./GameFeedback";
 import { GamePhoto } from "./GamePhoto";
+import { GameIntro } from "./GameIllustration";
 import styles from "./PhotoGames.module.css";
 
 export const PhotoOracle = ({ photos }: { photos: PhotoGamePhoto[] }) => {
+  const [mode, setMode] = useState<"mind" | "discover">("mind");
   const [cohort, setCohort] = useState<PhotoGamePhoto[]>([]);
   const [secret, setSecret] = useState<PhotoGamePhoto | null>(null);
   const [stage, setStage] = useState<"lobby" | "choose" | "remember" | "questions" | "finished">(
@@ -27,12 +31,16 @@ export const PhotoOracle = ({ photos }: { photos: PhotoGamePhoto[] }) => {
   >([]);
   const [error, setError] = useState<string | null>(null);
   const eligible = photos.filter((photo) => photo.caption || photo.tags);
-  const start = () => {
-    const selection = buildOracleCohort(eligible);
+  const start = (nextMode: "mind" | "discover" = mode) => {
+    const selection =
+      nextMode === "mind"
+        ? buildOracleCohort(eligible)
+        : shuffleGamePhotos([...new Map(eligible.map((photo) => [photo.path, photo])).values()]);
     if (selection.length < 2) {
       setError("These photographs are too alike for the oracle's questions.");
       return;
     }
+    setMode(nextMode);
     setError(null);
     setCohort(selection);
     setSecret(null);
@@ -40,7 +48,7 @@ export const PhotoOracle = ({ photos }: { photos: PhotoGamePhoto[] }) => {
     setAnswers([]);
     setConfirmed(null);
     setHistory([]);
-    setStage("choose");
+    setStage(nextMode === "mind" ? "choose" : "questions");
   };
   const question = chooseOracleQuestion(
     candidates,
@@ -58,16 +66,22 @@ export const PhotoOracle = ({ photos }: { photos: PhotoGamePhoto[] }) => {
     return <p>Photo Oracle needs at least two photographs with captions or tags.</p>;
   if (stage === "lobby")
     return (
-      <div className={styles.game}>
+      <GameIntro game="oracle">
         {error ? <p role="alert">{error}</p> : null}
         <p>
           Choose a photograph and keep it in mind. Answer visual questions while the oracle tries to
           find it.
         </p>
-        <Button variant="primary" onClick={start}>
-          Meet the oracle
-        </Button>
-      </div>
+        <div className={styles.actions}>
+          <Button variant="primary" onClick={() => start("mind")}>
+            Meet the oracle
+          </Button>
+          <Button onClick={() => start("discover")}>Find me a photograph</Button>
+        </div>
+        <Caption>
+          Discovery mode finds a photograph from your answers, without a hidden target.
+        </Caption>
+      </GameIntro>
     );
   return (
     <div className={styles.game} ref={gameRef} tabIndex={-1}>
@@ -117,7 +131,9 @@ export const PhotoOracle = ({ photos }: { photos: PhotoGamePhoto[] }) => {
           </div>
           {isGuess && top ? (
             <>
-              <Heading level={1}>Is this your photograph?</Heading>
+              <Heading level={1}>
+                {mode === "mind" ? "Is this your photograph?" : "A photograph for you"}
+              </Heading>
               <div className={styles.secret}>
                 <GamePhoto photo={top.photo} />
               </div>
@@ -129,7 +145,7 @@ export const PhotoOracle = ({ photos }: { photos: PhotoGamePhoto[] }) => {
                     setStage("finished");
                   }}
                 >
-                  That&apos;s it
+                  {mode === "mind" ? "That's it" : "Keep this one"}
                 </Button>
                 <Button
                   onClick={() => {
@@ -137,7 +153,7 @@ export const PhotoOracle = ({ photos }: { photos: PhotoGamePhoto[] }) => {
                     setCandidates(candidates.filter((item) => item.photo.path !== top.photo.path));
                   }}
                 >
-                  Not this one
+                  {mode === "mind" ? "Not this one" : "Another match"}
                 </Button>
               </div>
             </>
@@ -147,7 +163,7 @@ export const PhotoOracle = ({ photos }: { photos: PhotoGamePhoto[] }) => {
                 Question {answers.length + 1} · {candidates.length} possible photographs
               </Caption>
               <p className={styles.question} role="status">
-                {question.label}
+                {mode === "mind" ? question.label : oracleDiscoveryQuestion(question)}
               </p>
               <div className={styles.actions}>
                 {(["yes", "no", "unsure"] as const).map((answer) => (
@@ -159,7 +175,12 @@ export const PhotoOracle = ({ photos }: { photos: PhotoGamePhoto[] }) => {
                       setCandidates(answerOracle(candidates, question, answer));
                       setAnswers([
                         ...answers,
-                        { id: question.id, question: question.label, answer },
+                        {
+                          id: question.id,
+                          question:
+                            mode === "mind" ? question.label : oracleDiscoveryQuestion(question),
+                          answer,
+                        },
                       ]);
                     }}
                   >
@@ -183,19 +204,30 @@ export const PhotoOracle = ({ photos }: { photos: PhotoGamePhoto[] }) => {
             >
               Back
             </Button>
-            <Button variant="quiet" onClick={() => setStage("finished")}>
-              Give up
+            <Button
+              variant="quiet"
+              disabled={mode === "discover" && !top}
+              onClick={() => {
+                if (mode === "discover" && top) setConfirmed(top.photo);
+                setStage("finished");
+              }}
+            >
+              {mode === "mind" ? "Give up" : "Show a match now"}
             </Button>
           </div>
         </>
       ) : null}
-      {stage === "finished" && secret ? (
+      {stage === "finished" && (secret || confirmed) ? (
         <div className={styles.result} role="region" aria-label="Oracle result">
           <Heading level={1}>
-            {confirmed ? "A frame of mind, found" : "The photograph in mind"}
+            {mode === "discover"
+              ? "Your discovery"
+              : confirmed
+                ? "A frame of mind, found"
+                : "The photograph in mind"}
           </Heading>
           <div className={styles.secret}>
-            <GamePhoto photo={confirmed ?? secret} link />
+            <GamePhoto photo={(confirmed ?? secret)!} link />
           </div>
           <Caption>
             {answers.length} {answers.length === 1 ? "question" : "questions"} answered
@@ -217,8 +249,11 @@ export const PhotoOracle = ({ photos }: { photos: PhotoGamePhoto[] }) => {
               </ol>
             </details>
           ) : null}
-          <Button variant="primary" onClick={start}>
+          <Button variant="primary" onClick={() => start()}>
             Play again
+          </Button>
+          <Button variant="quiet" onClick={() => setStage("lobby")}>
+            Change mode
           </Button>
         </div>
       ) : null}

@@ -9,11 +9,13 @@ jest.mock("../search/SearchDrawPad", () => ({
   SearchDrawPad: ({
     onSubmit,
     onCancel,
+    inline,
   }: {
+    inline?: boolean;
     onSubmit: (blob: Blob) => void;
     onCancel: () => void;
   }) => (
-    <div role="dialog">
+    <div role={inline ? "region" : "dialog"} aria-label="Blind Frame sketch">
       <button onClick={() => onSubmit(new Blob(["sketch"], { type: "image/png" }))}>
         Submit sketch
       </button>
@@ -51,7 +53,7 @@ it("keeps the target hidden until the sketch is submitted, then compares all thr
   });
   expect(screen.getByRole("region", { name: "Blind Frame result" })).toBeTruthy();
   expect(screen.getByText("100 / 100")).toBeTruthy();
-  expect(screen.getAllByRole("img")).toHaveLength(3);
+  expect(screen.getAllByRole("img")).toHaveLength(4);
   fireEvent.click(screen.getByRole("button", { name: "Play again" }));
   expect(screen.queryByRole("img")).toBeNull();
   expect(revokePreview).toHaveBeenCalledWith("blob:sketch");
@@ -79,8 +81,29 @@ it("allows giving up while matching a sketch and ignores its late completion", a
   fireEvent.click(screen.getByRole("button", { name: "Submit sketch" }));
   fireEvent.click(screen.getByRole("button", { name: "Give up" }));
   expect(screen.getByRole("region", { name: "Blind Frame result" })).toBeTruthy();
-  expect(screen.getAllByRole("img")).toHaveLength(1);
+  expect(screen.getAllByRole("img")).toHaveLength(2);
   await act(async () => complete([1, 0]));
   expect(screen.queryByText(/\/ 100/)).toBeNull();
-  expect(screen.getAllByRole("img")).toHaveLength(1);
+  expect(screen.getAllByRole("img")).toHaveLength(2);
+});
+
+it("opens the drawing pad as soon as a desktop round starts", () => {
+  const match = jest.spyOn(window, "matchMedia").mockImplementation((query) => ({
+    matches: query.includes("min-width"),
+    media: query,
+    onchange: null,
+    addEventListener: jest.fn(),
+    removeEventListener: jest.fn(),
+    addListener: jest.fn(),
+    removeListener: jest.fn(),
+    dispatchEvent: jest.fn(),
+  }));
+  try {
+    render(<BlindFrame photos={photos} />);
+    fireEvent.click(screen.getByRole("button", { name: "Start Blind Frame" }));
+    expect(screen.getByRole("region", { name: "Blind Frame sketch" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Draw this scene" })).toBeNull();
+  } finally {
+    match.mockRestore();
+  }
 });

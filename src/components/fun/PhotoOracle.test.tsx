@@ -57,3 +57,16 @@ it("lets the player undo an uncertain answer and answer the same question again"
   expect(screen.getByRole("status")).toHaveTextContent(question!);
   expect(screen.getByRole("button", { name: "Back" })).toBeDisabled();
 });
+
+it("discovers a photograph through answers without asking the player to remember one", () => {
+  render(<PhotoOracle photos={photos} />);
+  fireEvent.click(screen.getByRole("button", { name: "Find me a photograph" }));
+  expect(screen.queryByRole("button", { name: /Remember photograph/ })).toBeNull();
+  expect(screen.queryByRole("img")).toBeNull();
+  for (let i = 0; i < 8 && screen.queryByRole("button", { name: "Yes" }); i++)
+    fireEvent.click(screen.getByRole("button", { name: "Yes" }));
+  fireEvent.click(screen.getByRole("button", { name: "Keep this one" }));
+  expect(screen.getByRole("region", { name: "Oracle result" }).querySelector("img")).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "Play again" }));
+  expect(screen.queryByRole("button", { name: /Remember photograph/ })).toBeNull();
+});

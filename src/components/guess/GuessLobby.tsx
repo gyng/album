@@ -4,6 +4,7 @@ import { Button, Caption, Heading, KeyHint, Select, SegmentedToggle } from "../u
 import { fetchGuessRegions, GuessRegionOption } from "../search/api";
 import { GameSettings } from "./guessTypes";
 import { isInteractiveTarget } from "./guessKeyboard";
+import { GameIllustration } from "../fun/GameIllustration";
 import styles from "./GuessLobby.module.css";
 
 type GuessLobbyProps = {
@@ -99,8 +100,13 @@ export const GuessLobby: React.FC<GuessLobbyProps> = ({ database, defaults, onSt
 
   return (
     <div className={styles.lobby}>
+      <div className={styles.illustration}>
+        <GameIllustration src="/fun/guess-where.avif" />
+      </div>
       <div className={styles.header}>
-        <Heading level={1}>Guess Where</Heading>
+        <Heading level={1} as="h1">
+          Guess Where
+        </Heading>
         <Caption as="p">Guess where each photo was taken on the map</Caption>
       </div>
 

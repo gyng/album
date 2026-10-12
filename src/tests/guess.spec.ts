@@ -55,3 +55,70 @@ test.describe("guess game layout", () => {
     expect(Math.round(mapBox.y + mapBox.height)).toBeLessThanOrEqual(metrics.vh + 1);
   });
 });
+
+test("Guess Where keeps the regular nav until play and respects reduced motion when moving it", async ({
+  page,
+}) => {
+  await stubExternalMapAssets(page);
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.addInitScript(() => {
+    // Preserve and explicitly rebind the native method while observing real animation.
+    // oxlint-disable-next-line typescript/unbound-method
+    const original = Element.prototype.animate;
+    Element.prototype.animate = function (frames, options) {
+      if (this.tagName === "NAV") document.documentElement.dataset.navAnimated = "true";
+      return original.call(this, frames, options);
+    };
+  });
+  for (const reducedMotion of ["no-preference", "reduce"] as const) {
+    await page.emulateMedia({ reducedMotion });
+    await gotoHydrated(page, "/fun");
+    const ordinary = (await page.getByRole("link", { name: "Albums", exact: true }).boundingBox())!;
+    await gotoHydrated(page, "/fun/guess");
+    await expect(page.getByRole("button", { name: /^Play/ })).toBeVisible();
+    const lobby = (await page.getByRole("link", { name: "Albums", exact: true }).boundingBox())!;
+    expect(lobby.x).toBeCloseTo(ordinary.x, 0);
+    expect(lobby.y).toBeCloseTo(ordinary.y, 0);
+    await page.getByRole("button", { name: /^Play/ }).click();
+    await expect(page.getByRole("img", { name: /mystery photo/i })).toBeVisible();
+    if (reducedMotion === "reduce")
+      await expect(page.locator("html")).not.toHaveAttribute("data-nav-animated", "true");
+    else await expect(page.locator("html")).toHaveAttribute("data-nav-animated", "true");
+    await expect
+      .poll(() =>
+        page
+          .getByRole("navigation")
+          .first()
+          .evaluate(
+            (node) =>
+              node.getAnimations().filter((animation) => animation.playState === "running").length,
+          ),
+      )
+      .toBe(0);
+    const playing = (await page.getByRole("link", { name: "Albums", exact: true }).boundingBox())!;
+    expect(playing.y).toBeLessThan(lobby.y);
+  }
+});
+
+test("navigation moves between the map and regular pages in both directions", async ({ page }) => {
+  await stubExternalMapAssets(page);
+  await page.setViewportSize({ width: 1920, height: 1000 });
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await page.addInitScript(() => {
+    // Observe the native animation while retaining its real timing and rendering.
+    // oxlint-disable-next-line typescript/unbound-method
+    const original = Element.prototype.animate;
+    Element.prototype.animate = function (frames, options) {
+      if (this.tagName === "NAV")
+        document.documentElement.dataset.navAnimatedRoute = location.pathname;
+      return original.call(this, frames, options);
+    };
+  });
+  await gotoHydrated(page, "/fun");
+  await page.getByRole("link", { name: "Map", exact: true }).click();
+  await expect(page).toHaveURL(/\/map/);
+  await expect(page.locator("html")).toHaveAttribute("data-nav-animated-route", "/map");
+  await page.getByRole("link", { name: "Fun!", exact: true }).click();
+  await expect(page).toHaveURL(/\/fun/);
+  await expect(page.locator("html")).toHaveAttribute("data-nav-animated-route", "/fun");
+});

@@ -60,9 +60,7 @@
 }
 
 .dailyAction {
-  display: grid;
-  gap: var(--space-2);
-  min-inline-size: 0;
+  display: contents;
   text-align: center;
 }
 
@@ -73,7 +71,7 @@
 .dailyButton,
 .playButton {
   inline-size: 100%;
-  align-self: start;
+  align-self: stretch;
   justify-self: stretch;
   padding-inline: var(--space-2);
 }
@@ -90,4 +88,23 @@
     grid-template-columns: minmax(0, 1fr);
     gap: var(--space-2);
   }
+}
+
+.illustration {
+  max-inline-size: 20rem;
+  inline-size: 100%;
+  margin-inline: auto;
+}
+
+.dailyButton {
+  grid-column: 1;
+  grid-row: 1;
+}
+.playButton {
+  grid-column: 2;
+  grid-row: 1;
+}
+.dailyDescription {
+  grid-column: 1;
+  grid-row: 2;
 }

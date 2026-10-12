@@ -354,3 +354,133 @@ export const answerOracle = (
   const total = updated.reduce((sum, item) => sum + item.weight, 0);
   return updated.map((item) => ({ ...item, weight: item.weight / total }));
 };
+
+export const nearestGamePhotos = (
+  target: PhotoGamePhoto,
+  photos: PhotoGamePhoto[],
+  limit = 4,
+): PhotoGamePhoto[] => {
+  const query = normalise(target.vector);
+  if (!query) return [];
+  const seen = new Set([target.path]);
+  return photos
+    .flatMap((photo) => {
+      if (seen.has(photo.path)) return [];
+      seen.add(photo.path);
+      const vector = normalise(photo.vector);
+      return vector?.length === query.length ? [{ photo, similarity: dot(query, vector) }] : [];
+    })
+    .sort((a, b) => b.similarity - a.similarity || a.photo.path.localeCompare(b.photo.path))
+    .slice(0, limit)
+    .map((item) => item.photo);
+};
+
+export const relayLinkSimilarities = (photos: PhotoGamePhoto[]): Array<number | null> =>
+  photos.slice(0, -1).map((photo, index) => {
+    const left = normalise(photo.vector);
+    const right = normalise(photos[index + 1]!.vector);
+    return left && right && left.length === right.length
+      ? Math.round(100 * Math.max(-1, Math.min(1, dot(left, right))))
+      : null;
+  });
+
+const CONNECTION_LABELS: Record<string, string> = {
+  people: "People",
+  water: "Water",
+  buildings: "Architecture",
+  greenery: "Trees and plants",
+  transport: "Vehicles",
+  night: "Night scenes",
+  indoors: "Interiors",
+  animals: "Animals",
+  food: "Food",
+  mountains: "Mountains",
+  street: "Streets",
+  sky: "Sky",
+  reflection: "Reflections",
+  sign: "Signs",
+  bridge: "Bridges",
+  snow: "Snow",
+  windows: "Windows",
+  doors: "Doorways",
+  flowers: "Flowers",
+  stairs: "Stairs",
+  red: "Red",
+  blue: "Blue",
+  yellow: "Yellow",
+};
+export type ConnectionGroup = { id: string; label: string; photos: PhotoGamePhoto[] };
+export type ConnectionsPuzzle = { groups: ConnectionGroup[]; tiles: PhotoGamePhoto[] };
+
+export const buildConnectionsPuzzle = (
+  photos: PhotoGamePhoto[],
+  random: () => number = Math.random,
+): ConnectionsPuzzle | null => {
+  const unique = [...new Map(photos.map((photo) => [photo.path, photo])).values()];
+  if (unique.length < 16) return null;
+  const signatures = unique.map((photo) => ({
+    photo,
+    bits: ORACLE_QUESTIONS.reduce((bits, q, i) => (q.matches(photo) ? bits | (1 << i) : bits), 0),
+  }));
+  const bitsByPath = new Map(signatures.map((item) => [item.photo.path, item.bits]));
+  const questions = shuffleGamePhotos(
+    ORACLE_QUESTIONS.map((question, index) => ({ question, bit: 1 << index })).filter(
+      (item) => signatures.filter((photo) => photo.bits & item.bit).length >= 4,
+    ),
+    random,
+  );
+  // Each frame matches exactly one of the four chosen captioned subjects.
+  // Precomputed bit signatures keep overlap checking independent of regex work.
+  for (let a = 0; a < questions.length - 3; a++)
+    for (let b = a + 1; b < questions.length - 2; b++)
+      for (let c = b + 1; c < questions.length - 1; c++)
+        for (let d = c + 1; d < questions.length; d++) {
+          const selected = [questions[a]!, questions[b]!, questions[c]!, questions[d]!];
+          const mask = selected.reduce((bits, item) => bits | item.bit, 0);
+          const pools = selected.map((item) =>
+            signatures.filter((photo) => (photo.bits & mask) === item.bit),
+          );
+          if (pools.some((pool) => pool.length < 4)) continue;
+          const groups = selected.map((item, index) => ({
+            id: item.question.id,
+            label: CONNECTION_LABELS[item.question.id] ?? item.question.id,
+            photos: shuffleGamePhotos(pools[index]!, random)
+              .slice(0, 4)
+              .map((item) => item.photo),
+          }));
+          const tiles = groups.flatMap((group) => group.photos);
+          // Another visible subject that singles out four different photographs
+          // would be a plausible competing answer. Keep only clear partitions.
+          const competing = ORACLE_QUESTIONS.some((_, index) => {
+            const matching = tiles.filter((photo) => bitsByPath.get(photo.path)! & (1 << index));
+            return (
+              matching.length === 4 &&
+              !groups.some((group) => group.photos.every((photo) => matching.includes(photo)))
+            );
+          });
+          if (competing) continue;
+          return { groups, tiles: shuffleGamePhotos(tiles, random) };
+        }
+  return null;
+};
+
+export const checkConnection = (
+  puzzle: ConnectionsPuzzle,
+  paths: string[],
+): { kind: "match"; group: ConnectionGroup } | { kind: "near" | "miss" } => {
+  if (paths.length !== 4 || new Set(paths).size !== 4) return { kind: "miss" };
+  const group = puzzle.groups.find((group) =>
+    group.photos.every((photo) => paths.includes(photo.path)),
+  );
+  if (group) return { kind: "match", group };
+  return {
+    kind: puzzle.groups.some(
+      (group) => group.photos.filter((photo) => paths.includes(photo.path)).length === 3,
+    )
+      ? "near"
+      : "miss",
+  };
+};
+
+export const oracleDiscoveryQuestion = (question: OracleQuestion): string =>
+  `Would you like a photograph featuring ${(CONNECTION_LABELS[question.id] ?? question.id).toLowerCase()}?`;
