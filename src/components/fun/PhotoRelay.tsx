@@ -14,14 +14,27 @@ export const PhotoRelay = ({ photos }: { photos: PhotoGamePhoto[] }) => {
   const [order, setOrder] = useState<PhotoGamePhoto[]>([]);
   const [finished, setFinished] = useState(false);
   const [gaveUp, setGaveUp] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const resultRef = useRef<HTMLDivElement>(null);
   const boardRef = useRef<HTMLDivElement>(null);
+  const choiceRefs = useRef(new Map<string, HTMLButtonElement>());
+  const finishRef = useRef<HTMLButtonElement>(null);
+  const requestedFocus = useRef<{ path: string } | { finish: true } | null>(null);
+  useEffect(() => {
+    const request = requestedFocus.current;
+    if (!request) return;
+    requestedFocus.current = null;
+    if ("finish" in request) finishRef.current?.focus();
+    else choiceRefs.current.get(request.path)?.focus();
+  }, [order]);
   useEffect(() => {
     if (finished) resultRef.current?.focus();
     else if (puzzle) boardRef.current?.focus();
   }, [finished, puzzle]);
   const start = () => {
-    setPuzzle(buildRelayPuzzle(photos));
+    const next = buildRelayPuzzle(photos);
+    setError(next ? null : "There aren't enough comparable photographs for a relay.");
+    setPuzzle(next);
     setOrder([]);
     setFinished(false);
     setGaveUp(false);
@@ -35,6 +48,7 @@ export const PhotoRelay = ({ photos }: { photos: PhotoGamePhoto[] }) => {
   if (!puzzle)
     return (
       <div className={styles.game}>
+        {error ? <p role="alert">{error}</p> : null}
         <p>
           Arrange five photographs between a start and a finish. Aim for a smooth visual change from
           one frame to the next.
@@ -50,16 +64,16 @@ export const PhotoRelay = ({ photos }: { photos: PhotoGamePhoto[] }) => {
         <>
           <div className={styles.endpoints} ref={boardRef} tabIndex={-1}>
             <figure className={styles.frame}>
-              <Caption as="span">Start</Caption>
+              <Caption as="figcaption">Start</Caption>
               <GamePhoto photo={puzzle.start} />
             </figure>
             <figure className={styles.frame}>
-              <Caption as="span">Finish</Caption>
+              <Caption as="figcaption">Finish</Caption>
               <GamePhoto photo={puzzle.end} />
             </figure>
           </div>
           <p role="status">{order.length} of 5 links placed</p>
-          {order.length > 0 ? <PhotoChain photos={order} /> : null}
+          {order.length > 0 ? <PhotoChain photos={order} linked={false} /> : null}
           <div className={styles.choices}>
             {puzzle.tiles.map((photo, index) => {
               const position = order.findIndex((item) => item.path === photo.path);
@@ -69,11 +83,22 @@ export const PhotoRelay = ({ photos }: { photos: PhotoGamePhoto[] }) => {
                   key={photo.path}
                   className={styles.choice}
                   aria-label={`Choose photograph ${index + 1}`}
+                  ref={(element) => {
+                    if (element) choiceRefs.current.set(photo.path, element);
+                    else choiceRefs.current.delete(photo.path);
+                  }}
                   disabled={position >= 0}
-                  onClick={() => {
+                  onClick={(event) => {
                     const next = [...order, photo];
+                    if (event.detail === 0) {
+                      const available = puzzle.tiles.find(
+                        (tile) => !next.some((item) => item.path === tile.path),
+                      );
+                      requestedFocus.current = available
+                        ? { path: available.path }
+                        : { finish: true };
+                    }
                     setOrder(next);
-                    if (next.length === 5) finish(false);
                   }}
                 >
                   <GamePhoto photo={photo} />
@@ -83,7 +108,23 @@ export const PhotoRelay = ({ photos }: { photos: PhotoGamePhoto[] }) => {
             })}
           </div>
           <div className={styles.actions}>
-            <Button onClick={() => setOrder(order.slice(0, -1))} disabled={!order.length}>
+            <Button
+              ref={finishRef}
+              variant="primary"
+              disabled={order.length !== 5}
+              onClick={() => finish(false)}
+            >
+              Finish relay
+            </Button>
+            <Button
+              onClick={(event) => {
+                const previous = order.at(-1);
+                if (event.detail === 0 && previous)
+                  requestedFocus.current = { path: previous.path };
+                setOrder(order.slice(0, -1));
+              }}
+              disabled={!order.length}
+            >
               Undo last link
             </Button>
             <Button variant="quiet" onClick={() => finish(true)}>

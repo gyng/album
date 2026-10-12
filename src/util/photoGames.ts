@@ -16,7 +16,7 @@ const normalise = (vector: ArrayLike<number>): number[] | null => {
   const values = Array.from(vector);
   if (!values.length || values.some((value) => !Number.isFinite(value))) return null;
   const norm = Math.hypot(...values);
-  return norm ? values.map((value) => value / norm) : null;
+  return norm && Number.isFinite(norm) ? values.map((value) => value / norm) : null;
 };
 
 const dot = (left: ArrayLike<number>, right: ArrayLike<number>) => {
@@ -79,10 +79,19 @@ export const buildRelayPuzzle = (
   photos: PhotoGamePhoto[],
   random: () => number = Math.random,
 ): RelayPuzzle | null => {
-  const vectors = photos.flatMap((photo) => {
+  const seen = new Set<string>();
+  const validVectors = photos.flatMap((photo) => {
     const vector = normalise(photo.vector);
-    return vector ? [{ photo, vector }] : [];
+    if (!vector || seen.has(photo.path)) return [];
+    seen.add(photo.path);
+    return [{ photo, vector }];
   });
+  const dimensions = new Map<number, number>();
+  for (const item of validVectors)
+    dimensions.set(item.vector.length, (dimensions.get(item.vector.length) ?? 0) + 1);
+  const dimension = [...dimensions].sort((a, b) => b[1] - a[1])[0]?.[0];
+  const vectors = validVectors.filter((item) => item.vector.length === dimension);
+  if (vectors.length < 7) return null;
   const first = shuffleGamePhotos(vectors, random)[0];
   if (!first) return null;
   const candidates = vectors
@@ -94,15 +103,22 @@ export const buildRelayPuzzle = (
   const last = candidates[Math.min(candidates.length - 1, Math.floor(candidates.length * 0.7))]!;
   const used = new Set([first.photo.path, last.photo.path]);
   const tiles: PhotoGamePhoto[] = [];
+  const usedVectors = [first.vector, last.vector];
   for (let step = 1; step <= 5; step++) {
     const t = step / 6;
     const query =
       normalise(first.vector.map((value, i) => value * (1 - t) + last.vector[i]! * t)) ??
       first.vector;
-    const next = candidates
+    const ranked = candidates
       .filter((item) => !used.has(item.photo.path))
-      .sort((a, b) => dot(query, b.vector) - dot(query, a.vector))[0]!;
+      .sort((a, b) => dot(query, b.vector) - dot(query, a.vector));
+    // Prefer distinct frames over duplicate exports/burst copies. A small
+    // archive can still complete a round when no diverse alternative exists.
+    const next =
+      ranked.find((item) => usedVectors.every((vector) => dot(vector, item.vector) < 0.98)) ??
+      ranked[0]!;
     tiles.push(next.photo);
+    usedVectors.push(next.vector);
     used.add(next.photo.path);
   }
   const base = { start: first.photo, end: last.photo, tiles };
@@ -149,12 +165,35 @@ export const rankDrawing = (vector: number[], photos: PhotoGamePhoto[], targetPa
   // Equal similarities share a rank, so an arbitrary path order cannot
   // penalise a drawing that matches several photographs equally well.
   const rank = ranked.filter((item) => item.similarity > targetSimilarity + 1e-9).length + 1;
+  const middle = Math.floor(ranked.length / 2);
+  const typicalSimilarity =
+    ranked.length % 2
+      ? ranked[middle]!.similarity
+      : (ranked[middle - 1]!.similarity + ranked[middle]!.similarity) / 2;
+  const bestSimilarity = ranked[0]!.similarity;
+  // A high archive percentile can still be a weak match: most photographs
+  // are unrelated to any one sketch. Reward similarity above a typical match,
+  // scaled against the closest match, rather than the number of worse photos.
+  const score =
+    bestSimilarity - typicalSimilarity < 1e-9
+      ? targetSimilarity >= bestSimilarity - 1e-9
+        ? 100
+        : 0
+      : Math.round(
+          100 *
+            Math.max(
+              0,
+              Math.min(
+                1,
+                (targetSimilarity - typicalSimilarity) / (bestSimilarity - typicalSimilarity),
+              ),
+            ),
+        );
   return {
     nearest: ranked[0]!.photo,
     rank,
     total: ranked.length,
-    score:
-      ranked.length === 1 ? 100 : Math.round((100 * (ranked.length - rank)) / (ranked.length - 1)),
+    score,
   };
 };
 
@@ -168,38 +207,38 @@ const topics: Array<[string, string, RegExp]> = [
   [
     "people",
     "Are there people in the photograph?",
-    /\b(person|people|man|woman|men|women|child|children|crowd|pedestrian|portrait|boy|girl)\b/i,
+    /\b(person|people|man|woman|men|women|child|children|crowds?|pedestrians?|portraits?|boys?|girls?)\b/i,
   ],
   [
     "water",
     "Is there water in the scene?",
-    /\b(water|sea|ocean|river|lake|harbou?r|canal|pond|beach|boat)\b/i,
+    /\b(water|sea|ocean|rivers?|lakes?|harbou?rs?|canals?|ponds?|reservoirs?)\b/i,
   ],
   [
     "buildings",
-    "Are buildings a prominent part of the scene?",
-    /\b(building|buildings|architecture|house|houses|skyscraper|facade|façade|temple|church|shopfront)\b/i,
+    "Does it show buildings?",
+    /\b(buildings?|architecture|houses?|skyscrapers?|facades?|façades?|temples?|church(?:es)?|shopfronts?)\b/i,
   ],
   [
     "greenery",
     "Does it show trees or plants?",
-    /\b(tree|trees|forest|plant|plants|garden|foliage|flower|flowers|grass|park)\b/i,
+    /\b(trees?|forests?|plants?|gardens?|foliage|flowers?|grass|parks?)\b/i,
   ],
   [
     "transport",
     "Is there a vehicle?",
-    /\b(car|cars|train|bus|truck|bicycle|bike|motorcycle|tram|boat|ship|plane|vehicle)\b/i,
+    /\b(cars?|trains?(?!\s+station\b)|bus(?:es)?|trucks?|bicycles?|bikes?|motorcycles?|trams?|boats?|ships?|planes?|vehicles?)\b/i,
   ],
-  ["night", "Is it a night scene?", /\b(night|nighttime|darkness|neon|illuminated|nightscape)\b/i],
+  ["night", "Is it a night scene?", /\b(night|nighttime|nightscape)\b/i],
   [
     "indoors",
     "Was it photographed indoors?",
-    /\b(interior|indoors|room|bedroom|kitchen|restaurant|cafe|café|hallway|corridor)\b/i,
+    /\b(interiors?|indoors|rooms?|bedrooms?|kitchens?|hallways?|corridors?)\b|\binside (?:a |an |the )?(?:cafe|café|restaurant|building|house|shop|station)\b/i,
   ],
   [
     "animals",
     "Is there an animal?",
-    /\b(cat|dog|bird|birds|animal|animals|fish|horse|insect|butterfly)\b/i,
+    /\b(cats?|dogs?|birds?|animals?|fish|horses?|insects?|butterfl(?:y|ies))\b/i,
   ],
   [
     "food",
@@ -216,7 +255,7 @@ const topics: Array<[string, string, RegExp]> = [
     "Does it show a street or road?",
     /\b(street|road|alley|pavement|sidewalk|crossing|intersection|highway)\b/i,
   ],
-  ["sky", "Is the sky prominent?", /\b(sky|clouds|cloudy|sunset|sunrise|horizon)\b/i],
+  ["sky", "Can you see the sky?", /\b(sky|clouds|cloudy|sunset|sunrise|horizon)\b/i],
   [
     "reflection",
     "Is there a reflection?",
@@ -229,12 +268,49 @@ const topics: Array<[string, string, RegExp]> = [
   ],
   ["bridge", "Is there a bridge?", /\b(bridge|bridges|footbridge|overpass)\b/i],
   ["snow", "Does it show snow?", /\b(snow|snowy|snowfall|snow-covered)\b/i],
+  ["windows", "Can you see windows?", /\b(windows?|windowpanes?)\b/i],
+  ["doors", "Does it show a door or doorway?", /\b(doors?|doorways?|entrances?)\b/i],
+  ["flowers", "Does it show flowers?", /\b(flowers?|blossoms?|blooms?)\b/i],
+  ["stairs", "Does it show stairs or steps?", /\b(stairs?|staircases?|stairways?|steps?)\b/i],
+  ["red", "Is there something red?", /\bred\b/i],
+  ["blue", "Is there something blue?", /\bblue\b/i],
+  ["yellow", "Is there something yellow?", /\byellow\b/i],
 ];
+const matchesVisibleTopic = (photo: PhotoGamePhoto, pattern: RegExp): boolean => {
+  const mentions = [...photo.caption.matchAll(new RegExp(pattern.source, `${pattern.flags}g`))];
+  if (mentions.length)
+    return mentions.some((mention) => {
+      const prefix = photo.caption.slice(Math.max(0, mention.index! - 60), mention.index);
+      return !/\b(?:no|without|not|absence of)\s+(?:[\w-]+\s+){0,2}$/i.test(prefix);
+    });
+  return pattern.test(photo.tags);
+};
+
 export const ORACLE_QUESTIONS: OracleQuestion[] = topics.map(([id, label, pattern]) => ({
   id,
   label,
-  matches: (photo) => pattern.test(`${photo.caption} ${photo.tags}`),
+  matches: (photo) => matchesVisibleTopic(photo, pattern),
 }));
+
+export const buildOracleCohort = (
+  photos: PhotoGamePhoto[],
+  limit = 12,
+  random: () => number = Math.random,
+): PhotoGamePhoto[] => {
+  const signatures = new Set<string>();
+  const cohort: PhotoGamePhoto[] = [];
+  for (const photo of shuffleGamePhotos(
+    photos.filter((photo) => photo.caption || photo.tags),
+    random,
+  )) {
+    const signature = ORACLE_QUESTIONS.map((question) => +question.matches(photo)).join("");
+    if (signatures.has(signature)) continue;
+    signatures.add(signature);
+    cohort.push(photo);
+    if (cohort.length >= limit) break;
+  }
+  return cohort;
+};
 
 export const chooseOracleQuestion = (
   candidates: OracleCandidate[],

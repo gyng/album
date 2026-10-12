@@ -3,7 +3,7 @@ import { Button, Caption, Heading } from "../ui";
 import {
   answerOracle,
   chooseOracleQuestion,
-  shuffleGamePhotos,
+  buildOracleCohort,
   type OracleCandidate,
   type PhotoGamePhoto,
 } from "../../util/photoGames";
@@ -21,14 +21,24 @@ export const PhotoOracle = ({ photos }: { photos: PhotoGamePhoto[] }) => {
     Array<{ id: string; question: string; answer: "yes" | "no" | "unsure" }>
   >([]);
   const [confirmed, setConfirmed] = useState<PhotoGamePhoto | null>(null);
+  const [history, setHistory] = useState<
+    Array<{ candidates: OracleCandidate[]; answers: typeof answers }>
+  >([]);
+  const [error, setError] = useState<string | null>(null);
   const eligible = photos.filter((photo) => photo.caption || photo.tags);
   const start = () => {
-    const selection = shuffleGamePhotos(eligible).slice(0, 12);
+    const selection = buildOracleCohort(eligible);
+    if (selection.length < 2) {
+      setError("These photographs are too alike for the oracle's questions.");
+      return;
+    }
+    setError(null);
     setCohort(selection);
     setSecret(null);
     setCandidates(selection.map((photo) => ({ photo, weight: 1 / selection.length })));
     setAnswers([]);
     setConfirmed(null);
+    setHistory([]);
     setStage("choose");
   };
   const question = chooseOracleQuestion(
@@ -48,6 +58,7 @@ export const PhotoOracle = ({ photos }: { photos: PhotoGamePhoto[] }) => {
   if (stage === "lobby")
     return (
       <div className={styles.game}>
+        {error ? <p role="alert">{error}</p> : null}
         <p>
           Choose a photograph and keep it in mind. Answer visual questions while the oracle tries to
           find it.
@@ -116,9 +127,10 @@ export const PhotoOracle = ({ photos }: { photos: PhotoGamePhoto[] }) => {
                   That&apos;s it
                 </Button>
                 <Button
-                  onClick={() =>
-                    setCandidates(candidates.filter((item) => item.photo.path !== top.photo.path))
-                  }
+                  onClick={() => {
+                    setHistory([...history, { candidates, answers }]);
+                    setCandidates(candidates.filter((item) => item.photo.path !== top.photo.path));
+                  }}
                 >
                   Not this one
                 </Button>
@@ -138,6 +150,7 @@ export const PhotoOracle = ({ photos }: { photos: PhotoGamePhoto[] }) => {
                     key={answer}
                     variant={answer === "unsure" ? "quiet" : "surface"}
                     onClick={() => {
+                      setHistory([...history, { candidates, answers }]);
                       setCandidates(answerOracle(candidates, question, answer));
                       setAnswers([
                         ...answers,
@@ -153,9 +166,22 @@ export const PhotoOracle = ({ photos }: { photos: PhotoGamePhoto[] }) => {
           ) : (
             <p>No candidates left. Reveal the photograph or start again.</p>
           )}
-          <Button variant="quiet" onClick={() => setStage("finished")}>
-            Give up
-          </Button>
+          <div className={styles.actions}>
+            <Button
+              disabled={!history.length}
+              onClick={() => {
+                const previous = history.at(-1)!;
+                setCandidates(previous.candidates);
+                setAnswers(previous.answers);
+                setHistory(history.slice(0, -1));
+              }}
+            >
+              Back
+            </Button>
+            <Button variant="quiet" onClick={() => setStage("finished")}>
+              Give up
+            </Button>
+          </div>
         </>
       ) : null}
       {stage === "finished" && secret ? (

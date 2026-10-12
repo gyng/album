@@ -45,3 +45,15 @@ it("continues after an incorrect guess without showing the rejected candidate ag
   fireEvent.click(screen.getByRole("button", { name: "That's it" }));
   expect(screen.getByRole("region", { name: "Oracle result" })).toBeTruthy();
 });
+
+it("lets the player undo an uncertain answer and answer the same question again", () => {
+  render(<PhotoOracle photos={photos} />);
+  fireEvent.click(screen.getByRole("button", { name: "Meet the oracle" }));
+  fireEvent.click(screen.getByRole("button", { name: "Remember photograph 1" }));
+  fireEvent.click(screen.getByRole("button", { name: "I have my photograph" }));
+  const question = screen.getByRole("status").textContent;
+  fireEvent.click(screen.getByRole("button", { name: "Not sure" }));
+  fireEvent.click(screen.getByRole("button", { name: "Back" }));
+  expect(screen.getByRole("status")).toHaveTextContent(question!);
+  expect(screen.getByRole("button", { name: "Back" })).toBeDisabled();
+});

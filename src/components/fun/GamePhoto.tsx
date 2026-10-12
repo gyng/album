@@ -21,11 +21,17 @@ export const GamePhoto = ({ photo, link = false }: { photo: PhotoGamePhoto; link
   );
 };
 
-export const PhotoChain = ({ photos }: { photos: PhotoGamePhoto[] }) => (
+export const PhotoChain = ({
+  photos,
+  linked = true,
+}: {
+  photos: PhotoGamePhoto[];
+  linked?: boolean;
+}) => (
   <ol className={styles.chain}>
     {photos.map((photo, index) => (
       <li key={photo.path}>
-        <GamePhoto photo={photo} link />
+        <GamePhoto photo={photo} link={linked} />
         <span className={styles.step}>{index + 1}</span>
       </li>
     ))}

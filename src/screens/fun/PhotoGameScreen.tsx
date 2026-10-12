@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { GlobalNav } from "../../components/GlobalNav";
 import { Seo } from "../../components/Seo";
-import { Button, Heading } from "../../components/ui";
+import { Button, Heading, buttonStyles } from "../../components/ui";
+import { AppLink } from "../../components/platform";
 import { ProgressBar } from "../../components/ProgressBar";
 import { useDatabase, useEmbeddingsDatabase } from "../../components/database/useDatabase";
 import { fetchPhotoGameArchive } from "../../components/search/api";
@@ -42,7 +43,11 @@ export const PhotoGameScreen = ({ game }: { game: PhotoGameKind }) => {
       cancelled = true;
     };
   }, [database, embeddings, needsVectors, game, attempt]);
-  const loadError = error ?? databaseError?.message ?? (needsVectors ? vectorError?.message : null);
+  const loadError =
+    error ??
+    (databaseError || (needsVectors && vectorError)
+      ? "The game photographs could not be loaded."
+      : null);
   return (
     <main id="main-content" className={styles.page}>
       <Seo
@@ -64,12 +69,15 @@ export const PhotoGameScreen = ({ game }: { game: PhotoGameKind }) => {
             <Button
               onClick={() => {
                 if (databaseError) retryDatabase();
-                else if (vectorError) retryVectors();
+                else if (needsVectors && vectorError) retryVectors();
                 else setAttempt((value) => value + 1);
               }}
             >
               Try again
             </Button>
+            <AppLink href="/fun" className={buttonStyles.base}>
+              All games
+            </AppLink>
           </div>
         ) : !photos ? (
           <div role="status">
@@ -77,7 +85,12 @@ export const PhotoGameScreen = ({ game }: { game: PhotoGameKind }) => {
             <ProgressBar progress={needsVectors ? Math.min(progress, vectorProgress) : progress} />
           </div>
         ) : !photos.length ? (
-          <p>This archive does not have the indexed photographs needed for this game yet.</p>
+          <div>
+            <p>This archive does not have the photographs needed for this game yet.</p>
+            <AppLink href="/fun" className={buttonStyles.base}>
+              All games
+            </AppLink>
+          </div>
         ) : game === "relay" ? (
           <PhotoRelay photos={photos} />
         ) : game === "blind-frame" ? (

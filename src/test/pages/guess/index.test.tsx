@@ -94,7 +94,8 @@ describe("GuessPage", () => {
 
     render(<GuessPage />);
 
-    expect(screen.getByText(/needs a search index/i)).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "All games" })).toHaveAttribute("href", "/fun");
     expect(screen.getByRole("button", { name: /try again/i })).toBeInTheDocument();
     expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
   });

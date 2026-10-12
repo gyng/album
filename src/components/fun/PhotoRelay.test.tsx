@@ -28,10 +28,14 @@ it("supports undo, prevents duplicate links and shows a scored chain after all f
   const first = screen.getByRole("button", { name: "Choose photograph 1" });
   fireEvent.click(first);
   expect(first).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Choose photograph 2" })).toHaveFocus();
   fireEvent.click(screen.getByRole("button", { name: "Undo last link" }));
   expect(first).toBeEnabled();
+  expect(first).toHaveFocus();
   for (let i = 1; i <= 5; i++)
     fireEvent.click(screen.getByRole("button", { name: `Choose photograph ${i}` }));
+  expect(screen.queryByRole("region", { name: "Relay result" })).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Finish relay" }));
   const result = screen.getByRole("region", { name: "Relay result" });
   expect(within(result).getByText(/Visual flow: \d+ \/ 100/)).toBeTruthy();
   expect(within(result).getAllByRole("list")[0]?.children).toHaveLength(7);

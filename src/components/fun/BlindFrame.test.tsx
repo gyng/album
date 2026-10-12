@@ -65,3 +65,22 @@ it("does not submit a cancelled sketch", () => {
   expect(encodeSearchImage).not.toHaveBeenCalled();
   expect(screen.queryByRole("dialog")).toBeNull();
 });
+
+it("allows giving up while matching a sketch and ignores its late completion", async () => {
+  let complete!: (vector: number[]) => void;
+  jest.mocked(encodeSearchImage).mockReturnValue(
+    new Promise((resolve) => {
+      complete = resolve;
+    }),
+  );
+  render(<BlindFrame photos={photos} />);
+  fireEvent.click(screen.getByRole("button", { name: "Start Blind Frame" }));
+  fireEvent.click(screen.getByRole("button", { name: "Draw this scene" }));
+  fireEvent.click(screen.getByRole("button", { name: "Submit sketch" }));
+  fireEvent.click(screen.getByRole("button", { name: "Give up" }));
+  expect(screen.getByRole("region", { name: "Blind Frame result" })).toBeTruthy();
+  expect(screen.getAllByRole("img")).toHaveLength(1);
+  await act(async () => complete([1, 0]));
+  expect(screen.queryByText(/\/ 100/)).toBeNull();
+  expect(screen.getAllByRole("img")).toHaveLength(1);
+});

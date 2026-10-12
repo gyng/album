@@ -19,6 +19,8 @@ describe("SearchDrawPad focus management", () => {
     moveTo: jest.fn(),
     lineTo: jest.fn(),
     stroke: jest.fn(),
+    drawImage: jest.fn(),
+    getImageData: jest.fn(() => ({ data: new Uint8ClampedArray([0, 0, 0, 255]) })),
   };
   let getContext: jest.SpyInstance;
   let nextBlob: Blob | null;
@@ -33,6 +35,7 @@ describe("SearchDrawPad focus management", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    context.getImageData.mockReturnValue({ data: new Uint8ClampedArray([0, 0, 0, 255]) });
     getContext = jest
       .spyOn(HTMLCanvasElement.prototype, "getContext")
       .mockReturnValue(context as unknown as CanvasRenderingContext2D);
@@ -173,5 +176,62 @@ describe("SearchDrawPad focus management", () => {
     nextBlob = null;
     fireEvent.click(screen.getByRole("button", { name: "Search" }));
     expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it("saves a cancelled drawing as a resumable PNG draft without submitting it", () => {
+    const onDraft = jest.fn();
+    const onSubmit = jest.fn();
+    const onCancel = jest.fn();
+    const { container } = render(
+      <SearchDrawPad onCancel={onCancel} onSubmit={onSubmit} onDraft={onDraft} />,
+    );
+    const canvas = container.querySelector("canvas")!;
+    canvas.getBoundingClientRect = () => ({ left: 0, top: 0, width: 448, height: 448 }) as DOMRect;
+    fireEvent.pointerDown(canvas, { clientX: 20, clientY: 20, pointerId: 1 });
+    fireEvent.pointerUp(canvas, { pointerId: 1 });
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(onDraft).toHaveBeenCalledWith(nextBlob);
+    expect(onCancel).toHaveBeenCalledTimes(1);
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it("restores a saved draft and allows the player to submit or clear it", () => {
+    const image = document.createElement("img");
+    const imageFactory = jest.spyOn(window, "Image").mockImplementation(() => image);
+    URL.createObjectURL = jest.fn(() => "blob:draft");
+    const revoke = jest.fn();
+    URL.revokeObjectURL = revoke;
+    try {
+      const { unmount } = render(
+        <SearchDrawPad
+          initialDrawing={new Blob(["draft"])}
+          onCancel={jest.fn()}
+          onSubmit={jest.fn()}
+        />,
+      );
+      fireEvent.load(image);
+      expect(screen.getByRole("button", { name: "Search" })).toBeEnabled();
+      expect(context.drawImage).toHaveBeenCalledWith(image, 0, 0, 448, 448);
+      fireEvent.click(screen.getByRole("button", { name: "Clear" }));
+      expect(screen.getByRole("button", { name: "Search" })).toBeDisabled();
+      unmount();
+      expect(revoke).toHaveBeenCalledWith("blob:draft");
+    } finally {
+      imageFactory.mockRestore();
+    }
+  });
+
+  it("rejects an all-white drawing before model submission", () => {
+    context.getImageData.mockReturnValue({ data: new Uint8ClampedArray([255, 255, 255, 255]) });
+    const onSubmit = jest.fn();
+    const { container } = render(<SearchDrawPad onCancel={jest.fn()} onSubmit={onSubmit} />);
+    const canvas = container.querySelector("canvas")!;
+    canvas.getBoundingClientRect = () => ({ left: 0, top: 0, width: 448, height: 448 }) as DOMRect;
+    fireEvent.pointerDown(canvas, { clientX: 20, clientY: 20, pointerId: 1 });
+    fireEvent.pointerUp(canvas, { pointerId: 1 });
+    fireEvent.click(screen.getByRole("button", { name: "Search" }));
+    expect(screen.getByRole("alert")).toBeTruthy();
+    expect(onSubmit).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "Search" })).toBeDisabled();
   });
 });

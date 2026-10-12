@@ -10,10 +10,14 @@ import styles from "./PhotoGames.module.css";
 export const BlindFrame = ({ photos }: { photos: PhotoGamePhoto[] }) => {
   const [target, setTarget] = useState<PhotoGamePhoto | null>(null);
   const [drawing, setDrawing] = useState(false);
+  const [gaveUp, setGaveUp] = useState(false);
+  const roundRef = useRef(0);
+  const round = roundRef.current;
   const blobRef = useRef<Blob | null>(null);
   const previousTarget = useRef<string | null>(null);
   const resultRef = useRef<HTMLDivElement>(null);
   const promptRef = useRef<HTMLQuoteElement>(null);
+  const feedbackRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (target) promptRef.current?.focus();
   }, [target]);
@@ -25,6 +29,9 @@ export const BlindFrame = ({ photos }: { photos: PhotoGamePhoto[] }) => {
     startImageQuery,
     clearImageQuery,
   } = useImageQuery();
+  useEffect(() => {
+    if (imageVectorError || (imageQuery && !imageQuery.vector)) feedbackRef.current?.focus();
+  }, [imageVectorError, imageQuery]);
   const result = useMemo(
     () =>
       target && imageQuery?.vector ? rankDrawing(imageQuery.vector, photos, target.path) : null,
@@ -35,6 +42,7 @@ export const BlindFrame = ({ photos }: { photos: PhotoGamePhoto[] }) => {
   }, [result]);
   const eligible = photos.filter((photo) => photo.caption.length >= 20 && photo.vector.length > 0);
   const start = () => {
+    roundRef.current += 1;
     const next =
       shuffleGamePhotos(eligible.filter((photo) => photo.path !== previousTarget.current))[0] ??
       eligible[0]!;
@@ -43,6 +51,7 @@ export const BlindFrame = ({ photos }: { photos: PhotoGamePhoto[] }) => {
     clearImageQuery();
     blobRef.current = null;
     setDrawing(false);
+    setGaveUp(false);
   };
   if (!eligible.length)
     return (
@@ -68,7 +77,7 @@ export const BlindFrame = ({ photos }: { photos: PhotoGamePhoto[] }) => {
       <blockquote className={styles.prompt} ref={promptRef} tabIndex={-1}>
         {target.caption}
       </blockquote>
-      {result && imageQuery ? (
+      {(result && imageQuery) || gaveUp ? (
         <div
           className={styles.result}
           ref={resultRef}
@@ -77,44 +86,69 @@ export const BlindFrame = ({ photos }: { photos: PhotoGamePhoto[] }) => {
           aria-label="Blind Frame result"
         >
           <Heading level={1}>The reveal</Heading>
-          <p className={styles.score}>{result.score} / 100</p>
-          <Caption>
-            The hidden photograph ranked {result.rank.toLocaleString("en-GB")} of{" "}
-            {result.total.toLocaleString("en-GB")} archive matches for your sketch. The score
-            follows that rank.
-          </Caption>
-          <div className={styles.comparison}>
+          {result && !gaveUp ? (
+            <>
+              <p className={styles.score}>{result.score} / 100</p>
+              <Caption>
+                The hidden photograph ranked {result.rank.toLocaleString("en-GB")} of{" "}
+                {result.total.toLocaleString("en-GB")} archive matches for your sketch. The score
+                compares its similarity with the closest and typical matches.
+              </Caption>
+            </>
+          ) : null}
+          <div
+            className={[styles.comparison, gaveUp ? styles.comparisonSingle : ""]
+              .filter(Boolean)
+              .join(" ")}
+          >
+            {imageQuery && !gaveUp ? (
+              <>
+                <figure className={styles.frame}>
+                  <Caption as="figcaption">Your sketch</Caption>
+                  <img
+                    className={styles.photo}
+                    src={imageQuery.previewUrl}
+                    alt="Your submitted sketch"
+                  />
+                </figure>
+              </>
+            ) : null}
             <figure className={styles.frame}>
-              <Caption as="span">Your sketch</Caption>
-              <img
-                className={styles.photo}
-                src={imageQuery.previewUrl}
-                alt="Your submitted sketch"
-              />
-            </figure>
-            <figure className={styles.frame}>
-              <Caption as="span">Hidden photograph</Caption>
+              <Caption as="figcaption">Hidden photograph</Caption>
               <GamePhoto photo={target} link />
             </figure>
-            <figure className={styles.frame}>
-              <Caption as="span">Closest archive match</Caption>
-              <GamePhoto photo={result.nearest} link />
-            </figure>
+            {result && !gaveUp ? (
+              <figure className={styles.frame}>
+                <Caption as="figcaption">Closest archive match</Caption>
+                <GamePhoto photo={result.nearest} link />
+              </figure>
+            ) : null}
           </div>
-          <Button variant="primary" onClick={start}>
-            Play again
-          </Button>
+          <div className={styles.actions}>
+            <Button variant="primary" onClick={start}>
+              Play again
+            </Button>
+            <Button
+              onClick={() => {
+                clearImageQuery();
+                setGaveUp(false);
+                setDrawing(true);
+              }}
+            >
+              Try this scene again
+            </Button>
+          </div>
         </div>
       ) : (
         <>
           {imageQuery && !imageQuery.vector ? (
-            <div role="status">
+            <div ref={feedbackRef} tabIndex={-1} role="status">
               <p>{imageModelStage}</p>
               <ProgressBar progress={imageModelProgress} />
             </div>
           ) : null}
           {imageVectorError ? (
-            <div role="alert">
+            <div ref={feedbackRef} tabIndex={-1} role="alert">
               <p>{imageVectorError}</p>
               <Button
                 onClick={() => {
@@ -141,6 +175,15 @@ export const BlindFrame = ({ photos }: { photos: PhotoGamePhoto[] }) => {
             <Button variant="quiet" onClick={start}>
               Another description
             </Button>
+            <Button
+              variant="quiet"
+              onClick={() => {
+                clearImageQuery();
+                setGaveUp(true);
+              }}
+            >
+              Give up
+            </Button>
           </div>
         </>
       )}
@@ -148,9 +191,15 @@ export const BlindFrame = ({ photos }: { photos: PhotoGamePhoto[] }) => {
         <SearchDrawPad
           title="Blind Frame sketch"
           description={target.caption}
-          submitLabel="Reveal the photograph"
+          submitLabel="Reveal"
+          cancelLabel="Close sketch"
+          {...(blobRef.current ? { initialDrawing: blobRef.current } : {})}
+          onDraft={(blob) => {
+            if (round === roundRef.current) blobRef.current = blob;
+          }}
           onCancel={() => setDrawing(false)}
           onSubmit={(blob) => {
+            if (round !== roundRef.current) return;
             blobRef.current = blob;
             setDrawing(false);
             startImageQuery(blob, "drawing");

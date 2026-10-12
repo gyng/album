@@ -92,6 +92,10 @@ description and an explicit Play action. Game controls retain normal theme,
 focus and touch-target tokens; photo-choice buttons have a visible border and
 never depend on hover alone. Sketch canvases stay white. Results show their
 scoring basis alongside the score. See [game rules and illustration prompts](fun-games.md).
+Allow a final review before scoring a photo sequence. Drawing dialogs preserve
+their draft on close and use short action labels that fit a phone's control row.
+Comparison images use semantic figure captions. Matching progress, errors and
+reveals receive focus so keyboard users can continue from the current game state.
 
 ## Deliberate variants
 

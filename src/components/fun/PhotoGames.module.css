@@ -26,6 +26,11 @@
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+.comparisonSingle {
+  grid-template-columns: minmax(0, 1fr);
+  max-inline-size: 28rem;
+}
+
 .frame {
   display: grid;
   align-content: start;

@@ -29,6 +29,9 @@ type Props = {
   title?: string;
   description?: string;
   submitLabel?: string;
+  cancelLabel?: string;
+  initialDrawing?: Blob;
+  onDraft?: (blob: Blob | null) => void;
 };
 
 export const SearchDrawPad: React.FC<Props> = ({
@@ -37,6 +40,9 @@ export const SearchDrawPad: React.FC<Props> = ({
   title = "Draw to search",
   description,
   submitLabel = "Search",
+  cancelLabel = "Cancel",
+  initialDrawing,
+  onDraft,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const dialogRef = useRef<HTMLDialogElement | null>(null);
@@ -47,6 +53,8 @@ export const SearchDrawPad: React.FC<Props> = ({
   const [brushColour, setBrushColour] = useState(BRUSH_COLOURS[0]!);
   const [brushWidth, setBrushWidth] = useState(BRUSH_SIZES[1]!.width);
   const [hasStrokes, setHasStrokes] = useState(false);
+  const [restoring, setRestoring] = useState(!!initialDrawing);
+  const [error, setError] = useState<string | null>(null);
 
   const fillBackground = useCallback(() => {
     const context = canvasRef.current?.getContext("2d");
@@ -59,7 +67,39 @@ export const SearchDrawPad: React.FC<Props> = ({
 
   useEffect(() => {
     fillBackground();
-  }, [fillBackground]);
+    setHasStrokes(false);
+    setError(null);
+    if (!initialDrawing) {
+      setRestoring(false);
+      return;
+    }
+    setRestoring(true);
+    let cancelled = false;
+    const url = URL.createObjectURL(initialDrawing);
+    const image = new Image();
+    image.onload = () => {
+      if (cancelled) return;
+      const context = canvasRef.current?.getContext("2d");
+      if (context) {
+        context.drawImage(image, 0, 0, CANVAS_SIZE, CANVAS_SIZE);
+        setHasStrokes(true);
+      } else setError("The saved sketch could not be reopened.");
+      setRestoring(false);
+    };
+    image.onerror = () => {
+      if (!cancelled) {
+        setError("The saved sketch could not be reopened. You can start a new sketch.");
+        setRestoring(false);
+      }
+    };
+    image.src = url;
+    return () => {
+      cancelled = true;
+      image.onload = null;
+      image.onerror = null;
+      URL.revokeObjectURL(url);
+    };
+  }, [fillBackground, initialDrawing]);
 
   useEffect(() => {
     const previouslyFocused =
@@ -93,6 +133,7 @@ export const SearchDrawPad: React.FC<Props> = ({
   };
 
   const handlePointerDown = (event: React.PointerEvent<HTMLCanvasElement>) => {
+    if (restoring) return;
     event.currentTarget.setPointerCapture(event.pointerId);
     isDrawingRef.current = true;
     lastPointRef.current = canvasPoint(event);
@@ -118,6 +159,7 @@ export const SearchDrawPad: React.FC<Props> = ({
     // A tap with no movement still leaves a dot thanks to the round cap.
     context.lineTo(to.x + 0.01, to.y + 0.01);
     context.stroke();
+    setError(null);
     lastPointRef.current = to;
     setHasStrokes(true);
   };
@@ -130,9 +172,42 @@ export const SearchDrawPad: React.FC<Props> = ({
   const handleClear = () => {
     fillBackground();
     setHasStrokes(false);
+    setError(null);
+  };
+
+  const hasInk = () => {
+    const pixels = canvasRef.current
+      ?.getContext("2d")
+      ?.getImageData(0, 0, CANVAS_SIZE, CANVAS_SIZE).data;
+    if (!pixels) return false;
+    for (let i = 0; i < pixels.length; i += 4) {
+      if (pixels[i]! < 250 || pixels[i + 1]! < 250 || pixels[i + 2]! < 250) return true;
+    }
+    return false;
+  };
+
+  const handleCancel = () => {
+    if (!onDraft || restoring) {
+      onCancel();
+      return;
+    }
+    if (!hasStrokes || !hasInk()) {
+      onDraft(null);
+      onCancel();
+      return;
+    }
+    canvasRef.current!.toBlob((blob) => {
+      if (blob) onDraft(blob);
+      onCancel();
+    }, "image/png");
   };
 
   const handleSubmit = () => {
+    if (!hasInk()) {
+      setHasStrokes(false);
+      setError("The canvas is blank. Add a few strokes first.");
+      return;
+    }
     canvasRef.current!.toBlob((blob) => {
       if (blob) {
         onSubmit(blob);
@@ -150,11 +225,11 @@ export const SearchDrawPad: React.FC<Props> = ({
       aria-label={title}
       onCancel={(event) => {
         event.preventDefault();
-        onCancel();
+        handleCancel();
       }}
       onClick={(event) => {
         if (event.target === event.currentTarget) {
-          onCancel();
+          handleCancel();
         }
       }}
     >
@@ -171,6 +246,16 @@ export const SearchDrawPad: React.FC<Props> = ({
           onPointerUp={handlePointerUp}
           onPointerCancel={handlePointerUp}
         />
+        {restoring ? (
+          <p className={styles.status} role="status">
+            Restoring sketch…
+          </p>
+        ) : null}
+        {error ? (
+          <p className={styles.status} role="alert">
+            {error}
+          </p>
+        ) : null}
         <div className={styles.toolRow} role="group" aria-label="Brush colour">
           {BRUSH_COLOURS.map((colour) => (
             <button
@@ -206,11 +291,13 @@ export const SearchDrawPad: React.FC<Props> = ({
           ))}
         </div>
         <div className={styles.actionRow}>
-          <Button onClick={handleClear}>Clear</Button>
-          <Button ref={cancelRef} onClick={onCancel}>
-            Cancel
+          <Button onClick={handleClear} disabled={restoring}>
+            Clear
           </Button>
-          <Button variant="accent" onClick={handleSubmit} disabled={!hasStrokes}>
+          <Button ref={cancelRef} onClick={handleCancel}>
+            {cancelLabel}
+          </Button>
+          <Button variant="accent" onClick={handleSubmit} disabled={!hasStrokes || restoring}>
             {submitLabel}
           </Button>
         </div>

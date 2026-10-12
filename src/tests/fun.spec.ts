@@ -5,7 +5,7 @@ import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { gotoHydrated } from "./hydrated";
 
-test.use({ serviceWorkers: "block" });
+test.use({ serviceWorkers: "block", hasTouch: true });
 let directory: string;
 let core: Buffer;
 let embeddings: Buffer;
@@ -91,8 +91,15 @@ test("Photo Relay supports giving up and completing a new chain on mobile", asyn
   const result = page.getByRole("region", { name: "Relay result" });
   await expect(result.getByRole("link")).toHaveCount(7);
   await page.getByRole("button", { name: "Play again" }).click();
-  for (let i = 1; i <= 5; i++)
-    await page.getByRole("button", { name: `Choose photograph ${i}` }).click();
+  await page.getByRole("button", { name: "Choose photograph 1" }).focus();
+  for (let i = 1; i <= 5; i++) {
+    const choice = page.getByRole("button", { name: `Choose photograph ${i}` });
+    await expect(choice).toBeFocused();
+    await choice.press("Enter");
+  }
+  await expect(page.getByRole("button", { name: "Finish relay" })).toBeEnabled();
+  await expect(page.getByRole("button", { name: "Finish relay" })).toBeFocused();
+  await page.getByRole("button", { name: "Finish relay" }).press("Enter");
   await expect(result).toBeVisible();
   await expect(result.getByText(/Visual flow: \d+ \/ 100/)).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
@@ -107,6 +114,7 @@ test("Blind Frame reuses the drawing canvas and reveals the sketch, target and n
   // downloading a vision model in a deterministic browser test.
   await page.addInitScript(() => {
     const OriginalWorker = window.Worker;
+    let attempts = 0;
     window.Worker = class extends OriginalWorker {
       override postMessage(message: unknown, transfer: Transferable[]): void;
       override postMessage(message: unknown, options?: StructuredSerializeOptions): void;
@@ -116,11 +124,15 @@ test("Blind Frame reuses the drawing canvas and reveals the sketch, target and n
       ) {
         const request = message as { type?: string; id?: number };
         if (request?.type === "encode-image") {
+          attempts++;
           queueMicrotask(() => {
             this.dispatchEvent(new MessageEvent("message", { data: { boot: true } }));
             this.dispatchEvent(
               new MessageEvent("message", {
-                data: { id: request.id, ok: true, vector: [1, 0, 0] },
+                data:
+                  attempts === 1
+                    ? { id: request.id, ok: false, error: "Temporary matcher failure" }
+                    : { id: request.id, ok: true, vector: [1, 0, 0] },
               }),
             );
           });
@@ -139,14 +151,36 @@ test("Blind Frame reuses the drawing canvas and reveals the sketch, target and n
   const dialog = page.getByRole("dialog", { name: "Blind Frame sketch" });
   const box = await dialog.locator("canvas").boundingBox();
   expect(box).not.toBeNull();
+  await dialog.getByRole("button", { name: "Brush colour #ffffff" }).click();
+  await page.touchscreen.tap(box!.x + 30, box!.y + 30);
+  await dialog.getByRole("button", { name: "Reveal", exact: true }).click();
+  await expect(dialog.getByRole("alert")).toBeVisible();
+  await dialog.getByRole("button", { name: "Brush colour #1a1a1a" }).click();
   await page.mouse.move(box!.x + 40, box!.y + 40);
   await page.mouse.down();
   await page.mouse.move(box!.x + 140, box!.y + 140, { steps: 8 });
   await page.mouse.up();
-  await dialog.getByRole("button", { name: "Reveal the photograph" }).click();
+  const ink = () =>
+    dialog.locator("canvas").evaluate((canvas: HTMLCanvasElement) => {
+      const data = canvas.getContext("2d")!.getImageData(0, 0, canvas.width, canvas.height).data;
+      let pixels = 0;
+      for (let i = 0; i < data.length; i += 4)
+        if (data[i]! < 250 || data[i + 1]! < 250 || data[i + 2]! < 250) pixels++;
+      return pixels;
+    });
+  const originalInk = await ink();
+  expect(originalInk).toBeGreaterThan(0);
+  await dialog.getByRole("button", { name: "Close sketch" }).click();
+  await page.getByRole("button", { name: "Draw this scene" }).click();
+  await expect(dialog.getByRole("button", { name: "Reveal", exact: true })).toBeEnabled();
+  expect(await ink()).toBe(originalInk);
+  await dialog.getByRole("button", { name: "Reveal", exact: true }).click();
+  await expect(page.getByRole("main").getByRole("alert")).toBeVisible();
+  await page.getByRole("button", { name: "Retry this sketch" }).click();
   const result = page.getByRole("region", { name: "Blind Frame result" });
   await expect(result).toBeVisible();
   await expect(result.getByRole("img")).toHaveCount(3);
+  await expect(result.getByRole("figure", { name: "Hidden photograph" })).toBeVisible();
   await expect(result.getByText(/\d+ \/ 100/)).toBeVisible();
 });
 
@@ -163,7 +197,10 @@ test("Photo Oracle hides the remembered photo during questions and reveals it on
   const remembered = await page.locator("main img").getAttribute("src");
   await page.getByRole("button", { name: "I have my photograph" }).click();
   await expect(page.locator("main img")).toHaveCount(0);
+  const question = await page.getByRole("status").innerText();
   await page.getByRole("button", { name: "Not sure" }).click();
+  await page.getByRole("button", { name: "Back", exact: true }).click();
+  await expect(page.getByRole("status")).toHaveText(question);
   await page.getByRole("button", { name: "Give up" }).click();
   await expect(
     page.getByRole("region", { name: "Oracle result" }).getByRole("img"),

@@ -1,12 +1,12 @@
 import { useCallback } from "react";
-import { useUrlSearchParams } from "../../components/platform";
+import { AppLink, useUrlSearchParams } from "../../components/platform";
 import { useDatabase } from "../../components/database/useDatabase";
 import { ProgressBar } from "../../components/ProgressBar";
 import { GlobalNav } from "../../components/GlobalNav";
 import { GuessGame } from "../../components/guess/GuessGame";
 import type { GameSettings } from "../../components/guess/guessTypes";
 import { Seo } from "../../components/Seo";
-import { Heading } from "../../components/ui";
+import { Button, Heading, buttonStyles } from "../../components/ui";
 import styles from "./GuessScreen.module.css";
 import { formatPageTitle } from "../../lib/seo";
 
@@ -66,17 +66,15 @@ const GuessScreen = () => {
             0% progress bar forever, which reads as a hang rather than as a
             gallery that simply has not been indexed yet. */}
         {databaseError ? (
-          <div className={styles.loading}>
+          <div className={styles.loading} role="alert">
             <Heading level={1} as="h1" className={styles.title}>
               Guess Where
             </Heading>
-            <p>
-              Couldn&apos;t load the photo database. This game needs a search index — run{" "}
-              <code>album index</code> to build one.
-            </p>
-            <button type="button" onClick={() => retryDatabase()}>
-              Try again
-            </button>
+            <p>The game photographs could not be loaded.</p>
+            <Button onClick={() => retryDatabase()}>Try again</Button>
+            <AppLink href="/fun" className={buttonStyles.base}>
+              All games
+            </AppLink>
           </div>
         ) : !database || !urlReady ? (
           <div className={styles.loading}>

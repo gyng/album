@@ -10,8 +10,15 @@ preserving existing challenge query strings. New share links use the new route.
 Photo Relay uses one image embedding space, preferring SigLIP 2 and falling back
 to SigLIP 1 for older archives. It chooses two endpoints and five distinct
 photographs near interpolated positions between their normalised vectors.
-The player orders the five photographs. All 120 possible orders are evaluated
-by the sum of adjacent cosine similarities; the suggested route is the best.
+It prefers distinct frames over nearly identical copies when alternatives
+exist and chooses from a compatible vector dimension group. The player orders
+the five photographs, can undo the final choice, and explicitly finishes the
+relay. Active-route previews do not link away from the game.
+Keyboard selections move focus to the next available photograph, then Finish;
+undo restores focus to the returned photograph. Pointer selections keep the
+reader's current position.
+All 120 possible orders are evaluated by the sum of adjacent cosine similarities;
+the suggested route is the best.
 The visual-flow score scales the player's sum between the worst and best orders
 of this same tray. Give up reveals the complete suggested chain. Undo and replay
 do not require new network requests. This measures embedding similarity rather
@@ -22,16 +29,30 @@ embedding, then hides its image until the submitted sketch is compared. It
 reuses the search drawing pad and browser image encoder. SigLIP 2 vectors must
 never be substituted: the browser encoder produces SigLIP 1 vectors. The reveal
 shows the sketch, hidden target, and closest archive photograph. The score
-reflects the target's percentile rank among compatible archive vectors; it is
-not the raw cosine expressed as a percentage. Ties share a rank. Model loading
+scales the target's similarity above the archive median against the closest
+match. Rank is shown separately: a large archive must not turn a weak match
+into a high score just because many photographs rank below it. It is not the
+raw cosine expressed as a percentage. Ties share a rank. Model loading
 reports progress; a failed encode retains the submitted blob for retry.
+Closing the drawing pad preserves a PNG draft that is restored when reopened.
+Blank canvases are rejected before inference. Give up reveals the target and
+invalidates a pending match so its late completion cannot replace the reveal.
+The same scene can be retried with the previous sketch, or replayed with a new
+description. Figure captions label the three comparisons for screen readers.
 
-Photo Oracle offers up to twelve captioned/tagged photographs to remember.
+Photo Oracle offers up to twelve captioned/tagged photographs to remember,
+chosen with distinct visual-question signatures so the available questions can
+distinguish them. A collection with fewer than two distinguishable photographs
+gets an explanatory empty state rather than a random guessing round.
 The secret selection is held only for remembering and revealing, never passed
 to the question/ranking functions. Visual questions are selected for the most
 balanced split of current candidate weights. Answers multiply the likelihoods
 rather than deleting disagreeing candidates, because captions can omit objects.
-Not sure leaves weights unchanged and skips the question. The oracle guesses
+Incidental venue names and lighting do not imply indoors/night; explicit
+negations in captions override positive tags for the same subject. The vocabulary
+covers plurals, architectural details and visible colours as well as broad subjects.
+Not sure leaves weights unchanged and skips the question. Back restores the
+previous question or rejected guess, including its candidate weights. The oracle guesses
 after eight questions, at 85% relative confidence, or when no unused question
 can divide the candidates. A rejected guess is removed and play continues.
 
@@ -39,6 +60,29 @@ Game data comes through `fetchPhotoGameArchive`, using the existing core and
 split embeddings databases. Video scenes/clips are excluded. There is no new
 runtime API, index migration or live caption generation. Games run in neutral
 screens/components; Next routes remain thin adapters.
+
+## Refinement validation — 12 October 2026
+
+A fixed-seed audit used 1,514 indexed, non-video archive photographs. Before
+refinement, 72 of 100 sampled Oracle cohorts contained photographs with identical
+answers to every available question. After selecting distinguishable cohorts,
+none of 100 did. Twenty sampled relays had no pair above 0.98 cosine similarity;
+the duplicate-frame fallback is also exercised with a synthetic duplicate set.
+
+Browser checks use real canvas pixels for blank rejection, PNG draft restoration
+and brush input. Vision inference is mocked at the worker-message boundary for
+deterministic tests; these prove the submit/retry/reveal flow rather than model
+quality. The normal core/embedding fixtures remain unchanged: games use isolated
+extended copies. Existing search drawing behaviour and Guess Where remain in the
+regression suite.
+
+A real browser-model run matched a mountain sketch to a mountain photograph,
+but its unrelated bonsai target initially earned 89/100 under percentile
+scoring. That prompted the similarity-based calibration above. A regression
+case with a weak second-ranked match and 1,000 worse photographs now stays
+below 50 points while the closest match earns 100.
+Replaying the real model's vector against the same archive gives the unrelated
+bonsai target 42 instead of 89, and a daffodil-portrait target 26 instead of 78.
 
 ## Illustrations
 
