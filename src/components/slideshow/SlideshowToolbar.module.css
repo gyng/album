@@ -477,7 +477,7 @@
   inline-size: var(--size-28);
   block-size: var(--size-28);
   margin-inline-start: calc(var(--m-s) * 0.5);
-  opacity: 0.46;
+  opacity: 1;
   transform: translateY(var(--size-0-5));
 }
 
@@ -494,20 +494,11 @@
   inline-size: 100%;
   block-size: 100%;
   border-radius: var(--radius-pill);
-  background:
-    radial-gradient(
-      circle closest-side,
-      transparent 74%,
-      color-mix(in oklch, var(--c-white) 10%, transparent) 75% 100%
-    ),
-    conic-gradient(
-      color-mix(in oklch, var(--c-white) 50%, transparent) calc(var(--hide-progress, 1) * 1turn),
-      color-mix(in oklch, var(--c-white) 8%, transparent) 0
-    );
-  box-shadow:
-    inset 0 0 0 var(--size-1) color-mix(in oklch, var(--c-white) 5%, transparent),
-    0 0 0 var(--size-1) color-mix(in oklch, var(--c-black) 8%, transparent);
-  filter: saturate(0.8);
+  background: conic-gradient(
+    var(--c-white) calc(var(--hide-progress, 1) * 1turn),
+    color-mix(in oklch, var(--c-white) 20%, transparent) 0
+  );
+  mask-image: radial-gradient(circle closest-side, transparent 72%, #000 75%);
 }
 
 @media (hover: none), (pointer: coarse) {
@@ -633,10 +624,11 @@
 
   .sessionProgress {
     flex: 0 0 auto;
-    inline-size: var(--m-l);
-    block-size: var(--m-l);
+    display: grid;
+    place-items: center;
+    inline-size: var(--size-32);
+    block-size: var(--size-32);
     margin-inline-start: auto;
-    opacity: 0.58;
   }
 
   .toolbarCloseButton:active {
