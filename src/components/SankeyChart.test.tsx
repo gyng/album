@@ -164,7 +164,7 @@ describe("SankeyChart", () => {
     expect(screen.getByTestId("link-tooltip").textContent).toContain(
       "A deliberately long root label to Leaf",
     );
-    expect(screen.getByTestId("nivo").getAttribute("data-colours")).toBe("#111111,#222222,#e62065");
+    expect(screen.getByTestId("nivo").getAttribute("data-colours")).toBe("#111111,#222222,#c63e35");
 
     const link = document.querySelector('a[href="/search?facet=camera%3ARoot%20C"]');
     expect(link?.textContent).toBe("A deliberately lo…");
@@ -183,7 +183,7 @@ describe("SankeyChart", () => {
     );
     expect(colours.get("middle")).not.toBe(colours.get("root-a"));
     expect(colours.get("leaf")).toMatch(/^#[0-9a-f]{6}$/);
-    expect(colours.get("external-child")).toBe("#e93b77");
+    expect(colours.get("external-child")).toBe("#cd554d");
     expect(mockSankeyProps.margin.left).toBe(56);
   });
 

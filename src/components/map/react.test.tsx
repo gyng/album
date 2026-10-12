@@ -598,7 +598,7 @@ describe("DataLayer", () => {
         "circle-sort-key": ["coalesce", ["get", "sortKey"], 0],
       },
       paint: {
-        "circle-color": ["coalesce", ["get", "color"], "rgb(230, 32, 101)"],
+        "circle-color": ["coalesce", ["get", "color"], "rgb(198, 62, 53)"],
         "circle-radius": ["coalesce", ["get", "radius"], 5],
         "circle-opacity": ["coalesce", ["get", "opacity"], 1],
       },

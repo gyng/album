@@ -2,7 +2,7 @@
  * @jest-environment jsdom
  */
 
-import { render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { StatsWorldMap } from "./StatsWorldMap";
 
@@ -11,7 +11,7 @@ const dataLayerProps = jest.fn();
 jest.mock("./map", () => ({
   __esModule: true,
   // The port's own defaults, which this map deliberately draws its points with.
-  DEFAULT_POINT_COLOUR: "rgb(230, 32, 101)",
+  DEFAULT_POINT_COLOUR: "rgb(198, 62, 53)",
   DEFAULT_POINT_RADIUS: 5,
   MapView: ({ children, ...props }: { children?: ReactNode }) => {
     mapProps(props);
@@ -51,12 +51,11 @@ describe("StatsWorldMap", () => {
         ],
       }),
     );
-    // Every photo is drawn the same way — the pink dot the stats page's accent
-    // colour comes from.
+    // Every photo uses the same darkroom-red marker.
     expect(lastDataLayerProps().points[0]).toEqual({
       id: expect.any(String),
       at: { lng: 103.75, lat: 1.25 },
-      color: "rgb(230, 32, 101)",
+      color: "rgb(198, 62, 53)",
       radius: 5,
     });
     expect(mapProps).toHaveBeenCalledWith(
@@ -70,6 +69,21 @@ describe("StatsWorldMap", () => {
     expect(dataLayerProps.mock.calls.at(-1)?.[0].points).toBe(
       dataLayerProps.mock.calls.at(-2)?.[0].points,
     );
+  });
+
+  it("follows the site theme for its basemap", async () => {
+    document.documentElement.className = "dark theme-darkroom";
+    const view = render(<StatsWorldMap points={[]} />);
+    try {
+      expect(mapProps.mock.calls.at(-1)?.[0].styleUrl).toBe("/map-styles/theme-darkroom.json");
+      await act(async () => {
+        document.documentElement.className = "dark theme-slate";
+      });
+      expect(mapProps.mock.calls.at(-1)?.[0].styleUrl).toBe("/map-styles/theme-slate.json");
+    } finally {
+      view.unmount();
+      document.documentElement.className = "";
+    }
   });
 
   it("provides no features when there are no mapped photos", () => {

@@ -232,7 +232,7 @@ export type PointFeature = {
 };
 
 /** The colour a point is drawn in when it carries none of its own. */
-export const DEFAULT_POINT_COLOUR = "rgb(230, 32, 101)";
+export const DEFAULT_POINT_COLOUR = "rgb(198, 62, 53)";
 
 /** The radius, in pixels, a point is drawn at when it carries none of its own. */
 export const DEFAULT_POINT_RADIUS = 5;

@@ -9,6 +9,7 @@ import {
 import styles from "./StatsWorldMap.module.css";
 import { mapStyleUrl } from "../util/mapStyles";
 import { MapLibreStyles } from "./MapLibreStyles";
+import { useActiveTheme } from "./useActiveTheme";
 
 type Props = {
   points: Array<{ lat: number; lng: number }>;
@@ -18,6 +19,7 @@ type Props = {
 const STATS_POINT_RING = { color: "rgba(255, 255, 255, 0.84)", width: 2 };
 
 export const StatsWorldMap: React.FC<Props> = ({ points }) => {
+  const activeTheme = useActiveTheme();
   const features = React.useMemo<PointFeature[]>(
     () =>
       points.map((point, index) => ({
@@ -37,7 +39,7 @@ export const StatsWorldMap: React.FC<Props> = ({ points }) => {
           <div className={styles.map}>
             <MapView
               initialView={{ center: { lng: 15, lat: 20 }, zoom: 1.25 }}
-              styleUrl={mapStyleUrl("monochrome")}
+              styleUrl={mapStyleUrl("theme", activeTheme)}
               attribution={false}
             >
               <DataLayer id="stats-photos" points={features} stroke={STATS_POINT_RING} cluster />

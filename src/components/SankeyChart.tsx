@@ -154,15 +154,16 @@ const chartTheme = {
 const FALLBACK_SPACING = 8;
 const FALLBACK_LABEL_OFFSET = 12;
 const FALLBACK_NODE_THICKNESS = 18;
+// Red safelight tones, with distinct roots and lighter downstream branches.
 const SANKEY_PALETTE = [
-  "#e62065",
-  "#ef4c8a",
-  "#d94f7d",
-  "#f06d9d",
-  "#c7356f",
-  "#f28bb1",
-  "#b82b60",
-  "#f5a7c7",
+  "#c63e35",
+  "#ed5e50",
+  "#a92e29",
+  "#e77d62",
+  "#b94c38",
+  "#d99a7d",
+  "#8e2926",
+  "#efb69b",
 ] as const;
 
 const hexToRgb = (hex: string): [number, number, number] => {
