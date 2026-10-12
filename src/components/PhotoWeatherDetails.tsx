@@ -1,16 +1,18 @@
 import type { WeatherMetadata } from "../util/weather";
 import { weatherCondition } from "../util/weather";
+import { WeatherIcon, weatherConditionIcon } from "./WeatherIcon";
 import styles from "./PhotoWeatherDetails.module.css";
 
 export const PhotoWeatherDetails = ({ weather }: { weather: WeatherMetadata }) => {
   const metrics = [
-    ["Feels like", weather.apparent_temperature, "°C"],
-    ["Humidity", weather.relative_humidity_2m, "%"],
-    ["Cloud cover", weather.cloud_cover, "%"],
-    ["Wind", weather.wind_speed_10m, " km/h"],
-    ["Precipitation, preceding hour", weather.precipitation, " mm"],
+    ["Feels like", "temperature", weather.apparent_temperature, "°C"],
+    ["Humidity", "humidity", weather.relative_humidity_2m, "%"],
+    ["Cloud cover", "cloud", weather.cloud_cover, "%"],
+    ["Wind", "wind", weather.wind_speed_10m, " km/h"],
+    ["Precipitation, preceding hour", "rain", weather.precipitation, " mm"],
     [
       "Snowfall, preceding hour",
+      "snow",
       weather.snowfall && weather.snowfall > 0 ? weather.snowfall : null,
       " cm",
     ],
@@ -18,14 +20,18 @@ export const PhotoWeatherDetails = ({ weather }: { weather: WeatherMetadata }) =
   return (
     <div className={styles.weather}>
       <div className={styles.summary}>
-        {weatherCondition(weather.weather_code)} · {weather.temperature_2m.toFixed(1)}°C
+        <WeatherIcon kind={weatherConditionIcon(weatherCondition(weather.weather_code))} />{" "}
+        {weatherCondition(weather.weather_code)} · <WeatherIcon kind="temperature" />{" "}
+        {weather.temperature_2m.toFixed(1)}°C
       </div>
       <dl className={styles.metrics}>
         {metrics
-          .filter(([, value]) => value !== null)
-          .map(([label, value, unit]) => (
+          .filter(([, , value]) => value !== null)
+          .map(([label, kind, value, unit]) => (
             <div key={label}>
-              <dt>{label}</dt>
+              <dt>
+                <WeatherIcon kind={kind} /> {label}
+              </dt>
               <dd>
                 {value}
                 {unit}

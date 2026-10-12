@@ -1,0 +1,18 @@
+.buckets {
+  display: flex;
+  flex-direction: column;
+  gap: var(--m-s);
+}
+
+.toggle {
+  align-self: flex-start;
+}
+
+.frame {
+  width: 1.5em;
+  height: 1.5em;
+  flex-shrink: 0;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+}
