@@ -324,7 +324,6 @@
 }
 
 .timelineSectionAligned .visualTimelineRow::after {
-  display: block;
   inset-inline-start: calc(var(--visual-timeline-rail-width) / 2);
 }
 

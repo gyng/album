@@ -1,3 +1,4 @@
+import { COLOUR_FAMILIES, COLOUR_FAMILY_LABELS } from "../../util/colourFamilies";
 import type {
   BucketedStat,
   NumericFacetStat,
@@ -25,41 +26,13 @@ export type OverviewCard = {
   value: string;
 };
 
-export const COLOR_SWATCHES: Record<string, string> = {
-  Neutral: "#8f8a84",
-  Red: "#d9534f",
-  Orange: "#df8b39",
-  Yellow: "#d7b44a",
-  Green: "#68a36b",
-  Cyan: "#4fa8ae",
-  Blue: "#5d84d6",
-  Purple: "#8f67c7",
-  Pink: "#d86ba7",
-};
-
-export const COLOR_SEARCH_PARAMS: Record<string, string> = {
-  Neutral: "143,138,132",
-  Red: "217,83,79",
-  Orange: "223,139,57",
-  Yellow: "215,180,74",
-  Green: "104,163,107",
-  Cyan: "79,168,174",
-  Blue: "93,132,214",
-  Purple: "143,103,199",
-  Pink: "216,107,167",
-};
-
-export const COLOR_FAMILY_ORDER = [
-  "Neutral",
-  "Red",
-  "Orange",
-  "Yellow",
-  "Green",
-  "Cyan",
-  "Blue",
-  "Purple",
-  "Pink",
-] as const;
+export const COLOR_SWATCHES: Record<string, string> = Object.fromEntries(
+  COLOUR_FAMILIES.map((family) => [family.label, family.swatch]),
+);
+export const COLOR_SEARCH_PARAMS: Record<string, string> = Object.fromEntries(
+  COLOUR_FAMILIES.map((family) => [family.label, family.rgb.join(",")]),
+);
+export const COLOR_FAMILY_ORDER = COLOUR_FAMILY_LABELS;
 
 export const EXPLORE_SECTION_LINKS = [
   { href: "#embedding-space", label: "Cloud" },
@@ -77,7 +50,9 @@ export const EXPLORE_SECTION_LINKS = [
 ] as const;
 
 export const formatCoverage = (coverage: number): string =>
-  `Available for ${Math.round(coverage * 100)}% of archive`;
+  Math.round(coverage * 100) >= 100
+    ? ""
+    : `Available for ${Math.round(coverage * 100)}% of archive`;
 
 export const findNumericFacet = (
   stats: Pick<PhotoStats, "numericFacets"> | Pick<ShootingScopeStats, "numericFacets">,

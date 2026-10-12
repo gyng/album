@@ -43,7 +43,7 @@ export const ExploreStatSection: React.FC<{
       <Heading level={2} as="h3">
         {title}
       </Heading>
-      <Caption as="span">{formatCoverage(coverage)}</Caption>
+      {formatCoverage(coverage) ? <Caption as="span">{formatCoverage(coverage)}</Caption> : null}
     </div>
     {coverage === 0 ? (
       <Caption size="sm">No data available.</Caption>

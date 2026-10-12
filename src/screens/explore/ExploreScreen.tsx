@@ -49,7 +49,6 @@ import {
   ExploreRecentTrendsSection,
   ExploreRevisitedPlacesSection,
 } from "../../components/explore/ExploreStorySections";
-import { ExploreTripsSection } from "../../components/explore/ExploreTripsSection";
 import {
   ExploreArchiveGaps,
   ExploreThisDaySection,
@@ -717,8 +716,6 @@ const ExploreScreen = ({
 
           <ExploreThisDaySection memories={stats.dayOfYearMemories} />
 
-          <ExploreTripsSection trips={stats.trips} />
-
           <ExploreFunStatsSection cards={funStats} deferContent />
           <ExploreRecentTrendsSection data={stats.recentYearStats} deferContent />
           <ExploreRevisitedPlacesSection places={stats.revisitedPlaces} deferContent />
@@ -728,7 +725,12 @@ const ExploreScreen = ({
             title="When you shoot"
             actions={renderScopeFilterControls("Time")}
             deferContent
-            deferredSummary={`${formatCoverage(activeCalendarCoverage)}. Time relationships and archive cadence summarise when photos were made.`}
+            deferredSummary={[
+              formatCoverage(activeCalendarCoverage),
+              "Time relationships and archive cadence summarise when photos were made.",
+            ]
+              .filter(Boolean)
+              .join(" ")}
           >
             {activeTimeFacet && activeTimeRelationships ? (
               <section className={`${styles.section} ${styles.sectionWide}`}>
@@ -745,7 +747,9 @@ const ExploreScreen = ({
                   <Heading level={2} as="h3">
                     Archive cadence
                   </Heading>
-                  <Caption as="span">{formatCoverage(activeCalendarCoverage)}</Caption>
+                  {formatCoverage(activeCalendarCoverage) ? (
+                    <Caption as="span">{formatCoverage(activeCalendarCoverage)}</Caption>
+                  ) : null}
                   <Link
                     href="/explore/timeline"
                     className={`${pillStyles.base} ${pillStyles.ghost} ${pillStyles.compact}`}

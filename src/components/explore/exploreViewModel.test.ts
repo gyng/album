@@ -96,6 +96,7 @@ describe("exploreViewModel", () => {
   });
 
   it("keeps coverage and colour search links deterministic", () => {
+    expect(formatCoverage(1)).toBe("");
     expect(formatCoverage(0.456)).toBe("Available for 46% of archive");
     expect(buildYearSearchHref("2024")).toBe("/search?facet=year%3A2024");
     expect(buildColorSearchHref("Blue")).toBe("/search?color=93%2C132%2C214");

@@ -552,6 +552,32 @@ describe("computePhotoStats", () => {
     );
   });
 
+  it("separates neutral tones and finds colour beneath a neutral dominant palette entry", () => {
+    const palettes = [
+      [[15, 15, 15]],
+      [[140, 140, 140]],
+      [[240, 240, 240]],
+      [
+        [15, 15, 15],
+        [30, 60, 210],
+      ],
+      [
+        [15, 15, 15],
+        [20, 160, 30],
+      ],
+    ];
+    const stats = computePhotoStats([
+      makeAlbum(palettes.map((colors) => makePhoto({ tags: { colors } as any }))),
+    ]);
+    expect(stats.colorStats.find((bucket) => bucket.label === "Dark neutrals")?.count).toBe(3);
+    expect(stats.colorStats.find((bucket) => bucket.label === "Mid neutrals")?.count).toBe(1);
+    expect(stats.colorStats.find((bucket) => bucket.label === "Light neutrals")?.count).toBe(1);
+    expect(stats.accentColorStats?.filter((bucket) => bucket.count > 0)).toEqual([
+      { label: "Green", count: 1 },
+      { label: "Blue", count: 1 },
+    ]);
+  });
+
   it("computes dominant color families, examples, and color drift", () => {
     const stats = computePhotoStats([
       makeAlbum([
@@ -593,7 +619,7 @@ describe("computePhotoStats", () => {
     expect(stats.colorCoverage).toBeCloseTo(3 / 4);
     expect(stats.colorStats.find((bucket) => bucket.label === "Red")?.count).toBe(1);
     expect(stats.colorStats.find((bucket) => bucket.label === "Blue")?.count).toBe(1);
-    expect(stats.colorStats.find((bucket) => bucket.label === "Neutral")?.count).toBe(1);
+    expect(stats.colorStats.find((bucket) => bucket.label === "Mid neutrals")?.count).toBe(1);
     expect(stats.paletteSizeStats).toEqual([
       { label: "1", count: 1 },
       { label: "2", count: 1 },
@@ -687,7 +713,7 @@ describe("computePhotoStats", () => {
     const stats = computePhotoStats([album]);
 
     for (const label of [
-      "Neutral",
+      "Mid neutrals",
       "Red",
       "Orange",
       "Yellow",

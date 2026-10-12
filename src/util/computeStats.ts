@@ -1,3 +1,4 @@
+import { COLOUR_FAMILY_LABELS as COLOR_FAMILY_LABELS, isNeutralFamily } from "./colourFamilies";
 import type { Content, PhotoBlock } from "../services/types";
 import { computeGearStats, type GearStats } from "./computeGearStats";
 import { fillYearRange } from "./yearRange";
@@ -76,6 +77,7 @@ export type PhotoStats = {
   recentYearStats: BucketedStatGroup[];
   mapPoints: Array<{ lat: number; lng: number }>;
   colorStats: BucketedStat[];
+  accentColorStats?: BucketedStat[];
   colorCoverage: number;
   paletteSizeStats: BucketedStat[];
   colorFamilyExamples: Array<{
@@ -197,17 +199,6 @@ const MONTH_LABELS = [
   "Nov",
   "Dec",
 ];
-const COLOR_FAMILY_LABELS = [
-  "Neutral",
-  "Red",
-  "Orange",
-  "Yellow",
-  "Green",
-  "Cyan",
-  "Blue",
-  "Purple",
-  "Pink",
-] as const;
 const PALETTE_SIZE_LABELS = ["1", "2", "3", "4", "5+"] as const;
 
 export type SankeyNode = {
@@ -856,7 +847,7 @@ function getColorFamilyLabel(rgb: [number, number, number]): (typeof COLOR_FAMIL
   const { h, s, l } = rgbToHsl(rgb[0], rgb[1], rgb[2]);
 
   if (s < 0.16 || l < 0.12 || l > 0.88) {
-    return "Neutral";
+    return l < 0.25 ? "Dark neutrals" : l > 0.75 ? "Light neutrals" : "Mid neutrals";
   }
 
   if (h < 15 || h >= 345) return "Red";
@@ -871,6 +862,7 @@ function getColorFamilyLabel(rgb: [number, number, number]): (typeof COLOR_FAMIL
 
 function computeColorStats(photos: PhotoBlock[]): {
   colorStats: BucketedStat[];
+  accentColorStats: BucketedStat[];
   colorCoverage: number;
   paletteSizeStats: BucketedStat[];
   colorFamilyExamples: PhotoStats["colorFamilyExamples"];
@@ -879,6 +871,9 @@ function computeColorStats(photos: PhotoBlock[]): {
   colorDrift: PhotoStats["colorDrift"];
 } {
   const colorCounts = new Map<string, number>(COLOR_FAMILY_LABELS.map((label) => [label, 0]));
+  const accentCounts = new Map(
+    COLOR_FAMILY_LABELS.filter((label) => !isNeutralFamily(label)).map((label) => [label, 0]),
+  );
   const paletteCounts = new Map<string, number>(PALETTE_SIZE_LABELS.map((label) => [label, 0]));
   let withPalette = 0;
 
@@ -893,6 +888,11 @@ function computeColorStats(photos: PhotoBlock[]): {
     const family = getColorFamilyLabel(dominant);
     colorCounts.set(family, colorCounts.get(family)! + 1);
 
+    const accent = palette
+      .map((rgb) => getColorFamilyLabel(rgb as [number, number, number]))
+      .find((label) => !isNeutralFamily(label));
+    if (accent) accentCounts.set(accent, (accentCounts.get(accent) ?? 0) + 1);
+
     const paletteLabel = palette.length >= 5 ? "5+" : String(palette.length);
     paletteCounts.set(paletteLabel, paletteCounts.get(paletteLabel)! + 1);
   }
@@ -902,6 +902,7 @@ function computeColorStats(photos: PhotoBlock[]): {
       label,
       count: colorCounts.get(label)!,
     })),
+    accentColorStats: [...accentCounts].map(([label, count]) => ({ label, count })),
     colorCoverage: photos.length > 0 ? withPalette / photos.length : 0,
     paletteSizeStats: PALETTE_SIZE_LABELS.map((label) => ({
       label,
@@ -916,6 +917,7 @@ function computeColorStats(photos: PhotoBlock[]): {
 
 function computeRichColorStats(albums: Content[]): {
   colorStats: BucketedStat[];
+  accentColorStats: BucketedStat[];
   colorCoverage: number;
   paletteSizeStats: BucketedStat[];
   colorFamilyExamples: PhotoStats["colorFamilyExamples"];
@@ -1566,6 +1568,7 @@ export function computePhotoStats(albums: Content[]): PhotoStats {
     recentYearStats: recentTrendStats.recentYearStats,
     mapPoints,
     colorStats: colorStats.colorStats,
+    accentColorStats: colorStats.accentColorStats,
     colorCoverage: colorStats.colorCoverage,
     paletteSizeStats: colorStats.paletteSizeStats,
     colorFamilyExamples: colorStats.colorFamilyExamples,

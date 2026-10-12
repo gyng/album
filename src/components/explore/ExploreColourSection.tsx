@@ -79,7 +79,12 @@ export const ExploreColourSection = ({
   // 2025's three hundred.
   const busiestYear = Math.max(...colourStacks.map((year) => year.total), 1);
   const maxColorCount = Math.max(...stats.colorStats.map((item) => item.count), 1);
-  const leadingColourFamily = stats.colorStats[0];
+  const leadingColourFamily = stats.colorStats.reduce(
+    (best, family) => (family.count > (best?.count ?? 0) ? family : best),
+    stats.colorStats[0],
+  );
+  const accentStats = stats.accentColorStats?.filter((bucket) => bucket.count > 0) ?? [];
+  const maxAccentCount = Math.max(...accentStats.map((bucket) => bucket.count), 1);
   const deferredSummary = [
     formatCoverage(stats.colorCoverage),
     leadingColourFamily
@@ -106,7 +111,9 @@ export const ExploreColourSection = ({
               <Heading level={2} as="h3">
                 Dominant colour families
               </Heading>
-              <Caption as="span">{formatCoverage(stats.colorCoverage)}</Caption>
+              {formatCoverage(stats.colorCoverage) ? (
+                <Caption as="span">{formatCoverage(stats.colorCoverage)}</Caption>
+              ) : null}
             </div>
             <div className={styles.bars}>
               {stats.colorStats.map((bucket) => (
@@ -135,6 +142,43 @@ export const ExploreColourSection = ({
               ))}
             </div>
           </section>
+
+          {accentStats.length > 0 ? (
+            <section className={styles.colourPanel}>
+              <div className={styles.sectionHeader}>
+                <Heading level={2} as="h3">
+                  Accent colours
+                </Heading>
+                <Caption as="span">First non-neutral colour in each palette</Caption>
+              </div>
+              <div className={styles.bars}>
+                {accentStats.map((bucket) => (
+                  <StatBar
+                    key={bucket.label}
+                    label={bucket.label}
+                    count={bucket.count}
+                    maxCount={maxAccentCount}
+                    {...(COLOR_SWATCHES[bucket.label]
+                      ? { barColor: COLOR_SWATCHES[bucket.label] }
+                      : {})}
+                    actionHref={buildColorSearchHref(bucket.label)}
+                    actionLabel={`Find photos with similar ${bucket.label.toLowerCase()} tones`}
+                    labelPrefix={
+                      <span
+                        data-colour-swatch
+                        className={styles.colorSwatch}
+                        style={{
+                          backgroundColor:
+                            COLOR_SWATCHES[bucket.label] ?? "var(--c-bg-contrast-light)",
+                        }}
+                        aria-hidden="true"
+                      />
+                    }
+                  />
+                ))}
+              </div>
+            </section>
+          ) : null}
 
           {stats.colorFamilyExamples.length > 0 ? (
             <section className={`${styles.colourPanel} ${styles.colourFamilyPanel}`}>

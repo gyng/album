@@ -25,7 +25,9 @@ export const TimeRelationshipExplorer: React.FC<Props> = ({
           <Heading level={2} as="h2" className={styles.title}>
             {hourFacet.displayName}
           </Heading>
-          <Caption as="span">{formatCoverage(hourFacet.coverage)}</Caption>
+          {formatCoverage(hourFacet.coverage) ? (
+            <Caption as="span">{formatCoverage(hourFacet.coverage)}</Caption>
+          ) : null}
         </div>
         {hourFacet.coverage === 0 ? (
           <Caption size="sm">No data available.</Caption>
