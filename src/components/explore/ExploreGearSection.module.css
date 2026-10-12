@@ -252,33 +252,7 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* Bins across the lens's own range, tall where it is used. A gap in the middle
-   is the shape worth seeing: a zoom carried at both ends and nowhere between. */
-.gearLensBars {
-  display: flex;
-  align-items: flex-end;
-  gap: var(--size-2);
-  block-size: var(--size-56);
-  padding-block-end: var(--size-1);
-  border-block-end: var(--size-1) solid color-mix(in oklch, var(--c-font) 20%, transparent);
-}
-
-.gearLensBar {
-  flex: 1 1 0;
-  display: flex;
-  align-items: flex-end;
-  block-size: 100%;
-}
-
-.gearLensBarFill {
-  inline-size: 100%;
-  min-block-size: var(--size-1);
-  border-radius: var(--size-1) var(--size-1) 0 0;
-  background: var(--c-accent);
-}
-
-/* The bars carry a relative height, so the axis carries the numbers: both ends
-   of the lens's range, and what the tallest bin actually holds. */
+/* Every lens row names the same wide-to-long axis. */
 .gearLensAxis {
   display: flex;
   justify-content: space-between;
@@ -286,6 +260,7 @@
   color: var(--c-bg-contrast-light);
   font-size: var(--fs-xs);
   font-variant-numeric: tabular-nums;
+  margin-inline-start: calc(var(--size-32) + var(--m-s));
 }
 
 .gearLensPeak {
@@ -300,7 +275,7 @@
 
 .gearLensYearRow {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-columns: var(--size-32) minmax(0, 1fr);
   gap: var(--m-s);
   align-items: center;
 }
@@ -309,18 +284,6 @@
   color: var(--c-bg-contrast-light);
   font-size: var(--fs-xs);
   font-variant-numeric: tabular-nums;
-}
-
-.gearLensYearBar {
-  display: flex;
-  block-size: var(--size-10);
-  border-radius: var(--size-2);
-  overflow: hidden;
-  background: color-mix(in oklch, var(--c-bg-contrast-light) 18%, transparent);
-}
-
-.gearLensYearBand {
-  display: block;
 }
 
 /* Every frame as its own sliver, where it fell in the year. Full width, unlike
@@ -332,6 +295,27 @@
   border-radius: var(--m-xs);
   background: color-mix(in oklch, var(--c-bg-contrast-light) 18%, transparent);
   overflow: hidden;
+}
+
+.gearRangeLine {
+  background: transparent;
+  overflow: visible;
+}
+
+.gearRangeLine::before {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  inset-block-start: 50%;
+  block-size: var(--line-hairline);
+  background: var(--c-bg-contrast-dark);
+}
+
+.gearRangeDot {
+  position: absolute;
+  inset-block-start: 50%;
+  transform: translate(-50%, -50%);
+  border-radius: var(--radius-pill);
 }
 
 .gearYearSliver {

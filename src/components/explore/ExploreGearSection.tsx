@@ -443,9 +443,7 @@ export const ExploreGearSection = ({
       {gear.lensFocalRanges.length > 0 ? (
         <section className={`${styles.section} ${styles.sectionWide}`}>
           <GearSectionHeader title="Where a zoom is used">
-            <Caption as="span">
-              Frames across each lens's own range, then year by year — wide to long
-            </Caption>
+            <Caption as="span">Wide to long · dot size shows photo count</Caption>
           </GearSectionHeader>
           <div className={styles.gearLenses}>
             {gear.lensFocalRanges.map((lens) => (

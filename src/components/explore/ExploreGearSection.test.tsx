@@ -525,8 +525,22 @@ describe("the gear section's own reporting", () => {
     expect(screen.getByTitle("48–80mm: 4 photos, 25%")).toBeInTheDocument();
   });
 
-  // The bars are drawn against the tallest one, so without the axis their
-  // height is a shape with no scale and their position a range with no numbers.
+  it("shows only populated focal ranges as dots, with the latest year first", () => {
+    render(<ExploreGearSection gear={gear()} frames={frames} />);
+    const section = screen
+      .getByRole("heading", { name: "Where a zoom is used" })
+      .closest("section")!;
+    expect(within(section).getAllByRole("img")).toHaveLength(4);
+    expect(
+      within(section).getByRole("img", { name: "16–48mm: 12 photos, 75%" }),
+    ).toBeInTheDocument();
+    expect(within(section).queryByTitle("16–48mm in 2024: 0 of 8")).toBeNull();
+    expect(within(section).queryByTitle("48–80mm in 2023: 0 of 8")).toBeNull();
+    const years = within(section).getAllByText(/^(2023|2024)$/);
+    expect(years.map((year) => year.textContent)).toEqual(["2024", "2023"]);
+  });
+
+  // The axis names the focal range and busiest interval alongside the dots.
   it("puts numbers on the lens axis", () => {
     render(<ExploreGearSection gear={gear()} frames={frames} />);
 

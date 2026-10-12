@@ -1,6 +1,11 @@
 import { mergeCssModuleStyles } from "../../util/mergeCssModuleStyles";
 import { AppLink as Link } from "../platform";
-import type { GearFrame, GearProfile, LensFocalRange } from "../../util/computeGearStats";
+import type {
+  FocalBucket,
+  GearFrame,
+  GearProfile,
+  LensFocalRange,
+} from "../../util/computeGearStats";
 import { Caption, Heading, PillButton, Thumb } from "../ui";
 import sharedStyles from "./ExploreShared.module.css";
 import localStyles from "./ExploreGearSection.module.css";
@@ -49,17 +54,14 @@ export const gearStyles = mergeCssModuleStyles(
     "gearLensHeader",
     "gearLensName",
     "gearLensRange",
-    "gearLensBars",
-    "gearLensBar",
-    "gearLensBarFill",
     "gearLensAxis",
     "gearLensPeak",
     "gearLensYears",
     "gearLensYearRow",
     "gearLensYearLabel",
-    "gearLensYearBar",
-    "gearLensYearBand",
     "gearYearRibbon",
+    "gearRangeLine",
+    "gearRangeDot",
     "gearYearSliver",
     "gearTooltip",
     "gearTooltipImage",
@@ -283,6 +285,21 @@ export const GearStackedBar = ({
   </div>
 );
 
+/** Shared position track for dates through a year and focal lengths through a lens. */
+const GearRibbonTrack = ({
+  children,
+  dots = false,
+}: {
+  children: React.ReactNode;
+  dots?: boolean;
+}) => (
+  <div
+    className={[styles.gearYearRibbon, dots ? styles.gearRangeLine : ""].filter(Boolean).join(" ")}
+  >
+    {children}
+  </div>
+);
+
 /**
  * Every frame of one year, where it fell in it.
  *
@@ -307,7 +324,7 @@ export const GearRibbon = ({
   active: string | null;
   onActive: (key: string | null) => void;
 }) => (
-  <div className={styles.gearYearRibbon}>
+  <GearRibbonTrack>
     {frames.map((frame, index) => {
       const key = `${chart}-${frame.year}-${index}`;
 
@@ -345,15 +362,54 @@ export const GearRibbon = ({
         </Link>
       );
     })}
-  </div>
+  </GearRibbonTrack>
 );
 
-/**
- * One lens: where along its range it is used, and how that moved year by year.
- *
- * The bars carry a height measured against the tallest of them, so the axis has
- * to name both ends of the range and what that tallest bin holds.
- */
+/** Dots keep their focal position across every row; area shows the number of frames. */
+const GearFocalDots = ({
+  buckets,
+  shortest,
+  longest,
+  maximum,
+  titleOf,
+  colourOf,
+}: {
+  buckets: FocalBucket[];
+  shortest: number;
+  longest: number;
+  maximum: number;
+  titleOf: (bucket: FocalBucket) => string;
+  colourOf: (index: number, total: number) => string;
+}) => (
+  <GearRibbonTrack dots>
+    {buckets.map((bucket, index) => {
+      if (bucket.count <= 0) return null;
+      const position = Math.max(
+        0,
+        Math.min(1, ((bucket.from + bucket.to) / 2 - shortest) / Math.max(1, longest - shortest)),
+      );
+      const size = Math.max(4, 18 * Math.sqrt(bucket.count / maximum));
+      const title = titleOf(bucket);
+      return (
+        <span
+          key={bucket.from}
+          className={styles.gearRangeDot}
+          role="img"
+          aria-label={title}
+          title={title}
+          style={{
+            insetInlineStart: `${position * 100}%`,
+            inlineSize: `${size}px`,
+            blockSize: `${size}px`,
+            background: colourOf(index, buckets.length),
+          }}
+        />
+      );
+    })}
+  </GearRibbonTrack>
+);
+
+/** One lens's focal distribution, with the same scale repeated for each year. */
 export const GearLensChart = ({
   lens,
   href,
@@ -363,8 +419,11 @@ export const GearLensChart = ({
   href: string;
   bandColour: (index: number, total: number) => string;
 }) => {
-  const busiest = Math.max(...lens.buckets.map((bucket) => bucket.share), 1);
-
+  const maximum = Math.max(
+    ...lens.buckets.map((bucket) => bucket.count),
+    ...lens.years.flatMap((year) => year.bands.map((band) => band.count)),
+    1,
+  );
   return (
     <div className={styles.gearLensRow}>
       <div className={styles.gearLensHeader}>
@@ -375,19 +434,18 @@ export const GearLensChart = ({
           {lens.shortest}–{lens.longest}mm · {formatCount(lens.count)}
         </Caption>
       </div>
-      <div className={styles.gearLensBars}>
-        {lens.buckets.map((bucket) => (
-          <div
-            key={bucket.from}
-            className={styles.gearLensBar}
-            title={`${bucket.from}–${bucket.to}mm: ${formatCount(bucket.count)}, ${Math.round(bucket.share)}%`}
-          >
-            <span
-              className={styles.gearLensBarFill}
-              style={{ blockSize: `${(bucket.share / busiest) * 100}%` }}
-            />
-          </div>
-        ))}
+      <div className={styles.gearLensYearRow}>
+        <span className={styles.gearLensYearLabel}>All</span>
+        <GearFocalDots
+          buckets={lens.buckets}
+          shortest={lens.shortest}
+          longest={lens.longest}
+          maximum={maximum}
+          colourOf={bandColour}
+          titleOf={(bucket) =>
+            `${bucket.from}–${bucket.to}mm: ${formatCount(bucket.count)}, ${Math.round(bucket.share)}%`
+          }
+        />
       </div>
       <div className={styles.gearLensAxis}>
         <span>{lens.shortest}mm</span>
@@ -398,24 +456,23 @@ export const GearLensChart = ({
       </div>
       {lens.years.length > 1 ? (
         <div className={styles.gearLensYears}>
-          {lens.years.map((year) => (
-            <div key={year.label} className={styles.gearLensYearRow}>
-              <span className={styles.gearLensYearLabel}>{year.label}</span>
-              <div className={styles.gearLensYearBar}>
-                {year.bands.map((band, index) => (
-                  <span
-                    key={band.from}
-                    className={styles.gearLensYearBand}
-                    title={`${band.from}–${band.to}mm in ${year.label}: ${band.count.toLocaleString("en")} of ${year.total.toLocaleString("en")}`}
-                    style={{
-                      inlineSize: `${band.share}%`,
-                      background: bandColour(index, year.bands.length),
-                    }}
-                  />
-                ))}
+          {[...lens.years]
+            .sort((left, right) => Number(right.label) - Number(left.label))
+            .map((year) => (
+              <div key={year.label} className={styles.gearLensYearRow}>
+                <span className={styles.gearLensYearLabel}>{year.label}</span>
+                <GearFocalDots
+                  buckets={year.bands}
+                  shortest={lens.shortest}
+                  longest={lens.longest}
+                  maximum={maximum}
+                  colourOf={bandColour}
+                  titleOf={(band) =>
+                    `${band.from}–${band.to}mm in ${year.label}: ${band.count.toLocaleString("en")} of ${year.total.toLocaleString("en")}`
+                  }
+                />
               </div>
-            </div>
-          ))}
+            ))}
         </div>
       ) : null}
     </div>
