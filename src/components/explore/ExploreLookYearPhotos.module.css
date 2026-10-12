@@ -11,3 +11,18 @@
   flex-wrap: wrap;
   gap: var(--m-s);
 }
+
+.thumbs {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 108px), 1fr));
+  inline-size: 100%;
+}
+.content .thumbs > div {
+  inline-size: 100%;
+}
+.content .thumbs > div a img {
+  inline-size: 100%;
+  max-inline-size: none;
+  block-size: auto;
+  aspect-ratio: 1;
+}

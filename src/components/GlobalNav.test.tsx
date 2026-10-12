@@ -63,3 +63,10 @@ describe("GlobalNav", () => {
     );
   });
 });
+
+it("groups timeline and trips under Explore with a current subpage", () => {
+  render(<GlobalNav currentPage="timeline" />);
+  expect(screen.getByRole("link", { name: "Explore" })).toHaveAttribute("aria-current", "true");
+  expect(screen.getByRole("navigation", { name: "Explore views" })).toBeInTheDocument();
+  expect(screen.getByRole("link", { name: "Timeline" })).toHaveAttribute("aria-current", "page");
+});

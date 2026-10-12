@@ -24,7 +24,7 @@ test.describe("Smoke Tests", () => {
 
     // Navigation links
     await expect(page.locator('a[href="/map"]')).toBeVisible();
-    await expect(page.locator('a[href="/timeline"]')).toBeVisible();
+    await expect(page.getByRole("link", { name: "Explore", exact: true })).toBeVisible();
     await expect(page.locator('a[href="/search"]')).toBeVisible();
     await expect(page.getByRole("link", { name: "Slideshow", exact: true })).toHaveAttribute(
       "href",

@@ -40,10 +40,6 @@
 .colorFamilyRows {
   display: grid;
   gap: var(--m);
-  /* The label column plus representative thumbnails fill roughly the gallery measure; cap
-     the rows there so the right-hand whitespace reads as intentional rather
-     than the rows stranding half-way across a wide section. */
-  max-inline-size: min(100%, var(--content-width-gallery));
 }
 
 .colorFamilyRow {
@@ -78,11 +74,10 @@
 }
 
 .colorFamilyThumbs {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 96px), 1fr));
+  inline-size: 100%;
   gap: var(--m-s);
-  align-items: flex-start;
-  align-self: stretch;
 }
 
 .colorFamilyThumbLink {
@@ -349,4 +344,11 @@
 .colourStackSegment:hover .colourStackLabel,
 .colourStackSegment:focus-visible .colourStackLabel {
   opacity: 0.75;
+}
+
+.colorFamilyThumbLink img {
+  inline-size: 100%;
+  max-inline-size: none;
+  block-size: auto;
+  aspect-ratio: 1;
 }

@@ -1063,7 +1063,7 @@ describe("computePhotoStats", () => {
     );
   });
 
-  it("ranks revisited places by span, photo count, and label, then keeps four", () => {
+  it("ranks all revisited places by span, photo count, and label", () => {
     const geocode = (city: string) => `${city}\nRegion\nSubregion\nCountry`;
     const at = (city: string, year: number, suffix: string, title?: string): PhotoBlock => {
       const photo = makePhoto({
@@ -1101,6 +1101,7 @@ describe("computePhotoStats", () => {
       "Most",
       "Alpha",
       "Beta",
+      "Gamma",
     ]);
     expect(stats.revisitedPlaces.find((place) => place.label === "Most")?.photoCount).toBe(3);
     expect(

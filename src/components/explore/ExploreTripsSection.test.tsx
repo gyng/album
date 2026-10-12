@@ -49,7 +49,7 @@ describe("ExploreTripsSection", () => {
 
     expect(screen.getByRole("link", { name: /browse every trip/i })).toHaveAttribute(
       "href",
-      "/trips",
+      "/explore/trips",
     );
   });
 

@@ -143,7 +143,7 @@ const AlbumScreen = ({ album }: AlbumScreenProps) => {
             </li>
             <li>
               <Link
-                href={`/timeline?${new URLSearchParams({ filter_album: albumName })}`}
+                href={`/explore/timeline?${new URLSearchParams({ filter_album: albumName })}`}
                 className={`${buttonStyles.base} ${commonStyles.navContext}`}
               >
                 Album timeline

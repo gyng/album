@@ -4,12 +4,29 @@ import sharedStyles from "./ExploreShared.module.css";
 import localStyles from "./ExploreOverview.module.css";
 import type { OverviewCard } from "./exploreViewModel";
 
+const sectionGroups = [
+  { label: "Visuals", ids: ["#embedding-space", "#visual-sameness", "#colour"] },
+  {
+    label: "Archive",
+    ids: [
+      "#fun-stats",
+      "#recent-trends",
+      "#revisited-places",
+      "#when-you-shoot",
+      "#where-you-shoot",
+    ],
+  },
+  { label: "Photography", ids: ["#what-you-shoot-with", "#how-you-shoot", "#framing", "#weather"] },
+];
+
 const styles = mergeCssModuleStyles(sharedStyles, localStyles, [
   "header",
   "headerBody",
   "jumpNav",
   "jumpNavLink",
   "jumpNavLinks",
+  "jumpNavGroup",
+  "jumpNavGroups",
   "overview",
   "overviewValue",
   "title",
@@ -23,17 +40,6 @@ export const ExploreOverview = ({
   cards: OverviewCard[];
 }) => (
   <>
-    <nav className={styles.jumpNav} aria-label="Jump to section">
-      <Caption as="span">Jump to</Caption>
-      <div className={styles.jumpNavLinks}>
-        {sectionLinks.map((link) => (
-          <Pill key={link.href} href={link.href} className={styles.jumpNavLink}>
-            {link.label}
-          </Pill>
-        ))}
-      </div>
-    </nav>
-
     <header className={styles.header}>
       <div className={styles.headerBody}>
         <Heading level={1} as="h1" className={styles.title}>
@@ -50,5 +56,24 @@ export const ExploreOverview = ({
         </Card>
       ))}
     </section>
+
+    <nav className={styles.jumpNav} aria-label="Jump to section">
+      <div className={styles.jumpNavGroups}>
+        {sectionGroups.map((group) => (
+          <div key={group.label} className={styles.jumpNavGroup}>
+            <Caption as="span">{group.label}</Caption>
+            <div className={styles.jumpNavLinks}>
+              {sectionLinks
+                .filter((link) => group.ids.includes(link.href))
+                .map((link) => (
+                  <Pill key={link.href} href={link.href} className={styles.jumpNavLink}>
+                    {link.label}
+                  </Pill>
+                ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </nav>
   </>
 );

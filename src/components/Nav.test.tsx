@@ -4,6 +4,7 @@
 
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { Nav } from "./Nav";
+import { AppLink } from "./platform";
 
 jest.mock("./ThemeToggle", () => ({ ThemeToggle: () => <button type="button">Theme</button> }));
 
@@ -50,7 +51,7 @@ describe("Nav", () => {
     );
     expect(screen.getByRole("link", { name: "Album timeline" })).toHaveAttribute(
       "href",
-      "/timeline?filter_album=test+manifest",
+      "/explore/timeline?filter_album=test+manifest",
     );
     expect(screen.getByRole("link", { name: "Album slideshow" })).toHaveAttribute(
       "href",
@@ -117,6 +118,21 @@ describe("Nav", () => {
 
     const list = screen.getByRole("list");
     expect(within(list).getByRole("combobox", { name: "Map style" })).toBeInTheDocument();
+  });
+
+  it("reveals the current section when a subpage is selected", () => {
+    render(
+      <Nav
+        extraItems={
+          <li>
+            <AppLink href="/explore" aria-current="true">
+              Explore
+            </AppLink>
+          </li>
+        }
+      />,
+    );
+    expect(scrollIntoView).toHaveBeenCalledWith(expect.objectContaining({ inline: "nearest" }));
   });
 
   it("honours reduced-motion when revealing the current page", () => {

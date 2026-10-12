@@ -27,7 +27,7 @@ import { getMapPhotoHref } from "./mapSearchIndex";
 import { getDegLatLngFromExif } from "./dms2deg";
 import { getDisplayDimensions } from "./photoDimensions";
 import { formatAspectRatio } from "./formatAspectRatio";
-import { weatherCondition, type WeatherMetadata } from "./weather";
+import { WEATHER_FACETS } from "./metadataFacets";
 
 export type BucketedStat = {
   label: string;
@@ -180,7 +180,6 @@ export type PhotoStats = {
 
 const TOP_N_STRING = 20;
 const GEAR_FALLBACK_LENS_LABEL = "Unknown / built-in lens";
-const MAX_REVISITED_PLACES = 4;
 const MAX_ARCHIVE_GAPS = 5;
 const MAX_MEMORY_YEARS = 4;
 const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -1249,7 +1248,6 @@ function computeRevisitedPlace(photos: PhotoBlock[]): PhotoStats["revisitedPlace
       }
       return left.label.localeCompare(right.label);
     })
-    .slice(0, MAX_REVISITED_PLACES)
     .map((place) => ({
       label: place.label,
       facetId: place.facetId,
@@ -1457,57 +1455,7 @@ function computeTripSummaries(albums: Content[]): TripSummary[] {
 }
 
 function computeWeatherFacets(photos: PhotoBlock[]): StringFacetStat[] {
-  const specs: Array<{
-    id: string;
-    name: string;
-    labels: string[] | null;
-    value: (weather: WeatherMetadata) => string | null;
-  }> = [
-    {
-      id: "weather-condition",
-      name: "Conditions",
-      labels: null,
-      value: (weather) => weatherCondition(weather.weather_code),
-    },
-    {
-      id: "weather-temperature",
-      name: "Temperature",
-      labels: ["Below 0°C", "0–9°C", "10–19°C", "20–29°C", "30°C and above"],
-      value: (weather) =>
-        weather.temperature_2m < 0
-          ? "Below 0°C"
-          : weather.temperature_2m < 10
-            ? "0–9°C"
-            : weather.temperature_2m < 20
-              ? "10–19°C"
-              : weather.temperature_2m < 30
-                ? "20–29°C"
-                : "30°C and above",
-    },
-    {
-      id: "weather-precipitation",
-      name: "Precipitation in the preceding hour",
-      labels: ["Dry", "Precipitation"],
-      value: (weather) =>
-        weather.precipitation === null ? null : weather.precipitation > 0 ? "Precipitation" : "Dry",
-    },
-    {
-      id: "weather-cloud",
-      name: "Cloud cover",
-      labels: ["0–24%", "25–49%", "50–74%", "75–100%"],
-      value: (weather) =>
-        weather.cloud_cover === null
-          ? null
-          : weather.cloud_cover < 25
-            ? "0–24%"
-            : weather.cloud_cover < 50
-              ? "25–49%"
-              : weather.cloud_cover < 75
-                ? "50–74%"
-                : "75–100%",
-    },
-  ];
-  return specs.map((spec) => {
+  return WEATHER_FACETS.map((spec) => {
     const counts = new Map<string, number>();
     let count = 0;
     for (const photo of photos) {
@@ -1527,7 +1475,7 @@ function computeWeatherFacets(photos: PhotoBlock[]): StringFacetStat[] {
         );
     return {
       facetId: spec.id,
-      displayName: spec.name,
+      displayName: spec.displayName,
       data,
       coverage: photos.length ? count / photos.length : 0,
     };

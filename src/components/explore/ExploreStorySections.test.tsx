@@ -2,7 +2,7 @@
  * @jest-environment jsdom
  */
 
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import {
   ExploreFunStatsSection,
   ExploreRecentTrendsSection,
@@ -88,7 +88,7 @@ describe("Explore story sections", () => {
     );
     expect(screen.getByRole("link", { name: /Open Timeline/ })).toHaveAttribute(
       "href",
-      "/timeline",
+      "/explore/timeline",
     );
     expect(screen.getByRole("link", { name: "Last 5 years" })).toHaveAttribute(
       "href",
@@ -158,4 +158,26 @@ describe("Explore story sections", () => {
       "/search?facet=location%3ASingapore",
     );
   });
+});
+
+it("reveals more revisited places without changing their order", () => {
+  const places = Array.from({ length: 9 }, (_, index) => ({
+    label: `Place ${index}`,
+    facetId: "city" as const,
+    facetValue: `Place ${index}`,
+    firstYear: 2010,
+    lastYear: 2026,
+    spanYears: 16,
+    photoCount: 2,
+    timeline: [],
+    examples: [],
+  }));
+  render(<ExploreRevisitedPlacesSection places={places} />);
+  expect(screen.queryByRole("heading", { name: "Place 4" })).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "More places" }));
+  expect(screen.getByRole("heading", { name: "Place 7" })).toBeInTheDocument();
+  expect(screen.queryByRole("heading", { name: "Place 8" })).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "More places" }));
+  expect(screen.getByRole("heading", { name: "Place 8" })).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "More places" })).toBeNull();
 });

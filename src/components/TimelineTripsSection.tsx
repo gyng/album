@@ -145,7 +145,7 @@ export const TimelineTripsSection = ({
                   its own saying "see the whole trip" was a fourth line for
                   something the title already means. */}
               <p className={styles.meta}>
-                <Link className={styles.title} href={`/trips#trip-${trip.id}`}>
+                <Link className={styles.title} href={`/explore/trips#trip-${trip.id}`}>
                   {tripDates(trip)}
                 </Link>
                 <span className={styles.stats}>

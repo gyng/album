@@ -96,7 +96,7 @@ export const Search: React.FC<{
   const [facetSections, setFacetSections] = useState<SearchFacetSection[]>([]);
   const [isFacetSectionsLoading, setIsFacetSectionsLoading] = useState<boolean>(false);
   const [selectedFilterCategory, setSelectedFilterCategory] = useState<
-    "tags" | "color" | "time" | "place" | "gear" | "settings"
+    "tags" | "color" | "time" | "place" | "gear" | "settings" | "weather" | "framing"
   >("tags");
   const [isRandomSimilarLoading, setIsRandomSimilarLoading] = useState<boolean>(false);
   const [randomExploreError, setRandomExploreError] = useState<string | null>(null);

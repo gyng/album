@@ -78,7 +78,7 @@ describe("SearchFacetPanel", () => {
     render(<SearchFacetPanel {...baseProps()} />);
     const tags = screen.getByRole("tab", { name: "Tags" });
     const colour = screen.getByRole("tab", { name: "Colour" });
-    const settings = screen.getByRole("tab", { name: "Settings" });
+    const weather = screen.getByRole("tab", { name: "Weather" });
 
     fireEvent.keyDown(tags, { key: "Enter" });
     expect(handlers.onSelectCategory).not.toHaveBeenCalled();
@@ -88,8 +88,8 @@ describe("SearchFacetPanel", () => {
     expect(colour).toHaveFocus();
 
     fireEvent.keyDown(tags, { key: "ArrowLeft" });
-    expect(handlers.onSelectCategory).toHaveBeenLastCalledWith("settings");
-    expect(settings).toHaveFocus();
+    expect(handlers.onSelectCategory).toHaveBeenLastCalledWith("weather");
+    expect(weather).toHaveFocus();
 
     fireEvent.click(screen.getByRole("tab", { name: "Time" }));
     expect(handlers.onSelectCategory).toHaveBeenLastCalledWith("time");
@@ -240,4 +240,28 @@ describe("SearchFacetPanel", () => {
     expect(screen.getByText("Loading filters…")).toBeInTheDocument();
     expect(screen.queryByText("hidden")).toBeNull();
   });
+});
+
+it("allows weather and framing facets to be selected", () => {
+  global.ResizeObserver = MockResizeObserver as unknown as typeof ResizeObserver;
+  const props = baseProps();
+  const sections = [
+    {
+      facetId: "weather-condition",
+      displayName: "Conditions",
+      options: [{ value: "Mostly clear", count: 3 }],
+    },
+    { facetId: "aspect-ratio", displayName: "Aspect ratio", options: [{ value: "3:2", count: 5 }] },
+  ];
+  const view = render(
+    <SearchFacetPanel {...props} sections={sections} selectedCategory="weather" />,
+  );
+  fireEvent.click(screen.getByRole("button", { name: /Mostly clear/ }));
+  expect(handlers.onToggleFacet).toHaveBeenCalledWith({
+    facetId: "weather-condition",
+    value: "Mostly clear",
+  });
+  view.rerender(<SearchFacetPanel {...props} sections={sections} selectedCategory="framing" />);
+  fireEvent.click(screen.getByRole("button", { name: /3:2/ }));
+  expect(handlers.onToggleFacet).toHaveBeenCalledWith({ facetId: "aspect-ratio", value: "3:2" });
 });

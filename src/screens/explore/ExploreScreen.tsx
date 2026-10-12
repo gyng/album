@@ -742,12 +742,12 @@ const ExploreScreen = ({
             {activeCalendarCoverage > 0 ? (
               <section className={`${styles.section} ${styles.sectionWide}`}>
                 <div className={styles.sectionHeader}>
-                  <Heading level={2} as="h2">
+                  <Heading level={2} as="h3">
                     Archive cadence
                   </Heading>
                   <Caption as="span">{formatCoverage(activeCalendarCoverage)}</Caption>
                   <Link
-                    href="/timeline"
+                    href="/explore/timeline"
                     className={`${pillStyles.base} ${pillStyles.ghost} ${pillStyles.compact}`}
                   >
                     <span>Open Timeline</span>
@@ -774,7 +774,7 @@ const ExploreScreen = ({
             {stats.technicalRelationships ? (
               <section className={`${styles.section} ${styles.sectionWide}`}>
                 <div className={styles.sectionHeader}>
-                  <Heading level={2} as="h2">
+                  <Heading level={2} as="h3">
                     Settings relationships
                   </Heading>
                   <Caption as="span">
@@ -854,7 +854,7 @@ const ExploreScreen = ({
             <ExploreGearSection gear={stats.gear} frames={visualSameness?.cameraFrames ?? []} />
             <section className={`${styles.section} ${styles.sectionWide}`}>
               <div className={styles.sectionHeader}>
-                <Heading level={2} as="h2">
+                <Heading level={2} as="h3">
                   Every camera and lens
                 </Heading>
                 {/* Beside the chart it changes, not up in the group's header: a

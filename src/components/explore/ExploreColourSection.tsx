@@ -7,6 +7,7 @@ import { Caption, Heading, PillButton, SegmentedToggle, Thumb, pillStyles } from
 import { buildColourYearStacks } from "../../util/colourYearStacks";
 import sharedStyles from "./ExploreShared.module.css";
 import localStyles from "./ExploreColourSection.module.css";
+import { usePhotoRowCapacity } from "./usePhotoRowCapacity";
 import { ExploreStatGroup } from "./ExplorePrimitives";
 import {
   buildColorSearchHref,
@@ -67,7 +68,6 @@ export const ExploreColourSection = ({
   // first is the archive as it happened; the second is the only one that
   // answers whether a year was greener than the one before.
   const [visibleFamilies, setVisibleFamilies] = React.useState(4);
-  const [visiblePhotos, setVisiblePhotos] = React.useState<Record<string, number>>({});
   const [colourView, setColourView] = React.useState<"photos" | "families">("photos");
   const colourStacks = React.useMemo(
     () => buildColourYearStacks(stats.colorYearRibbons, COLOR_FAMILY_ORDER),
@@ -103,7 +103,7 @@ export const ExploreColourSection = ({
         <div className={styles.colourSectionGrid}>
           <section className={styles.colourPanel}>
             <div className={styles.sectionHeader}>
-              <Heading level={2} as="h2">
+              <Heading level={2} as="h3">
                 Dominant colour families
               </Heading>
               <Caption as="span">{formatCoverage(stats.colorCoverage)}</Caption>
@@ -139,7 +139,7 @@ export const ExploreColourSection = ({
           {stats.colorFamilyExamples.length > 0 ? (
             <section className={`${styles.colourPanel} ${styles.colourFamilyPanel}`}>
               <div className={styles.sectionHeader}>
-                <Heading level={2} as="h2">
+                <Heading level={2} as="h3">
                   Representative colour looks
                 </Heading>
               </div>
@@ -174,41 +174,7 @@ export const ExploreColourSection = ({
                           </Link>
                         ) : null}
                       </div>
-                      <div className={localStyles.familyPhotos}>
-                        <div className={styles.colorFamilyThumbs}>
-                          {family.photos.slice(0, visiblePhotos[family.label] ?? 6).map((photo) => (
-                            <Link
-                              key={`${family.label}-${photo.href}-${photo.src}`}
-                              href={photo.href}
-                              className={styles.colorFamilyThumbLink}
-                            >
-                              <Thumb
-                                src={photo.src}
-                                alt={photo.label}
-                                size="small"
-                                loading="lazy"
-                                {...(photo.swatch
-                                  ? { style: { backgroundColor: photo.swatch } }
-                                  : {})}
-                              />
-                            </Link>
-                          ))}
-                        </div>
-                        {family.photos.length > (visiblePhotos[family.label] ?? 6) ? (
-                          <PillButton
-                            size="compact"
-                            aria-label={`More photos with ${family.label.toLowerCase()} tones`}
-                            onClick={() =>
-                              setVisiblePhotos((current) => ({
-                                ...current,
-                                [family.label]: (current[family.label] ?? 6) + 6,
-                              }))
-                            }
-                          >
-                            More
-                          </PillButton>
-                        ) : null}
-                      </div>
+                      <ColourFamilyPhotos family={family} />
                     </div>
                   );
                 })}
@@ -229,7 +195,7 @@ export const ExploreColourSection = ({
           {stats.colorYearRibbons.length > 0 ? (
             <section className={`${styles.colourPanel} ${styles.colourFullRowPanel}`}>
               <div className={styles.sectionHeader}>
-                <Heading level={2} as="h2">
+                <Heading level={2} as="h3">
                   Colour over time
                 </Heading>
                 <SegmentedToggle
@@ -397,5 +363,40 @@ export const ExploreColourSection = ({
         </div>
       </section>
     </ExploreStatGroup>
+  );
+};
+
+const ColourFamilyPhotos = ({ family }: { family: PhotoStats["colorFamilyExamples"][number] }) => {
+  const { ref, capacity } = usePhotoRowCapacity(96, 6);
+  const [rows, setRows] = React.useState(1);
+  const visible = rows * capacity;
+  return (
+    <div className={localStyles.familyPhotos}>
+      <div ref={ref} className={localStyles.colorFamilyThumbs}>
+        {family.photos.slice(0, visible).map((photo) => (
+          <Link
+            key={`${photo.href}-${photo.src}`}
+            href={photo.href}
+            className={localStyles.colorFamilyThumbLink}
+          >
+            <Thumb
+              src={photo.src}
+              alt={photo.label}
+              loading="lazy"
+              {...(photo.swatch ? { style: { backgroundColor: photo.swatch } } : {})}
+            />
+          </Link>
+        ))}
+      </div>
+      {family.photos.length > visible ? (
+        <PillButton
+          size="compact"
+          aria-label={`More photos with ${family.label.toLowerCase()} tones`}
+          onClick={() => setRows((count) => count + 1)}
+        >
+          More
+        </PillButton>
+      ) : null}
+    </div>
   );
 };

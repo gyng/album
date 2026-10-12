@@ -35,3 +35,21 @@ it("omits controls when the entire year already fits", () => {
   render(<ExploreLookYearPhotos year={2026} photos={photos.slice(0, 2)} />);
   expect(screen.queryByRole("button")).toBeNull();
 });
+
+it("fills the available first row and reveals another complete row", () => {
+  const width = jest.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(780);
+  try {
+    const many = Array.from({ length: 20 }, (_, index) => ({
+      ...photos[0]!,
+      path: `/${index}.jpg`,
+      src: `/${index}.avif`,
+      label: `Photo ${index}`,
+    }));
+    render(<ExploreLookYearPhotos year={2026} photos={many} />);
+    expect(screen.getAllByRole("img")).toHaveLength(7);
+    fireEvent.click(screen.getByRole("button", { name: "More photos from 2026" }));
+    expect(screen.getAllByRole("img")).toHaveLength(14);
+  } finally {
+    width.mockRestore();
+  }
+});

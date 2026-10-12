@@ -1,3 +1,4 @@
+import { METADATA_FACETS } from "./metadataFacets";
 import type { Exif, Tags } from "../services/types";
 import {
   ALL_FACETS,
@@ -24,6 +25,7 @@ export type SearchFacetSelection = {
 const FACET_PARAM = "facet";
 
 const SEARCHABLE_FACET_IDS = new Set([
+  ...METADATA_FACETS.map((facet) => facet.id),
   FOCAL_LENGTH_35MM_FACET.id,
   FOCAL_LENGTH_ACTUAL_FACET.id,
   APERTURE_FACET.id,
@@ -174,8 +176,10 @@ export const getSearchFacetChipLabel = (selection: SearchFacetSelection): string
       return `Subregion: ${selection.value}`;
     case CITY_FACET.id:
       return `City: ${selection.value}`;
-    default:
-      return selection.value;
+    default: {
+      const facet = METADATA_FACETS.find((facet) => facet.id === selection.facetId);
+      return facet ? `${facet.displayName}: ${selection.value}` : selection.value;
+    }
   }
 };
 

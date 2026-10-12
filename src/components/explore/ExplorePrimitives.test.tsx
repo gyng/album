@@ -7,6 +7,33 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { ExploreStatGroup, ExploreStatSection, VisualSimilarityThumb } from "./ExplorePrimitives";
 
 describe("Explore primitives", () => {
+  it("loads a desktop deferred group when its section link is followed", () => {
+    const originalObserver = globalThis.IntersectionObserver;
+    Object.defineProperty(globalThis, "IntersectionObserver", {
+      configurable: true,
+      value: jest.fn(() => ({ observe: jest.fn(), disconnect: jest.fn() })),
+    });
+    const view = render(
+      <ExploreStatGroup id="colour" title="Colour" deferContent>
+        <p>Linked content</p>
+      </ExploreStatGroup>,
+    );
+    try {
+      expect(screen.queryByText("Linked content")).toBeNull();
+      act(() => {
+        window.location.hash = "#colour";
+        window.dispatchEvent(new HashChangeEvent("hashchange"));
+      });
+      expect(screen.getByText("Linked content")).toBeInTheDocument();
+    } finally {
+      view.unmount();
+      window.location.hash = "";
+      Object.defineProperty(globalThis, "IntersectionObserver", {
+        configurable: true,
+        value: originalObserver,
+      });
+    }
+  });
   it("keeps a meaningful summary in server-rendered HTML while deferring heavy content", () => {
     const markup = renderToStaticMarkup(
       <ExploreStatGroup

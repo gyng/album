@@ -1,3 +1,5 @@
+import { METADATA_FACETS, weatherFacetValue } from "../../util/metadataFacets";
+import { weatherCondition } from "../../util/weather";
 import { Database } from "@sqlite.org/sqlite-wasm";
 import { SearchResultRow } from "./searchTypes";
 import { RGB, deltaE, rgbToLab, parseColorPalette } from "../../util/colorDistance";
@@ -316,6 +318,49 @@ export const hasStructuredGeocode = (db: Database): boolean => {
   return has;
 };
 
+const metadataColumnCache = new WeakMap<object, Set<string>>();
+const searchMetadataColumns = (db: Database): Set<string> => {
+  const cached = metadataColumnCache.get(db);
+  if (cached) return cached;
+  const columns = new Set<string>();
+  for (const name of ["aspect_ratio", "orientation", "weather_json"]) {
+    try {
+      db.exec({
+        sql: `SELECT 1 FROM pragma_table_info('metadata') WHERE name = '${name}' LIMIT 1`,
+        returnValue: "resultRows",
+        callback: () => {
+          columns.add(name);
+        },
+      });
+    } catch {
+      /* Older databases can still search their existing fields. */
+    }
+  }
+  metadataColumnCache.set(db, columns);
+  return columns;
+};
+
+const weatherJsonSql = "CASE WHEN json_valid(weather_json) THEN weather_json ELSE NULL END";
+const weatherField = (name: string) => `json_extract(${weatherJsonSql}, '$.${name}')`;
+const conditionCodes = new Map<string, number[]>();
+for (let code = 0; code < 100; code++) {
+  const label = weatherCondition(code);
+  if (label === "Unknown") continue;
+  conditionCodes.set(label, [...(conditionCodes.get(label) ?? []), code]);
+}
+const weatherConditionSql = `CASE ${[...conditionCodes].map(([label, codes]) => `WHEN ${weatherField("weather_code")} IN (${codes.join(",")}) THEN '${label}'`).join(" ")} ELSE 'Unknown' END`;
+const weatherTemperatureSql = `CASE WHEN ${weatherField("temperature_2m")} IS NULL THEN NULL WHEN ${weatherField("temperature_2m")} < 0 THEN 'Below 0°C' WHEN ${weatherField("temperature_2m")} < 10 THEN '0–9°C' WHEN ${weatherField("temperature_2m")} < 20 THEN '10–19°C' WHEN ${weatherField("temperature_2m")} < 30 THEN '20–29°C' ELSE '30°C and above' END`;
+const weatherCloudSql = `CASE WHEN ${weatherField("cloud_cover")} IS NULL THEN NULL WHEN ${weatherField("cloud_cover")} < 25 THEN '0–24%' WHEN ${weatherField("cloud_cover")} < 50 THEN '25–49%' WHEN ${weatherField("cloud_cover")} < 75 THEN '50–74%' ELSE '75–100%' END`;
+const weatherPrecipitationSql = `CASE WHEN ${weatherField("precipitation")} IS NULL THEN NULL WHEN ${weatherField("precipitation")} > 0 THEN 'Precipitation' ELSE 'Dry' END`;
+const METADATA_FACET_SQL: Record<string, { column: string; expression: string }> = {
+  "aspect-ratio": { column: "aspect_ratio", expression: "aspect_ratio" },
+  orientation: { column: "orientation", expression: "orientation" },
+  "weather-condition": { column: "weather_json", expression: weatherConditionSql },
+  "weather-temperature": { column: "weather_json", expression: weatherTemperatureSql },
+  "weather-cloud": { column: "weather_json", expression: weatherCloudSql },
+  "weather-precipitation": { column: "weather_json", expression: weatherPrecipitationSql },
+};
+
 const parseDbExifString = (raw: string): Exif => {
   if (!raw) {
     return {};
@@ -368,7 +413,21 @@ const parseDbExifString = (raw: string): Exif => {
 const buildSingleFacetClause = (
   selection: SearchFacetSelection,
   hasGeocodeColumns: boolean,
+  metadataColumns: Set<string>,
 ): { sql: string; bind: (string | number)[] } | null => {
+  const metadataFacet = METADATA_FACET_SQL[selection.facetId];
+  if (metadataFacet) {
+    if (!metadataColumns.has(metadataFacet.column)) return { sql: "0", bind: [] };
+    const weatherGuard =
+      metadataFacet.column === "weather_json"
+        ? `${weatherField("version")} = 1 AND ${weatherField("source")} = 'open-meteo' AND ${weatherField("model")} IN ('era5', 'ecmwf_ifs') AND ${weatherField("temperature_2m")} IS NOT NULL AND ${weatherField("weather_code")} IS NOT NULL AND `
+        : "";
+    return {
+      sql: `images.path IN (SELECT path FROM metadata WHERE ${weatherGuard}(${metadataFacet.expression}) = ?)`,
+      bind: [selection.value],
+    };
+  }
+
   if (selection.facetId === HOUR_FACET.id) {
     const bucket = HOUR_FACET.buckets.find((candidate) => candidate.label === selection.value);
     const [min, max] = bucket?.range ?? [];
@@ -444,6 +503,7 @@ const buildSingleFacetClause = (
 const buildFacetWhereClause = (
   selectedFacets: SearchFacetSelection[],
   hasGeocodeColumns: boolean,
+  metadataColumns = new Set(["aspect_ratio", "orientation", "weather_json"]),
 ) => {
   if (selectedFacets.length === 0) {
     return { sql: "", bind: [] as (string | number)[] };
@@ -460,7 +520,7 @@ const buildFacetWhereClause = (
   const groups = Array.from(grouped.values())
     .map((group) => {
       const resolved = group
-        .map((selection) => buildSingleFacetClause(selection, hasGeocodeColumns))
+        .map((selection) => buildSingleFacetClause(selection, hasGeocodeColumns, metadataColumns))
         .filter((value): value is { sql: string; bind: (string | number)[] } => Boolean(value));
       if (resolved.length === 0) {
         return null;
@@ -747,7 +807,11 @@ const fetchFacetMatchedPaths = async (
   database: Database,
   selectedFacets: SearchFacetSelection[],
 ): Promise<Set<string>> => {
-  const facetWhere = buildFacetWhereClause(selectedFacets, hasStructuredGeocode(database));
+  const facetWhere = buildFacetWhereClause(
+    selectedFacets,
+    hasStructuredGeocode(database),
+    searchMetadataColumns(database),
+  );
   if (!facetWhere.sql) {
     return new Set();
   }
@@ -771,7 +835,11 @@ const fetchColorMatchedResults = async (opts: {
   selectedFacets: SearchFacetSelection[];
 }): Promise<RankedColorResult[]> => {
   const { database, color, maxDistance, selectedFacets } = opts;
-  const facetWhere = buildFacetWhereClause(selectedFacets, hasStructuredGeocode(database));
+  const facetWhere = buildFacetWhereClause(
+    selectedFacets,
+    hasStructuredGeocode(database),
+    searchMetadataColumns(database),
+  );
   const lightRows = await exec(
     database,
     `SELECT images.path, images.colors FROM images
@@ -830,19 +898,24 @@ export const fetchSearchFacetSections = async (opts: {
   // matches, so counts and results stay in lockstep and region/subregion carry
   // their true admin level. Old DBs lack the columns → parse the blob instead.
   const useGeoColumns = hasStructuredGeocode(database);
+  const metadataColumns = searchMetadataColumns(database);
 
   const fetchFacetItems = async (facetId: string) => {
     const facetWhere = buildFacetWhereClause(
       selectedFacets.filter((selection) => selection.facetId !== facetId),
       useGeoColumns,
+      metadataColumns,
     );
     const whereClause = [keywordWhere.sql, facetWhere.sql].filter(Boolean);
     const geoSelect = useGeoColumns
       ? ", m.geo_city, m.geo_region, m.geo_subregion, m.geo_country"
       : "";
+    const metadataSelect = ["aspect_ratio", "orientation", "weather_json"]
+      .map((column) => (metadataColumns.has(column) ? `m.${column}` : "NULL"))
+      .join(", ");
     const result = await exec(
       database,
-      `SELECT images.exif, images.geocode, ${NORMALIZED_IMAGE_DATE_SQL}${geoSelect}
+      `SELECT images.exif, images.geocode, ${NORMALIZED_IMAGE_DATE_SQL}${geoSelect}, ${metadataSelect}
         FROM images
         LEFT JOIN metadata m ON m.path = images.path
         ${whereClause.length > 0 ? `WHERE ${whereClause.join(" AND ")}` : ""}`,
@@ -858,6 +931,9 @@ export const fetchSearchFacetSections = async (opts: {
       geoRegion: useGeoColumns ? (row[4] ?? null) : null,
       geoSubregion: useGeoColumns ? (row[5] ?? null) : null,
       geoCountry: useGeoColumns ? (row[6] ?? null) : null,
+      aspectRatio: row[useGeoColumns ? 7 : 3] ?? null,
+      orientation: row[useGeoColumns ? 8 : 4] ?? null,
+      weather: row[useGeoColumns ? 9 : 5] ?? null,
     }));
   };
 
@@ -935,7 +1011,31 @@ export const fetchSearchFacetSections = async (opts: {
     }),
   );
 
-  return [...numericSections, ...stringSections].filter((section) => section.options.length > 0);
+  const metadataSections = await Promise.all(
+    METADATA_FACETS.map(async (facet) => {
+      const items = await fetchFacetItems(facet.id);
+      const counts = new Map<string, number>();
+      for (const item of items) {
+        const value =
+          facet.id === "aspect-ratio"
+            ? item.aspectRatio
+            : facet.id === "orientation"
+              ? item.orientation
+              : weatherFacetValue(facet.id, item.weather);
+        if (value) counts.set(value, (counts.get(value) ?? 0) + 1);
+      }
+      return {
+        facetId: facet.id,
+        displayName: facet.displayName,
+        options: [...counts]
+          .map(([value, count]) => ({ value, count }))
+          .sort((a, b) => b.count - a.count || a.value.localeCompare(b.value)),
+      };
+    }),
+  );
+  return [...numericSections, ...stringSections, ...metadataSections].filter(
+    (section) => section.options.length > 0,
+  );
 };
 
 // The embeddings table exists in two on-disk formats: int8 blobs with a
@@ -1078,7 +1178,11 @@ export const fetchResults = async (opts: {
     : null;
   const facetWhere = colorSearch
     ? { sql: "", bind: [] as (string | number)[] }
-    : buildFacetWhereClause(selectedFacets, hasStructuredGeocode(database));
+    : buildFacetWhereClause(
+        selectedFacets,
+        hasStructuredGeocode(database),
+        searchMetadataColumns(database),
+      );
   const whereParts = [
     ...Array.from({ length: queries.length }, () => "images MATCH ?"),
     ...(facetWhere.sql ? [facetWhere.sql] : []),
@@ -1157,7 +1261,11 @@ export const fetchRefinementTagCounts = async (opts: {
   const normalizedCandidateTags = Array.from(
     new Set(candidateTags.map((tag) => tag.trim().toLowerCase()).filter(Boolean)),
   ).filter((tag) => !normalizedActiveTerms.includes(tag));
-  const facetWhere = buildFacetWhereClause(selectedFacets, hasStructuredGeocode(database));
+  const facetWhere = buildFacetWhereClause(
+    selectedFacets,
+    hasStructuredGeocode(database),
+    searchMetadataColumns(database),
+  );
 
   if (normalizedCandidateTags.length === 0) {
     return {};

@@ -431,7 +431,7 @@ export const GearSectionHeader = ({
   children?: React.ReactNode;
 }) => (
   <div className={styles.sectionHeader}>
-    <Heading level={2} as="h2">
+    <Heading level={2} as="h3">
       {title}
     </Heading>
     {children}

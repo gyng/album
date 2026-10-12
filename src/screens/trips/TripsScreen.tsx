@@ -122,7 +122,7 @@ const TripsScreen = ({ trips }: TripsScreenProps) => {
       <Seo
         title={formatPageTitle("Trips")}
         description={`${journeys.length} journeys and ${trips.length - journeys.length} single-day outings, grouped from the photographs themselves.`}
-        pathname="/trips"
+        pathname="/explore/trips"
       />
       {/* Same shell as the timeline and explore: the nav sits inside main and
           brings no padding of its own, so it lines up across pages. */}

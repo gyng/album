@@ -4,6 +4,7 @@ import { PillButton } from "../ui";
 import { VisualSimilarityThumb } from "./ExplorePrimitives";
 import sharedStyles from "./ExploreShared.module.css";
 import styles from "./ExploreLookYearPhotos.module.css";
+import { usePhotoRowCapacity } from "./usePhotoRowCapacity";
 
 export const ExploreLookYearPhotos = ({
   year,
@@ -12,7 +13,9 @@ export const ExploreLookYearPhotos = ({
   year: number;
   photos: VisualSamenessStats["lookTimeline"][number]["photos"];
 }) => {
-  const [visible, setVisible] = useState(3);
+  const { ref, capacity } = usePhotoRowCapacity(108, 3);
+  const [rows, setRows] = useState(1);
+  const visible = rows * capacity;
   const [offset, setOffset] = useState(0);
   if (!photos.length) return null;
   const shown = Array.from(
@@ -22,7 +25,11 @@ export const ExploreLookYearPhotos = ({
   const hasMore = visible < photos.length;
   return (
     <div className={styles.content}>
-      <div id={`look-year-${year}-photos`} className={sharedStyles.visualTimelineThumbs}>
+      <div
+        id={`look-year-${year}-photos`}
+        ref={ref}
+        className={`${sharedStyles.visualTimelineThumbs} ${styles.thumbs}`}
+      >
         {shown.map((photo) => (
           <VisualSimilarityThumb
             key={photo.path}
@@ -38,7 +45,7 @@ export const ExploreLookYearPhotos = ({
             size="compact"
             aria-label={`More photos from ${year}`}
             aria-controls={`look-year-${year}-photos`}
-            onClick={() => setVisible((count) => Math.min(count + 3, photos.length))}
+            onClick={() => setRows((count) => count + 1)}
           >
             More
           </PillButton>

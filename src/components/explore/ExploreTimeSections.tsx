@@ -68,7 +68,7 @@ export const ExploreArchiveGaps = ({
   return (
     <section className={styles.section}>
       <div className={styles.sectionHeader}>
-        <Heading level={2} as="h2">
+        <Heading level={2} as="h3">
           Longest silences
         </Heading>
         <Caption as="span">Stretches with no photograph</Caption>
@@ -144,7 +144,7 @@ export const ExploreThisDaySection = ({
   return (
     <section className={`${styles.section} ${styles.sectionWide}`}>
       <div className={styles.sectionHeader}>
-        <Heading level={2} as="h2">
+        <Heading level={2} as="h3">
           On this day
         </Heading>
         <Caption as="span">{formatDayLabel(`${thisYear}-${monthDay}`)} in other years</Caption>

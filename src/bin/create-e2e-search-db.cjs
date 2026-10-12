@@ -77,7 +77,8 @@ const createE2eSearchDatabases = ({ outputPath, embeddingsOutputPath, force = fa
     scene_seconds REAL,
     scene_of TEXT,
     tz_name TEXT,
-    tz_offset TEXT
+    tz_offset TEXT,
+    weather_json TEXT
   );
 `);
   embeddingsDb.exec(`
@@ -160,6 +161,8 @@ const createE2eSearchDatabases = ({ outputPath, embeddingsOutputPath, force = fa
     media_kind, duration_seconds, tz_name, tz_offset
   ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `);
+  const { weatherFixture } = require("../test/fixtures/weather.ts");
+  const updateWeather = db.prepare("UPDATE metadata SET weather_json = ? WHERE path = ?");
   const insertEmbedding = embeddingsDb.prepare(`
   INSERT INTO embeddings (path, model_id, embedding_dim, embedding_blob, embedding_scale)
   VALUES (?, ?, ?, ?, ?)
@@ -225,6 +228,10 @@ const createE2eSearchDatabases = ({ outputPath, embeddingsOutputPath, force = fa
       // directly so the join has something real to return.
       country === "Japan" ? "Asia/Tokyo" : "Asia/Singapore",
       country === "Japan" ? "+09:00" : "+08:00",
+    );
+    updateWeather.run(
+      JSON.stringify({ ...weatherFixture, weather_code: index % 2 ? 61 : 1 }),
+      photoPath,
     );
     const encodedEmbedding = encodeEmbedding(embeddingVectors[index]);
     insertEmbedding.run(

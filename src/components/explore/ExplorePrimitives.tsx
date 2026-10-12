@@ -40,7 +40,7 @@ export const ExploreStatSection: React.FC<{
 }> = ({ facetId, title, coverage, children }) => (
   <section className={[styles.section, facetId === "hour" ? styles.sectionWide : ""].join(" ")}>
     <div className={styles.sectionHeader}>
-      <Heading level={2} as="h2">
+      <Heading level={2} as="h3">
         {title}
       </Heading>
       <Caption as="span">{formatCoverage(coverage)}</Caption>
@@ -140,7 +140,7 @@ export const ExploreStatGroup: React.FC<{
     }
 
     return () => observer.disconnect();
-  }, [deferContent, id, isDeferredContentVisible, isCollapsed]);
+  }, [deferContent, id, isDeferredContentVisible, isCollapsed, isLinkedTarget]);
 
   return (
     <section id={id} className={styles.group}>

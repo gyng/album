@@ -388,13 +388,13 @@ const TimelineScreen = ({ entries: suppliedEntries, entryRows }: TimelineScreenP
       <Seo
         title={formatPageTitle("Timeline")}
         description="Explore dated photos across the archive timeline."
-        pathname="/timeline"
+        pathname="/explore/timeline"
         noindex={hasRouteState}
         jsonLd={buildCollectionPageJsonLd(
           {
             name: formatPageTitle("Timeline"),
             description: "Explore dated photos across the archive timeline.",
-            pathname: "/timeline",
+            pathname: "/explore/timeline",
           },
           siteOrigin,
         )}

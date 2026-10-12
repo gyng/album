@@ -296,7 +296,7 @@ describe("SEO helpers", () => {
 
     const html = renderToStaticMarkup(<TimelinePage entries={[]} />);
 
-    expect(html).toContain('rel="canonical" href="https://photos.example.com/timeline"');
+    expect(html).toContain('rel="canonical" href="https://photos.example.com/explore/timeline"');
     expect(html).not.toContain('name="robots" content="noindex, nofollow"');
   });
 });

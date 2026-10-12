@@ -42,7 +42,7 @@ const buildTimelineMemoryHref = (date: string, album?: string | null) => {
   if (album) {
     params.set("filter_album", album);
   }
-  return `/timeline?${params.toString()}`;
+  return `/explore/timeline?${params.toString()}`;
 };
 
 type MemoryResult = SearchResultRow & {

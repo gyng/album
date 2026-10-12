@@ -62,7 +62,15 @@ type Tag = {
   count: number;
 };
 
-type FilterCategoryId = "tags" | "color" | "time" | "place" | "gear" | "settings";
+export type FilterCategoryId =
+  | "tags"
+  | "color"
+  | "time"
+  | "place"
+  | "gear"
+  | "settings"
+  | "weather"
+  | "framing";
 
 type FilterCategory = {
   id: FilterCategoryId;
@@ -76,9 +84,13 @@ const FILTER_CATEGORIES: FilterCategory[] = [
   { id: "place", label: "Place" },
   { id: "gear", label: "Gear" },
   { id: "settings", label: "Settings" },
+  { id: "framing", label: "Framing" },
+  { id: "weather", label: "Weather" },
 ];
 
 const CATEGORY_FACET_IDS: Record<Exclude<FilterCategoryId, "tags" | "color">, string[]> = {
+  framing: ["aspect-ratio", "orientation"],
+  weather: ["weather-condition", "weather-temperature", "weather-precipitation", "weather-cloud"],
   time: ["year", "hour"],
   place: ["location", "region", "subregion", "city"],
   gear: ["camera", "lens"],

@@ -55,7 +55,7 @@ export const Nav: React.FC<{
   // JS-driven smooth scroll.
   useEffect(() => {
     const ul = ulRef.current!;
-    const active = ul.querySelector<HTMLElement>('[aria-current="page"]');
+    const active = ul.querySelector<HTMLElement>('[aria-current="page"], [aria-current="true"]');
     if (!active) return;
     const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     active.scrollIntoView({
@@ -116,7 +116,7 @@ export const Nav: React.FC<{
               </li>
               <li>
                 <Link
-                  href={`/timeline?${new URLSearchParams({ filter_album: props.albumName })}`}
+                  href={`/explore/timeline?${new URLSearchParams({ filter_album: props.albumName })}`}
                   className={`${buttonStyles.base} ${commonStyles.navContext}`}
                 >
                   Album timeline

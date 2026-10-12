@@ -32,9 +32,6 @@
 }
 
 .jumpNav {
-  position: sticky;
-  inset-block-start: 0;
-  z-index: var(--z-sticky);
   display: grid;
   gap: var(--m-s);
   padding: var(--m-s) 0;
@@ -63,5 +60,22 @@
     overscroll-behavior-inline: contain;
     scrollbar-width: thin;
     padding-block-end: var(--size-3);
+  }
+}
+
+.jumpNavGroups {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--m-l);
+}
+.jumpNavGroup {
+  display: grid;
+  align-content: start;
+  gap: var(--m-s);
+}
+@media (max-width: 720px) {
+  .jumpNavGroups {
+    grid-template-columns: 1fr;
+    gap: var(--m-m);
   }
 }

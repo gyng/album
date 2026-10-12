@@ -1,9 +1,10 @@
+import { useState } from "react";
 import { mergeCssModuleStyles } from "../../util/mergeCssModuleStyles";
 import { AppLink as Link } from "../platform";
 import type { PhotoStats } from "../../util/computeStats";
 import { buildSearchHref } from "../../util/searchFacets";
 import { YearSplitHistogram } from "../YearSplitHistogram";
-import { Caption, Card, Heading, Thumb, pillStyles } from "../ui";
+import { Caption, Card, Heading, Thumb, PillButton, pillStyles } from "../ui";
 import sharedStyles from "./ExploreShared.module.css";
 import localStyles from "./ExploreStorySections.module.css";
 import { ExploreStatGroup } from "./ExplorePrimitives";
@@ -105,7 +106,7 @@ export const ExploreRecentTrendsSection = ({
       deferContent={deferContent}
       deferredSummary={`Recent-year trends cover ${data.map((item) => item.label).join(", ")}.`}
       actions={
-        <Link href="/timeline" className={`${pillStyles.base} ${pillStyles.ghost}`}>
+        <Link href="/explore/timeline" className={`${pillStyles.base} ${pillStyles.ghost}`}>
           <span>Open Timeline</span>
           <span aria-hidden="true">↗</span>
         </Link>
@@ -125,8 +126,9 @@ export const ExploreRevisitedPlacesSection = ({
 }: {
   places: PhotoStats["revisitedPlaces"];
   deferContent?: boolean;
-}) =>
-  places.length > 0 ? (
+}) => {
+  const [visible, setVisible] = useState(4);
+  return places.length > 0 ? (
     <ExploreStatGroup
       id="revisited-places"
       title="Revisited places"
@@ -141,7 +143,7 @@ export const ExploreRevisitedPlacesSection = ({
     >
       <section className={`${styles.section} ${styles.sectionWide}`}>
         <div className={styles.revisitedPlacesGrid}>
-          {places.map((place) => (
+          {places.slice(0, visible).map((place) => (
             <section
               key={`${place.facetId}:${place.facetValue}`}
               className={`${styles.revisitedPlaceCard} ${styles.timelineSectionAligned}`}
@@ -223,6 +225,16 @@ export const ExploreRevisitedPlacesSection = ({
             </section>
           ))}
         </div>
+        {places.length > visible ? (
+          <PillButton
+            size="compact"
+            className={sharedStyles.loadMoreButton}
+            onClick={() => setVisible((count) => count + 4)}
+          >
+            More places
+          </PillButton>
+        ) : null}
       </section>
     </ExploreStatGroup>
   ) : null;
+};

@@ -33,6 +33,10 @@ const nextConfig = {
     ignoreBuildErrors: hasExternalTypecheck,
     tsconfigPath: isE2eBuild ? "tsconfig.e2e.json" : "tsconfig.next.json",
   },
+  redirects: async () => [
+    { source: "/timeline", destination: "/explore/timeline", permanent: true },
+    { source: "/trips", destination: "/explore/trips", permanent: true },
+  ],
   headers: async () => [
     {
       source: "/feed.xml",

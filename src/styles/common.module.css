@@ -81,6 +81,8 @@
 }
 
 .splitButton {
+  block-size: var(--tap-target);
+  box-sizing: border-box;
   display: inline-flex;
   align-items: stretch;
   border: solid var(--line-strong) var(--c-bg-contrast-light);
@@ -112,11 +114,12 @@
 }
 
 .splitButtonMain {
-  padding: var(--m-m);
+  line-height: 1;
+  padding: var(--m-s) var(--m-l);
 }
 
 .splitButtonSub {
-  padding: var(--m-m);
+  padding: var(--m-s) var(--m-m);
   border-inline-start: solid var(--line-strong) var(--c-bg-contrast-light);
   cursor: pointer;
   line-height: 1;

@@ -4,7 +4,7 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: var(--m-s);
-  scroll-margin-block-start: calc(var(--size-96) + var(--size-3));
+  scroll-margin-block-start: var(--m-l);
   min-inline-size: 0;
 }
 

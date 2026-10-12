@@ -1,0 +1,23 @@
+.nav {
+  display: flex;
+  gap: var(--m-l);
+  border-block-end: var(--size-1) solid var(--c-bg-contrast-dark);
+  overflow-x: auto;
+}
+.link {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  min-block-size: var(--tap-target);
+  color: var(--c-bg-contrast-light);
+  font-size: var(--fs-sm);
+  text-decoration: none;
+  border-block-end: var(--size-2) solid transparent;
+}
+.link[aria-current="page"] {
+  color: var(--c-font);
+  border-color: var(--c-accent);
+}
+.link:hover {
+  color: var(--c-font);
+}

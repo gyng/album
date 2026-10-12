@@ -151,7 +151,7 @@ describe("what the timeline says about a trip", () => {
     render(<TimelineTripsSection entries={archive} onSelectDate={() => {}} />);
 
     const links = screen.getAllByRole("link").map((link) => link.getAttribute("href"));
-    expect(links).toContain("/trips#trip-2016-11-13");
+    expect(links).toContain("/explore/trips#trip-2016-11-13");
   });
 
   // Fifty-eight single-day outings against thirty-six journeys: the list is

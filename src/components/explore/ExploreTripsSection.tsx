@@ -29,7 +29,7 @@ export const ExploreTripsSection = ({ trips }: { trips: TripSummary[] }) => {
   return (
     <section className={styles.section}>
       <div className={styles.sectionHeader}>
-        <Heading level={2} as="h2">
+        <Heading level={2} as="h3">
           Trips
         </Heading>
         <Caption as="span">Grouped from the photographs themselves</Caption>
@@ -48,7 +48,7 @@ export const ExploreTripsSection = ({ trips }: { trips: TripSummary[] }) => {
         </p>
       ) : null}
       <Link
-        href="/trips"
+        href="/explore/trips"
         className={`${pillStyles.base} ${pillStyles.ghost} ${pillStyles.compact} ${styles.tripBrowse}`}
       >
         <span>Browse every trip</span>
