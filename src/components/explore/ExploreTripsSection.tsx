@@ -5,7 +5,12 @@ import { Caption, Heading, pillStyles } from "../ui";
 import sharedStyles from "./ExploreShared.module.css";
 import localStyles from "./ExploreTripsSection.module.css";
 
-const styles = mergeCssModuleStyles(sharedStyles, localStyles, ["tripBig", "tripLead"], []);
+const styles = mergeCssModuleStyles(
+  sharedStyles,
+  localStyles,
+  ["tripBig", "tripLead", "tripBrowse"],
+  [],
+);
 
 /**
  * That the archive contains journeys is a fact about it, so it belongs here.
@@ -42,7 +47,10 @@ export const ExploreTripsSection = ({ trips }: { trips: TripSummary[] }) => {
           The longest ran {longest.dayCount} days across {longest.places.slice(0, 3).join(", ")}.
         </p>
       ) : null}
-      <Link href="/trips" className={`${pillStyles.base} ${pillStyles.ghost}`}>
+      <Link
+        href="/trips"
+        className={`${pillStyles.base} ${pillStyles.ghost} ${pillStyles.compact} ${styles.tripBrowse}`}
+      >
         <span>Browse every trip</span>
         <span aria-hidden="true">↗</span>
       </Link>

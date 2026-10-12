@@ -1,3 +1,8 @@
+.tripBrowse {
+  align-self: flex-start;
+  max-inline-size: 100%;
+}
+
 .tripBig {
   margin: 0;
   font-size: var(--fs-l);
