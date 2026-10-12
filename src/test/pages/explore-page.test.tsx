@@ -411,8 +411,8 @@ describe("explore page", () => {
       screen.queryByRole("button", { name: "Load more travelling looks" }),
     ).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Load more recurring looks" }));
-    fireEvent.click(screen.getByRole("button", { name: "Load more years" }));
-    expect(screen.queryByRole("button", { name: "Load more years" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "More years" }));
+    expect(screen.queryByRole("button", { name: "More years" })).not.toBeInTheDocument();
 
     const locationControls = screen.getByLabelText("Location chart view");
     fireEvent.click(locationControls.querySelectorAll("button")[1]!);

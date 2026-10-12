@@ -340,6 +340,7 @@ describe("computeVisualSamenessStats derived views", () => {
       { year: 2020, count: 29 },
       { year: 2024, count: 30 },
     ]);
+    expect(stats?.lookTimeline.map(({ photos }) => photos.length)).toEqual([29, 30]);
     expect(stats?.lookDrift).toEqual(expect.objectContaining({ firstYear: 2020, lastYear: 2024 }));
     expect(stats?.averageExamples).toHaveLength(12);
     expect(stats?.outlierExamples).toHaveLength(12);

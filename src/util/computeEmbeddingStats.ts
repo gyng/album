@@ -977,8 +977,7 @@ export const computeVisualSamenessStats = async (
                   score: dotProduct(candidate.vector, normalizedYearCentroid),
                 }))
                 .sort((left, right) => right.score - left.score)
-                .map((match) => photoLookup.get(match.candidate.path)!)
-                .slice(0, 3);
+                .map((match) => photoLookup.get(match.candidate.path)!);
               return {
                 year,
                 photos,

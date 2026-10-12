@@ -313,20 +313,18 @@
   box-shadow: 0 0 0 var(--size-1) color-mix(in oklch, var(--c-accent) 50%, transparent);
 }
 
-/* Aligned cards use a compact two-column timeline. :where() keeps these
-   contextual adjustments at the same cascade weight as the base classes above
-   (which they must follow in source order to win), so the compact viewport
-   rules below can still override them naturally. */
+/* Aligned cards keep a compact rail and content column at every viewport size. */
 :where(.timelineSectionAligned) > .visualTimeline {
   inline-size: 100%;
 }
 
-:where(.timelineSectionAligned) .visualTimelineRow {
+.timelineSectionAligned .visualTimelineRow {
   grid-template-columns: var(--visual-timeline-rail-width) minmax(0, 1fr);
   gap: var(--m);
 }
 
-:where(.timelineSectionAligned) .visualTimelineRow::after {
+.timelineSectionAligned .visualTimelineRow::after {
+  display: block;
   inset-inline-start: calc(var(--visual-timeline-rail-width) / 2);
 }
 
@@ -380,8 +378,20 @@
   aspect-ratio: 1;
 }
 
-.visualTimelineThumbWrap {
+.visualTimelineThumbs .visualTimelineThumbWrap {
   inline-size: var(--visual-timeline-thumb-size);
+  flex: 0 0 var(--visual-timeline-thumb-size);
+}
+
+.visualTimelineThumbWrap .visualThumbSearchButton {
+  inline-size: var(--tap-target);
+  justify-content: center;
+  padding-inline: 0;
+  gap: 0;
+}
+
+.visualTimelineThumbWrap .visualThumbSearchButton > span:not(:first-child) {
+  display: none;
 }
 
 .revisitSection {

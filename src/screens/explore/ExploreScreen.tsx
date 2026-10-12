@@ -54,6 +54,7 @@ import {
   ExploreArchiveGaps,
   ExploreThisDaySection,
 } from "../../components/explore/ExploreTimeSections";
+import { ExploreLookYearPhotos } from "../../components/explore/ExploreLookYearPhotos";
 import { ExploreColourSection } from "../../components/explore/ExploreColourSection";
 import { ExploreGearSection } from "../../components/explore/ExploreGearSection";
 import { EmbeddingSpaceDeferred } from "../../components/EmbeddingSpaceDeferred";
@@ -680,23 +681,14 @@ const ExploreScreen = ({
                               <div className={styles.visualTimelineRail} aria-hidden="true">
                                 <span className={styles.visualTimelineDot} />
                               </div>
-                              <div className={styles.visualTimelineThumbs}>
-                                {entry.photos.map((photo) => (
-                                  <VisualSimilarityThumb
-                                    key={photo.path}
-                                    photo={photo}
-                                    // invariant: CSS module classes always resolve
-                                    className={styles.visualTimelineThumbWrap!}
-                                    imageClassName={`${styles.visualEraThumb} ${styles.visualTimelineThumb}`}
-                                  />
-                                ))}
-                              </div>
+                              <ExploreLookYearPhotos year={entry.year} photos={entry.photos} />
                             </div>
                           ))}
                         </div>
                         {visualSameness.lookTimeline.length > lookTimeline.length ? (
                           <PillButton
                             className={styles.loadMoreButton}
+                            aria-label="More years"
                             onClick={() => {
                               setVisibleLookTimeline((count) =>
                                 Math.min(
@@ -706,7 +698,7 @@ const ExploreScreen = ({
                               );
                             }}
                           >
-                            <span>Load more years</span>
+                            <span>More</span>
                           </PillButton>
                         ) : null}
                       </section>
