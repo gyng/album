@@ -114,7 +114,7 @@
 .clusterName.clusterNameChosen {
   background-color: var(--c-accent);
   border-color: var(--c-accent);
-  color: var(--c-white);
+  color: light-dark(var(--c-white), var(--c-black));
 }
 
 .clusterCount {

@@ -8,6 +8,7 @@
 export const NAMED_THEMES = [
   "paper",
   "ink",
+  "darkroom",
   "slate",
   "watercolour",
   "ember",
@@ -27,6 +28,7 @@ export const THEME_SCHEMES: Record<ThemeName, "light" | "dark"> = {
   dark: "dark",
   paper: "light",
   ink: "dark",
+  darkroom: "dark",
   slate: "dark",
   watercolour: "light",
   ember: "dark",
@@ -44,6 +46,7 @@ export const THEME_LABELS: Record<ThemeName, string> = {
   dark: "Dark",
   paper: "Paper",
   ink: "Ink",
+  darkroom: "Darkroom",
   slate: "Slate",
   watercolour: "Watercolour",
   ember: "Ember",

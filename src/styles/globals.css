@@ -470,6 +470,22 @@ body.dark {
   --c-accent: oklch(71% 0.2 27);
 }
 
+/* Darkroom — warm black surfaces, print-paper text and a red safelight. */
+:root:where(.theme-darkroom),
+:where(.theme-darkroom) {
+  --c-bg: #140e0e;
+  --c-overlay: rgb(20 14 14 / 0.78);
+  --c-font: #ebe0d5;
+  --c-bg-contrast-light: #b2a29a;
+  --c-bg-contrast-dark: #352221;
+  --c-accent: #f75a4f;
+  --c-bg-edit: #351b18;
+  --c-heatmap-low: #38211e;
+  --c-heatmap-mid: #74342c;
+  --c-heatmap-high: #c14a3d;
+  --c-heatmap-peak: #ff8270;
+}
+
 /* Slate — an architect's midnight contact sheet: cyan blueprint rulings,
    condensed labelling and cool steel surfaces. */
 :root:where(.theme-slate),

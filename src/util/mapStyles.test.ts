@@ -140,6 +140,13 @@ describe("the basemap that follows the page", () => {
 });
 
 describe("defaultMapStyleForTheme", () => {
+  it("offers Darkroom independently and follows it when matching the site theme", () => {
+    expect(MAP_STYLE_NAMES).toContain("darkroom");
+    expect(mapStyleUrl("darkroom")).toBe("/map-styles/theme-darkroom.json");
+    expect(defaultMapStyleForTheme("darkroom")).toBe("darkroom");
+    expect(mapStyleForChoice(AUTO_MAP_STYLE, "darkroom")).toBe("darkroom");
+    expect(mapStyleForChoice("streets", "darkroom")).toBe("streets");
+  });
   // A theme with an obvious map of its own supplies it — but only as a default:
   // a reader's own choice is read from storage and outranks this entirely.
   it("gives a theme its own map where there is one", () => {

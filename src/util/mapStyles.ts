@@ -38,6 +38,7 @@ export type MapStyleName =
   | "sketch"
   | "streets"
   | "dark"
+  | "darkroom"
   | "watercolour"
   | "monochrome"
   | "neon"
@@ -138,6 +139,12 @@ export const MAP_STYLES: Record<
     label: "Dark",
     swatch: "#1b1f24",
     group: "provider",
+  },
+  darkroom: {
+    source: { provider: "self", path: "/map-styles/theme-darkroom.json" },
+    label: "Darkroom",
+    swatch: "linear-gradient(135deg, #140e0e 60%, #a33b32)",
+    group: "made-here",
   },
   // A wash, composed here rather than copied: the transplanted document's whole
   // look came from a raster texture tileset this fork does not have, and what
@@ -277,6 +284,7 @@ const THEME_MAP_STYLES: Partial<Record<ThemeName, MapStyleName>> = {
   terminal: "crt",
   paper: "paper",
   ink: "sketch",
+  darkroom: "darkroom",
   watercolour: "watercolour",
   herbarium: "herbarium",
   bling: "neon",

@@ -59,6 +59,7 @@ describe("ThemeToggle", () => {
   it.each([
     ["watercolour", "Watercolour", "light"],
     ["ember", "Ember", "dark"],
+    ["darkroom", "Darkroom", "dark"],
     ["bling", "Bling", "dark"],
     ["herbarium", "Herbarium", "light"],
     ["arcana", "Arcana", "dark"],

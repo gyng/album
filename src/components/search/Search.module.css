@@ -174,7 +174,7 @@
     padding: 0 var(--m);
     border-radius: var(--radius-pill);
     background: var(--c-accent);
-    color: var(--c-white);
+    color: light-dark(var(--c-white), var(--c-black));
     font-size: var(--fs-xs);
     font-variant-numeric: tabular-nums;
   }
