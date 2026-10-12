@@ -9,6 +9,55 @@ test.use({ serviceWorkers: "block" });
 const slideshowImage = 'img[alt]:not([aria-hidden="true"])';
 const updateTestUrl = `/slideshow/shell?mode=random&filter=test-simple&delay=86400&photo=${encodeURIComponent("../albums/test-simple/DSCF2485-2.jpg")}`;
 
+test.describe("touch slideshow controls", () => {
+  test.use({ hasTouch: true });
+
+  test("touch controls hide after a shell reload even when runtime painting stops", async ({
+    page,
+  }) => {
+    test.setTimeout(80_000);
+    await page.addInitScript(() => {
+      const state = window as Window & { __stallAnimationFrames?: () => void };
+      const requestFrame = window.requestAnimationFrame.bind(window);
+      const cancelFrame = window.cancelAnimationFrame.bind(window);
+      const pending = new Set<number>();
+      window.requestAnimationFrame = (callback) => {
+        let id = 0;
+        id = requestFrame((time) => {
+          pending.delete(id);
+          callback(time);
+        });
+        pending.add(id);
+        return id;
+      };
+      window.cancelAnimationFrame = (id) => {
+        pending.delete(id);
+        cancelFrame(id);
+      };
+      state.__stallAnimationFrames = () => {
+        pending.forEach(cancelFrame);
+        pending.clear();
+        window.requestAnimationFrame = () => 0;
+      };
+    });
+    await gotoHydrated(page, updateTestUrl);
+    const frame = page.locator('iframe[title="Slideshow"]');
+    await expect(frame).toHaveAttribute("data-ready", "true", { timeout: 20_000 });
+    await page.reload();
+    await expect(page.locator("html")).toHaveAttribute("data-app-hydrated", "true");
+    await expect(frame).toHaveAttribute("data-ready", "true", { timeout: 20_000 });
+    const runtime = await (await frame.elementHandle())!.contentFrame();
+    expect(runtime).not.toBeNull();
+    const controls = runtime!.locator("[data-controls-visible][data-paused]");
+    await expect(controls).toHaveAttribute("data-controls-visible", "true");
+    await runtime!.evaluate(() => {
+      (window as Window & { __stallAnimationFrames?: () => void }).__stallAnimationFrames!();
+    });
+    await expect(controls).toHaveAttribute("data-controls-visible", "false", { timeout: 35_000 });
+    await expect(frame).toHaveAttribute("data-ready", "true");
+  });
+});
+
 test("a runtime that stops reporting health recovers without releasing the parent lock", async ({
   page,
 }) => {

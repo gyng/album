@@ -25,9 +25,8 @@ export type UseControlsAutoHide = {
 };
 
 // Owns the slideshow controls' visibility lifecycle: coarse-pointer detection,
-// the requestAnimationFrame auto-hide countdown (with its progress ring), and
-// the desktop show/hide + post-Hide suppression. Extracted verbatim from the
-// slideshow page; consumers destructure to the same local names they used.
+// an independent hide deadline, the animated progress ring, and
+// the desktop show/hide + post-Hide suppression.
 export const useControlsAutoHide = (): UseControlsAutoHide => {
   const [controlsVisible, setControlsVisible] = React.useState(true);
   const [controlsHideProgress, setControlsHideProgress] = React.useState(1);
@@ -89,8 +88,37 @@ export const useControlsAutoHide = (): UseControlsAutoHide => {
     setControlsHideProgress(1);
 
     let frameId = 0;
+    let hideTimerId = 0;
+    let active = true;
+
+    const hideExpiredControls = () => {
+      controlsHideDeadlineRef.current = null;
+      setControlsHideProgress(0);
+      setControlsVisible(false);
+    };
+
+    // A reloaded or suspended iframe may stop receiving animation frames.
+    // Painting the ring must never be what makes the controls disappear.
+    const checkDeadline = () => {
+      if (!active) return;
+      const currentDeadline = controlsHideDeadlineRef.current;
+      if (currentDeadline === null) return;
+      const remaining = Math.max(0, currentDeadline - Date.now());
+      window.clearTimeout(hideTimerId);
+      if (remaining === 0) {
+        hideExpiredControls();
+        return;
+      }
+      setControlsHideProgress(remaining / autoHideMs);
+      hideTimerId = window.setTimeout(checkDeadline, remaining);
+    };
+
+    const checkOnResume = () => {
+      if (document.visibilityState !== "hidden") checkDeadline();
+    };
 
     const tick = () => {
+      if (!active) return;
       const currentDeadline = controlsHideDeadlineRef.current;
       if (!currentDeadline) {
         setControlsHideProgress(0);
@@ -102,16 +130,26 @@ export const useControlsAutoHide = (): UseControlsAutoHide => {
       setControlsHideProgress(progress);
 
       if (remaining <= 0) {
-        controlsHideDeadlineRef.current = null;
-        setControlsVisible(false);
+        hideExpiredControls();
         return;
       }
       frameId = window.requestAnimationFrame(tick);
     };
 
+    checkDeadline();
+    window.addEventListener("pageshow", checkOnResume);
+    window.addEventListener("focus", checkOnResume);
+    document.addEventListener("visibilitychange", checkOnResume);
     frameId = window.requestAnimationFrame(tick);
 
-    return () => window.cancelAnimationFrame(frameId);
+    return () => {
+      active = false;
+      window.clearTimeout(hideTimerId);
+      window.cancelAnimationFrame(frameId);
+      window.removeEventListener("pageshow", checkOnResume);
+      window.removeEventListener("focus", checkOnResume);
+      document.removeEventListener("visibilitychange", checkOnResume);
+    };
   }, [controlsVisible, isCoarsePointer, isPointerOverToolbar]);
 
   const showControlsForDesktop = useCallback(() => {

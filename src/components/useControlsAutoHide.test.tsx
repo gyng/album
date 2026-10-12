@@ -24,14 +24,13 @@ const mockMatchMedia = (matches: boolean) => {
 
 describe("useControlsAutoHide", () => {
   beforeEach(() => {
-    // Fake timers mock Date.now() so the 700ms suppression window is
-    // controllable; the rAF auto-hide deadline (3s) is never advanced to in
-    // these tests, so controls don't spontaneously hide mid-assertion.
+    // Fake timers keep the hide deadline and desktop reveal suppression deterministic.
     jest.useFakeTimers();
     mockMatchMedia(false); // desktop / fine pointer by default
   });
 
   afterEach(() => {
+    jest.restoreAllMocks();
     jest.useRealTimers();
   });
 
@@ -104,6 +103,55 @@ describe("useControlsAutoHide", () => {
     });
     expect(result.current.controlsVisible).toBe(false);
     expect(result.current.controlsHideProgress).toBe(0);
+  });
+
+  it("hides touch controls after reload even when animation frames stop arriving", () => {
+    mockMatchMedia(true);
+    jest.spyOn(window, "requestAnimationFrame").mockReturnValue(1);
+    jest.spyOn(window, "cancelAnimationFrame").mockImplementation(() => {});
+    const { result } = renderHook(() => useControlsAutoHide());
+    act(() => {
+      jest.advanceTimersByTime(31000);
+    });
+    expect(result.current.controlsVisible).toBe(false);
+    expect(result.current.controlsHideProgress).toBe(0);
+    jest.restoreAllMocks();
+  });
+
+  it("checks an expired touch deadline when the document resumes without timer delivery", () => {
+    mockMatchMedia(true);
+    jest.spyOn(window, "requestAnimationFrame").mockReturnValue(1);
+    jest.spyOn(window, "cancelAnimationFrame").mockImplementation(() => {});
+    const { result } = renderHook(() => useControlsAutoHide());
+    act(() => {
+      jest.setSystemTime(Date.now() + 31000);
+      window.dispatchEvent(new Event("pageshow"));
+    });
+    expect(result.current.controlsVisible).toBe(false);
+    expect(result.current.controlsHideProgress).toBe(0);
+    jest.restoreAllMocks();
+  });
+
+  it("keeps the extended touch deadline when animation frames have stalled", () => {
+    mockMatchMedia(true);
+    jest.spyOn(window, "requestAnimationFrame").mockReturnValue(1);
+    jest.spyOn(window, "cancelAnimationFrame").mockImplementation(() => {});
+    const { result } = renderHook(() => useControlsAutoHide());
+    act(() => {
+      jest.advanceTimersByTime(20000);
+    });
+    act(() => {
+      result.current.extendControlsHideDeadline();
+    });
+    act(() => {
+      jest.advanceTimersByTime(29000);
+    });
+    expect(result.current.controlsVisible).toBe(true);
+    act(() => {
+      jest.advanceTimersByTime(1100);
+    });
+    expect(result.current.controlsVisible).toBe(false);
+    jest.restoreAllMocks();
   });
 
   it("pauses the countdown while the pointer is over the toolbar", () => {
