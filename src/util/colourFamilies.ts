@@ -1,5 +1,7 @@
 export const COLOUR_FAMILIES = [
-  { label: "Dark neutrals", rgb: [48, 48, 48], swatch: "#303030" },
+  // Lift the display swatch so dark tones remain visible on dark surfaces;
+  // colour search still targets the original deep grey.
+  { label: "Dark neutrals", rgb: [48, 48, 48], swatch: "#77716a" },
   { label: "Mid neutrals", rgb: [143, 138, 132], swatch: "#8f8a84" },
   { label: "Light neutrals", rgb: [225, 224, 219], swatch: "#e1e0db" },
   { label: "Red", rgb: [217, 83, 79], swatch: "#d9534f" },
