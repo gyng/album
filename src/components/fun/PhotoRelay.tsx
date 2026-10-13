@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type DragEvent } from "react";
-import { Button, Caption, Heading } from "../ui";
+import { Button, Caption, Heading, KeyHint } from "../ui";
 import {
   buildRelayPuzzle,
   scoreRelay,
@@ -15,7 +15,7 @@ import { useGameReadiness } from "./GameReadiness";
 import { GameDock } from "./GameDock";
 import styles from "./PhotoGames.module.css";
 import relayStyles from "./PhotoRelay.module.css";
-import { useGameShortcuts, GameShortcutHelp } from "./useGameShortcuts";
+import { useGameShortcuts } from "./useGameShortcuts";
 
 export const PhotoRelay = ({ photos }: { photos: PhotoGamePhoto[] }) => {
   const { loading } = useGameReadiness();
@@ -108,8 +108,8 @@ export const PhotoRelay = ({ photos }: { photos: PhotoGamePhoto[] }) => {
         </p>
         <Button variant="primary" onClick={start}>
           Start relay
+          <KeyHint aria-hidden="true">N</KeyHint>
         </Button>
-        <GameShortcutHelp shortcuts={shortcuts} />
       </GameIntro>
     );
   return (
@@ -323,6 +323,7 @@ export const PhotoRelay = ({ photos }: { photos: PhotoGamePhoto[] }) => {
               onClick={() => finish(false)}
             >
               Finish relay
+              <KeyHint aria-hidden="true">Enter</KeyHint>
             </Button>
             <Button
               onClick={(event) => {
@@ -337,6 +338,7 @@ export const PhotoRelay = ({ photos }: { photos: PhotoGamePhoto[] }) => {
             </Button>
             <Button variant="quiet" onClick={() => finish(true)}>
               Give up
+              <KeyHint aria-hidden="true">G</KeyHint>
             </Button>
           </div>
         </>
@@ -430,10 +432,10 @@ export const PhotoRelay = ({ photos }: { photos: PhotoGamePhoto[] }) => {
           ) : null}
           <Button variant="primary" onClick={start}>
             Play again
+            <KeyHint aria-hidden="true">N</KeyHint>
           </Button>
         </div>
       )}
-      <GameShortcutHelp shortcuts={shortcuts} />
     </div>
   );
 };

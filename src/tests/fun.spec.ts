@@ -338,7 +338,7 @@ for (const width of [390, 1280]) {
             expect(
               Math.abs(before[element]![dimension] - after[element]![dimension]),
             ).toBeLessThanOrEqual(1);
-        await expect(page.getByRole("note", { name: "Keyboard shortcuts" })).toBeVisible();
+        await expect(start.locator("kbd")).toHaveText("N");
       } finally {
         release();
       }

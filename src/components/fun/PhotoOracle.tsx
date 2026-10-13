@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Button, Caption, Heading } from "../ui";
+import { Button, Caption, Heading, KeyHint } from "../ui";
 import {
   answerOracle,
   chooseOracleQuestion,
@@ -18,7 +18,7 @@ import { useGameSettings } from "./useGameSettings";
 import styles from "./PhotoGames.module.css";
 import oracleStyles from "./PhotoOracle.module.css";
 import { useGameReadiness } from "./GameReadiness";
-import { useGameShortcuts, GameShortcutHelp } from "./useGameShortcuts";
+import { useGameShortcuts } from "./useGameShortcuts";
 
 type OracleAnswer = { id: string; question: string; answer: "yes" | "no" | "unsure" };
 
@@ -202,6 +202,7 @@ export const PhotoOracle = ({ photos }: { photos: PhotoGamePhoto[] }) => {
             onClick={() => start("mind")}
           >
             Meet the oracle
+            {mode === "mind" ? <KeyHint aria-hidden="true">N</KeyHint> : null}
           </Button>
           <Button
             variant={mode === "discover" ? "primary" : "surface"}
@@ -209,9 +210,9 @@ export const PhotoOracle = ({ photos }: { photos: PhotoGamePhoto[] }) => {
             onClick={() => start("discover")}
           >
             Find me a photograph
+            {mode === "discover" ? <KeyHint aria-hidden="true">N</KeyHint> : null}
           </Button>
         </div>
-        <GameShortcutHelp shortcuts={shortcuts} />
       </GameIntro>
     );
   return (
@@ -247,6 +248,7 @@ export const PhotoOracle = ({ photos }: { photos: PhotoGamePhoto[] }) => {
           <div className={styles.actions}>
             <Button variant="primary" onClick={() => setStage("questions")}>
               I have my photograph
+              <KeyHint aria-hidden="true">Space</KeyHint>
             </Button>
             <Button variant="quiet" onClick={() => setStage("choose")}>
               Choose another
@@ -279,9 +281,11 @@ export const PhotoOracle = ({ photos }: { photos: PhotoGamePhoto[] }) => {
               <div className={styles.actions}>
                 <Button variant="primary" onClick={keep}>
                   {mode === "mind" ? "That's it" : "Keep this one"}
+                  <KeyHint aria-hidden="true">1</KeyHint>
                 </Button>
                 <Button disabled={candidates.length <= 1} onClick={another}>
                   {mode === "mind" ? "Not this one" : "Another match"}
+                  <KeyHint aria-hidden="true">2</KeyHint>
                 </Button>
               </div>
             </>
@@ -299,6 +303,9 @@ export const PhotoOracle = ({ photos }: { photos: PhotoGamePhoto[] }) => {
                     onClick={() => handleAnswer(answer)}
                   >
                     {answer === "yes" ? "Yes" : answer === "no" ? "No" : "Not sure"}
+                    <KeyHint aria-hidden="true">
+                      {answer === "yes" ? "1" : answer === "no" ? "2" : "3"}
+                    </KeyHint>
                   </Button>
                 ))}
               </div>
@@ -309,6 +316,7 @@ export const PhotoOracle = ({ photos }: { photos: PhotoGamePhoto[] }) => {
           <div className={styles.actions}>
             <Button disabled={!history.length} onClick={back}>
               Back
+              <KeyHint aria-hidden="true">B</KeyHint>
             </Button>
             <Button
               variant="quiet"
@@ -321,7 +329,7 @@ export const PhotoOracle = ({ photos }: { photos: PhotoGamePhoto[] }) => {
               {mode === "mind" ? "Give up" : "Show a match now"}
             </Button>
           </div>
-          <GameShortcutHelp shortcuts={shortcuts} />
+
           <AnswerTrail answers={answers} />
         </>
       ) : null}
@@ -343,13 +351,13 @@ export const PhotoOracle = ({ photos }: { photos: PhotoGamePhoto[] }) => {
           <AnswerTrail answers={answers} />
           <Button variant="primary" onClick={() => start()}>
             Play again
+            <KeyHint aria-hidden="true">N</KeyHint>
           </Button>
           <Button variant="quiet" onClick={() => setStage("lobby")}>
             Change mode
           </Button>
         </div>
       ) : null}
-      {stage !== "questions" ? <GameShortcutHelp shortcuts={shortcuts} /> : null}
     </div>
   );
 };

@@ -9,10 +9,10 @@ import {
   type PhotoCrosswordPuzzle,
 } from "../../util/photoCrossword";
 import { shuffleGamePhotos, type PhotoGamePhoto } from "../../util/photoGames";
-import { Button, Caption, Heading } from "../ui";
+import { Button, Caption, Heading, KeyHint } from "../ui";
 import { GameIntro } from "./GameIllustration";
 import { GamePhoto } from "./GamePhoto";
-import { GameShortcutHelp, useGameShortcuts, type GameShortcut } from "./useGameShortcuts";
+import { useGameShortcuts, type GameShortcut } from "./useGameShortcuts";
 import { useGameSettings } from "./useGameSettings";
 import styles from "./PhotoCrossword.module.css";
 
@@ -307,8 +307,8 @@ export const PhotoCrossword = ({ photos }: { photos: PhotoGamePhoto[] }) => {
         {message ? <p role="alert">{message}</p> : null}
         <Button variant="primary" onClick={start}>
           Start crossing
+          <KeyHint aria-hidden="true">N</KeyHint>
         </Button>
-        <GameShortcutHelp shortcuts={shortcuts} />
       </GameIntro>
     );
   return (
@@ -355,6 +355,7 @@ export const PhotoCrossword = ({ photos }: { photos: PhotoGamePhoto[] }) => {
             {mode === "hidden" && !finished && remainingHints > 0 ? (
               <Button aria-label="Hint" onClick={revealHint}>
                 Hint · {remainingHints}
+                <KeyHint aria-hidden="true">H</KeyHint>
               </Button>
             ) : null}
           </div>
@@ -580,6 +581,7 @@ export const PhotoCrossword = ({ photos }: { photos: PhotoGamePhoto[] }) => {
               <div className={styles.actions}>
                 <Button variant="primary" onClick={checkGrid}>
                   Check grid
+                  <KeyHint aria-hidden="true">Enter</KeyHint>
                 </Button>
                 <Button
                   disabled={!selected || !used.has(selected)}
@@ -606,6 +608,7 @@ export const PhotoCrossword = ({ photos }: { photos: PhotoGamePhoto[] }) => {
                 <Button onClick={() => setTiles(shuffleGamePhotos(tiles))}>Shuffle</Button>
                 <Button variant="quiet" onClick={giveUp}>
                   Give up
+                  <KeyHint aria-hidden="true">G</KeyHint>
                 </Button>
               </div>
               {selected ? (
@@ -619,6 +622,7 @@ export const PhotoCrossword = ({ photos }: { photos: PhotoGamePhoto[] }) => {
             <div className={styles.actions}>
               <Button variant="primary" onClick={start}>
                 Play again
+                <KeyHint aria-hidden="true">N</KeyHint>
               </Button>
               <Button
                 onClick={() => {
@@ -634,7 +638,6 @@ export const PhotoCrossword = ({ photos }: { photos: PhotoGamePhoto[] }) => {
           <p role="status">
             {message || (selected ? "Choose a square for the selected photograph." : "")}
           </p>
-          <GameShortcutHelp shortcuts={shortcuts} />
         </div>
       </div>
     </div>

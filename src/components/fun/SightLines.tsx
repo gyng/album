@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import { Button, Caption } from "../ui";
+import { Button, Caption, KeyHint } from "../ui";
 import { GameIntro } from "./GameIllustration";
 import { GameDock } from "./GameDock";
 import { GamePhoto, PhotoChain } from "./GamePhoto";
 import { useGameSettings } from "./useGameSettings";
-import { useGameShortcuts, GameShortcutHelp } from "./useGameShortcuts";
+import { useGameShortcuts } from "./useGameShortcuts";
 import {
   buildPhotoWordSearch,
   PHOTO_SEARCH_SIZES,
@@ -160,8 +160,8 @@ export const SightLines = ({ photos }: { photos: PhotoGamePhoto[] }) => {
         {message ? <p role="alert">{message}</p> : null}
         <Button variant="primary" onClick={start}>
           Start searching
+          <KeyHint aria-hidden="true">N</KeyHint>
         </Button>
-        <GameShortcutHelp shortcuts={shortcuts} />
       </GameIntro>
     );
   const shownLines = puzzle.targets.flatMap((target, index) => {
@@ -189,11 +189,17 @@ export const SightLines = ({ photos }: { photos: PhotoGamePhoto[] }) => {
           </Caption>
           {!finished ? (
             <>
-              <Button onClick={showHint}>Hint</Button>
-              <Button onClick={giveUp}>Give up</Button>
+              <Button onClick={showHint}>
+                Hint<KeyHint aria-hidden="true">H</KeyHint>
+              </Button>
+              <Button onClick={giveUp}>
+                Give up<KeyHint aria-hidden="true">G</KeyHint>
+              </Button>
             </>
           ) : (
-            <Button onClick={start}>Play again</Button>
+            <Button onClick={start}>
+              Play again<KeyHint aria-hidden="true">N</KeyHint>
+            </Button>
           )}
         </div>
         <section aria-label="Search targets" className={styles.targets}>
@@ -393,7 +399,6 @@ export const SightLines = ({ photos }: { photos: PhotoGamePhoto[] }) => {
           ))}
         </section>
       ) : null}
-      <GameShortcutHelp shortcuts={shortcuts} />
     </div>
   );
 };

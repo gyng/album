@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Button, Caption, LoadingIndicator } from "../ui";
+import { Button, Caption, LoadingIndicator, KeyHint } from "../ui";
 import { GameIntro } from "./GameIllustration";
 import { GameDock } from "./GameDock";
 import { PhotoChain } from "./GamePhoto";
@@ -16,7 +16,7 @@ import {
 } from "../../util/photoHangman";
 import type { PhotoGamePhoto } from "../../util/photoGames";
 import styles from "./PhotoHangman.module.css";
-import { useGameShortcuts, GameShortcutHelp } from "./useGameShortcuts";
+import { useGameShortcuts } from "./useGameShortcuts";
 
 const subjectLabel = (subject: string) => subject[0]! + subject.slice(1).toLowerCase();
 
@@ -89,8 +89,8 @@ export const PhotoHangman = ({ photos }: { photos: PhotoGamePhoto[] }) => {
         {error ? <p role="alert">{error}</p> : null}
         <Button variant="primary" onClick={start}>
           Start guessing
+          <KeyHint aria-hidden="true">N</KeyHint>
         </Button>
-        <GameShortcutHelp shortcuts={shortcuts} />
       </GameIntro>
     );
   const revealed = Math.min(misses + HANGMAN_INITIAL_CLUES, puzzle.photos.length);
@@ -277,6 +277,7 @@ export const PhotoHangman = ({ photos }: { photos: PhotoGamePhoto[] }) => {
                 }}
               >
                 Give up
+                <KeyHint aria-hidden="true">G</KeyHint>
               </Button>
             </>
           ) : (
@@ -293,12 +294,13 @@ export const PhotoHangman = ({ photos }: { photos: PhotoGamePhoto[] }) => {
                   : `${guesses.length} ${guesses.length === 1 ? "guess" : "guesses"} · ${misses} ${misses === 1 ? "miss" : "misses"}.`}
               </p>
               <PhotoChain photos={puzzle.photos} numbered={false} />
-              <Button onClick={start}>Play again</Button>
+              <Button onClick={start}>
+                Play again<KeyHint aria-hidden="true">N</KeyHint>
+              </Button>
             </section>
           )}
         </div>
       </div>
-      <GameShortcutHelp shortcuts={shortcuts} />
     </div>
   );
 };

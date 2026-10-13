@@ -6,13 +6,13 @@ import {
   type ConnectionsPuzzle,
   type PhotoGamePhoto,
 } from "../../util/photoGames";
-import { Button, Caption, Heading, Icon } from "../ui";
+import { Button, Caption, Heading, Icon, KeyHint } from "../ui";
 import { GameIntro } from "./GameIllustration";
 import { GamePhoto, PhotoChain } from "./GamePhoto";
 import { GameProgress } from "./GameFeedback";
 import { GameDock } from "./GameDock";
 import { useGameSettings } from "./useGameSettings";
-import { GameShortcutHelp, useGameShortcuts } from "./useGameShortcuts";
+import { useGameShortcuts } from "./useGameShortcuts";
 import shuffleStyles from "./PhotoConnections.module.css";
 import styles from "./PhotoGames.module.css";
 
@@ -185,8 +185,8 @@ export const PhotoConnections = ({ photos }: { photos: PhotoGamePhoto[] }) => {
         {message ? <p role="alert">{message}</p> : null}
         <Button variant="primary" onClick={start}>
           Start connecting
+          <KeyHint aria-hidden="true">N</KeyHint>
         </Button>
-        <GameShortcutHelp shortcuts={shortcuts} />
       </GameIntro>
     );
   const visibleGroups = finished
@@ -222,18 +222,20 @@ export const PhotoConnections = ({ photos }: { photos: PhotoGamePhoto[] }) => {
             onClick={submit}
           >
             Check
+            <KeyHint aria-hidden="true">Enter</KeyHint>
           </Button>
           <Button
-            size="icon"
             aria-label="Deselect"
             title="Deselect"
             disabled={!selected.length}
             onClick={deselect}
           >
             <Icon kind="close" />
+            <KeyHint aria-hidden="true">Esc</KeyHint>
           </Button>
-          <Button size="icon" aria-label="Shuffle" title="Shuffle" onClick={shuffle}>
+          <Button aria-label="Shuffle" title="Shuffle" onClick={shuffle}>
             <Icon kind="shuffle" />
+            <KeyHint aria-hidden="true">S</KeyHint>
           </Button>
         </GameDock>
       ) : null}
@@ -316,6 +318,7 @@ export const PhotoConnections = ({ photos }: { photos: PhotoGamePhoto[] }) => {
           <div className={styles.actions}>
             <Button variant="quiet" onClick={() => setGaveUp(true)}>
               Give up
+              <KeyHint aria-hidden="true">G</KeyHint>
             </Button>
           </div>
         </>
@@ -323,6 +326,7 @@ export const PhotoConnections = ({ photos }: { photos: PhotoGamePhoto[] }) => {
         <div className={styles.actions}>
           <Button variant="primary" onClick={start}>
             Play again
+            <KeyHint aria-hidden="true">N</KeyHint>
           </Button>
           <Button
             onClick={() => {
@@ -334,7 +338,6 @@ export const PhotoConnections = ({ photos }: { photos: PhotoGamePhoto[] }) => {
           </Button>
         </div>
       )}
-      <GameShortcutHelp shortcuts={shortcuts} />
     </div>
   );
 };

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Button, Caption, Heading, LoadingIndicator } from "../ui";
+import { Button, Caption, Heading, LoadingIndicator, KeyHint } from "../ui";
 import { SearchDrawPad } from "../search/SearchDrawPad";
 import { useImageQuery } from "../search/useImageQuery";
 import { ProgressBar } from "../ProgressBar";
@@ -14,7 +14,7 @@ import { GamePhoto, PhotoChain } from "./GamePhoto";
 import { GameIntro } from "./GameIllustration";
 import { useGameReadiness } from "./GameReadiness";
 import styles from "./PhotoGames.module.css";
-import { useGameShortcuts, GameShortcutHelp } from "./useGameShortcuts";
+import { useGameShortcuts } from "./useGameShortcuts";
 
 export const BlindFrame = ({ photos }: { photos: PhotoGamePhoto[] }) => {
   const { loading } = useGameReadiness();
@@ -103,8 +103,8 @@ export const BlindFrame = ({ photos }: { photos: PhotoGamePhoto[] }) => {
         </p>
         <Button variant="primary" onClick={start}>
           Start Blind Frame
+          <KeyHint aria-hidden="true">N</KeyHint>
         </Button>
-        <GameShortcutHelp shortcuts={shortcuts} />
       </GameIntro>
     );
   return (
@@ -174,6 +174,7 @@ export const BlindFrame = ({ photos }: { photos: PhotoGamePhoto[] }) => {
           <div className={styles.actions}>
             <Button variant="primary" onClick={start}>
               Play again
+              <KeyHint aria-hidden="true">N</KeyHint>
             </Button>
             <Button
               onClick={() => {
@@ -225,6 +226,7 @@ export const BlindFrame = ({ photos }: { photos: PhotoGamePhoto[] }) => {
                 onClick={() => setDrawing(true)}
               >
                 Draw this scene
+                <KeyHint aria-hidden="true">D</KeyHint>
               </Button>
             ) : null}
             <Button variant="quiet" onClick={start}>
@@ -238,6 +240,7 @@ export const BlindFrame = ({ photos }: { photos: PhotoGamePhoto[] }) => {
               }}
             >
               Give up
+              <KeyHint aria-hidden="true">G</KeyHint>
             </Button>
           </div>
         </>
@@ -263,7 +266,6 @@ export const BlindFrame = ({ photos }: { photos: PhotoGamePhoto[] }) => {
           }}
         />
       ) : null}
-      <GameShortcutHelp shortcuts={shortcuts} />
     </div>
   );
 };

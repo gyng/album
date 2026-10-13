@@ -1,5 +1,4 @@
 import { useEffect, useRef } from "react";
-import styles from "./GameShortcuts.module.css";
 import { useGameReadiness } from "./GameReadiness";
 
 export type GameShortcut = {
@@ -42,19 +41,4 @@ export const useGameShortcuts = (shortcuts: readonly GameShortcut[], active = tr
     window.addEventListener("keydown", handle);
     return () => window.removeEventListener("keydown", handle);
   }, [active, loading]);
-};
-
-export const GameShortcutHelp = ({ shortcuts }: { shortcuts: readonly GameShortcut[] }) => {
-  const available = shortcuts.filter((shortcut) => shortcut.enabled !== false);
-  if (!available.length) return null;
-  return (
-    <div className={styles.help} role="note" aria-label="Keyboard shortcuts">
-      {available.map(({ key, label }) => (
-        <span className={styles.hint} key={key}>
-          <kbd>{key === "Escape" ? "Esc" : key.length === 1 ? key.toUpperCase() : key}</kbd>
-          <span>{label}</span>
-        </span>
-      ))}
-    </div>
-  );
 };

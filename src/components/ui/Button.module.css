@@ -10,6 +10,11 @@
   text-align: center;
   text-decoration: none;
 
+  & > kbd {
+    color: inherit;
+    border-color: color-mix(in oklch, currentColor 35%, transparent);
+  }
+
   &:hover:not(:disabled) {
     background-color: var(--c-surface-hover);
   }

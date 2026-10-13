@@ -279,7 +279,9 @@ then use ordinary vertical flow and height-aware context docks on small screens.
 Drag sources and eligible, hovered and fixed destinations have distinct visual
 states; tap and keyboard alternatives remain first-class. Short verdict and
 shuffle animations respect reduced motion. Keyboard shortcuts are discoverable
-as compact inline hints and never intercept text entry or native activation.
+as shared `KeyHint` badges inside action buttons, matching Guess Where. Badges
+inherit button contrast and hide on narrow phones. Shortcuts never intercept
+text entry or native activation.
 
 Game lobbies keep their real setup mounted during loading, with disabled controls
 and a reserved feedback row. Top-aligned artwork stays fixed as data arrives.

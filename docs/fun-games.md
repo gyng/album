@@ -358,7 +358,10 @@ shuffle animates tiles to their new positions, with cancellation on a subsequent
 shuffle and no animation under reduced motion. Oracle defaults to discovery;
 an explicitly saved mode still wins.
 
-Games expose phase-aware shortcuts through compact inline keyboard hints:
+Games show shortcuts as shared `KeyHint` badges inside their action buttons,
+matching Guess Where. Badges hide on narrow phone layouts and are excluded from
+button accessible names. Only the selected Oracle mode shows the start key.
+Games expose phase-aware shortcuts:
 N starts a new round where safe; G gives up, H hints and Escape clears selection
 where supported. Oracle uses 1/2/3 for yes/no/unsure, B to undo; Double Take uses
 1/2 for same/different place. Hangman uses / to focus its subject filter.

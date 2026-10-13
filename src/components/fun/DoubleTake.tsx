@@ -3,11 +3,11 @@ import { buildDoubleTakeDeck, doubleTakePoints, type DoubleTakePair } from "../.
 import type { PhotoGamePhoto } from "../../util/photoGames";
 import { getResizedAlbumImageSrc } from "../../util/getResizedAlbumImageSrc";
 import { exifDayKey } from "../../util/exifTime";
-import { Button, Caption, Heading, Icon } from "../ui";
+import { Button, Caption, Heading, Icon, KeyHint } from "../ui";
 import { GameIntro } from "./GameIllustration";
 import { GameProgress, GameScore } from "./GameFeedback";
 import { GamePhoto } from "./GamePhoto";
-import { GameShortcutHelp, useGameShortcuts } from "./useGameShortcuts";
+import { useGameShortcuts } from "./useGameShortcuts";
 import { useGameSettings } from "./useGameSettings";
 import styles from "./DoubleTake.module.css";
 
@@ -234,8 +234,8 @@ export const DoubleTake = ({ photos }: { photos: PhotoGamePhoto[] }) => {
         {message ? <p role="alert">{message}</p> : null}
         <Button variant="primary" onClick={start}>
           Start Double Take
+          <KeyHint aria-hidden="true">N</KeyHint>
         </Button>
-        <GameShortcutHelp shortcuts={shortcuts} />
       </GameIntro>
     );
 
@@ -257,9 +257,9 @@ export const DoubleTake = ({ photos }: { photos: PhotoGamePhoto[] }) => {
         </p>
         <Button variant="primary" onClick={start}>
           Play again
+          <KeyHint aria-hidden="true">N</KeyHint>
         </Button>
         <Button onClick={() => setPhase("lobby")}>Change viewing time</Button>
-        <GameShortcutHelp shortcuts={shortcuts} />
       </div>
     );
 
@@ -330,6 +330,7 @@ export const DoubleTake = ({ photos }: { photos: PhotoGamePhoto[] }) => {
           ) : null}
           <Button variant="primary" onClick={next}>
             {round + 1 === deck.length ? "See results" : "Next pair"}
+            <KeyHint aria-hidden="true">Enter</KeyHint>
           </Button>
         </div>
       ) : (
@@ -375,21 +376,28 @@ export const DoubleTake = ({ photos }: { photos: PhotoGamePhoto[] }) => {
               <>
                 <Button variant="primary" onClick={() => choose(true)}>
                   Same place
+                  <KeyHint aria-hidden="true">1</KeyHint>
                 </Button>
                 <Button variant="primary" onClick={() => choose(false)}>
                   Different places
+                  <KeyHint aria-hidden="true">2</KeyHint>
                 </Button>
-                <Button onClick={() => watch(true)}>Replay pair</Button>
+                <Button onClick={() => watch(true)}>
+                  Replay pair
+                  <KeyHint aria-hidden="true">R</KeyHint>
+                </Button>
               </>
             ) : null}
             {phase === "paused" ? (
               <Button variant="primary" onClick={() => watch()}>
                 Watch again
+                <KeyHint aria-hidden="true">Space</KeyHint>
               </Button>
             ) : null}
             {phase === "error" ? (
               <Button variant="primary" onClick={() => watch()}>
                 Retry photographs
+                <KeyHint aria-hidden="true">Space</KeyHint>
               </Button>
             ) : null}
             <Button variant="quiet" onClick={() => choose(null)}>
@@ -404,7 +412,6 @@ export const DoubleTake = ({ photos }: { photos: PhotoGamePhoto[] }) => {
           ) : null}
         </>
       )}
-      <GameShortcutHelp shortcuts={shortcuts} />
     </div>
   );
 };
