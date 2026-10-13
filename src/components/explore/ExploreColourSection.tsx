@@ -68,6 +68,17 @@ export const ExploreColourSection = ({
   // first is the archive as it happened; the second is the only one that
   // answers whether a year was greener than the one before.
   const [colourView, setColourView] = React.useState<"photos" | "families">("photos");
+  const [colourBasis, setColourBasis] = React.useState<"dominant" | "accents">("accents");
+  const ribbons = React.useMemo(
+    () =>
+      stats.colorYearRibbons.map((year) => ({
+        ...year,
+        slices: year.slices.map((slice) =>
+          colourBasis === "accents" && slice.accent ? { ...slice, ...slice.accent } : slice,
+        ),
+      })),
+    [stats.colorYearRibbons, colourBasis],
+  );
   const colourFamilies = [...stats.colorFamilyExamples].sort((left, right) => {
     const leftIndex = COLOR_FAMILY_ORDER.findIndex((label) => label === left.label);
     const rightIndex = COLOR_FAMILY_ORDER.findIndex((label) => label === right.label);
@@ -78,8 +89,8 @@ export const ExploreColourSection = ({
     );
   });
   const colourStacks = React.useMemo(
-    () => buildColourYearStacks(stats.colorYearRibbons, COLOR_FAMILY_ORDER),
-    [stats.colorYearRibbons],
+    () => buildColourYearStacks(ribbons, COLOR_FAMILY_ORDER),
+    [ribbons],
   );
   // The busiest year sets the full width, so a bar's length says how much was
   // shot and its divisions say what colour it was. Stretched to full width,
@@ -251,6 +262,22 @@ export const ExploreColourSection = ({
                   ]}
                 />
               </div>
+              <div className={localStyles.colourTimeControls}>
+                <SegmentedToggle
+                  size="compact"
+                  ariaLabel="Palette colour to show"
+                  value={colourBasis}
+                  onChange={setColourBasis}
+                  options={[
+                    { value: "accents", label: "Accents" },
+                    { value: "dominant", label: "Dominant" },
+                  ]}
+                />
+                <Caption as="span">
+                  Accents use the first non-neutral palette colour. Neutral-only photos stay
+                  neutral.
+                </Caption>
+              </div>
               <div className={styles.colorTimeLegend}>
                 {COLOR_FAMILY_ORDER.map((label) => (
                   <div key={`legend-${label}`} className={styles.colorTimeLegendItem}>
@@ -302,12 +329,15 @@ export const ExploreColourSection = ({
                           </Link>
                         ))}
                       </div>
+                      <YearColourSummary
+                        year={ribbons.find((ribbon) => ribbon.label === year.label)!}
+                      />
                     </div>
                   ))}
                 </div>
               ) : (
                 <div className={styles.colorTimeSeries}>
-                  {stats.colorYearRibbons.map((year) => (
+                  {ribbons.map((year) => (
                     <div key={year.label} className={styles.colorTimeRow}>
                       <div className={styles.colorTimeMeta}>
                         <span className={styles.colorTimeYear}>{year.label}</span>
@@ -317,7 +347,7 @@ export const ExploreColourSection = ({
                       </div>
                       <div className={styles.colorTimeBar}>
                         {year.slices.map((slice, index) => {
-                          const sliceKey = `${year.label}-${slice.family}-${index}`;
+                          const sliceKey = `${colourBasis}-${year.label}-${slice.family}-${index}`;
                           const share = year.total > 0 ? (slice.count / year.total) * 100 : 0;
                           const segmentPosition = slice.position * 100;
                           return (
@@ -377,25 +407,7 @@ export const ExploreColourSection = ({
                           );
                         })}
                       </div>
-                      <div className={styles.colorTimeSummary}>
-                        {year.dominantFamily ? (
-                          <>
-                            <span
-                              data-colour-swatch
-                              className={styles.colorSwatch}
-                              style={{
-                                backgroundColor:
-                                  COLOR_SWATCHES[year.dominantFamily] ??
-                                  "var(--c-bg-contrast-light)",
-                              }}
-                              aria-hidden="true"
-                            />
-                            <span>{year.dominantFamily}</span>
-                          </>
-                        ) : (
-                          <span>—</span>
-                        )}
-                      </div>
+                      <YearColourSummary year={year} />
                     </div>
                   ))}
                 </div>
@@ -430,15 +442,51 @@ const ColourFamilyPhotos = ({ family }: { family: PhotoStats["colorFamilyExample
           </Link>
         ))}
       </div>
-      {family.photos.length > visible ? (
-        <PillButton
-          size="compact"
-          aria-label={`More photos with ${family.label.toLowerCase()} tones`}
-          onClick={() => setRows((count) => count + 1)}
-        >
-          More
-        </PillButton>
-      ) : null}
+      <div className={localStyles.familyMore}>
+        {family.photos.length > visible ? (
+          <PillButton
+            size="compact"
+            aria-label={`More photos with ${family.label.toLowerCase()} tones`}
+            onClick={() => setRows((count) => count + 1)}
+          >
+            More
+          </PillButton>
+        ) : null}
+      </div>
     </div>
   );
 };
+
+const YearColourSummary = ({ year }: { year: PhotoStats["colorYearRibbons"][number] }) => (
+  <div className={styles.colorTimeSummary}>
+    {year.dominantFamily ? (
+      <span className={localStyles.yearAccent} title="Dominant colour">
+        <span
+          data-colour-swatch
+          className={styles.colorSwatch}
+          style={{
+            backgroundColor: COLOR_SWATCHES[year.dominantFamily] ?? "var(--c-bg-contrast-light)",
+          }}
+          aria-hidden="true"
+        />
+        <span>{year.dominantFamily}</span>
+      </span>
+    ) : (
+      <span>—</span>
+    )}
+    {year.accentFamily ? (
+      <span
+        className={localStyles.yearAccent}
+        title={`${year.accentCount ?? 0} photos with ${year.accentFamily.toLowerCase()} accents in ${year.label}`}
+      >
+        <span
+          data-colour-swatch
+          className={styles.colorSwatch}
+          style={{ backgroundColor: COLOR_SWATCHES[year.accentFamily] }}
+          aria-hidden="true"
+        />
+        <span>{year.accentFamily} accents</span>
+      </span>
+    ) : null}
+  </div>
+);

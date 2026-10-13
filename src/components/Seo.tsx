@@ -44,7 +44,7 @@ export const Seo: React.FC<SeoProps> = ({
       <title>{resolvedTitle}</title>
       <meta name="description" content={resolvedDescription} key="description" />
       <link rel="canonical" href={canonicalUrl} key="canonical" />
-      <link rel="icon" href="/favicon.svg" key="favicon" />
+      <link rel="icon" href="/favicon.svg?v=aperture" key="favicon" />
       <link
         rel="alternate"
         type="application/rss+xml"

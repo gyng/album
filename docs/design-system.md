@@ -46,6 +46,9 @@ regardless of CSS chunk/import order. Compose only within a single local class
 selector, never a grouped selector.
 
 - Standard controls have a 44px minimum height and 12px horizontal padding.
+- Input defaults use low-specificity selectors so shared controls and adorned
+  fields retain their padding. Search clear buttons keep a 44px target at the
+  trailing edge; text and activity indicators reserve separate space beside it.
 - Compact controls use 32px, with 12px labels and 16px line height. Coarse-pointer
   devices increase compact controls to 44px. Inputs and selects use at least
   16px text on touch devices to avoid Safari's focus zoom.
@@ -125,6 +128,9 @@ look like a form control.
   the matching set. Keep sparse thumbnail rows at the same size as full rows.
   Photo metadata uses a fixed two-column table so deferred maps and similarity
   content cannot change its horizontal layout after opening.
+  The sticky info trigger keeps its 44px footprint when opened; its panel floats
+  below it and scrolls internally. Only the photo with open details releases
+  off-screen paint containment, keeping the panel usable past the photo's edge.
 - Guess Where keeps its full-height photo/map layout and narrow canvas gutters.
   Lobby/results use readable document widths. Timer urgency, score reveals and
   map-pin feedback may animate; ordinary game buttons use shared hover/selection
@@ -285,6 +291,47 @@ text entry or native activation.
 
 Game lobbies keep their real setup mounted during loading, with disabled controls
 and a reserved feedback row. Top-aligned artwork stays fixed as data arrives.
+
+Colour history defaults to the first non-neutral palette colour, with a Dominant
+view for comparison. Neutral-only photos retain their neutral tone. Year summaries
+pair the dominant family with the leading accent; both chart views use the same
+photos and counts. Representative colour rows reserve a compact control footer
+even when there are no more photos, keeping sparse families on the same rhythm.
+
+Album navigation stays mounted in a sticky slot. Only its surface translates,
+so hiding it never changes the photographs' document positions. Beyond the nav
+height plus 80px, 24px of sustained downward travel hides it; 32px upward brings
+it back. Direction reversals restart the threshold. Focus keeps it visible,
+photo anchors clear its measured height, and reduced motion removes the slide.
+Sticky nav regions use viewport coordinates in cross-page position animations.
+The initial page-load event preserves scroll intent; a browser-history restoration
+resets the navigation to visible.
+
+Darkroom's safelight accent is `#ed3535`. Default Dark uses `#ff5959` for readable
+accent text on charcoal; both avoid the earlier orange tint. Browser and install
+icons share a six-blade aperture mark. The favicon is a small SVG; install PNGs
+are generated from the canonical `public/pwa-icon.svg`.
+
+The cloud groups topics in the full image embedding space. Similar photos uses a
+cached three-dimensional UMAP layout; Overview retains the principal-component
+view. Year/lens filters keep original indices and cloud positions; the sheet
+packs the matching photographs in chronological order. Scene search loads its
+model and embedding database only on submission and selects up to 40 closest
+matches after applying those filters.
+Cloud atlas thumbnails and full-resolution focus images use the same centred
+square crop, so the subject stays in place when the sharper image arrives. Dots
+remain visible until their thumbnail is ready before beginning the reveal.
+
+Prepare the optional layout with
+`uv run --no-project --with umap-learn==0.5.12 src/bin/prepare-umap.py`.
+It reads existing embeddings, performs no model inference and writes a generated
+cache. Builds check its model and database SHA-256 and use Overview when it is
+absent or stale. The archive comparison used 1,518 SigLIP2 vectors, three output
+dimensions, cosine distance, 15 neighbours, minimum distance 0.15 and seed 42.
+UMAP retained 40.4% of the original ten nearest neighbours, versus 13.3% for the
+current stretched PCA view; trustworthiness was 0.939 versus 0.824. These are
+local-neighbourhood measures, not evidence that every visible distance is exact.
+
 Player copy uses short active sentences and consistent action names, with light
 humour where it adds character. Oracle answer history uses compact rows, explicit
 answer badges and reduced-motion-aware entry transitions beneath the question.

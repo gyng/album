@@ -84,7 +84,7 @@ const atlasManifest = (plan, files) => ({
  */
 const atlasFingerprint = (sources, layout) =>
   [
-    `v1 cell=${layout.cell} sheet=${layout.sheet}`,
+    `v2 crop=centre cell=${layout.cell} sheet=${layout.sheet}`,
     ...[...sources]
       .sort((left, right) => (left.path < right.path ? -1 : left.path > right.path ? 1 : 0))
       .map((source) => `${source.path} ${source.size} ${Math.round(source.mtimeMs)}`),

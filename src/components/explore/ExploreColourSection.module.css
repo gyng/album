@@ -35,7 +35,9 @@
 
 .colorFamilyRows {
   display: grid;
-  gap: var(--m);
+  gap: var(--space-4);
+  align-content: start;
+  align-items: start;
 }
 
 .colorFamilyRow {
@@ -75,6 +77,8 @@
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 96px), 1fr));
   inline-size: 100%;
   gap: var(--m-s);
+  align-content: start;
+  align-items: start;
 }
 
 .colorFamilyThumbLink {
@@ -245,12 +249,25 @@
 .colorTimeSummary {
   grid-area: summary;
   display: inline-flex;
-  align-items: center;
   justify-content: flex-end;
   gap: var(--m);
   min-inline-size: 0;
   color: var(--c-bg-contrast-light);
   font-size: var(--fs-s);
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.colourTimeControls,
+.yearAccent {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--m-s);
+}
+
+.colourTimeControls {
+  gap: var(--m-s) var(--m);
 }
 
 @media (max-width: 720px) {
@@ -348,4 +365,8 @@
   max-inline-size: none;
   block-size: auto;
   aspect-ratio: 1;
+}
+
+.familyMore {
+  min-block-size: var(--compact-control-size);
 }

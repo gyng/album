@@ -1,0 +1,20 @@
+.search {
+  min-inline-size: 0;
+}
+
+.search form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.search label {
+  font-size: var(--fs-s);
+}
+
+.query {
+  min-inline-size: 0;
+  flex: 1 1 180px;
+  max-inline-size: 360px;
+}

@@ -711,6 +711,19 @@ const rankEmbeddingsByVector = async (opts: {
   return collapseSceneRanking(ranked);
 };
 
+// The cloud already has photo metadata; it only needs the embedding ranking.
+export const fetchSemanticPaths = async (
+  database: Database,
+  textVector: number[],
+): Promise<string[]> => {
+  const ranked = await rankEmbeddingsByVector({
+    database,
+    queryVector: textVector,
+    modelId: DEFAULT_EMBEDDING_MODEL_ID,
+  });
+  return ranked.map((result) => clipPathOf(result.path));
+};
+
 const fetchKeywordRanking = async (opts: {
   database: Database;
   query: string;

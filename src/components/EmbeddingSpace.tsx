@@ -1,4 +1,7 @@
 import React from "react";
+import { CloudSpotlight } from "./CloudSpotlight";
+import { selectCloudIndices } from "../util/cloudSelection";
+import { Select, Caption, Button } from "./ui";
 import { AppLink } from "./platform";
 import { OverlayButton, overlayButtonStyles, pillStyles, SegmentedToggle } from "./ui";
 import { useActiveTheme } from "./useActiveTheme";
@@ -12,6 +15,7 @@ import {
   projectPoint,
   type ProjectedPoint,
   withinFrame,
+  thumbnailReveal,
 } from "../util/embeddingSpace";
 import { justifiedRows, type JustifiedLayout } from "../util/justifiedRows";
 import { buildSearchHref, buildSimilaritySearchHref } from "../util/searchFacets";
@@ -278,6 +282,31 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
   const [axisScale, setAxisScale] = React.useState({ x: 1, y: 1, z: 1 });
   const [clusters, setClusters] = React.useState<EmbeddingSpaceCluster[]>([]);
   const [failed, setFailed] = React.useState(false);
+  const [projectionMode, setProjectionMode] = React.useState<"semantic" | "overview">("semantic");
+  const hasSemantic = Boolean(entries?.length && entries.every((entry) => entry.umap));
+  const semanticRef = React.useRef(false);
+  semanticRef.current = projectionMode === "semantic" && hasSemantic;
+  const [yearFilter, setYearFilter] = React.useState("");
+  const [lensFilter, setLensFilter] = React.useState("");
+  const [rankedPaths, setRankedPaths] = React.useState<string[] | null>(null);
+  const visibleIndices = React.useMemo(
+    () => selectCloudIndices(entries ?? [], yearFilter, lensFilter, rankedPaths),
+    [entries, yearFilter, lensFilter, rankedPaths],
+  );
+  const visibleRef = React.useRef(visibleIndices);
+  visibleRef.current = visibleIndices;
+  const years = React.useMemo(
+    () =>
+      [...new Set((entries ?? []).flatMap((entry) => (entry.year ? [entry.year] : [])))].sort(
+        (a, b) => b - a,
+      ),
+    [entries],
+  );
+  const lenses = React.useMemo(
+    () => [...new Set((entries ?? []).flatMap((entry) => (entry.lens ? [entry.lens] : [])))].sort(),
+    [entries],
+  );
+
   const [hovered, setHovered] = React.useState<Placed | null>(null);
   const [drifting, setDrifting] = React.useState(true);
   /** Which named clump the reader has chosen, if any. */
@@ -644,14 +673,17 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
 
       const placed: Placed[] = [];
       entries.forEach((entry, index) => {
+        if (!visibleRef.current.has(index)) return;
         // Flat is the same projection with the depth axis dropped — which is
         // exactly the two-component projection, since the first two directions
         // are the same whether three are solved for or two. The stretch that
         // makes the cloud turnable is undone here, because a scatter plot of
         // two components should show the proportions they actually have.
+        const pose = semanticRef.current && entry.umap ? entry.umap : entry;
+        const scale = semanticRef.current ? { x: 1, y: 1, z: 1 } : axisScale;
         const projected = inView(
           projectPoint(
-            isFlat ? { x: entry.x * axisScale.x, y: entry.y * axisScale.y, z: 0 } : entry,
+            isFlat ? { x: pose.x * scale.x, y: pose.y * scale.y, z: 0 } : pose,
             camera,
             viewport,
           ),
@@ -695,6 +727,7 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
         if (sheetLayout.width !== width || sheetLayout.row !== rowTargetRef.current) {
           const order = entries
             .map((entry, index) => ({ index, taken: entry.taken ?? Infinity }))
+            .filter((item) => visibleRef.current.has(item.index))
             .sort((left, right) => left.taken - right.taken)
             .map((entry) => entry.index);
           sheetLayout = {
@@ -907,13 +940,6 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
       let started = 0;
       for (const point of ordered) {
         const wantsThumbnail = nearest.has(point.index);
-        const grown = ease(
-          photoness[point.index] ?? 0,
-          wantsThumbnail ? 1 : 0,
-          elapsed,
-          wantsThumbnail ? 0.28 : 0.45,
-        );
-        photoness[point.index] = grown;
         const image = thumbnailsRef.current.get(point.entry.src);
 
         if (!atlas && wantsThumbnail && !image && started < LOADS_PER_FRAME) {
@@ -931,12 +957,10 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
         const behind = (point.depth - frontDepth) / depthSpan;
         const depthAlpha = Math.max(0.08, 1 - 0.92 * behind ** 1.3);
 
-        // Resolved from how much of a photograph it currently is rather than
-        // from whether it still wants to be one: taking the sheet away at the
-        // moment a point leaves the near set left the fade-out with nothing to
-        // draw, so it vanished instead of going.
+        // Keep the cell available throughout the reveal and fade-out. Its load
+        // state decides when the dot can begin becoming a photograph.
         const cell =
-          atlas && grown > 0.02 && point.entry.slot !== undefined
+          atlas && point.entry.slot !== undefined
             ? sheetsRef.current[Math.floor(point.entry.slot / atlas.perSheet)]
             : undefined;
 
@@ -945,6 +969,14 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
           (cell?.naturalWidth ?? 0) > 0 &&
           Boolean(atlas) &&
           point.entry.slot !== undefined;
+        const hasImage = Boolean(image?.complete && image.naturalWidth > 0);
+        const grown = thumbnailReveal(
+          photoness[point.index] ?? 0,
+          wantsThumbnail,
+          hasCell || hasImage,
+          elapsed,
+        );
+        photoness[point.index] = grown;
 
         // The dot beneath, fading out as the photograph fades in, so nothing
         // ever arrives or leaves abruptly.
@@ -998,7 +1030,11 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
           cluster,
           at: inView(
             projectPoint(
-              isFlat ? { x: cluster.x * axisScale.x, y: cluster.y * axisScale.y, z: 0 } : cluster,
+              semanticRef.current && cluster.umap
+                ? { ...cluster.umap, ...(isFlat ? { z: 0 } : {}) }
+                : isFlat
+                  ? { x: cluster.x * axisScale.x, y: cluster.y * axisScale.y, z: 0 }
+                  : cluster,
               camera,
               viewport,
             ),
@@ -1563,11 +1599,17 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
     tappedRef.current = hit.entry.href;
   };
 
-  if (failed) {
-    return null;
-  }
-
-  const count = entries?.length ?? 0;
+  React.useEffect(() => {
+    sheetLayoutRef.current.width = 0;
+    showcaseRef.current = null;
+    pickRef.current = null;
+    tappedRef.current = null;
+    setChosen(null);
+    setHovered(null);
+    setShowcased(null);
+  }, [visibleIndices]);
+  if (failed) return null;
+  const count = visibleIndices.size;
   // Whatever is being pointed at, or — when nobody is — whatever the cloud is
   // showing off by itself.
   const named = hovered?.entry ?? showcased;
@@ -1575,7 +1617,11 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
   if (named) lastNamedRef.current = named;
   const lastNamed = named ?? lastNamedRef.current;
   const selected =
-    chosen === null ? [] : (entries ?? []).filter((entry) => entry.cluster === chosen);
+    chosen === null
+      ? []
+      : (entries ?? []).filter(
+          (entry, index) => visibleIndices.has(index) && entry.cluster === chosen,
+        );
   const chosenLabel = chosen === null ? null : (clusters[chosen]?.label ?? null);
 
   // What the selection turned out to be about, asked the same way the cluster
@@ -1611,11 +1657,80 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
 
   return (
     <figure className={[styles.space, className].filter(Boolean).join(" ")}>
+      <div className={styles.filters}>
+        <CloudSpotlight onMatches={setRankedPaths} />
+        <div className={styles.filterRow}>
+          {hasSemantic ? (
+            <SegmentedToggle
+              size="compact"
+              ariaLabel="Cloud layout"
+              value={projectionMode}
+              onChange={setProjectionMode}
+              options={[
+                { value: "semantic", label: "Similar photos" },
+                { value: "overview", label: "Overview" },
+              ]}
+            />
+          ) : null}
+
+          <label>
+            Year{" "}
+            <Select
+              aria-label="Year"
+              value={yearFilter}
+              onChange={(event) => setYearFilter(event.target.value)}
+            >
+              <option value="">All years</option>
+              {years.map((year) => (
+                <option key={year} value={year}>
+                  {year}
+                </option>
+              ))}
+            </Select>
+          </label>
+          <label>
+            Lens{" "}
+            <Select
+              aria-label="Lens"
+              value={lensFilter}
+              onChange={(event) => setLensFilter(event.target.value)}
+            >
+              <option value="">All lenses</option>
+              {lenses.map((lens) => (
+                <option key={lens} value={lens}>
+                  {lens}
+                </option>
+              ))}
+            </Select>
+          </label>
+          {yearFilter || lensFilter ? (
+            <Button
+              variant="quiet"
+              onClick={() => {
+                setYearFilter("");
+                setLensFilter("");
+              }}
+            >
+              Clear filters
+            </Button>
+          ) : null}
+          <span role="status">
+            <Caption as="span">
+              {rankedPaths ? `${count} closest matches` : `${count} photographs`}
+            </Caption>
+          </span>
+        </div>
+      </div>
       <div
         ref={stageRef}
         className={styles.stage}
         {...(height === undefined ? {} : { style: { blockSize: `${height}px` } })}
       >
+        {entries && !count ? (
+          <p className={styles.empty} role="status">
+            No photographs match these filters.
+          </p>
+        ) : null}
         <canvas
           ref={canvasRef}
           className={styles.canvas}
@@ -1705,7 +1820,8 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
 
         {clusters.map((cluster, index) => (
           <button
-            key={cluster.label}
+            key={`${index}-${cluster.label}`}
+            hidden={![...visibleIndices].some((point) => entries?.[point]?.cluster === index)}
             type="button"
             ref={(element) => {
               labelRefs.current[index] = element;
@@ -1724,7 +1840,9 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
             onClick={() => setChosen((current) => (current === index ? null : index))}
           >
             {cluster.label.replaceAll("_", " ")}
-            <span className={styles.clusterCount}>{cluster.count}</span>
+            <span className={styles.clusterCount}>
+              {[...visibleIndices].filter((point) => entries?.[point]?.cluster === index).length}
+            </span>
           </button>
         ))}
 
@@ -1748,7 +1866,7 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
           {sheet ? `${rowHeight}px rows` : `×${zoom.toFixed(1)}`}
         </p>
 
-        {count === 0 ? <p className={styles.status}>Arranging the collection…</p> : null}
+        {entries === null ? <p className={styles.status}>Arranging the collection…</p> : null}
 
         {/* Always mounted, so it fades rather than appears. */}
         <figcaption
@@ -1816,11 +1934,13 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
       {/* A canvas has no children, so the photographs in it are unreachable
           without this: the same compensation the map makes for its GPU pins. */}
       <ul className={styles.hiddenList}>
-        {(entries ?? []).map((entry) => (
-          <li key={entry.href}>
-            <AppLink href={entry.href}>{entry.label}</AppLink>
-          </li>
-        ))}
+        {(entries ?? [])
+          .filter((_entry, index) => visibleIndices.has(index))
+          .map((entry) => (
+            <li key={entry.href}>
+              <AppLink href={entry.href}>{entry.label}</AppLink>
+            </li>
+          ))}
       </ul>
     </figure>
   );

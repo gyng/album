@@ -92,8 +92,11 @@ a {
   box-sizing: border-box;
 }
 
-input,
-textarea {
+:where(input, textarea) {
+  padding: var(--control-padding-block) var(--control-padding-inline);
+}
+
+:where(input:is([type="range"], [type="color"], [type="checkbox"], [type="radio"], [type="file"])) {
   padding: var(--m);
 }
 
@@ -379,7 +382,7 @@ textarea {
   --c-bg-edit: light-dark(rgb(238 245 197), oklch(37% 0.06 115));
   --c-bg-contrast-light: light-dark(rgb(100 100 100), rgb(200 200 200));
   --c-bg-contrast-dark: light-dark(black, rgb(51 51 51));
-  --c-accent: light-dark(oklch(52% 0.2 27), oklch(70% 0.2 27));
+  --c-accent: light-dark(oklch(52% 0.2 27), #ff5959);
   --c-font: light-dark(black, white);
   /* Theme-relative surfaces and states, including every named palette. */
   --c-surface: color-mix(in oklch, var(--c-bg) 96%, var(--c-font));
@@ -517,12 +520,12 @@ body.dark {
   --c-font: #ebe0d5;
   --c-bg-contrast-light: #b2a29a;
   --c-bg-contrast-dark: #352221;
-  --c-accent: #f75a4f;
+  --c-accent: #ed3535;
   --c-bg-edit: #351b18;
-  --c-heatmap-low: #38211e;
-  --c-heatmap-mid: #74342c;
-  --c-heatmap-high: #c14a3d;
-  --c-heatmap-peak: #ff8270;
+  --c-heatmap-low: #381b1e;
+  --c-heatmap-mid: #74242a;
+  --c-heatmap-high: #c12c34;
+  --c-heatmap-peak: #f54a51;
 }
 
 /* Slate — an architect's midnight contact sheet: cyan blueprint rulings,

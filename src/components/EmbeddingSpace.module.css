@@ -255,3 +255,34 @@
   background: var(--c-bg);
   clip-path: none;
 }
+
+.filters {
+  display: grid;
+  gap: var(--space-3);
+}
+.filterRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+.filterRow label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-inline-size: 0;
+  font-size: var(--fs-s);
+}
+.filterRow select {
+  max-inline-size: min(280px, 70vw);
+}
+.empty {
+  position: absolute;
+  inset: 45% var(--space-4) auto;
+  text-align: center;
+  pointer-events: none;
+}
+
+.clusterName[hidden] {
+  display: none;
+}

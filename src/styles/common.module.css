@@ -192,11 +192,6 @@
   flex-direction: column;
   block-size: var(--tap-target);
   max-block-size: 90svh;
-  transition: block-size var(--t-base) var(--ease-out);
-}
-
-.disclosure[open] {
-  block-size: auto;
 }
 
 .mediaDetails {
@@ -273,6 +268,11 @@
 }
 
 .mediaDetailsContent {
+  /* Opening metadata must not enlarge the sticky trigger's footprint: a tall
+     sticky box is pushed above the viewport by the photograph's bottom edge. */
+  position: absolute;
+  inset-block-start: var(--tap-target);
+  inset-inline-end: 0;
   display: flex;
   align-items: stretch;
   flex-direction: column;

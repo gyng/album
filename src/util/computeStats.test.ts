@@ -95,8 +95,7 @@ describe("computePhotoStats", () => {
     expect(stats.stringFacets.find((facet) => facet.facetId === "aspect-ratio")).toMatchObject({
       coverage: 5 / 6,
       data: [
-        { label: "3:2", count: 2 },
-        { label: "≈1.50:1", count: 1 },
+        { label: "3:2", count: 3 },
         { label: "1:1", count: 1 },
         { label: "2:3", count: 1 },
       ],
@@ -597,6 +596,46 @@ describe("computePhotoStats", () => {
       { label: "Green", count: 1 },
       { label: "Blue", count: 1 },
     ]);
+  });
+
+  it("keeps yearly dominant tones and counts accents beneath neutral palettes", () => {
+    const stats = computePhotoStats([
+      makeAlbum([
+        makePhoto({
+          exif: { DateTimeOriginal: "2024:01:01 12:00:00" },
+          tags: {
+            colors: [
+              [15, 15, 15],
+              [30, 60, 210],
+            ],
+          } as any,
+        }),
+        makePhoto({
+          exif: { DateTimeOriginal: "2024:02:01 12:00:00" },
+          tags: {
+            colors: [
+              [15, 15, 15],
+              [30, 60, 210],
+            ],
+          } as any,
+        }),
+        makePhoto({
+          exif: { DateTimeOriginal: "2024:03:01 12:00:00" },
+          tags: { colors: [[15, 15, 15]] } as any,
+        }),
+      ]),
+    ]);
+    expect(stats.colorYearRibbons[0]).toMatchObject({
+      total: 3,
+      dominantFamily: "Dark neutrals",
+      accentFamily: "Blue",
+      accentCount: 2,
+    });
+    expect(stats.colorYearRibbons[0]!.slices[0]).toMatchObject({
+      family: "Dark neutrals",
+      accent: { family: "Blue", rgb: "rgb(30, 60, 210)" },
+    });
+    expect(stats.colorYearRibbons[0]!.slices[2]).not.toHaveProperty("accent");
   });
 
   it("computes dominant color families, examples, and color drift", () => {

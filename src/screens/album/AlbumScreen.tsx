@@ -7,6 +7,7 @@ import {
 import { seekLinkedMoment } from "../../util/seekLinkedMoment";
 import React from "react";
 import type { PhotoBlock } from "../../services/types";
+import { AlbumNavigation } from "../../components/AlbumNavigation";
 import { GlobalNav } from "../../components/GlobalNav";
 import { PhotoAlbum } from "../../components/PhotoAlbum";
 import { AlbumTripsView } from "../../components/AlbumTripsView";
@@ -118,52 +119,60 @@ const AlbumScreen = ({ album }: AlbumScreenProps) => {
         ]}
       />
 
-      <GlobalNav
-        extraItems={
-          <>
-            <li>
-              {/* One of the album's views, named like its siblings here rather
+      <AlbumNavigation
+        routeKey={`${albumName}:${view}`}
+        navigation={
+          <GlobalNav
+            extraItems={
+              <>
+                <li>
+                  {/* One of the album's views, named like its siblings here rather
                   than shaped as a switch — and a link, so it survives without
                   JavaScript and can be shared. Putting it above the photographs
                   pushed the first one below the fold on a split-screen tablet. */}
-              <Link
-                href={view === "trips" ? `/album/${albumName}` : `/album/${albumName}?view=trips`}
-                className={`${buttonStyles.base} ${commonStyles.navContext}`}
-              >
-                {view === "trips" ? "Album grid" : "Album trips"}
-              </Link>
-            </li>
-            <li>
-              <Link
-                href={`/map?${new URLSearchParams({ filter_album: albumName })}`}
-                className={`${buttonStyles.base} ${commonStyles.navContext}`}
-              >
-                Album map
-              </Link>
-            </li>
-            <li>
-              <Link
-                href={`/explore/timeline?${new URLSearchParams({ filter_album: albumName })}`}
-                className={`${buttonStyles.base} ${commonStyles.navContext}`}
-              >
-                Album timeline
-              </Link>
-            </li>
-            <li>
-              <Link
-                href={`/slideshow/shell?${new URLSearchParams({ filter: albumName })}`}
-                className={`${buttonStyles.base} ${commonStyles.navContext}`}
-              >
-                Album slideshow
-              </Link>
-            </li>
-          </>
+                  <Link
+                    href={
+                      view === "trips" ? `/album/${albumName}` : `/album/${albumName}?view=trips`
+                    }
+                    className={`${buttonStyles.base} ${commonStyles.navContext}`}
+                  >
+                    {view === "trips" ? "Album grid" : "Album trips"}
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    href={`/map?${new URLSearchParams({ filter_album: albumName })}`}
+                    className={`${buttonStyles.base} ${commonStyles.navContext}`}
+                  >
+                    Album map
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    href={`/explore/timeline?${new URLSearchParams({ filter_album: albumName })}`}
+                    className={`${buttonStyles.base} ${commonStyles.navContext}`}
+                  >
+                    Album timeline
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    href={`/slideshow/shell?${new URLSearchParams({ filter: albumName })}`}
+                    className={`${buttonStyles.base} ${commonStyles.navContext}`}
+                  >
+                    Album slideshow
+                  </Link>
+                </li>
+              </>
+            }
+          />
         }
-      />
-      <main id="main-content">
-        {view === "trips" ? <AlbumTripsView album={album} /> : <PhotoAlbum album={album} />}
-      </main>
-      <Footer />
+      >
+        <main id="main-content">
+          {view === "trips" ? <AlbumTripsView album={album} /> : <PhotoAlbum album={album} />}
+        </main>
+        <Footer />
+      </AlbumNavigation>
     </>
   );
 };

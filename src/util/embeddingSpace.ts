@@ -570,3 +570,15 @@ export const distinctiveTag = (
 
   return best;
 };
+
+/** Keep the dot until its image is ready, then reveal it at the same centre. */
+export const thumbnailReveal = (
+  current: number,
+  wanted: boolean,
+  ready: boolean,
+  elapsed: number,
+): number => {
+  const target = wanted && ready ? 1 : 0;
+  const seconds = target ? 0.28 : 0.45;
+  return current + (target - current) * (1 - Math.exp(-elapsed / seconds));
+};

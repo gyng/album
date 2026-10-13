@@ -36,10 +36,13 @@ it("round-trips detailed gear and colour ribbons without rounding or losing null
         label: "2024",
         total: 2,
         dominantFamily: null,
+        accentFamily: "Blue",
+        accentCount: 1,
         slices: [
           {
             rgb: "rgb(1, 2, 3)",
             family: "blue",
+            accent: { family: "Blue", rgb: "rgb(30, 60, 210)" },
             count: 1,
             position: 0.123456789,
             dateLabel: "Jan 1",

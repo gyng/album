@@ -116,10 +116,13 @@ describe("ExploreColourSection", () => {
           label: "2024",
           total: 10,
           dominantFamily: "Blue",
+          accentFamily: "Green",
+          accentCount: 4,
           slices: [
             {
               rgb: "rgb(1, 2, 3)",
               family: "Blue",
+              accent: { family: "Green", rgb: "rgb(20, 160, 30)" },
               count: 4,
               position: 0.2,
               dateLabel: "March 2024",
@@ -164,6 +167,13 @@ describe("ExploreColourSection", () => {
 
     render(<ExploreColourSection stats={stats} />);
     expect(screen.getByRole("heading", { name: "Colour over time" })).toBeInTheDocument();
+    expect(screen.getByTitle("Green around 2024: 4 photos (40%)")).toHaveAttribute(
+      "href",
+      "/search?color=104%2C163%2C107&facet=year%3A2024",
+    );
+    expect(screen.getByText("Green accents")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("radio", { name: /^Dominant$/ }));
+
     expect(screen.getByTitle("Blue around 2024: 4 photos (40%)")).toHaveAttribute(
       "href",
       "/search?color=93%2C132%2C214&facet=year%3A2024",

@@ -11,7 +11,24 @@ import {
   projectToThreeDimensions,
   type SpacePoint,
   withinFrame,
+  thumbnailReveal,
 } from "./embeddingSpace";
+
+describe("thumbnailReveal", () => {
+  it("keeps the dot visible for the whole image load, then grows the ready thumbnail", () => {
+    expect(thumbnailReveal(0, true, false, 5)).toBe(0);
+    const first = thumbnailReveal(0, true, true, 1 / 60);
+    expect(first).toBeGreaterThan(0);
+    expect(first).toBeLessThan(0.1);
+    expect(thumbnailReveal(first, true, true, 1 / 60)).toBeGreaterThan(first);
+  });
+
+  it("fades a ready thumbnail back to its dot when it leaves the near set", () => {
+    const fading = thumbnailReveal(1, false, true, 1 / 60);
+    expect(fading).toBeGreaterThan(0.9);
+    expect(fading).toBeLessThan(1);
+  });
+});
 
 const VIEWPORT = { width: 800, height: 600 };
 const CAMERA: Camera = { yaw: 0, pitch: 0, distance: 2.6 };

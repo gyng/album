@@ -22,6 +22,10 @@ const OUTPUT_PREFIX = "embedding-atlas";
 /** What the sheet on disk was made from, beside the sheet. */
 const FINGERPRINT_FILE = `${OUTPUT_PREFIX}.inputs`;
 
+// Match the browser's centred square crop so sharpening never moves the subject.
+const resizeAtlasCell = (source, cell) =>
+  require("sharp")(source).resize(cell, cell, { fit: "cover", position: "centre" }).toBuffer();
+
 /**
  * The photographs on disk, keyed the way the search database keys them.
  *
@@ -101,9 +105,7 @@ const run = async (log = console.log, { force = false } = {}) => {
       const source = byPath.get(placement.path);
       try {
         composites.push({
-          input: await sharp(source)
-            .resize(plan.cell, plan.cell, { fit: "cover", position: "attention" })
-            .toBuffer(),
+          input: await resizeAtlasCell(source, plan.cell),
           left: placement.x,
           top: placement.y,
         });
@@ -143,7 +145,7 @@ const run = async (log = console.log, { force = false } = {}) => {
   return { plan, files };
 };
 
-module.exports = { findOptimisedPhotos, run };
+module.exports = { findOptimisedPhotos, resizeAtlasCell, run };
 
 /* istanbul ignore next -- direct CLI dispatch */
 if (require.main === module) {

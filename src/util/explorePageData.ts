@@ -13,12 +13,14 @@ type FrameRow = [
   number,
   number,
 ];
-type SliceRow = [number, number, number, number, number, number, number];
+type SliceRow = [number, number, number, number, number, number, number, [number, number] | null];
 export type PackedExploreStats = Omit<PhotoStats, "gear" | "colorYearRibbons"> & {
   strings: string[];
   gear: Omit<PhotoStats["gear"], "frames">;
   frameRows: FrameRow[];
-  colourRows: Array<[number, number, number | null, SliceRow[]]>;
+  colourRows: Array<
+    [number, number, number | null, SliceRow[], { family: number | null; count: number } | null]
+  >;
 };
 
 export const packExploreStats = (stats: PhotoStats): PackedExploreStats => {
@@ -60,7 +62,14 @@ export const packExploreStats = (stats: PhotoStats): PackedExploreStats => {
       intern(s.dateLabel),
       intern(s.thumbSrc),
       intern(s.photoLabel),
+      s.accent ? [intern(s.accent.family), intern(s.accent.rgb)] : null,
     ]),
+    year.accentFamily === undefined
+      ? null
+      : {
+          family: year.accentFamily === null ? null : intern(year.accentFamily),
+          count: year.accentCount ?? 0,
+        },
   ]);
   return { ...rest, gear, strings, frameRows, colourRows };
 };
@@ -85,19 +94,28 @@ export const unpackExploreStats = (packed: PackedExploreStats): PhotoStats => {
         }),
       ),
     },
-    colorYearRibbons: colourRows.map(([label, total, dominantFamily, slices]) => ({
+    colorYearRibbons: colourRows.map(([label, total, dominantFamily, slices, accent]) => ({
       label: strings[label]!,
       total,
       dominantFamily: dominantFamily === null ? null : strings[dominantFamily]!,
-      slices: slices.map(([rgb, family, count, position, dateLabel, thumbSrc, photoLabel]) => ({
-        rgb: strings[rgb]!,
-        family: strings[family]!,
-        count,
-        position,
-        dateLabel: strings[dateLabel]!,
-        thumbSrc: strings[thumbSrc]!,
-        photoLabel: strings[photoLabel]!,
-      })),
+      ...(accent
+        ? {
+            accentFamily: accent.family === null ? null : strings[accent.family]!,
+            accentCount: accent.count,
+          }
+        : {}),
+      slices: slices.map(
+        ([rgb, family, count, position, dateLabel, thumbSrc, photoLabel, accent]) => ({
+          rgb: strings[rgb]!,
+          family: strings[family]!,
+          count,
+          position,
+          dateLabel: strings[dateLabel]!,
+          thumbSrc: strings[thumbSrc]!,
+          photoLabel: strings[photoLabel]!,
+          ...(accent ? { accent: { family: strings[accent[0]]!, rgb: strings[accent[1]]! } } : {}),
+        }),
+      ),
     })),
   };
 };

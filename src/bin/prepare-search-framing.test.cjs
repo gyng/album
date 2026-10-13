@@ -14,7 +14,7 @@ it("indexes published dimensions and rotation, then updates framing after a crop
       "CREATE TABLE images(path TEXT); CREATE TABLE metadata(path TEXT PRIMARY KEY, weather_json TEXT)",
     );
     db.prepare("INSERT INTO images VALUES (?)").run(source);
-    await sharp({ create: { width: 8, height: 6, channels: 3, background: "red" } })
+    await sharp({ create: { width: 408, height: 307, channels: 3, background: "red" } })
       .withMetadata({ orientation: 6 })
       .jpeg()
       .toFile(source);

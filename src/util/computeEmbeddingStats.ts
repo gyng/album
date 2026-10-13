@@ -1,4 +1,6 @@
 import fs from "node:fs";
+import { loadSemanticProjection } from "../services/embeddingProjection";
+import { clusterVectors } from "./semanticClusters";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import type { Content, PhotoBlock } from "../services/types";
@@ -7,12 +9,7 @@ import { rgbToString } from "./colorDistance";
 import { parseExifLocalDateTime } from "./exifTime";
 import { pairingLabel } from "./computeGearStats";
 import { CAMERA_FACET, LENS_FACET } from "./photoBuckets";
-import {
-  clusterPoints,
-  distinctiveTag,
-  nearestNeighbours,
-  projectToThreeDimensions,
-} from "./embeddingSpace";
+import { distinctiveTag, nearestNeighbours, projectToThreeDimensions } from "./embeddingSpace";
 
 // The shipped search-embeddings DB holds two embedding spaces (SigLIP v1 and
 // v2), one row per photo per model. These stats must run against a single space
@@ -1096,6 +1093,7 @@ const TAGS_PER_PHOTO = 4;
 
 /** What one clump of the cloud turned out to be about. */
 export type EmbeddingSpaceCluster = {
+  umap?: { x: number; y: number; z: number };
   x: number;
   y: number;
   z: number;
@@ -1105,6 +1103,9 @@ export type EmbeddingSpaceCluster = {
 
 /** One photograph as a position in the collection's own embedding space. */
 export type EmbeddingSpacePoint = {
+  camera?: string;
+  lens?: string;
+  umap?: { x: number; y: number; z: number };
   src: string;
   href: string;
   label: string;
@@ -1156,6 +1157,7 @@ export const loadEmbeddingSpacePoints = async (
     const albumLookup = buildPhotoAlbumLookup(albums);
     const dateLookup = buildPhotoDateLookup(albums);
     const aspectLookup = buildPhotoAspectLookup(albums);
+    const gearLookup = buildPhotoCameraLookup(albums);
     const selectedPaths = [...photoLookup.keys()];
     if (selectedPaths.length < MIN_EMBEDDING_SAMPLE) {
       return empty;
@@ -1202,6 +1204,11 @@ export const loadEmbeddingSpacePoints = async (
 
       const vectors = decoded.map((entry) => entry.vector);
       const { points: positions, axisScale } = projectToThreeDimensions(vectors);
+      const semantic = loadSemanticProjection(
+        resolvedDbPath,
+        path.join(process.cwd(), "public/data/embedding-umap.json"),
+        selectedModelId,
+      );
       const neighbours = nearestNeighbours(vectors, NEIGHBOURS_PER_PHOTO);
 
       // What each clump turned out to be about, from the tags of whatever
@@ -1213,7 +1220,15 @@ export const loadEmbeddingSpacePoints = async (
         }
       }
 
-      const named = clusterPoints(positions, CLUSTERS)
+      const named = clusterVectors(vectors, CLUSTERS)
+        .map((members) => ({
+          members,
+          centre: {
+            x: members.reduce((sum, index) => sum + positions[index]!.x, 0) / members.length,
+            y: members.reduce((sum, index) => sum + positions[index]!.y, 0) / members.length,
+            z: members.reduce((sum, index) => sum + positions[index]!.z, 0) / members.length,
+          },
+        }))
         .filter((cluster) => cluster.members.length >= MIN_CLUSTER_SIZE)
         .flatMap((cluster) => {
           const label = distinctiveTag(
@@ -1236,12 +1251,34 @@ export const loadEmbeddingSpacePoints = async (
         z: Number(cluster.centre.z.toFixed(4)),
         label,
         count: cluster.members.length,
+        ...(cluster.members.every((index) => semantic.has(decoded[index]!.path))
+          ? {
+              umap: {
+                x:
+                  cluster.members.reduce(
+                    (sum, index) => sum + semantic.get(decoded[index]!.path)!.x,
+                    0,
+                  ) / cluster.members.length,
+                y:
+                  cluster.members.reduce(
+                    (sum, index) => sum + semantic.get(decoded[index]!.path)!.y,
+                    0,
+                  ) / cluster.members.length,
+                z:
+                  cluster.members.reduce(
+                    (sum, index) => sum + semantic.get(decoded[index]!.path)!.z,
+                    0,
+                  ) / cluster.members.length,
+              },
+            }
+          : {}),
       }));
 
       const points = decoded.map((entry, index) => {
         const position = positions[index] ?? { x: 0, y: 0, z: 0 };
         const tags = (tagLookup.get(entry.path) ?? []).slice(0, TAGS_PER_PHOTO);
         const album = albumLookup.get(entry.path);
+        const gear = gearLookup.get(entry.path);
         const slot = slots[entry.path];
         // The wall-clock sort key, so a contact sheet can run in the order the
         // photographs were taken rather than the order their files are named.
@@ -1253,11 +1290,14 @@ export const loadEmbeddingSpacePoints = async (
           ...(taken ? { taken: taken.sortKey, year: taken.year } : {}),
           ...(aspectLookup.has(entry.path) ? { aspect: aspectLookup.get(entry.path) } : {}),
           ...(album ? { album } : {}),
+          ...(gear?.[0] ? { camera: gear[0] } : {}),
+          ...(gear?.[1] ? { lens: gear[1] } : {}),
           ...(entry.photo.swatch ? { swatch: entry.photo.swatch } : {}),
           ...(tags.length > 0 ? { tags } : {}),
           ...(slot === undefined ? {} : { slot }),
           ...((neighbours[index]?.length ?? 0) > 0 ? { near: neighbours[index] } : {}),
           ...(clusterOf.has(index) ? { cluster: clusterOf.get(index) } : {}),
+          ...(semantic.has(entry.path) ? { umap: semantic.get(entry.path)! } : {}),
           x: Number(position.x.toFixed(4)),
           y: Number(position.y.toFixed(4)),
           z: Number(position.z.toFixed(4)),

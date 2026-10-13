@@ -118,7 +118,7 @@ export const SearchInputBar: React.FC<Props> = ({
                 title="Clear search"
                 type="button"
               >
-                <span aria-hidden="true">×</span>
+                <Icon kind="close" />
               </button>
             ) : null}
           </div>

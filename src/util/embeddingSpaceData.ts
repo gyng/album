@@ -10,6 +10,8 @@ export type EmbeddingSpaceEntry = {
   href: string;
   label: string;
   album?: string;
+  camera?: string;
+  lens?: string;
   /** Wall-clock sort key and year, where the photograph carries a date. */
   taken?: number;
   year?: number;
@@ -24,6 +26,7 @@ export type EmbeddingSpaceEntry = {
   near?: number[];
   /** Which named clump it fell in, as an index into the clusters. */
   cluster?: number;
+  umap?: { x: number; y: number; z: number };
   x: number;
   y: number;
   z: number;
@@ -45,6 +48,7 @@ export type EmbeddingSpaceAtlas = {
 
 /** What one clump of the cloud turned out to be about. */
 export type EmbeddingSpaceCluster = {
+  umap?: { x: number; y: number; z: number };
   x: number;
   y: number;
   z: number;

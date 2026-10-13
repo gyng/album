@@ -97,9 +97,12 @@ export type PhotoStats = {
     label: string;
     total: number;
     dominantFamily: string | null;
+    accentFamily?: string | null;
+    accentCount?: number;
     slices: Array<{
       rgb: string;
       family: string;
+      accent?: { family: string; rgb: string };
       count: number;
       position: number;
       dateLabel: string;
@@ -949,6 +952,7 @@ function computeRichColorStats(albums: Content[]): {
       sortKey: number;
       rgb: [number, number, number];
       family: string;
+      accent?: { family: string; rgb: string };
       position: number;
       dateLabel: string;
       thumbSrc: string;
@@ -965,6 +969,15 @@ function computeRichColorStats(albums: Content[]): {
 
     const dominant = palette[0] as [number, number, number];
     const family = getColorFamilyLabel(dominant);
+    const accentRgb = palette.find(
+      (rgb) => !isNeutralFamily(getColorFamilyLabel(rgb as [number, number, number])),
+    );
+    const accent = accentRgb
+      ? {
+          family: getColorFamilyLabel(accentRgb as [number, number, number]),
+          rgb: rgbToString(accentRgb as [number, number, number]),
+        }
+      : null;
     const examples = exampleBuckets.get(family)!;
     const src = photo._build.srcset[0]?.src ?? encodePublicAssetPath(photo.data.src);
     examples.push({
@@ -1008,6 +1021,7 @@ function computeRichColorStats(albums: Content[]): {
       sortKey,
       rgb: dominant,
       family,
+      ...(accent ? { accent } : {}),
       position: Math.max(0, Math.min(1, position)),
       dateLabel: `${MONTH_LABELS[parsed.month - 1]} ${parsed.day}`,
       thumbSrc: src,
@@ -1056,6 +1070,7 @@ function computeRichColorStats(albums: Content[]): {
     const slices = entries.map((entry) => ({
       rgb: `rgb(${entry.rgb[0]}, ${entry.rgb[1]}, ${entry.rgb[2]})`,
       family: entry.family,
+      ...(entry.accent ? { accent: entry.accent } : {}),
       count: 1,
       position: entry.position,
       dateLabel: entry.dateLabel,
@@ -1069,11 +1084,21 @@ function computeRichColorStats(albums: Content[]): {
     // A year with no photographs has no dominant family, rather than the first
     // family in the list with a count of nothing.
     const dominantFamily = ranked && ranked.count > 0 ? ranked.label : null;
+    const accentCounts = new Map<string, number>();
+    for (const entry of entries) {
+      if (entry.accent)
+        accentCounts.set(entry.accent.family, (accentCounts.get(entry.accent.family) ?? 0) + 1);
+    }
+    const leadingAccent = [...accentCounts].sort(
+      (left, right) => right[1] - left[1] || left[0].localeCompare(right[0]),
+    )[0];
 
     return {
       label: yearKey,
       total,
       dominantFamily,
+      accentFamily: leadingAccent?.[0] ?? null,
+      accentCount: leadingAccent?.[1] ?? 0,
       slices,
     };
   });

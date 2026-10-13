@@ -165,6 +165,7 @@
   inline-size: var(--size-120);
   min-inline-size: 0;
   padding-block: var(--m-s);
+  padding-inline: 0;
   border: 0;
   background: transparent;
   color: var(--c-font);

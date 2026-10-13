@@ -27,6 +27,14 @@
   contain-intrinsic-size: auto 90svh;
 }
 
+/* An open details panel may extend beyond its photograph. Release paint
+   containment for this block only so the panel remains visible and usable. */
+.photoBlock:has(details[open]) {
+  content-visibility: visible;
+  position: relative;
+  z-index: var(--z-details);
+}
+
 .noMargin {
   margin: 0;
 }

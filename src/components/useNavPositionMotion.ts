@@ -30,7 +30,12 @@ export const useNavPositionMotion = (
           (edge === "right" ? rect.right : rect.x) +
           window.scrollX -
           (visual ? 0 : (matrix?.m41 ?? 0)),
-        y: rect.y + window.scrollY - (visual ? 0 : (matrix?.m42 ?? 0)),
+        // Sticky album chrome is already anchored to the viewport. Adding its
+        // document scroll would launch the next page's nav hundreds of pixels away.
+        y:
+          rect.y +
+          (node.closest("[data-nav-viewport-motion]") ? 0 : window.scrollY) -
+          (visual ? 0 : (matrix?.m42 ?? 0)),
         path: window.location.pathname,
         at: Date.now(),
       };

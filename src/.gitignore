@@ -59,3 +59,5 @@ node_modules/
 public/map-styles/*.json
 public/map-styles/patterns/
 !public/map-styles/*.template.json
+
+/public/data/embedding-umap.json
