@@ -1,19 +1,20 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type DragEvent } from "react";
 import { Button, Caption, Heading } from "../ui";
 import {
   buildRelayPuzzle,
   scoreRelay,
   relayLinkSimilarities,
-  relayLinkClues,
   type PhotoGamePhoto,
   type RelayPuzzle,
 } from "../../util/photoGames";
+import { describeRelayLinks } from "../../util/photoRelay";
 import { GameProgress, GameScore } from "./GameFeedback";
 import { GamePhoto, PhotoChain } from "./GamePhoto";
 import { GameIntro } from "./GameIllustration";
 import { GameDock } from "./GameDock";
 import styles from "./PhotoGames.module.css";
 import relayStyles from "./PhotoRelay.module.css";
+import { useGameShortcuts, GameShortcutHelp } from "./useGameShortcuts";
 
 export const PhotoRelay = ({ photos }: { photos: PhotoGamePhoto[] }) => {
   const [puzzle, setPuzzle] = useState<RelayPuzzle | null>(null);
@@ -21,6 +22,8 @@ export const PhotoRelay = ({ photos }: { photos: PhotoGamePhoto[] }) => {
   const [finished, setFinished] = useState(false);
   const [gaveUp, setGaveUp] = useState(false);
   const [dragged, setDragged] = useState<string | null>(null);
+  const [dropTarget, setDropTarget] = useState<number | null>(null);
+  const activeDrag = useRef<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const resultRef = useRef<HTMLDivElement>(null);
   const boardRef = useRef<HTMLDivElement>(null);
@@ -39,6 +42,18 @@ export const PhotoRelay = ({ photos }: { photos: PhotoGamePhoto[] }) => {
     if (finished) resultRef.current?.focus();
     else if (puzzle) boardRef.current?.focus();
   }, [finished, puzzle]);
+  const cancelDrag = () => {
+    activeDrag.current = null;
+    setDragged(null);
+    setDropTarget(null);
+  };
+  const beginDrag = (event: DragEvent<HTMLElement>, path: string) => {
+    activeDrag.current = path;
+    event.dataTransfer.setData("text/plain", path);
+    event.dataTransfer.effectAllowed = "move";
+    setDragged(path);
+    setDropTarget(null);
+  };
   const start = () => {
     const next = buildRelayPuzzle(photos);
     setError(next ? null : "There aren't enough comparable photographs for a relay.");
@@ -46,12 +61,39 @@ export const PhotoRelay = ({ photos }: { photos: PhotoGamePhoto[] }) => {
     setOrder([]);
     setFinished(false);
     setGaveUp(false);
-    setDragged(null);
+    cancelDrag();
   };
   const finish = (abandoned: boolean) => {
+    cancelDrag();
     setFinished(true);
     setGaveUp(abandoned);
   };
+  const shortcuts = [
+    { key: "Escape", label: "Cancel drag", action: cancelDrag, enabled: !!dragged },
+    {
+      key: "Enter",
+      label: "Finish relay",
+      action: () => finish(false),
+      enabled: !!puzzle && !finished && order.length === 5,
+    },
+    { key: "g", label: "Give up", action: () => finish(true), enabled: !!puzzle && !finished },
+    {
+      key: "n",
+      label: puzzle ? "Play again" : "Start relay",
+      action: start,
+      enabled: !puzzle || finished,
+    },
+  ];
+  useGameShortcuts(shortcuts, photos.length >= 7);
+  useEffect(() => {
+    const clear = () => {
+      activeDrag.current = null;
+      setDragged(null);
+      setDropTarget(null);
+    };
+    window.addEventListener("blur", clear);
+    return () => window.removeEventListener("blur", clear);
+  }, []);
   if (photos.length < 7)
     return <p>Photo Relay needs at least seven indexed photographs with image similarity data.</p>;
   if (!puzzle)
@@ -66,6 +108,7 @@ export const PhotoRelay = ({ photos }: { photos: PhotoGamePhoto[] }) => {
         <Button variant="primary" onClick={start}>
           Start relay
         </Button>
+        <GameShortcutHelp shortcuts={shortcuts} />
       </GameIntro>
     );
   return (
@@ -76,180 +119,201 @@ export const PhotoRelay = ({ photos }: { photos: PhotoGamePhoto[] }) => {
             Make each neighbouring pair resemble each other. Shared subjects, colours or shapes can
             bridge the start and finish; the whole chain earns the score.
           </Caption>
-          <div className={styles.endpoints} ref={boardRef} tabIndex={-1}>
-            <figure className={styles.frame}>
-              <Caption as="figcaption">Start</Caption>
-              <GamePhoto photo={puzzle.start} />
-            </figure>
-            <figure className={styles.frame}>
-              <Caption as="figcaption">Finish</Caption>
-              <GamePhoto photo={puzzle.end} />
-            </figure>
-          </div>
-          <div className={styles.roundProgress}>
-            <p role="status">{order.length} of 5 links placed</p>
-            <GameProgress current={order.length} total={5} />
-          </div>
-          <ol className={styles.relaySlots} aria-label="Your relay links" ref={slotsRef}>
-            {Array.from({ length: 5 }, (_, index) => (
-              // Native drag/drop supplements the move and remove buttons below.
-              // oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions
-              <li
-                key={index}
-                data-filled={!!order[index]}
-                data-drop-active={!!dragged}
-                onDragOver={(event) => {
-                  if (dragged) event.preventDefault();
-                }}
-                onDrop={(event) => {
-                  event.preventDefault();
-                  const path = event.dataTransfer.getData("text/plain");
-                  const photo = puzzle.tiles.find((tile) => tile.path === path);
-                  if (!photo) return;
-                  const next = order.filter((item) => item.path !== path);
-                  next.splice(Math.min(index, next.length), 0, photo);
-                  setOrder(next);
-                  setDragged(null);
-                }}
+          <div className={relayStyles.workspace}>
+            <div className={relayStyles.board}>
+              <div
+                className={[styles.endpoints, relayStyles.endpoints].join(" ")}
+                ref={boardRef}
+                tabIndex={-1}
               >
-                {order[index] ? (
-                  <div
-                    className={styles.dragFrame}
-                    draggable
-                    onDragStart={(event) => {
-                      event.dataTransfer.setData("text/plain", order[index]!.path);
-                      event.dataTransfer.effectAllowed = "move";
-                      setDragged(order[index]!.path);
+                <figure className={styles.frame}>
+                  <Caption as="figcaption">Start</Caption>
+                  <GamePhoto photo={puzzle.start} />
+                </figure>
+                <figure className={styles.frame}>
+                  <Caption as="figcaption">Finish</Caption>
+                  <GamePhoto photo={puzzle.end} />
+                </figure>
+              </div>
+              <div className={styles.roundProgress}>
+                <p role="status">{order.length} of 5 links placed</p>
+                <GameProgress current={order.length} total={5} />
+              </div>
+              <ol
+                className={[styles.relaySlots, relayStyles.slots].join(" ")}
+                aria-label="Your relay links"
+                ref={slotsRef}
+              >
+                {Array.from({ length: 5 }, (_, index) => (
+                  // Native drag/drop supplements the move and remove buttons below.
+                  // oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions
+                  <li
+                    key={index}
+                    data-filled={!!order[index]}
+                    data-drop-active={!!dragged}
+                    data-drop-hover={dropTarget === index}
+                    data-dragging={order[index]?.path === dragged}
+                    onDragOver={(event) => {
+                      if (!activeDrag.current) return;
+                      event.preventDefault();
+                      event.dataTransfer.dropEffect = "move";
+                      setDropTarget(index);
                     }}
-                    onDragEnd={() => setDragged(null)}
+                    onDragLeave={(event) => {
+                      if (!event.currentTarget.contains(event.relatedTarget as Node | null))
+                        setDropTarget((current) => (current === index ? null : current));
+                    }}
+                    onDrop={(event) => {
+                      event.preventDefault();
+                      const path = event.dataTransfer.getData("text/plain");
+                      const photo =
+                        path === activeDrag.current
+                          ? puzzle.tiles.find((tile) => tile.path === path)
+                          : null;
+                      cancelDrag();
+                      if (!photo) return;
+                      const next = order.filter((item) => item.path !== path);
+                      next.splice(Math.min(index, next.length), 0, photo);
+                      setOrder(next);
+                    }}
                   >
-                    <GamePhoto photo={order[index]!} />
-                  </div>
-                ) : (
-                  <span>{index + 1}</span>
-                )}
-                {order[index] ? (
-                  <div className={styles.slotActions}>
-                    <Button
-                      variant="quiet"
-                      aria-label={`Move link ${index + 1} earlier`}
-                      disabled={index === 0}
-                      onClick={() => {
-                        const next = [...order];
-                        [next[index - 1], next[index]] = [next[index]!, next[index - 1]!];
-                        setOrder(next);
-                      }}
-                    >
-                      ←
-                    </Button>
-                    <Button
-                      variant="quiet"
-                      aria-label={`Remove link ${index + 1}`}
-                      onClick={(event) => {
-                        if (event.detail === 0)
-                          requestedFocus.current = { path: order[index]!.path };
-                        setOrder(order.filter((_, position) => position !== index));
-                      }}
-                    >
-                      ×
-                    </Button>
-                    <Button
-                      variant="quiet"
-                      aria-label={`Move link ${index + 1} later`}
-                      disabled={index === order.length - 1}
-                      onClick={() => {
-                        const next = [...order];
-                        [next[index + 1], next[index]] = [next[index]!, next[index + 1]!];
-                        setOrder(next);
-                      }}
-                    >
-                      →
-                    </Button>
-                  </div>
-                ) : null}
-              </li>
-            ))}
-          </ol>
-          <GameDock
-            {...(relayStyles.reference ? { className: relayStyles.reference } : {})}
-            label="Relay reference"
-          >
-            <ol className={relayStyles.miniChain} aria-hidden="true">
-              {[
-                puzzle.start,
-                ...Array.from({ length: 5 }, (_, index) => order[index] ?? null),
-                puzzle.end,
-              ].map((photo, index) => (
-                <li key={index}>
-                  <span>{index === 0 ? "Start" : index === 6 ? "Finish" : index}</span>
-                  {photo ? (
-                    <GamePhoto photo={photo} />
-                  ) : (
-                    <span className={relayStyles.empty}>·</span>
-                  )}
-                </li>
-              ))}
-            </ol>
-            <div className={relayStyles.referenceActions}>
-              <Caption size="sm">{order.length} / 5 links</Caption>
-              <Button
-                disabled={!order.length}
-                onClick={(event) => {
-                  const control =
-                    slotsRef.current?.querySelector<HTMLButtonElement>("button:not(:disabled)");
-                  control?.scrollIntoView({
-                    block: "center",
-                    behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
-                      ? "auto"
-                      : "smooth",
-                  });
-                  if (event.detail === 0) control?.focus({ preventScroll: true });
-                }}
-              >
-                Edit links
-              </Button>
+                    {order[index] ? (
+                      <div
+                        className={styles.dragFrame}
+                        draggable
+                        onDragStart={(event) => beginDrag(event, order[index]!.path)}
+                        onDragEnd={cancelDrag}
+                      >
+                        <GamePhoto photo={order[index]!} />
+                      </div>
+                    ) : (
+                      <span>{index + 1}</span>
+                    )}
+                    {order[index] ? (
+                      <div className={[styles.slotActions, relayStyles.slotActions].join(" ")}>
+                        <Button
+                          variant="quiet"
+                          aria-label={`Move link ${index + 1} earlier`}
+                          disabled={index === 0}
+                          onClick={() => {
+                            const next = [...order];
+                            [next[index - 1], next[index]] = [next[index]!, next[index - 1]!];
+                            setOrder(next);
+                          }}
+                        >
+                          ←
+                        </Button>
+                        <Button
+                          variant="quiet"
+                          aria-label={`Remove link ${index + 1}`}
+                          onClick={(event) => {
+                            if (event.detail === 0)
+                              requestedFocus.current = { path: order[index]!.path };
+                            setOrder(order.filter((_, position) => position !== index));
+                          }}
+                        >
+                          ×
+                        </Button>
+                        <Button
+                          variant="quiet"
+                          aria-label={`Move link ${index + 1} later`}
+                          disabled={index === order.length - 1}
+                          onClick={() => {
+                            const next = [...order];
+                            [next[index + 1], next[index]] = [next[index]!, next[index + 1]!];
+                            setOrder(next);
+                          }}
+                        >
+                          →
+                        </Button>
+                      </div>
+                    ) : null}
+                  </li>
+                ))}
+              </ol>
             </div>
-          </GameDock>
-          <div className={styles.choices}>
-            {puzzle.tiles.map((photo, index) => {
-              const position = order.findIndex((item) => item.path === photo.path);
-              return (
-                <button
-                  type="button"
-                  key={photo.path}
-                  className={styles.choice}
-                  aria-label={`Choose photograph ${index + 1}`}
-                  ref={(element) => {
-                    if (element) choiceRefs.current.set(photo.path, element);
-                    else choiceRefs.current.delete(photo.path);
-                  }}
-                  aria-pressed={position >= 0}
-                  draggable={position < 0}
-                  onDragStart={(event) => {
-                    event.dataTransfer.setData("text/plain", photo.path);
-                    event.dataTransfer.effectAllowed = "move";
-                    setDragged(photo.path);
-                  }}
-                  onDragEnd={() => setDragged(null)}
-                  disabled={position >= 0}
+            <GameDock
+              {...(relayStyles.reference ? { className: relayStyles.reference } : {})}
+              label="Relay reference"
+            >
+              <ol className={relayStyles.miniChain} aria-hidden="true">
+                {[
+                  puzzle.start,
+                  ...Array.from({ length: 5 }, (_, index) => order[index] ?? null),
+                  puzzle.end,
+                ].map((photo, index) => (
+                  <li key={index}>
+                    <span>{index === 0 ? "Start" : index === 6 ? "Finish" : index}</span>
+                    {photo ? (
+                      <GamePhoto photo={photo} />
+                    ) : (
+                      <span className={relayStyles.empty}>·</span>
+                    )}
+                  </li>
+                ))}
+              </ol>
+              <div className={relayStyles.referenceActions}>
+                <Caption size="sm">{order.length} / 5 links</Caption>
+                <Button
+                  disabled={!order.length}
                   onClick={(event) => {
-                    const next = [...order, photo];
-                    if (event.detail === 0) {
-                      const available = puzzle.tiles.find(
-                        (tile) => !next.some((item) => item.path === tile.path),
-                      );
-                      requestedFocus.current = available
-                        ? { path: available.path }
-                        : { finish: true };
-                    }
-                    setOrder(next);
+                    const control =
+                      slotsRef.current?.querySelector<HTMLButtonElement>("button:not(:disabled)");
+                    control?.scrollIntoView({
+                      block: "center",
+                      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
+                        ? "auto"
+                        : "smooth",
+                    });
+                    if (event.detail === 0) control?.focus({ preventScroll: true });
                   }}
                 >
-                  <GamePhoto photo={photo} />
-                  <span>{position >= 0 ? `Link ${position + 1}` : `Photograph ${index + 1}`}</span>
-                </button>
-              );
-            })}
+                  Edit links
+                </Button>
+              </div>
+            </GameDock>
+            <div className={relayStyles.tray}>
+              <div className={[styles.choices, relayStyles.choices].join(" ")}>
+                {puzzle.tiles.map((photo, index) => {
+                  const position = order.findIndex((item) => item.path === photo.path);
+                  return (
+                    <button
+                      type="button"
+                      key={photo.path}
+                      className={[styles.choice, relayStyles.choice].join(" ")}
+                      data-dragging={dragged === photo.path}
+                      aria-label={`Choose photograph ${index + 1}`}
+                      ref={(element) => {
+                        if (element) choiceRefs.current.set(photo.path, element);
+                        else choiceRefs.current.delete(photo.path);
+                      }}
+                      aria-pressed={position >= 0}
+                      draggable={position < 0}
+                      onDragStart={(event) => beginDrag(event, photo.path)}
+                      onDragEnd={cancelDrag}
+                      disabled={position >= 0}
+                      onClick={(event) => {
+                        const next = [...order, photo];
+                        if (event.detail === 0) {
+                          const available = puzzle.tiles.find(
+                            (tile) => !next.some((item) => item.path === tile.path),
+                          );
+                          requestedFocus.current = available
+                            ? { path: available.path }
+                            : { finish: true };
+                        }
+                        setOrder(next);
+                      }}
+                    >
+                      <GamePhoto photo={photo} />
+                      <span>
+                        {position >= 0 ? `Link ${position + 1}` : `Photograph ${index + 1}`}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           </div>
           <div className={styles.actions}>
             <Button
@@ -288,10 +352,13 @@ export const PhotoRelay = ({ photos }: { photos: PhotoGamePhoto[] }) => {
           {!gaveUp ? <GameScore label="Visual flow" score={scoreRelay(puzzle, order)} /> : null}
           <Caption>
             {gaveUp
-              ? "This order gives the closest overall resemblance between neighbours. "
-              : "The score ranks your chain against all 120 possible orders: higher is smoother, and around 50 is the middle. "}
-            Each link shows the model’s resemblance percentage; higher means a closer match. Caption
-            clues name shared subjects, rather than the reason for the model’s score.
+              ? "This route has the strongest overall resemblance between neighbours."
+              : "Your score ranks this order against all 120 possible arrangements: 100 is the smoothest, 50 is around the middle."}
+          </Caption>
+          <Caption>
+            Each link’s resemblance measures how similar the two photographs look. Shared subjects
+            come from their captions and tags; they are clues, rather than an explanation of the
+            score.
           </Caption>
           <PhotoChain
             photos={[puzzle.start, ...(gaveUp ? puzzle.solution : order), puzzle.end]}
@@ -300,12 +367,39 @@ export const PhotoRelay = ({ photos }: { photos: PhotoGamePhoto[] }) => {
               ...(gaveUp ? puzzle.solution : order),
               puzzle.end,
             ])}
-            clues={relayLinkClues([
+          />
+          <ol className={relayStyles.linkReasons} aria-label="Relay connections">
+            {describeRelayLinks([
               puzzle.start,
               ...(gaveUp ? puzzle.solution : order),
               puzzle.end,
-            ])}
-          />
+            ]).map((link) => (
+              <li key={link.from}>
+                <strong>
+                  Photographs {link.from} → {link.to}
+                </strong>
+                <span>
+                  {link.similarity === null
+                    ? "Resemblance unavailable"
+                    : `${link.similarity}% resemblance`}
+                </span>
+                <span>
+                  {link.subjects.length
+                    ? `Shared subjects: ${link.subjects.join(" · ")}`
+                    : "No shared indexed subject"}
+                </span>
+              </li>
+            ))}
+          </ol>
+          {gaveUp && order.length ? (
+            <details>
+              <summary>Your unfinished route</summary>
+              <PhotoChain
+                photos={[puzzle.start, ...order, puzzle.end]}
+                similarities={relayLinkSimilarities([puzzle.start, ...order, puzzle.end])}
+              />
+            </details>
+          ) : null}
           {!gaveUp ? (
             <>
               {(() => {
@@ -331,7 +425,6 @@ export const PhotoRelay = ({ photos }: { photos: PhotoGamePhoto[] }) => {
                     ...puzzle.solution,
                     puzzle.end,
                   ])}
-                  clues={relayLinkClues([puzzle.start, ...puzzle.solution, puzzle.end])}
                 />
               </details>
             </>
@@ -341,6 +434,7 @@ export const PhotoRelay = ({ photos }: { photos: PhotoGamePhoto[] }) => {
           </Button>
         </div>
       )}
+      <GameShortcutHelp shortcuts={shortcuts} />
     </div>
   );
 };

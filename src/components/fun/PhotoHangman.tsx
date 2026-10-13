@@ -16,6 +16,7 @@ import {
 } from "../../util/photoHangman";
 import type { PhotoGamePhoto } from "../../util/photoGames";
 import styles from "./PhotoHangman.module.css";
+import { useGameShortcuts, GameShortcutHelp } from "./useGameShortcuts";
 
 const subjectLabel = (subject: string) => subject[0]! + subject.slice(1).toLowerCase();
 
@@ -57,6 +58,27 @@ export const PhotoHangman = ({ photos }: { photos: PhotoGamePhoto[] }) => {
     setGaveUp(false);
     setError("");
   };
+  const shortcuts = [
+    {
+      key: "N",
+      label: puzzle ? "Play again" : "Start guessing",
+      action: start,
+      enabled: !puzzle || ended,
+    },
+    {
+      key: "/",
+      label: "Filter subjects",
+      action: () => searchRef.current?.focus(),
+      enabled: Boolean(puzzle && !ended),
+    },
+    {
+      key: "G",
+      label: "Give up",
+      action: () => setGaveUp(true),
+      enabled: Boolean(puzzle && !ended),
+    },
+  ];
+  useGameShortcuts(shortcuts);
   if (!puzzle)
     return (
       <GameIntro game="photo-hangman">
@@ -68,6 +90,7 @@ export const PhotoHangman = ({ photos }: { photos: PhotoGamePhoto[] }) => {
         <Button variant="primary" onClick={start}>
           Start guessing
         </Button>
+        <GameShortcutHelp shortcuts={shortcuts} />
       </GameIntro>
     );
   const revealed = Math.min(misses + HANGMAN_INITIAL_CLUES, puzzle.photos.length);
@@ -275,6 +298,7 @@ export const PhotoHangman = ({ photos }: { photos: PhotoGamePhoto[] }) => {
           )}
         </div>
       </div>
+      <GameShortcutHelp shortcuts={shortcuts} />
     </div>
   );
 };

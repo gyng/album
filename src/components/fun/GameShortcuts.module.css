@@ -1,0 +1,35 @@
+.help {
+  font-size: var(--fs-s);
+  color: var(--c-bg-contrast-light);
+}
+.help summary {
+  cursor: pointer;
+  inline-size: fit-content;
+  min-block-size: var(--tap-target);
+  padding-block: var(--space-2);
+}
+.help summary:focus-visible {
+  outline: 2px solid var(--c-accent);
+  outline-offset: 3px;
+}
+.help ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  list-style: none;
+  margin: var(--space-2) 0;
+  padding: 0;
+}
+.help li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.help kbd {
+  border: var(--line-hairline) solid var(--c-border);
+  border-radius: var(--radius-preview);
+  padding: 1px var(--space-1);
+  color: var(--c-font);
+  background: var(--c-surface);
+  font: inherit;
+}

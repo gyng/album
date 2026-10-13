@@ -273,3 +273,10 @@ the photographs rather than nested card padding.
 A dock can report its measured sticky height to nearby controls. Use that value
 for scroll focus clearance, and reset it to zero when the dock releases or the
 viewport is too short. Photo Hangman's filter and subject bank use this contract.
+
+Game workspaces pair the task and a bounded scrolling photo tray on desktop,
+then use ordinary vertical flow and height-aware context docks on small screens.
+Drag sources and eligible, hovered and fixed destinations have distinct visual
+states; tap and keyboard alternatives remain first-class. Short verdict and
+shuffle animations respect reduced motion. Keyboard shortcuts are discoverable
+in a compact disclosure and never intercept text entry or native activation.

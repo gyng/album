@@ -1,9 +1,15 @@
+import type { PhotoSearchSize, PhotoSearchLineLength } from "../../util/photoWordSearch";
 import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 
 export type GameSettingsRegistry = {
-  cross: { mode: "visible" | "hidden"; prefill: "none" | "minimal" | "guided"; size: 3 | 4 | 5 };
-  connections: { size: 4 | 5 | 6; detail: "broad" | "specific"; hints: boolean };
-  sightLines: { size: 5 | 6 };
+  cross: { mode: "visible" | "hidden"; prefill: 0 | 1 | 2 | 3 | 4; size: 3 | 4 | 5 };
+  connections: {
+    size: 4 | 5 | 6;
+    detail: "broad" | "specific";
+    hints: boolean;
+    lives: null | 4 | 6 | 8;
+  };
+  sightLines: { size: PhotoSearchSize; lineLength: PhotoSearchLineLength };
   doubleTake: { slower: boolean };
   oracle: { mode: "mind" | "discover" };
   guess: { region: string; timeLimit: null | 15 | 30; rounds: 3 | 5 | 10 };
@@ -12,11 +18,11 @@ export type GameSettingsRegistry = {
 type Game = keyof GameSettingsRegistry;
 
 const defaults: GameSettingsRegistry = {
-  cross: { mode: "hidden", prefill: "minimal", size: 3 },
-  connections: { size: 4, detail: "broad", hints: true },
-  sightLines: { size: 5 },
+  cross: { mode: "hidden", prefill: 0, size: 3 },
+  connections: { size: 4, detail: "broad", hints: true, lives: null },
+  sightLines: { size: 5, lineLength: 3 },
   doubleTake: { slower: false },
-  oracle: { mode: "mind" },
+  oracle: { mode: "discover" },
   guess: { region: "", timeLimit: null, rounds: 5 },
 };
 
@@ -33,11 +39,16 @@ const validators: {
 } = {
   cross: {
     mode: oneOf("visible", "hidden"),
-    prefill: oneOf("none", "minimal", "guided"),
+    prefill: oneOf(0, 1, 2, 3, 4),
     size: oneOf(3, 4, 5),
   },
-  connections: { size: oneOf(4, 5, 6), detail: oneOf("broad", "specific"), hints: boolean },
-  sightLines: { size: oneOf(5, 6) },
+  connections: {
+    size: oneOf(4, 5, 6),
+    detail: oneOf("broad", "specific"),
+    hints: boolean,
+    lives: oneOf(null, 4, 6, 8),
+  },
+  sightLines: { size: oneOf(5, 6, 7, 8, 9, 10), lineLength: oneOf(3, 4, 5) },
   doubleTake: { slower: boolean },
   oracle: { mode: oneOf("mind", "discover") },
   guess: {
@@ -55,7 +66,9 @@ const validFields = <G extends Game>(game: G, value: unknown): Partial<GameSetti
   if (!value || typeof value !== "object" || Array.isArray(value)) return fields;
   const object = value as Record<string, unknown>;
   for (const field of Object.keys(defaults[game]) as Array<keyof GameSettingsRegistry[G]>) {
-    const candidate = object[String(field)];
+    let candidate = object[String(field)];
+    if (game === "cross" && field === "prefill" && typeof candidate === "string")
+      candidate = ({ none: 0, minimal: 1, guided: 4 } as Record<string, number>)[candidate];
     if (validators[game][field](candidate))
       fields[field] = candidate as GameSettingsRegistry[G][typeof field];
   }

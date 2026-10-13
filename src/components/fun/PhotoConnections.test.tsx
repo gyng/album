@@ -25,9 +25,9 @@ it("checks groups, avoids charging twice for the same mistake and reveals all co
   choose("A cat", 2);
   choose("A lake", 2);
   fireEvent.click(screen.getByRole("button", { name: "Check connection" }));
-  expect(screen.getByText("3 mistakes remaining")).toBeTruthy();
+  expect(screen.getByText("1 mistake · Unlimited lives")).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "Check connection" }));
-  expect(screen.getByText("3 mistakes remaining")).toBeTruthy();
+  expect(screen.getByText("1 mistake · Unlimited lives")).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "Deselect" }));
   choose("A cat", 4);
   fireEvent.click(screen.getByRole("button", { name: "Check connection" }));
@@ -40,6 +40,7 @@ it("checks groups, avoids charging twice for the same mistake and reveals all co
 });
 it("ends after four different mistakes and reveals the groups", () => {
   render(<PhotoConnections photos={photos} />);
+  fireEvent.click(screen.getByRole("button", { name: "4 lives" }));
   fireEvent.click(screen.getByRole("button", { name: "Start connecting" }));
   const cats = screen.getAllByRole("img", { name: "A cat" });
   const boats = screen.getAllByRole("img", { name: "A lake" });
@@ -83,6 +84,7 @@ it("restores lobby preferences after remount without restoring an active round",
   const first = render(<PhotoConnections photos={photos} />);
   fireEvent.click(screen.getByRole("button", { name: "6×6" }));
   fireEvent.click(screen.getByRole("button", { name: "Specific subjects" }));
+  fireEvent.click(screen.getByRole("button", { name: "8 lives" }));
   fireEvent.click(screen.getByRole("button", { name: "One-away hints on" }));
   first.unmount();
   render(<PhotoConnections photos={photos} />);
@@ -92,6 +94,7 @@ it("restores lobby preferences after remount without restoring an active round",
     "true",
   );
   expect(screen.getByRole("button", { name: "One-away hints off" })).toBeTruthy();
+  expect(screen.getByRole("button", { name: "8 lives" })).toHaveAttribute("aria-pressed", "true");
   expect(screen.getByRole("button", { name: "Start connecting" })).toBeTruthy();
 });
 
@@ -111,4 +114,54 @@ it("keeps active selection controls together and removes the dock from the resul
   fireEvent.click(screen.getByRole("button", { name: "Give up" }));
   expect(screen.queryByRole("group", { name: "Connection controls" })).toBeNull();
   expect(screen.getByRole("region", { name: "Connections result" })).toHaveFocus();
+});
+
+const makeMistakes = (count: number) => {
+  const cats = screen.getAllByRole("img", { name: "A cat" });
+  const lakes = screen.getAllByRole("img", { name: "A lake" });
+  const pairs = [
+    [0, 1],
+    [0, 2],
+    [0, 3],
+    [1, 2],
+    [1, 3],
+    [2, 3],
+  ];
+  for (let index = 0; index < count; index++) {
+    const pair = pairs[index % pairs.length]!;
+    const lake = Math.floor(index / pairs.length);
+    [cats[pair[0]!]!, cats[pair[1]!]!, lakes[lake]!, lakes[lake + 1]!].forEach((image) =>
+      fireEvent.click(image.closest("button")!),
+    );
+    fireEvent.keyDown(document.body, { key: "Enter" });
+    if (index + 1 < count) fireEvent.keyDown(document.body, { key: "Escape" });
+  }
+};
+
+it("keeps unlimited rounds playable beyond eight distinct mistakes", () => {
+  render(<PhotoConnections photos={photos} />);
+  expect(screen.getByRole("button", { name: "Unlimited" })).toHaveAttribute("aria-pressed", "true");
+  fireEvent.keyDown(document.body, { key: "n" });
+  makeMistakes(8);
+  expect(screen.getByText("8 mistakes · Unlimited lives")).toBeTruthy();
+  expect(screen.queryByRole("region", { name: "Connections result" })).toBeNull();
+  expect(screen.getByRole("button", { name: "Check connection" })).toBeEnabled();
+});
+
+it.each([6, 8])("ends at the selected %i-life budget", (lives) => {
+  render(<PhotoConnections photos={photos} />);
+  fireEvent.click(screen.getByRole("button", { name: `${lives} lives` }));
+  fireEvent.click(screen.getByRole("button", { name: "Start connecting" }));
+  makeMistakes(lives - 1);
+  expect(screen.queryByRole("region", { name: "Connections result" })).toBeNull();
+  fireEvent.keyDown(document.body, { key: "Escape" });
+  const cats = screen.getAllByRole("img", { name: "A cat" });
+  const lakes = screen.getAllByRole("img", { name: "A lake" });
+  // One fresh mixed group, distinct from the mistakes above.
+  [cats[0]!, lakes[0]!, lakes[1]!, lakes[2]!].forEach((image) =>
+    fireEvent.click(image.closest("button")!),
+  );
+  fireEvent.keyDown(document.body, { key: "Enter" });
+  expect(screen.getByRole("region", { name: "Connections result" })).toHaveFocus();
+  expect(screen.queryByRole("button", { name: "Check connection" })).toBeNull();
 });

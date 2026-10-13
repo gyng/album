@@ -217,3 +217,40 @@ it("remembers longer viewing time after remount and returns to the lobby", () =>
   );
   expect(screen.getByRole("button", { name: "Start Double Take" })).toBeTruthy();
 });
+
+it("reports correct and incorrect picks immediately while keeping the reveal focused", async () => {
+  start();
+  await watch();
+  fireEvent.click(screen.getByRole("button", { name: "Same place" }));
+  expect(screen.getByRole("status")).toHaveTextContent("Correct");
+  expect(screen.getByRole("region", { name: "Pair revealed" })).toHaveFocus();
+  fireEvent.click(screen.getByRole("button", { name: "Next pair" }));
+  await watch(900);
+  fireEvent.click(screen.getByRole("button", { name: "Same place" }));
+  expect(screen.getByRole("status")).toHaveTextContent("Not quite");
+  expect(screen.getByRole("region", { name: "Pair revealed" })).toHaveFocus();
+  expect(screen.getByRole("region", { name: "Pair revealed" })).toHaveTextContent(
+    "Different places",
+  );
+});
+
+it("offers keyboard picks only after watching and advances a revealed pair", async () => {
+  render(<DoubleTake photos={photos} />);
+  fireEvent.keyDown(document.body, { key: "n" });
+  tick(0);
+  fireEvent.keyDown(document.body, { key: "1" });
+  expect(screen.queryByRole("region", { name: "Pair revealed" })).toBeNull();
+  await watch();
+  fireEvent.keyDown(document.body, { key: "1" });
+  expect(screen.getByRole("status")).toHaveTextContent("Correct");
+  fireEvent.keyDown(document.body, { key: "2" });
+  expect(screen.getByText("+100 points")).toBeTruthy();
+  fireEvent.keyDown(document.body, { key: " " });
+  await watch(900);
+  fireEvent.keyDown(document.body, { key: "2" });
+  expect(screen.getByRole("status")).toHaveTextContent("Correct");
+  fireEvent.keyDown(document.body, { key: "Enter" });
+  expect(screen.getByRole("region", { name: "Double Take results" })).toHaveTextContent(
+    "2 of 2 correct",
+  );
+});

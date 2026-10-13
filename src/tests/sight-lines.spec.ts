@@ -17,9 +17,9 @@ test.beforeAll(() => {
   const db = new DatabaseSync(corePath);
   db.exec("DELETE FROM images; DELETE FROM metadata;");
   const subjects = ["cat", "bicycle", "boat", "umbrella", "stairs", "clock"];
-  for (let index = 0; index < 36; index++) {
+  for (let index = 0; index < 108; index++) {
     const filename = `sightline-${index}.jpg`;
-    const subject = subjects[Math.floor(index / 6)]!;
+    const subject = subjects[Math.floor(index / 18)]!;
     db.prepare(
       "INSERT INTO images (path, album_relative_path, filename, geocode, exif, tags, colors, alt_text, subject) VALUES (?, ?, ?, '', '', ?, '', ?, '')",
     ).run(
@@ -34,8 +34,8 @@ test.beforeAll(() => {
   core = readFileSync(corePath);
   const connectionsDb = new DatabaseSync(corePath);
   const connectionSubjects = ["people", "water", "food", "snow", "animals", "buildings"];
-  for (let index = 0; index < 36; index++) {
-    const subject = connectionSubjects[Math.floor(index / 6)]!;
+  for (let index = 0; index < 108; index++) {
+    const subject = connectionSubjects[Math.floor(index / 18)]!;
     connectionsDb
       .prepare("UPDATE images SET tags = ?, alt_text = ? WHERE filename = ?")
       .run(subject, `A photograph of ${subject}.`, `sightline-${index}.jpg`);
@@ -261,4 +261,32 @@ test("releasing a drag outside the board does not select photographs when the po
   await page.mouse.up();
   await page.mouse.move(third.x + third.width / 2, third.y + third.height / 2);
   await expect(board.getByRole("button").nth(2)).toHaveAttribute("aria-pressed", "false");
+});
+
+test("Sight Lines preserves a 10×10 five-photo-line game and keeps mobile targets usable", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 320, height: 844 });
+  await gotoHydrated(page, "/fun/sight-lines");
+  await page.getByRole("button", { name: "10×10", exact: true }).click();
+  await page.getByRole("button", { name: "5 per line", exact: true }).click();
+  await page.reload();
+  await expect(page.getByRole("button", { name: "10×10", exact: true })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await expect(page.getByRole("button", { name: "5 per line", exact: true })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await page.keyboard.press("n");
+  const board = page.getByRole("group", { name: "Photo search board" });
+  await expect(board.getByRole("button")).toHaveCount(100);
+  const box = await board.getByRole("button").first().boundingBox();
+  expect(box!.width).toBeGreaterThanOrEqual(44);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
+  await page.getByRole("button", { name: "Give up", exact: true }).click();
+  const result = page.getByRole("region", { name: "Sight Lines result" });
+  await expect(result).toBeFocused();
+  await expect(result.getByRole("link")).toHaveCount(30);
 });

@@ -96,3 +96,21 @@ it("accepts a truthful alternative line rather than only the planted coordinates
   });
   expect(matchPhotoSearchLine({ ...puzzle, tiles }, cells, [])?.id).toBe(target.id);
 });
+
+it.each([
+  [7, 3],
+  [8, 4],
+  [9, 4],
+  [10, 5],
+] as const)("builds a %s-square board with %s photographs per line", (size, length) => {
+  const archive = photos.flatMap((photo) => [photo, { ...photo, path: photo.path + "-extra" }]);
+  const puzzle = buildPhotoWordSearch(archive, size, () => 0.37, length)!;
+  expect(puzzle.tiles).toHaveLength(size * size);
+  expect(puzzle.lineLength).toBe(length);
+  expect(puzzle.targets.length).toBeGreaterThanOrEqual(4);
+  for (const target of puzzle.targets) {
+    expect(target.cells).toHaveLength(length);
+    expect(matchPhotoSearchLine(puzzle, target.cells, [])?.id).toBe(target.id);
+    expect(matchPhotoSearchLine(puzzle, target.cells.slice(0, -1), [])).toBeNull();
+  }
+});

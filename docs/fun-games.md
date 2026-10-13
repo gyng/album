@@ -152,7 +152,8 @@ excluding generic scene/place labels. Each frame matches exactly one selected
 subject, and competing same-sized partitions are rejected, including those that would
 emerge after removing solved groups. Selection has an
 accent outline and a tick badge without dimming the photograph. One-away hints
-can be switched off. Four different mistakes reveal the groups; repeated wrong
+can be switched off. Unlimited lives are the default; players can choose four, six or eight lives.
+Only a limited-lives round ends on mistakes. Repeated wrong
 submissions are not charged again. Solved groups remain visible, and phone
 screens also show larger previews of the selected photographs.
 
@@ -205,9 +206,9 @@ augmenting-path matching proves a complete arrangement with unique photographs.
 Equivalent clue families and duplicate board signatures are excluded. The tray
 contains exactly the solution photographs, shuffled; any alternative arrangement
 that satisfies both predicates for every square is accepted.
-Players choose Visible clues or Hidden connections. Starting photographs can be None, Minimal (one per row/column), or Guided (two
-per row/column). Hidden connections defaults to Minimal; Visible clues defaults
-to None. Clear keeps any starting photographs; swaps and removal apply only to
+Players choose Visible clues or Hidden connections. Starting photographs range from zero to four, with zero as the default.
+Filled starting cells have lock badges and stay fixed; old saved prefill labels
+migrate to numeric counts. Clear keeps any starting photographs; swaps and removal apply only to
 movable shots. Check
 marks which photographs fit both clues. On phones and tablets the whole board fits without horizontal scrolling.
 Compact row numbers and column letters reference a full clue key beneath the
@@ -270,13 +271,14 @@ five untimed rounds and does not overwrite the player's saved choices.
 
 ## Sight Lines
 
-A photograph word search at `/fun/sight-lines`. Four named connections are
-hidden as straight lines of three photographs, across, down or diagonally,
-in either direction. Dynamically generated 5×5 and 6×6 boards use concrete subjects from captions and tags, with unique photographs
-and four guaranteed solutions.
-Any other valid three-photo run also counts; overlapping connections are allowed.
+A photograph word search at `/fun/sight-lines`. Named connections are
+hidden as straight lines of three, four or five photographs, across, down or diagonally,
+in either direction. Dynamically generated 5×5 through 10×10 boards use concrete subjects from captions and tags, with unique photographs
+and four to eight guaranteed solutions, depending on size and available subjects.
+Any other valid run of the chosen length also counts; overlapping connections are allowed.
 
-Solutions require three clear caption mentions of a concrete subject, rather than
+Solutions require enough clear caption mentions of a concrete subject for the
+chosen line length, rather than
 broad scenery categories or tag-only matches. Caption prominence is a heuristic,
 not object detection. Selection favours close-ups and earlier mentions, and
 varies outings where location/date metadata permits. Highly overlapping topic
@@ -286,7 +288,7 @@ topics, multi-topic photographs and accidental solution lines; the best is used.
 Truthful alternative lines still count, including weaker caption or tag matches.
 Subject matching is shared with Photo Hangman, with results cached per board.
 
-The numbered “Find these” word bank names all four subjects above the board.
+The numbered “Find these” word bank names all chosen subjects above the board.
 Found subjects are crossed off; their numbers also mark the photographs and
 linked result rows. Solid accent lines connect found runs. The current selection
 and the unfound runs revealed by Give up use dashed lines.
@@ -294,9 +296,11 @@ and the unfound runs revealed by Give up use dashed lines.
 Drag between endpoints, tap the two ends, or activate them with the keyboard.
 Selected photographs have a larger preview. Hint marks the start of an unfound
 line; Give up reveals every connection with links to its photographs. Completed
-boards focus the result. Board size is saved with the other game preferences.
+boards focus the result. Board size and line length are saved with the other game preferences.
 The desktop board has a comfortable width; mobile uses the compact game-grid
-spacing and retains 44px touch targets even for 6×6 on a 320px screen.
+spacing and retains 44px touch targets. Boards larger than 6×6 scroll horizontally
+on small screens; touch uses tap-to-select endpoints while mouse dragging remains
+available. Arrow keys move within the board; Home and End reach row edges.
 The themed illustration is a deadpan giraffe with bird portraits pegged along
 its outstretched neck and matching birds perched above them.
 
@@ -333,3 +337,31 @@ failed images have a retry action. The clue panel uses the height-aware mobile
 dock, with measured focus clearance for the tag bank and filter. Win, loss and
 Give up reveal linked photos and focus the result. No text is submitted as an
 answer and no word-length clue narrows the choices.
+
+## Game interaction refinements
+
+Cross Exposure and Photo Relay use a two-column desktop workspace with an
+internally scrolling photo tray. On smaller screens their existing context docks
+remain height-aware. Mouse drag sources are visibly dimmed, eligible destinations
+are marked, and the currently hovered destination is highlighted. Fixed crossword
+cells reject moves; outside drops, focus loss and cancellation clear drag state.
+Tap/select and keyboard move/remove controls remain available without dragging.
+
+Relay results describe every adjacent pair with measured resemblance and shared
+indexed subjects, distinguish link resemblance from the overall rank among 120
+orders, and identify the biggest jump. Subject clues explain metadata overlap,
+not why the embedding produced a particular value.
+
+Double Take answers reveal an immediate animated verdict with text and icons;
+reduced-motion readers see the same verdict without movement. Connect the Shots
+shuffle animates tiles to their new positions, with cancellation on a subsequent
+shuffle and no animation under reduced motion. Oracle defaults to discovery;
+an explicitly saved mode still wins.
+
+Games expose phase-aware shortcuts through a compact Keyboard shortcuts disclosure:
+N starts a new round where safe; G gives up, H hints and Escape clears selection
+where supported. Oracle uses 1/2/3 for yes/no/unsure, B to undo; Double Take uses
+1/2 for same/different place. Hangman uses / to focus its subject filter.
+Guess Where retains its existing Enter/Space confirm and next controls. Shortcuts
+ignore typing, modifier combinations, held-key repeats and open modal dialogs;
+native activation of focused buttons takes precedence over Enter/Space shortcuts.

@@ -68,20 +68,16 @@ it.each([3, 4, 5] as const)(
 );
 
 it.each([3, 4, 5] as const)(
-  "provides zero, one or two unique starting shots per line on a %i grid",
+  "provides the requested total of unique fixed shots on a %i grid",
   (size) => {
-    for (const [choice, count] of [
-      ["none", 0],
-      ["minimal", 1],
-      ["guided", 2],
-    ] as const) {
-      const indices = crosswordSeedIndices(size, choice);
-      expect(indices).toHaveLength(size * count);
-      expect(new Set(indices).size).toBe(indices.length);
+    for (const count of [0, 1, 2, 3, 4] as const) {
+      const indices = crosswordSeedIndices(size, count);
+      expect(indices).toHaveLength(count);
+      expect(new Set(indices).size).toBe(count);
       expect(indices.every((index) => index >= 0 && index < size ** 2)).toBe(true);
-      for (let line = 0; line < size; line++) {
-        expect(indices.filter((index) => Math.floor(index / size) === line)).toHaveLength(count);
-        expect(indices.filter((index) => index % size === line)).toHaveLength(count);
+      if (count <= size) {
+        expect(new Set(indices.map((index) => Math.floor(index / size))).size).toBe(count);
+        expect(new Set(indices.map((index) => index % size)).size).toBe(count);
       }
     }
   },

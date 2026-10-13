@@ -1,6 +1,11 @@
 import { shuffleGamePhotos, type OracleQuestion, type PhotoGamePhoto } from "./photoGames";
 import { PHOTO_SUBJECTS, photoSubjectClarity } from "./photoSubjects";
 
+export type PhotoSearchSize = 5 | 6 | 7 | 8 | 9 | 10;
+export type PhotoSearchLineLength = 3 | 4 | 5;
+export const PHOTO_SEARCH_SIZES = [5, 6, 7, 8, 9, 10] as const;
+export const PHOTO_SEARCH_LINE_LENGTHS = [3, 4, 5] as const;
+
 export type PhotoSearchTarget = {
   id: string;
   label: string;
@@ -8,7 +13,8 @@ export type PhotoSearchTarget = {
   matches: OracleQuestion["matches"];
 };
 export type PhotoWordSearch = {
-  size: 5 | 6;
+  size: PhotoSearchSize;
+  lineLength: PhotoSearchLineLength;
   tiles: PhotoGamePhoto[];
   targets: PhotoSearchTarget[];
 };
@@ -33,8 +39,8 @@ export const matchPhotoSearchLine = (
   found: string[],
 ): PhotoSearchTarget | null => {
   if (
-    cells.length !== 3 ||
-    photoSearchLine(cells[0]!, cells[2]!, puzzle.size).join() !== cells.join()
+    cells.length !== puzzle.lineLength ||
+    photoSearchLine(cells[0]!, cells.at(-1)!, puzzle.size).join() !== cells.join()
   )
     return null;
   // Accept any valid run, including accidental ones: metadata cannot justify rejecting it.
@@ -48,8 +54,9 @@ export const matchPhotoSearchLine = (
 
 export const buildPhotoWordSearch = (
   photos: PhotoGamePhoto[],
-  size: 5 | 6 = 5,
+  size: PhotoSearchSize = 5,
   random: () => number = Math.random,
+  lineLength: PhotoSearchLineLength = 3,
 ): PhotoWordSearch | null => {
   const unique = [...new Map(photos.map((photo) => [photo.path, photo])).values()];
   if (unique.length < size * size) return null;
@@ -62,7 +69,7 @@ export const buildPhotoWordSearch = (
       const clarity = clarityByPhoto.get(photo)!;
       return clarity !== null && clarity >= 2 ? [{ photo, clarity }] : [];
     });
-    if (pool.length < 3) return [];
+    if (pool.length < lineLength) return [];
     const noun = answer.toLowerCase();
     const label =
       (
@@ -88,6 +95,7 @@ export const buildPhotoWordSearch = (
     ];
   });
   if (subjects.length < 4) return null;
+  const targetCount = Math.min(subjects.length, Math.max(4, size - 2));
   const lines: number[][] = [];
   for (let start = 0; start < size * size; start++) {
     for (const [dy, dx] of [
@@ -96,8 +104,8 @@ export const buildPhotoWordSearch = (
       [1, 1],
       [1, -1],
     ]) {
-      const row = Math.floor(start / size) + dy! * 2,
-        column = (start % size) + dx! * 2;
+      const row = Math.floor(start / size) + dy! * (lineLength - 1),
+        column = (start % size) + dx! * (lineLength - 1);
       if (row >= 0 && row < size && column >= 0 && column < size)
         lines.push(photoSearchLine(start, row * size + column, size));
     }
@@ -123,7 +131,7 @@ export const buildPhotoWordSearch = (
       const line = shuffleGamePhotos(lines, random).find((cells) =>
         cells.every((cell) => !tiles[cell]),
       );
-      if (pool.length < 3 || !line) continue;
+      if (pool.length < lineLength || !line) continue;
       const selected: PhotoGamePhoto[] = [];
       for (const cell of line) {
         const ranked = pool
@@ -150,9 +158,9 @@ export const buildPhotoWordSearch = (
         used.add(photo.path);
       }
       targets.push({ id: subject.id, label: subject.label, cells: line, matches: subject.matches });
-      if (targets.length === 4) break;
+      if (targets.length === targetCount) break;
     }
-    if (targets.length < 4) continue;
+    if (targets.length < targetCount) continue;
     const filler = shuffleGamePhotos(
       unique.filter((photo) => !used.has(photo.path)),
       random,
@@ -176,11 +184,11 @@ export const buildPhotoWordSearch = (
       const runs = lines.filter((cells) =>
         cells.every((cell) => target.matches(board[cell]!)),
       ).length;
-      penalty += Math.max(0, matches - 5) * 2 + Math.max(0, runs - 1) * 4;
+      penalty += Math.max(0, matches - (lineLength + 2)) * 2 + Math.max(0, runs - 1) * 4;
     }
     penalty += board.filter((photo) => memberships(photo) > 1).length * 2;
     if (penalty < bestPenalty) {
-      best = { size, tiles: board, targets };
+      best = { size, lineLength, tiles: board, targets };
       bestPenalty = penalty;
     }
     if (!penalty) break;

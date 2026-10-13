@@ -3,10 +3,11 @@ import { buildDoubleTakeDeck, doubleTakePoints, type DoubleTakePair } from "../.
 import type { PhotoGamePhoto } from "../../util/photoGames";
 import { getResizedAlbumImageSrc } from "../../util/getResizedAlbumImageSrc";
 import { exifDayKey } from "../../util/exifTime";
-import { Button, Caption, Heading } from "../ui";
+import { Button, Caption, Heading, Icon } from "../ui";
 import { GameIntro } from "./GameIllustration";
 import { GameProgress, GameScore } from "./GameFeedback";
 import { GamePhoto } from "./GamePhoto";
+import { GameShortcutHelp, useGameShortcuts } from "./useGameShortcuts";
 import { useGameSettings } from "./useGameSettings";
 import styles from "./DoubleTake.module.css";
 
@@ -154,23 +155,13 @@ export const DoubleTake = ({ photos }: { photos: PhotoGamePhoto[] }) => {
     setPhase("preparing");
   };
 
-  if (phase === "preparing")
-    return (
-      <div className={styles.placeholder}>
-        <span className={styles.spinner} aria-hidden="true" />
-        <p role="status">Finding visual doubles…</p>
-        <Button variant="quiet" onClick={() => setPhase("lobby")}>
-          Cancel
-        </Button>
-      </div>
-    );
   const watch = (replay = false) => {
     if (replay) setReplayed(true);
     setAttempt((value) => value + 1);
     setPhase("loading");
   };
   const choose = (guess: boolean | null) => {
-    if (!pair) return;
+    if (!pair || phase === "reveal" || phase === "summary") return;
     const correct = guess === pair.samePlace;
     const earned = doubleTakePoints(correct, streak, replayed);
     setAnswer(guess);
@@ -181,6 +172,50 @@ export const DoubleTake = ({ photos }: { photos: PhotoGamePhoto[] }) => {
     setPhase("reveal");
   };
 
+  const next = () => {
+    if (round + 1 === deck.length) setPhase("summary");
+    else {
+      setRound(round + 1);
+      setAnswer(null);
+      setReplayed(false);
+      setPhase("loading");
+    }
+  };
+  const shortcuts = [
+    {
+      key: "n",
+      label: "New game",
+      action: start,
+      enabled: phase === "lobby" || phase === "summary",
+    },
+    { key: "1", label: "Same place", action: () => choose(true), enabled: phase === "guess" },
+    {
+      key: "2",
+      label: "Different places",
+      action: () => choose(false),
+      enabled: phase === "guess",
+    },
+    { key: "r", label: "Replay pair", action: () => watch(true), enabled: phase === "guess" },
+    {
+      key: "Space",
+      label: phase === "reveal" ? "Next pair" : "Watch again",
+      action: phase === "reveal" ? next : () => watch(),
+      enabled: ["reveal", "paused", "error"].includes(phase),
+    },
+    { key: "Enter", label: "Next pair", action: next, enabled: phase === "reveal" },
+  ];
+  useGameShortcuts(shortcuts);
+
+  if (phase === "preparing")
+    return (
+      <div className={styles.placeholder}>
+        <span className={styles.spinner} aria-hidden="true" />
+        <p role="status">Finding visual doubles…</p>
+        <Button variant="quiet" onClick={() => setPhase("lobby")}>
+          Cancel
+        </Button>
+      </div>
+    );
   if (phase === "lobby")
     return (
       <GameIntro game="double-take">
@@ -202,6 +237,7 @@ export const DoubleTake = ({ photos }: { photos: PhotoGamePhoto[] }) => {
         <Button variant="primary" onClick={start}>
           Start Double Take
         </Button>
+        <GameShortcutHelp shortcuts={shortcuts} />
       </GameIntro>
     );
 
@@ -225,6 +261,7 @@ export const DoubleTake = ({ photos }: { photos: PhotoGamePhoto[] }) => {
           Play again
         </Button>
         <Button onClick={() => setPhase("lobby")}>Change viewing time</Button>
+        <GameShortcutHelp shortcuts={shortcuts} />
       </div>
     );
 
@@ -248,6 +285,20 @@ export const DoubleTake = ({ photos }: { photos: PhotoGamePhoto[] }) => {
           role="region"
           aria-label="Pair revealed"
         >
+          {answer !== null ? (
+            <div
+              className={styles.verdict}
+              data-correct={answer === pair.samePlace}
+              role="status"
+              key={round}
+            >
+              <span className={styles.verdictIcon} aria-hidden="true">
+                <Icon kind={answer === pair.samePlace ? "sparkles" : "close"} />
+              </span>
+              <strong>{answer === pair.samePlace ? "Correct" : "Not quite"}</strong>
+              <span>{points ? `+${points} points` : "No points this round"}</span>
+            </div>
+          ) : null}
           <Heading level={1}>
             {answer === null
               ? "The places revealed"
@@ -272,27 +323,14 @@ export const DoubleTake = ({ photos }: { photos: PhotoGamePhoto[] }) => {
               </figure>
             ))}
           </div>
-          <p>
-            {points ? `+${points} points` : "No points this round"}
-            {points > 100 ? ` · ${points - 100} streak bonus` : ""}
-          </p>
+          {answer === null ? <p>No points this round</p> : null}
+          {points > 100 ? <Caption>{points - 100} streak bonus</Caption> : null}
           {replayed ? (
             <Caption>
               Replayed pairs earn 100 points for a correct answer, without a streak bonus.
             </Caption>
           ) : null}
-          <Button
-            variant="primary"
-            onClick={() => {
-              if (round + 1 === deck.length) setPhase("summary");
-              else {
-                setRound(round + 1);
-                setAnswer(null);
-                setReplayed(false);
-                setPhase("loading");
-              }
-            }}
-          >
+          <Button variant="primary" onClick={next}>
             {round + 1 === deck.length ? "See results" : "Next pair"}
           </Button>
         </div>
@@ -368,6 +406,7 @@ export const DoubleTake = ({ photos }: { photos: PhotoGamePhoto[] }) => {
           ) : null}
         </>
       )}
+      <GameShortcutHelp shortcuts={shortcuts} />
     </div>
   );
 };

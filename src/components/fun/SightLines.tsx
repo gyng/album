@@ -4,8 +4,11 @@ import { GameIntro } from "./GameIllustration";
 import { GameDock } from "./GameDock";
 import { GamePhoto, PhotoChain } from "./GamePhoto";
 import { useGameSettings } from "./useGameSettings";
+import { useGameShortcuts, GameShortcutHelp } from "./useGameShortcuts";
 import {
   buildPhotoWordSearch,
+  PHOTO_SEARCH_SIZES,
+  PHOTO_SEARCH_LINE_LENGTHS,
   matchPhotoSearchLine,
   photoSearchLine,
   type PhotoWordSearch,
@@ -24,6 +27,8 @@ export const SightLines = ({ photos }: { photos: PhotoGamePhoto[] }) => {
   const [message, setMessage] = useState("");
   const drag = useRef<{ start: number; end: number; pointer: number } | null>(null);
   const resultRef = useRef<HTMLElement>(null);
+  const boardRef = useRef<HTMLDivElement>(null);
+  const [focusCell, setFocusCell] = useState(0);
   const finished = Boolean(puzzle && (gaveUp || found.length === puzzle.targets.length));
   useEffect(() => {
     if (!finished) return;
@@ -32,7 +37,7 @@ export const SightLines = ({ photos }: { photos: PhotoGamePhoto[] }) => {
     return () => cancelAnimationFrame(frame);
   }, [finished]);
   const start = () => {
-    const next = buildPhotoWordSearch(photos, settings.size);
+    const next = buildPhotoWordSearch(photos, settings.size, Math.random, settings.lineLength);
     if (!next) {
       setMessage(
         "This archive needs more photographs with distinct subjects. Try the smaller grid.",
@@ -47,6 +52,7 @@ export const SightLines = ({ photos }: { photos: PhotoGamePhoto[] }) => {
     setGaveUp(false);
     setMessage("");
     drag.current = null;
+    setFocusCell(0);
   };
   const check = (cells: number[]) => {
     if (!puzzle) return;
@@ -69,8 +75,8 @@ export const SightLines = ({ photos }: { photos: PhotoGamePhoto[] }) => {
       setSelected([]);
     } else
       setMessage(
-        cells.length !== 3
-          ? "Choose a straight line of three photographs."
+        cells.length !== puzzle.lineLength
+          ? `Choose a straight line of ${puzzle.lineLength} photographs.`
           : "That line doesn’t match an unfound connection.",
       );
   };
@@ -85,19 +91,71 @@ export const SightLines = ({ photos }: { photos: PhotoGamePhoto[] }) => {
       setMessage("");
     } else check(photoSearchLine(anchor, index, puzzle!.size));
   };
+  const showHint = () => {
+    if (!puzzle || finished) return;
+    const target = puzzle.targets.find((item) => !found.some((match) => match.id === item.id));
+    if (!target) return;
+    setHint(target.cells[0]!);
+    setSelected([]);
+    setAnchor(null);
+    setMessage(`A ${target.label.toLowerCase()} line starts at the marked photograph.`);
+  };
+  const giveUp = () => {
+    setGaveUp(true);
+    setSelected([]);
+    setAnchor(null);
+    setHint(null);
+    setMessage("The hidden sight lines are revealed below.");
+  };
+  const clear = () => {
+    drag.current = null;
+    setSelected([]);
+    setAnchor(null);
+    setHint(null);
+    setMessage("");
+  };
+  const shortcuts = [
+    {
+      key: "N",
+      label: puzzle ? "Play again" : "Start searching",
+      action: start,
+      enabled: !puzzle || finished,
+    },
+    { key: "H", label: "Hint", action: showHint, enabled: Boolean(puzzle && !finished) },
+    {
+      key: "Escape",
+      label: "Clear selection",
+      action: clear,
+      enabled: Boolean(puzzle && !finished),
+    },
+    { key: "G", label: "Give up", action: giveUp, enabled: Boolean(puzzle && !finished) },
+  ];
+  useGameShortcuts(shortcuts);
   if (!puzzle)
     return (
       <GameIntro game="sight-lines">
-        <p>Find four lines of three related photographs: across, down or diagonally.</p>
+        <p>Find lines of {settings.lineLength} related photographs: across, down or diagonally.</p>
         <div className={styles.actions} role="group" aria-label="Board size">
-          {([5, 6] as const).map((size) => (
+          {PHOTO_SEARCH_SIZES.map((size) => (
             <Button
               key={size}
               active={settings.size === size}
               aria-pressed={settings.size === size}
-              onClick={() => setSettings({ size })}
+              onClick={() => setSettings((previous) => ({ ...previous, size }))}
             >
               {size}×{size}
+            </Button>
+          ))}
+        </div>
+        <div className={styles.actions} role="group" aria-label="Line length">
+          {PHOTO_SEARCH_LINE_LENGTHS.map((lineLength) => (
+            <Button
+              key={lineLength}
+              active={settings.lineLength === lineLength}
+              aria-pressed={settings.lineLength === lineLength}
+              onClick={() => setSettings((previous) => ({ ...previous, lineLength }))}
+            >
+              {lineLength} per line
             </Button>
           ))}
         </div>
@@ -105,6 +163,7 @@ export const SightLines = ({ photos }: { photos: PhotoGamePhoto[] }) => {
         <Button variant="primary" onClick={start}>
           Start searching
         </Button>
+        <GameShortcutHelp shortcuts={shortcuts} />
       </GameIntro>
     );
   const shownLines = puzzle.targets.flatMap((target, index) => {
@@ -132,32 +191,8 @@ export const SightLines = ({ photos }: { photos: PhotoGamePhoto[] }) => {
           </Caption>
           {!finished ? (
             <>
-              <Button
-                onClick={() => {
-                  const target = puzzle.targets.find(
-                    (item) => !found.some((match) => match.id === item.id),
-                  )!;
-                  setHint(target.cells[0]!);
-                  setSelected([]);
-                  setAnchor(null);
-                  setMessage(
-                    `A ${target.label.toLowerCase()} line starts at the marked photograph.`,
-                  );
-                }}
-              >
-                Hint
-              </Button>
-              <Button
-                onClick={() => {
-                  setGaveUp(true);
-                  setSelected([]);
-                  setAnchor(null);
-                  setHint(null);
-                  setMessage("The hidden sight lines are revealed below.");
-                }}
-              >
-                Give up
-              </Button>
+              <Button onClick={showHint}>Hint</Button>
+              <Button onClick={giveUp}>Give up</Button>
             </>
           ) : (
             <Button onClick={start}>Play again</Button>
@@ -165,7 +200,7 @@ export const SightLines = ({ photos }: { photos: PhotoGamePhoto[] }) => {
         </div>
         <section aria-label="Search targets" className={styles.targets}>
           <h2>Find these</h2>
-          <Caption>Three photographs in a straight line for each subject.</Caption>
+          <Caption>{puzzle.lineLength} photographs in a straight line for each subject.</Caption>
           <ul className={styles.clues}>
             {puzzle.targets.map((target, index) => {
               const complete = found.some((match) => match.id === target.id);
@@ -188,94 +223,140 @@ export const SightLines = ({ photos }: { photos: PhotoGamePhoto[] }) => {
         <div role="status" className={styles.feedback}>
           {message || "Drag a line, or tap its first and last photographs."}
         </div>
-        <div
-          className={styles.board}
-          role="group"
-          aria-label="Photo search board"
-          style={{ "--search-size": puzzle.size } as React.CSSProperties}
-          onPointerMove={(event) => {
-            if (!drag.current || drag.current.pointer !== event.pointerId) return;
-            if (event.buttons === 0) {
+        <div className={styles.boardScroll}>
+          <div
+            ref={boardRef}
+            className={styles.board}
+            data-large={puzzle.size > 6}
+
+            role="group"
+            aria-label="Photo search board"
+            style={{ "--search-size": puzzle.size } as React.CSSProperties}
+            onPointerMove={(event) => {
+              if (event.pointerType === "touch" && puzzle.size > 6) return;
+              if (!drag.current || drag.current.pointer !== event.pointerId) return;
+              if (event.buttons === 0) {
+                drag.current = null;
+                setSelected(anchor === null ? [] : [anchor]);
+                return;
+              }
+              const tile = document
+                .elementFromPoint(event.clientX, event.clientY)
+                ?.closest<HTMLButtonElement>("button[data-cell]");
+              if (!tile || !event.currentTarget.contains(tile)) return;
+              drag.current.end = Number(tile.dataset.cell);
+              if (
+                drag.current.end !== drag.current.start &&
+                !event.currentTarget.hasPointerCapture(event.pointerId)
+              )
+                event.currentTarget.setPointerCapture(event.pointerId);
+              setSelected(photoSearchLine(drag.current.start, drag.current.end, puzzle.size));
+            }}
+            onPointerUp={(event) => {
+              const gesture = drag.current;
+              if (!gesture || gesture.pointer !== event.pointerId) return;
+              drag.current = null;
+              if (gesture.start !== gesture.end)
+                check(photoSearchLine(gesture.start, gesture.end, puzzle.size));
+            }}
+            onPointerCancel={() => {
               drag.current = null;
               setSelected(anchor === null ? [] : [anchor]);
-              return;
-            }
-            const tile = document
-              .elementFromPoint(event.clientX, event.clientY)
-              ?.closest<HTMLButtonElement>("button[data-cell]");
-            if (!tile || !event.currentTarget.contains(tile)) return;
-            drag.current.end = Number(tile.dataset.cell);
-            if (
-              drag.current.end !== drag.current.start &&
-              !event.currentTarget.hasPointerCapture(event.pointerId)
-            )
-              event.currentTarget.setPointerCapture(event.pointerId);
-            setSelected(photoSearchLine(drag.current.start, drag.current.end, puzzle.size));
-          }}
-          onPointerUp={(event) => {
-            const gesture = drag.current;
-            if (!gesture || gesture.pointer !== event.pointerId) return;
-            drag.current = null;
-            if (gesture.start !== gesture.end)
-              check(photoSearchLine(gesture.start, gesture.end, puzzle.size));
-          }}
-          onPointerCancel={() => {
-            drag.current = null;
-            setSelected(anchor === null ? [] : [anchor]);
-          }}
-        >
-          {puzzle.tiles.map((photo, index) => {
-            const matches = shownLines.filter((item) => item.cells.includes(index));
-            return (
-              <button
-                key={photo.path}
-                type="button"
-                data-cell={index}
-                data-found={matches.length > 0}
-                data-hint={hint === index}
-                className={styles.tile}
-                disabled={finished}
-                aria-pressed={selected.includes(index)}
-                aria-label={`Row ${Math.floor(index / puzzle.size) + 1}, column ${(index % puzzle.size) + 1}${matches.length ? `; ${matches.map((item) => `${item.label} ${item.revealed ? "revealed" : "found"}`).join(", ")}` : ""}${hint === index ? "; hint starts here" : ""}`}
-                onPointerDown={(event) => {
-                  if (event.button !== 0) return;
-                  drag.current = { start: index, end: index, pointer: event.pointerId };
-                }}
-                onClick={() => {
-                  // A tap completes on click, after its compatibility events, so
-                  // revealing and focusing result links cannot retarget that tap.
-                  tap(index);
-                }}
-              >
-                <GamePhoto photo={photo} />
-                {matches.length ? (
-                  <span className={styles.mark} aria-hidden="true">
-                    {matches.map((item) => item.number).join("·")}
-                  </span>
-                ) : hint === index ? (
-                  <span className={styles.mark} aria-hidden="true">
-                    ?
-                  </span>
-                ) : null}
-              </button>
-            );
-          })}
-          <svg
-            className={styles.lines}
-            viewBox="0 0 100 100"
-            preserveAspectRatio="none"
-            aria-hidden="true"
+            }}
           >
-            {shownLines.map((line) => (
-              <g key={line.id} data-revealed={line.revealed}>
-                <line {...lineCoordinates(line.cells)} className={styles.lineHalo} />
-                <line {...lineCoordinates(line.cells)} className={styles.foundLine} />
-              </g>
-            ))}
-            {selected.length > 1 ? (
-              <line {...lineCoordinates(selected)} className={styles.selectedLine} />
-            ) : null}
-          </svg>
+            {puzzle.tiles.map((photo, index) => {
+              const matches = shownLines.filter((item) => item.cells.includes(index));
+              return (
+                <button
+                  key={photo.path}
+                  type="button"
+                  data-cell={index}
+                  tabIndex={index === focusCell ? 0 : -1}
+                  onFocus={() => setFocusCell(index)}
+                  onKeyDown={(event) => {
+                    const tile =
+                      event.target instanceof Element
+                        ? event.target.closest<HTMLButtonElement>("button[data-cell]")
+                        : null;
+                    if (!tile || finished) return;
+                    const index = Number(tile.dataset.cell),
+                      column = index % puzzle.size;
+                    let next = index;
+                    switch (event.key) {
+                      case "ArrowRight":
+                        next = Math.min(index + 1, puzzle.tiles.length - 1);
+                        break;
+                      case "ArrowLeft":
+                        next = Math.max(0, index - 1);
+                        break;
+                      case "ArrowDown":
+                        next = Math.min(index + puzzle.size, puzzle.tiles.length - 1);
+                        break;
+                      case "ArrowUp":
+                        next = Math.max(0, index - puzzle.size);
+                        break;
+                      case "Home":
+                        next = index - column;
+                        break;
+                      case "End":
+                        next = index - column + puzzle.size - 1;
+                        break;
+                      default:
+                        return;
+                    }
+                    event.preventDefault();
+                    setFocusCell(next);
+                    boardRef.current
+                      ?.querySelector<HTMLButtonElement>(`button[data-cell="${next}"]`)
+                      ?.focus();
+                  }}
+                  data-found={matches.length > 0}
+                  data-hint={hint === index}
+                  className={styles.tile}
+                  disabled={finished}
+                  aria-pressed={selected.includes(index)}
+                  aria-label={`Row ${Math.floor(index / puzzle.size) + 1}, column ${(index % puzzle.size) + 1}${matches.length ? `; ${matches.map((item) => `${item.label} ${item.revealed ? "revealed" : "found"}`).join(", ")}` : ""}${hint === index ? "; hint starts here" : ""}`}
+                  onPointerDown={(event) => {
+                    if (event.pointerType === "touch" && puzzle.size > 6) return;
+                    if (event.button !== 0) return;
+                    drag.current = { start: index, end: index, pointer: event.pointerId };
+                  }}
+                  onClick={() => {
+                    // A tap completes on click, after its compatibility events, so
+                    // revealing and focusing result links cannot retarget that tap.
+                    tap(index);
+                  }}
+                >
+                  <GamePhoto photo={photo} />
+                  {matches.length ? (
+                    <span className={styles.mark} aria-hidden="true">
+                      {matches.map((item) => item.number).join("·")}
+                    </span>
+                  ) : hint === index ? (
+                    <span className={styles.mark} aria-hidden="true">
+                      ?
+                    </span>
+                  ) : null}
+                </button>
+              );
+            })}
+            <svg
+              className={styles.lines}
+              viewBox="0 0 100 100"
+              preserveAspectRatio="none"
+              aria-hidden="true"
+            >
+              {shownLines.map((line) => (
+                <g key={line.id} data-revealed={line.revealed}>
+                  <line {...lineCoordinates(line.cells)} className={styles.lineHalo} />
+                  <line {...lineCoordinates(line.cells)} className={styles.foundLine} />
+                </g>
+              ))}
+              {selected.length > 1 ? (
+                <line {...lineCoordinates(selected)} className={styles.selectedLine} />
+              ) : null}
+            </svg>
+          </div>
         </div>
       </GameDock>
       {selected.length ? (
@@ -297,7 +378,7 @@ export const SightLines = ({ photos }: { photos: PhotoGamePhoto[] }) => {
           <p>
             {gaveUp
               ? `${found.length} of ${puzzle.targets.length} sight lines found.`
-              : "All four connections found."}
+              : `All ${puzzle.targets.length} connections found.`}
           </p>
           {puzzle.targets.map((target, index) => (
             <div key={target.id}>
@@ -314,6 +395,7 @@ export const SightLines = ({ photos }: { photos: PhotoGamePhoto[] }) => {
           ))}
         </section>
       ) : null}
+      <GameShortcutHelp shortcuts={shortcuts} />
     </div>
   );
 };

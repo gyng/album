@@ -13,6 +13,7 @@ import { GameScore } from "./GameFeedback";
 import { GamePhoto, PhotoChain } from "./GamePhoto";
 import { GameIntro } from "./GameIllustration";
 import styles from "./PhotoGames.module.css";
+import { useGameShortcuts, GameShortcutHelp } from "./useGameShortcuts";
 
 export const BlindFrame = ({ photos }: { photos: PhotoGamePhoto[] }) => {
   const [target, setTarget] = useState<PhotoGamePhoto | null>(null);
@@ -68,6 +69,27 @@ export const BlindFrame = ({ photos }: { photos: PhotoGamePhoto[] }) => {
     setDrawing(false);
     setGaveUp(false);
   };
+  const shortcuts = [
+    {
+      key: "N",
+      label: target ? "Play again" : "Start Blind Frame",
+      action: start,
+      enabled: eligible.length > 0 && (!target || Boolean(result) || gaveUp),
+    },
+    {
+      key: "D",
+      label: "Draw this scene",
+      action: () => setDrawing(true),
+      enabled: Boolean(target && !result && !gaveUp && !inlinePad),
+    },
+    {
+      key: "G",
+      label: "Give up",
+      action: () => setGaveUp(true),
+      enabled: Boolean(target && !result && !gaveUp),
+    },
+  ];
+  useGameShortcuts(shortcuts);
   if (!eligible.length)
     return (
       <p>
@@ -85,6 +107,7 @@ export const BlindFrame = ({ photos }: { photos: PhotoGamePhoto[] }) => {
         <Button variant="primary" onClick={start}>
           Start Blind Frame
         </Button>
+        <GameShortcutHelp shortcuts={shortcuts} />
       </GameIntro>
     );
   return (
@@ -244,6 +267,7 @@ export const BlindFrame = ({ photos }: { photos: PhotoGamePhoto[] }) => {
           }}
         />
       ) : null}
+      <GameShortcutHelp shortcuts={shortcuts} />
     </div>
   );
 };

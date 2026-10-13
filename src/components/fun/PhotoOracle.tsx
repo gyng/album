@@ -16,6 +16,7 @@ import { GamePhoto } from "./GamePhoto";
 import { GameIntro } from "./GameIllustration";
 import { useGameSettings } from "./useGameSettings";
 import styles from "./PhotoGames.module.css";
+import { useGameShortcuts, GameShortcutHelp } from "./useGameShortcuts";
 
 export const PhotoOracle = ({ photos }: { photos: PhotoGamePhoto[] }) => {
   const [settings, setSettings] = useGameSettings("oracle");
@@ -72,6 +73,79 @@ export const PhotoOracle = ({ photos }: { photos: PhotoGamePhoto[] }) => {
   useEffect(() => {
     if (stage !== "lobby") gameRef.current?.focus();
   }, [stage, isGuess, candidates.length]);
+  const handleAnswer = (answer: "yes" | "no" | "unsure") => {
+    if (stage !== "questions" || !question || isGuess) return;
+    setHistory([...history, { candidates, answers }]);
+    setCandidates(
+      mode === "discover"
+        ? oracleDiscoveryCandidates(candidates, question, answer)
+        : answerOracle(candidates, question, answer),
+    );
+    setAnswers([
+      ...answers,
+      {
+        id: question.id,
+        question: mode === "mind" ? question.label : oracleDiscoveryQuestion(question),
+        answer,
+      },
+    ]);
+  };
+  const back = () => {
+    const previous = history.at(-1);
+    if (!previous) return;
+    setCandidates(previous.candidates);
+    setAnswers(previous.answers);
+    setHistory(history.slice(0, -1));
+  };
+  const keep = () => {
+    if (!top) return;
+    setConfirmed(top.photo);
+    setStage("finished");
+  };
+  const another = () => {
+    if (!top || candidates.length <= 1) return;
+    setHistory([...history, { candidates, answers }]);
+    setCandidates(candidates.filter((item) => item.photo.path !== top.photo.path));
+  };
+  const shortcuts = [
+    {
+      key: "N",
+      label: "New round",
+      action: () => start(mode),
+      enabled: stage === "lobby" || stage === "finished",
+    },
+    {
+      key: "1",
+      label: isGuess ? "Keep this photograph" : "Yes",
+      action: () => (isGuess ? keep() : handleAnswer("yes")),
+      enabled: stage === "questions" && Boolean(isGuess ? top : question),
+    },
+    {
+      key: "2",
+      label: isGuess ? "Another photograph" : "No",
+      action: () => (isGuess ? another() : handleAnswer("no")),
+      enabled: stage === "questions" && Boolean(isGuess ? top && candidates.length > 1 : question),
+    },
+    {
+      key: "3",
+      label: "Not sure",
+      action: () => handleAnswer("unsure"),
+      enabled: stage === "questions" && !isGuess && Boolean(question),
+    },
+    {
+      key: "B",
+      label: "Previous answer",
+      action: back,
+      enabled: stage === "questions" && history.length > 0,
+    },
+    {
+      key: "Space",
+      label: "I have my photograph",
+      action: () => setStage("questions"),
+      enabled: stage === "remember",
+    },
+  ];
+  useGameShortcuts(shortcuts);
   if (eligible.length < 2)
     return <p>Photo Oracle needs at least two photographs with captions or tags.</p>;
   if (stage === "lobby")
@@ -79,8 +153,9 @@ export const PhotoOracle = ({ photos }: { photos: PhotoGamePhoto[] }) => {
       <GameIntro game="oracle">
         {error ? <p role="alert">{error}</p> : null}
         <p>
-          Choose a photograph and keep it in mind. Answer visual questions while the oracle tries to
-          find it.
+          {mode === "discover"
+            ? "Follow your visual preferences to a photograph from the archive."
+            : "Keep a photograph in mind while the oracle tries to find it."}
         </p>
         <div className={styles.actions}>
           <Button
@@ -167,22 +242,10 @@ export const PhotoOracle = ({ photos }: { photos: PhotoGamePhoto[] }) => {
                 <GamePhoto photo={top.photo} />
               </div>
               <div className={styles.actions}>
-                <Button
-                  variant="primary"
-                  onClick={() => {
-                    setConfirmed(top.photo);
-                    setStage("finished");
-                  }}
-                >
+                <Button variant="primary" onClick={keep}>
                   {mode === "mind" ? "That's it" : "Keep this one"}
                 </Button>
-                <Button
-                  disabled={candidates.length <= 1}
-                  onClick={() => {
-                    setHistory([...history, { candidates, answers }]);
-                    setCandidates(candidates.filter((item) => item.photo.path !== top.photo.path));
-                  }}
-                >
+                <Button disabled={candidates.length <= 1} onClick={another}>
                   {mode === "mind" ? "Not this one" : "Another match"}
                 </Button>
               </div>
@@ -200,23 +263,7 @@ export const PhotoOracle = ({ photos }: { photos: PhotoGamePhoto[] }) => {
                   <Button
                     key={answer}
                     variant={answer === "unsure" ? "quiet" : "surface"}
-                    onClick={() => {
-                      setHistory([...history, { candidates, answers }]);
-                      setCandidates(
-                        mode === "discover"
-                          ? oracleDiscoveryCandidates(candidates, question, answer)
-                          : answerOracle(candidates, question, answer),
-                      );
-                      setAnswers([
-                        ...answers,
-                        {
-                          id: question.id,
-                          question:
-                            mode === "mind" ? question.label : oracleDiscoveryQuestion(question),
-                          answer,
-                        },
-                      ]);
-                    }}
+                    onClick={() => handleAnswer(answer)}
                   >
                     {answer === "yes" ? "Yes" : answer === "no" ? "No" : "Not sure"}
                   </Button>
@@ -227,15 +274,7 @@ export const PhotoOracle = ({ photos }: { photos: PhotoGamePhoto[] }) => {
             <p>No candidates left. Reveal the photograph or start again.</p>
           )}
           <div className={styles.actions}>
-            <Button
-              disabled={!history.length}
-              onClick={() => {
-                const previous = history.at(-1)!;
-                setCandidates(previous.candidates);
-                setAnswers(previous.answers);
-                setHistory(history.slice(0, -1));
-              }}
-            >
+            <Button disabled={!history.length} onClick={back}>
               Back
             </Button>
             <Button
@@ -291,6 +330,7 @@ export const PhotoOracle = ({ photos }: { photos: PhotoGamePhoto[] }) => {
           </Button>
         </div>
       ) : null}
+      <GameShortcutHelp shortcuts={shortcuts} />
     </div>
   );
 };

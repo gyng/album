@@ -67,23 +67,23 @@ it("checks both crossing clues, lets players remove or swap a placement, and com
   expect(screen.getByRole("region", { name: "Cross Exposure result" })).toHaveFocus();
   expect(screen.getByRole("status")).toHaveTextContent("9 of 9");
 });
-it("starts with hidden connections and fixed seed pairs, preserves them when clearing, and reveals clues on request", () => {
+it("offers hidden connections and fixed shots, preserves them when clearing, and reveals clues on request", () => {
   render(<PhotoCrossword photos={photos} />);
   expect(screen.getByRole("button", { name: "Hidden connections" })).toHaveAttribute(
     "aria-pressed",
     "true",
   );
-  fireEvent.click(screen.getByRole("button", { name: "Guided" }));
+  fireEvent.click(screen.getByRole("button", { name: "4 starting photographs" }));
   fireEvent.click(screen.getByRole("button", { name: "Start crossing" }));
-  expect(screen.getAllByRole("button", { name: /fixed starting photograph/ })).toHaveLength(6);
+  expect(screen.getAllByRole("button", { name: /fixed starting photograph/ })).toHaveLength(4);
   expect(screen.getByRole("button", { name: /Row 1; column 1/ })).toBeDisabled();
   expect(
     within(screen.getByRole("group", { name: "Available photographs" })).getAllByRole("button"),
-  ).toHaveLength(3);
+  ).toHaveLength(5);
   fireEvent.click(screen.getByRole("button", { name: "Select photograph 1" }));
   fireEvent.click(screen.getByRole("button", { name: /Row 1; column 3/ }));
   fireEvent.click(screen.getByRole("button", { name: "Clear grid" }));
-  expect(screen.getAllByRole("button", { name: /fixed starting photograph/ })).toHaveLength(6);
+  expect(screen.getAllByRole("button", { name: /fixed starting photograph/ })).toHaveLength(4);
   fireEvent.click(screen.getByRole("button", { name: "Hint" }));
   fireEvent.click(screen.getByRole("button", { name: "Hint" }));
   expect(screen.getByRole("columnheader", { name: "scarlet" })).toBeTruthy();
@@ -92,22 +92,26 @@ it("starts with hidden connections and fixed seed pairs, preserves them when cle
   expect(screen.getByRole("rowheader", { name: "round" })).toBeTruthy();
 });
 
-it("defaults to minimal hidden seeds and offers a fully empty hidden board", () => {
+it("starts hidden boards empty by default and offers exact additional fixed-photo counts", () => {
   render(<PhotoCrossword photos={photos} />);
-  expect(screen.getByRole("button", { name: "Minimal" })).toHaveAttribute("aria-pressed", "true");
-  fireEvent.click(screen.getByRole("button", { name: "Start crossing" }));
-  expect(screen.getAllByRole("button", { name: /fixed starting photograph/ })).toHaveLength(3);
-  fireEvent.click(screen.getByRole("button", { name: "Give up" }));
-  fireEvent.click(screen.getByRole("button", { name: "Change grid size" }));
-  fireEvent.click(screen.getByRole("button", { name: "None" }));
+  expect(screen.getByRole("button", { name: "0 starting photographs" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
   fireEvent.click(screen.getByRole("button", { name: "Start crossing" }));
   expect(screen.queryByRole("button", { name: /fixed starting photograph/ })).toBeNull();
   expect(
     within(screen.getByRole("group", { name: "Available photographs" })).getAllByRole("button"),
   ).toHaveLength(9);
-  expect(
-    screen.getAllByRole("columnheader").map((header) => header.getAttribute("aria-label")),
-  ).toEqual(["Column 1", "Column 2", "Column 3"]);
+  for (const count of [1, 2, 3, 4]) {
+    fireEvent.click(screen.getByRole("button", { name: "Give up" }));
+    fireEvent.click(screen.getByRole("button", { name: "Change grid size" }));
+    fireEvent.click(screen.getByRole("button", { name: `${count} starting photographs` }));
+    fireEvent.click(screen.getByRole("button", { name: "Start crossing" }));
+    expect(screen.getAllByRole("button", { name: /fixed starting photograph/ })).toHaveLength(
+      count,
+    );
+  }
 });
 
 it("offers 5×5 boards and defaults visible clues to no starting photographs", () => {
@@ -129,7 +133,10 @@ it("offers 5×5 boards and defaults visible clues to no starting photographs", (
   });
   render(<PhotoCrossword photos={photos} />);
   fireEvent.click(screen.getByRole("button", { name: "Visible clues" }));
-  expect(screen.getByRole("button", { name: "None" })).toHaveAttribute("aria-pressed", "true");
+  expect(screen.getByRole("button", { name: "0 starting photographs" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
   fireEvent.click(screen.getByRole("button", { name: "5×5" }));
   fireEvent.click(screen.getByRole("button", { name: "Start crossing" }));
   expect(buildPhotoCrossword).toHaveBeenLastCalledWith(photos, 5);
@@ -165,7 +172,7 @@ it("swaps two occupied squares without losing or duplicating a photograph", () =
 
 it("accepts a hidden grid with inferred row order and reveals clues in that order", () => {
   render(<PhotoCrossword photos={photos} />);
-  fireEvent.click(screen.getByRole("button", { name: "None" }));
+  fireEvent.click(screen.getByRole("button", { name: "0 starting photographs" }));
   fireEvent.click(screen.getByRole("button", { name: "Start crossing" }));
   const remaining = [...photos];
   const reordered = [2, 0, 1].flatMap((row) => photos.slice(row * 3, (row + 1) * 3));
@@ -188,7 +195,7 @@ it("accepts a hidden grid with inferred row order and reveals clues in that orde
 
 it("does not judge individual squares against a secret ordering before hidden clues are revealed", () => {
   render(<PhotoCrossword photos={photos} />);
-  fireEvent.click(screen.getByRole("button", { name: "None" }));
+  fireEvent.click(screen.getByRole("button", { name: "0 starting photographs" }));
   fireEvent.click(screen.getByRole("button", { name: "Start crossing" }));
   fireEvent.click(screen.getByRole("button", { name: "Select photograph 1" }));
   fireEvent.click(screen.getByRole("button", { name: /Row 2; column 2;/ }));
@@ -249,7 +256,7 @@ it("reveals one unique clue per hint without exposing other headers, cells or cl
 it("saves lobby choices without restoring an active puzzle", () => {
   const { unmount } = render(<PhotoCrossword photos={photos} />);
   fireEvent.click(screen.getByRole("button", { name: "Visible clues" }));
-  fireEvent.click(screen.getByRole("button", { name: "Guided" }));
+  fireEvent.click(screen.getByRole("button", { name: "4 starting photographs" }));
   fireEvent.click(screen.getByRole("button", { name: "5×5" }));
   unmount();
   render(<PhotoCrossword photos={photos} />);
@@ -257,7 +264,103 @@ it("saves lobby choices without restoring an active puzzle", () => {
     "aria-pressed",
     "true",
   );
-  expect(screen.getByRole("button", { name: "Guided" })).toHaveAttribute("aria-pressed", "true");
+  expect(screen.getByRole("button", { name: "4 starting photographs" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
   expect(screen.getByRole("button", { name: "5×5" })).toHaveAttribute("aria-pressed", "true");
   expect(screen.queryByRole("table")).toBeNull();
+});
+
+const dragTransfer = () => {
+  const values = new Map<string, string>();
+  return {
+    setData: (type: string, value: string) => values.set(type, value),
+    getData: (type: string) => values.get(type) ?? "",
+    effectAllowed: "none",
+    dropEffect: "none",
+  };
+};
+it("drags a tray photograph into a square and swaps occupied squares without duplicates", () => {
+  startVisible();
+  const first = () => screen.getByRole("button", { name: /Row 1: round; column 1/ });
+  const second = () => screen.getByRole("button", { name: /Row 1: round; column 2/ });
+  const transfer = dragTransfer();
+  const tile = screen.getByRole("button", { name: "Select photograph 1" });
+  expect(tile).toHaveAttribute("draggable", "true");
+  fireEvent.dragStart(tile, { dataTransfer: transfer });
+  fireEvent.dragOver(first(), { dataTransfer: transfer });
+  expect(transfer.dropEffect).toBe("move");
+  fireEvent.drop(first(), { dataTransfer: transfer });
+  expect(within(first()).getByRole("img")).toHaveAttribute("alt", "round scarlet");
+  fireEvent.click(screen.getByRole("button", { name: "Select photograph 1" }));
+  fireEvent.click(second());
+  fireEvent.dragStart(first(), { dataTransfer: transfer });
+  fireEvent.drop(second(), { dataTransfer: transfer });
+  expect(within(first()).getByRole("img")).toHaveAttribute("alt", "round azure");
+  expect(within(second()).getByRole("img")).toHaveAttribute("alt", "round scarlet");
+  expect(
+    within(screen.getByRole("group", { name: "Available photographs" })).getAllByRole("button"),
+  ).toHaveLength(7);
+});
+it("marks fixed photographs, rejects their drops and ignores unrelated dragged data", () => {
+  render(<PhotoCrossword photos={photos} />);
+  fireEvent.click(screen.getByRole("button", { name: "1 starting photographs" }));
+  fireEvent.click(screen.getByRole("button", { name: "Start crossing" }));
+  const fixed = screen.getByRole("button", { name: /Row 1; column 1/ });
+  expect(fixed).toHaveAttribute("draggable", "false");
+  expect(within(fixed).getByText("Fixed")).toBeTruthy();
+  const transfer = dragTransfer();
+  fireEvent.dragStart(screen.getByRole("button", { name: "Select photograph 1" }), {
+    dataTransfer: transfer,
+  });
+  fireEvent.drop(fixed, { dataTransfer: transfer });
+  expect(within(fixed).getByRole("img")).toHaveAttribute("alt", "round scarlet");
+  const empty = screen.getByRole("button", { name: /Row 1; column 2/ });
+  fireEvent.dragEnd(screen.getByRole("button", { name: "Select photograph 1" }));
+  const unrelated = dragTransfer();
+  unrelated.setData("text/plain", photos[1]!.path);
+  fireEvent.drop(empty, { dataTransfer: unrelated });
+  expect(within(empty).queryByRole("img")).toBeNull();
+});
+
+it("returns a placed photograph to the tray and clears a cancelled drag", () => {
+  startVisible();
+  const first = screen.getByRole("button", { name: /Row 1: round; column 1/ });
+  const tray = screen.getByRole("group", { name: "Available photographs" });
+  fireEvent.click(screen.getByRole("button", { name: "Select photograph 1" }));
+  fireEvent.click(first);
+  const transfer = dragTransfer();
+  fireEvent.dragStart(first, { dataTransfer: transfer });
+  fireEvent.drop(tray, { dataTransfer: transfer });
+  expect(within(first).queryByRole("img")).toBeNull();
+  expect(within(tray).getAllByRole("button")).toHaveLength(9);
+  const tile = screen.getByRole("button", { name: "Select photograph 1" });
+  fireEvent.dragStart(tile, { dataTransfer: transfer });
+  fireEvent.dragEnd(tile);
+  expect(tile).toHaveAttribute("aria-pressed", "false");
+  fireEvent.drop(first, { dataTransfer: transfer });
+  expect(within(first).queryByRole("img")).toBeNull();
+  fireEvent.dragStart(tile, { dataTransfer: transfer });
+  fireEvent.blur(window);
+  expect(tile).toHaveAttribute("aria-pressed", "false");
+  fireEvent.drop(first, { dataTransfer: transfer });
+  expect(within(first).queryByRole("img")).toBeNull();
+});
+it("supports start, hints, cancellation, checking and give up shortcuts", () => {
+  render(<PhotoCrossword photos={photos} />);
+  fireEvent.keyDown(window, { key: "n" });
+  expect(screen.getByRole("table")).toBeTruthy();
+  fireEvent.keyDown(window, { key: "h" });
+  expect(screen.getByRole("rowheader", { name: "round" })).toBeTruthy();
+  const tile = screen.getByRole("button", { name: "Select photograph 1" });
+  fireEvent.click(tile);
+  fireEvent.keyDown(window, { key: "Escape" });
+  expect(tile).toHaveAttribute("aria-pressed", "false");
+  fireEvent.keyDown(window, { key: "Enter" });
+  expect(screen.getByRole("status")).toHaveTextContent("Place every photograph");
+  fireEvent.keyDown(window, { key: "g" });
+  expect(screen.getByRole("region", { name: "Cross Exposure result" })).toHaveFocus();
+  fireEvent.keyDown(window, { key: "n" });
+  expect(screen.queryByRole("region", { name: "Cross Exposure result" })).toBeNull();
 });

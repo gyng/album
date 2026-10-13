@@ -56,7 +56,8 @@ export const FUN_GAMES = [
     href: "/fun/oracle",
     title: "Photo Oracle",
     illustration: "/fun/photo-oracle.avif",
-    description: "Keep a photograph in mind. Can the oracle find it with yes-or-no questions?",
+    description:
+      "Discover a photograph through visual questions, or challenge the oracle to find yours.",
   },
   {
     id: "double-take",

@@ -1,0 +1,11 @@
+.board {
+  position: relative;
+  isolation: isolate;
+}
+.tile {
+  position: relative;
+  transform-origin: center;
+}
+.tile:focus-visible {
+  z-index: 1;
+}

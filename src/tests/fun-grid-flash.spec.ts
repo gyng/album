@@ -111,7 +111,7 @@ test("Cross Exposure keeps its whole mobile grid visible and reveals the clue ke
   await expect(board.getByRole("columnheader").first()).toHaveAccessibleName("Column 1");
   await expect(
     page.getByRole("group", { name: "Available photographs" }).getByRole("button"),
-  ).toHaveCount(6);
+  ).toHaveCount(9);
   for (let hint = 0; hint < 6; hint++)
     await page.getByRole("button", { name: "Hint", exact: true }).click();
   await expect(board.getByRole("columnheader").first()).not.toHaveAccessibleName("Column 1");
@@ -139,7 +139,7 @@ for (const viewport of [
     await gotoHydrated(page, "/fun/cross-exposure");
     await page
       .getByRole("group", { name: "Starting photographs" })
-      .getByRole("button", { name: "None", exact: true })
+      .getByRole("button", { name: "0 starting photographs", exact: true })
       .click();
     await page.getByRole("button", { name: "Start crossing", exact: true }).click();
     const board = page.getByRole("region", { name: "Crossword board" });
@@ -186,21 +186,44 @@ for (const viewport of [
   });
 }
 
-test("Cross Exposure leaves the desktop board in normal document flow", async ({ page }) => {
-  await page.setViewportSize({ width: 1440, height: 900 });
+test("Cross Exposure keeps desktop play in one workspace and supports dragging, swapping and returning shots", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
   await gotoHydrated(page, "/fun/cross-exposure");
   await page.getByRole("button", { name: "Start crossing", exact: true }).click();
   const board = page.getByRole("region", { name: "Crossword board" });
-  const stickyAncestors = await board.evaluate((element) => {
-    let node: HTMLElement | null = element.parentElement;
-    const sticky: string[] = [];
-    while (node) {
-      if (getComputedStyle(node).position === "sticky") sticky.push(node.tagName);
-      node = node.parentElement;
-    }
-    return sticky;
-  });
-  expect(stickyAncestors).toEqual([]);
+  const tray = page.getByRole("group", { name: "Available photographs" });
+  const cells = board.getByRole("button");
+  const first = cells.nth(0);
+  const second = cells.nth(1);
+  const tile = tray.getByRole("button").first();
+  const source = await tile.getByRole("img").getAttribute("src");
+  await tile.dragTo(first);
+  await expect(first.getByRole("img")).toHaveAttribute("src", source!);
+  const nextTile = tray.getByRole("button").first();
+  const nextSource = await nextTile.getByRole("img").getAttribute("src");
+  await nextTile.dragTo(second);
+  await first.dragTo(second);
+  await expect(second.getByRole("img")).toHaveAttribute("src", source!);
+  await expect(first.getByRole("img")).toHaveAttribute("src", nextSource!);
+  await second.dragTo(tray);
+  await expect(second.getByRole("img")).toHaveCount(0);
+  await expect(tray.getByRole("button")).toHaveCount(8);
+  const geometry = await page.evaluate(() => ({
+    height: document.documentElement.scrollHeight,
+    viewport: innerHeight,
+    board: document
+      .querySelector('[aria-label="Crossword board"]')!
+      .getBoundingClientRect()
+      .toJSON(),
+    tray: document
+      .querySelector('[aria-label="Available photographs"]')!
+      .getBoundingClientRect()
+      .toJSON(),
+  }));
+  expect(geometry.tray.left).toBeGreaterThan(geometry.board.right);
+  expect(geometry.height).toBeLessThanOrEqual(geometry.viewport);
 });
 
 test("Cross Exposure releases a tall tablet board so the photograph tray remains usable", async ({
@@ -232,7 +255,7 @@ test("Cross Exposure releases a tall tablet board so the photograph tray remains
   await candidate.scrollIntoViewIfNeeded();
   await candidate.click();
   await expect(candidate).toHaveAttribute("aria-pressed", "true");
-  await expect(board).not.toBeInViewport();
+  await expect(candidate).toBeInViewport({ ratio: 1 });
 });
 
 test("game setup choices survive a page reload", async ({ page }) => {
@@ -256,9 +279,9 @@ test("game setup choices survive a page reload", async ({ page }) => {
     .click();
   await page
     .getByRole("group", { name: "Starting photographs" })
-    .getByRole("button", { name: "None", exact: true })
+    .getByRole("button", { name: "0 starting photographs", exact: true })
     .click();
-  await expect.poll(() => settings("cross")).toEqual({ size: 5, mode: "visible", prefill: "none" });
+  await expect.poll(() => settings("cross")).toEqual({ size: 5, mode: "visible", prefill: 0 });
   await reload();
   await expect(page.getByRole("button", { name: "5×5", exact: true })).toHaveAttribute(
     "aria-pressed",
@@ -268,10 +291,9 @@ test("game setup choices survive a page reload", async ({ page }) => {
     "aria-pressed",
     "true",
   );
-  await expect(page.getByRole("button", { name: "None", exact: true })).toHaveAttribute(
-    "aria-pressed",
-    "true",
-  );
+  await expect(
+    page.getByRole("button", { name: "0 starting photographs", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
 
   await gotoHydrated(page, "/fun/connections");
   await page.getByRole("button", { name: "6×6", exact: true }).click();
@@ -279,7 +301,7 @@ test("game setup choices survive a page reload", async ({ page }) => {
   await page.getByRole("button", { name: "One-away hints on", exact: true }).click();
   await expect
     .poll(() => settings("connections"))
-    .toEqual({ size: 6, detail: "specific", hints: false });
+    .toEqual({ size: 6, detail: "specific", hints: false, lives: null });
   await reload();
   await expect(page.getByRole("button", { name: "6×6", exact: true })).toHaveAttribute(
     "aria-pressed",

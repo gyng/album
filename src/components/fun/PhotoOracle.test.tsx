@@ -130,3 +130,18 @@ it("remembers discovery mode while returning to an unanswered lobby after remoun
   );
   expect(screen.queryByRole("button", { name: "Yes" })).toBeNull();
 });
+
+it("defaults to discovery and lets number shortcuts answer and undo a question", () => {
+  render(<PhotoOracle photos={photos} />);
+  expect(screen.getByRole("button", { name: "Find me a photograph" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  fireEvent.keyDown(window, { key: "n" });
+  expect(screen.queryByRole("button", { name: /Remember photograph/ })).toBeNull();
+  const original = screen.getByRole("status").textContent;
+  fireEvent.keyDown(window, { key: "3" });
+  expect(screen.getByText(/1 question answered/)).toBeTruthy();
+  fireEvent.keyDown(window, { key: "b" });
+  expect(screen.getByRole("status").textContent).toBe(original);
+});

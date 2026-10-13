@@ -151,3 +151,14 @@
     gap: var(--space-1);
   }
 }
+
+.boardScroll {
+  overflow-x: auto;
+  max-inline-size: 100%;
+  min-inline-size: 0;
+  padding: 2px;
+}
+.board[data-large="true"] {
+  min-inline-size: calc(var(--search-size) * (var(--tap-target) + var(--space-1)));
+  touch-action: auto;
+}

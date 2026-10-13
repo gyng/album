@@ -7,16 +7,17 @@ import {
 } from "./photoGames";
 
 export type CrosswordSize = 3 | 4 | 5;
-export type CrosswordPrefill = "none" | "minimal" | "guided";
+export type CrosswordPrefill = 0 | 1 | 2 | 3 | 4;
 export type CrosswordClueCoordinate = { axis: "row" | "column"; index: number };
 
 export const crosswordSeedIndices = (size: CrosswordSize, prefill: CrosswordPrefill): number[] => {
-  if (prefill === "none") return [];
-  return Array.from({ length: size ** 2 }, (_, index) => index).filter(
-    (index) =>
-      index % size === Math.floor(index / size) ||
-      (prefill === "guided" && index % size === (Math.floor(index / size) + 1) % size),
-  );
+  // Spread the first shots over different rows and columns before adding another diagonal.
+  const count = Math.max(0, Math.min(prefill, size ** 2));
+  return Array.from({ length: count }, (_, index) => {
+    const row = index % size;
+    const column = (row + Math.floor(index / size)) % size;
+    return row * size + column;
+  });
 };
 
 export type PhotoCrosswordPuzzle = {

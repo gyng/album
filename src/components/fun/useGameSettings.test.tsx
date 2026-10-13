@@ -19,7 +19,7 @@ it("restores each valid field, rejects malformed fields and discards session dat
     }),
   );
   const { result } = renderHook(() => useGameSettings("cross"));
-  expect(result.current[0]).toEqual({ mode: "visible", prefill: "minimal", size: 3 });
+  expect(result.current[0]).toEqual({ mode: "visible", prefill: 0, size: 3 });
   expect(JSON.parse(localStorage.getItem(gameSettingsStorageKey("cross"))!)).toEqual(
     result.current[0],
   );
@@ -30,7 +30,7 @@ it.each(["{", "null", "[]", "false"])(
   (raw) => {
     localStorage.setItem(gameSettingsStorageKey("connections"), raw);
     const { result } = renderHook(() => useGameSettings("connections"));
-    expect(result.current[0]).toEqual({ size: 4, detail: "broad", hints: true });
+    expect(result.current[0]).toEqual({ size: 4, detail: "broad", hints: true, lives: null });
   },
 );
 
@@ -45,18 +45,23 @@ it("validates booleans and allowed timers and round counts rather than coercing 
   );
   const connections = renderHook(() => useGameSettings("connections"));
   const guess = renderHook(() => useGameSettings("guess"));
-  expect(connections.result.current[0]).toEqual({ size: 6, detail: "specific", hints: true });
+  expect(connections.result.current[0]).toEqual({
+    size: 6,
+    detail: "specific",
+    hints: true,
+    lives: null,
+  });
   expect(guess.result.current[0]).toEqual({ rounds: 5, timeLimit: null, region: "" });
 });
 
 it("restores after remount and keeps each game's preferences separate", () => {
   const first = renderHook(() => useGameSettings("cross"));
-  act(() => first.result.current[1]({ mode: "visible", prefill: "none", size: 5 }));
+  act(() => first.result.current[1]({ mode: "visible", prefill: 0, size: 5 }));
   first.unmount();
   const restored = renderHook(() => useGameSettings("cross"));
   const other = renderHook(() => useGameSettings("connections"));
-  expect(restored.result.current[0]).toEqual({ mode: "visible", prefill: "none", size: 5 });
-  expect(other.result.current[0]).toEqual({ size: 4, detail: "broad", hints: true });
+  expect(restored.result.current[0]).toEqual({ mode: "visible", prefill: 0, size: 5 });
+  expect(other.result.current[0]).toEqual({ size: 4, detail: "broad", hints: true, lives: null });
 });
 
 it("applies only supplied initial overrides and allows later user changes", () => {
@@ -94,7 +99,30 @@ it("keeps controls working when both reading and writing storage are blocked", (
     throw new Error("blocked");
   });
   const { result } = renderHook(() => useGameSettings("oracle"));
-  expect(result.current[0]).toEqual({ mode: "mind" });
+  expect(result.current[0]).toEqual({ mode: "discover" });
   act(() => result.current[1]({ mode: "discover" }));
   expect(result.current[0]).toEqual({ mode: "discover" });
+});
+
+it("restores the largest Sight Lines board and longer line difficulty, rejecting out-of-range settings", () => {
+  localStorage.setItem(
+    gameSettingsStorageKey("sightLines"),
+    JSON.stringify({ size: 10, lineLength: 5 }),
+  );
+  const game = renderHook(() => useGameSettings("sightLines"));
+  expect(game.result.current[0]).toEqual({ size: 10, lineLength: 5 });
+  game.unmount();
+  localStorage.setItem(
+    gameSettingsStorageKey("sightLines"),
+    JSON.stringify({ size: 11, lineLength: 9 }),
+  );
+  expect(renderHook(() => useGameSettings("sightLines")).result.current[0]).toEqual({
+    size: 5,
+    lineLength: 3,
+  });
+});
+
+it("migrates old Cross Exposure prefill labels to numeric counts", () => {
+  localStorage.setItem(gameSettingsStorageKey("cross"), JSON.stringify({ prefill: "guided" }));
+  expect(renderHook(() => useGameSettings("cross")).result.current[0].prefill).toBe(4);
 });

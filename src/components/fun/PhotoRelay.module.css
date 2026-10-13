@@ -52,3 +52,146 @@
     gap: var(--space-2);
   }
 }
+
+.workspace,
+.board,
+.tray {
+  min-inline-size: 0;
+  display: grid;
+  align-content: start;
+  gap: var(--space-3);
+}
+
+.slots li {
+  position: relative;
+  align-content: start;
+  aspect-ratio: auto;
+  min-block-size: 5rem;
+  transition:
+    border-color 150ms ease,
+    background 150ms ease,
+    opacity 150ms ease;
+}
+
+.slots li[data-drop-active="true"] {
+  background: var(--c-surface);
+  border-color: var(--c-border-hover);
+}
+
+.slots li[data-drop-hover="true"] {
+  background: var(--c-selected);
+  border: 2px solid var(--c-accent);
+  box-shadow: inset 0 0 0 2px var(--c-bg);
+}
+
+.slots li[data-drop-hover="true"]::after {
+  content: "Place here";
+  position: absolute;
+  inset: var(--space-1) var(--space-1) auto;
+  padding: var(--space-1);
+  border-radius: var(--radius-preview);
+  color: light-dark(var(--c-white), var(--c-black));
+  background: var(--c-accent);
+  font-size: var(--fs-s);
+  text-align: center;
+  pointer-events: none;
+}
+
+.choice[data-dragging="true"],
+.slots li[data-dragging="true"] {
+  opacity: 0.4;
+  outline: 2px dashed var(--c-accent);
+  outline-offset: 2px;
+}
+
+.choices {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+.choice {
+  cursor: grab;
+  padding: var(--space-1);
+}
+
+.choice span {
+  font-size: var(--fs-s);
+}
+
+@media (min-width: 961px) {
+  .workspace {
+    grid-template-columns: minmax(0, 3fr) minmax(16rem, 2fr);
+    gap: var(--space-4);
+    align-items: start;
+  }
+
+  .endpoints {
+    gap: var(--space-3);
+  }
+
+  .endpoints img {
+    max-block-size: clamp(6rem, 22dvh, 12rem);
+  }
+
+  .tray {
+    max-block-size: max(16rem, calc(100dvh - 28rem));
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+    padding: var(--space-1);
+    border: var(--line-hairline) solid var(--c-border);
+    border-radius: var(--radius-panel);
+    background: var(--c-surface);
+  }
+}
+
+@media (max-width: 720px) {
+  .slots {
+    gap: var(--space-2);
+  }
+
+  .endpoints {
+    gap: var(--space-2);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .slots li {
+    transition: none;
+  }
+}
+
+@media (min-width: 961px) and (pointer: fine) {
+  .slotActions button {
+    min-inline-size: var(--control-height-compact, 2rem);
+    min-block-size: var(--control-height-compact, 2rem);
+    padding: 0;
+  }
+}
+
+.linkReasons {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-3);
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.linkReasons li {
+  display: grid;
+  align-content: start;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: var(--line-hairline) solid var(--c-border);
+  border-radius: var(--radius-panel);
+  background: var(--c-surface);
+  font-size: var(--fs-s);
+}
+
+@media (max-width: 720px) {
+  .linkReasons {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-2);
+  }
+}
