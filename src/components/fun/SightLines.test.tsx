@@ -3,21 +3,15 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import { SightLines } from "./SightLines";
 import { buildPhotoWordSearch } from "../../util/photoWordSearch";
 import type { PhotoGamePhoto } from "../../util/photoGames";
-const photos: PhotoGamePhoto[] = [
-  "people",
-  "water",
-  "food",
-  "snow",
-  "animals",
-  "buildings",
-].flatMap((tag) =>
-  Array.from({ length: 12 }, (_, i) => ({
-    path: `${tag}-${i}.jpg`,
-    href: "/album/test-simple",
-    caption: tag,
-    tags: tag,
-    vector: [],
-  })),
+const photos: PhotoGamePhoto[] = ["cat", "bicycle", "boat", "umbrella", "stairs", "clock"].flatMap(
+  (tag) =>
+    Array.from({ length: 12 }, (_, i) => ({
+      path: `${tag}-${i}.jpg`,
+      href: "/album/test-simple",
+      caption: tag,
+      tags: tag,
+      vector: [],
+    })),
 );
 beforeEach(() => {
   localStorage.clear();

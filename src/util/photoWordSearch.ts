@@ -1,10 +1,5 @@
-import {
-  ORACLE_QUESTIONS,
-  shuffleGamePhotos,
-  type OracleQuestion,
-  type PhotoGamePhoto,
-} from "./photoGames";
-import { crosswordClue } from "./photoCrossword";
+import { shuffleGamePhotos, type OracleQuestion, type PhotoGamePhoto } from "./photoGames";
+import { PHOTO_SUBJECTS, photoSubjectClarity } from "./photoSubjects";
 
 export type PhotoSearchTarget = {
   id: string;
@@ -58,10 +53,41 @@ export const buildPhotoWordSearch = (
 ): PhotoWordSearch | null => {
   const unique = [...new Map(photos.map((photo) => [photo.path, photo])).values()];
   if (unique.length < size * size) return null;
-  const subjects = shuffleGamePhotos(
-    ORACLE_QUESTIONS.filter((q) => unique.filter(q.matches).length >= 3),
-    random,
-  );
+  // Strong caption mentions supply solutions; weaker matches can still be accepted as alternatives.
+  const subjects = PHOTO_SUBJECTS.flatMap(({ answer, pattern }) => {
+    const clarityByPhoto = new Map(
+      unique.map((photo) => [photo, photoSubjectClarity(photo, pattern)]),
+    );
+    const pool = unique.flatMap((photo) => {
+      const clarity = clarityByPhoto.get(photo)!;
+      return clarity !== null && clarity >= 2 ? [{ photo, clarity }] : [];
+    });
+    if (pool.length < 3) return [];
+    const noun = answer.toLowerCase();
+    const label =
+      (
+        {
+          stairs: "Stairs",
+          bus: "Buses",
+          church: "Churches",
+          bench: "Benches",
+          deer: "Deer",
+        } as Record<string, string>
+      )[noun] ?? noun[0]!.toUpperCase() + noun.slice(1) + "s";
+    return [
+      {
+        id: noun,
+        label,
+        pattern,
+        pool,
+        matches: (photo: PhotoGamePhoto) =>
+          (clarityByPhoto.has(photo)
+            ? clarityByPhoto.get(photo)
+            : photoSubjectClarity(photo, pattern)) !== null,
+      },
+    ];
+  });
+  if (subjects.length < 4) return null;
   const lines: number[][] = [];
   for (let start = 0; start < size * size; start++) {
     for (const [dy, dx] of [
@@ -76,29 +102,54 @@ export const buildPhotoWordSearch = (
         lines.push(photoSearchLine(start, row * size + column, size));
     }
   }
-  for (let attempt = 0; attempt < 30; attempt++) {
+  let best: PhotoWordSearch | null = null;
+  let bestPenalty = Infinity;
+  for (let attempt = 0; attempt < 16; attempt++) {
     const used = new Set<string>();
     const tiles: Array<PhotoGamePhoto | undefined> = Array(size * size);
     const targets: PhotoSearchTarget[] = [];
     for (const subject of shuffleGamePhotos(subjects, random)) {
+      // Related labels should not make the same collection of photographs count twice.
+      const overlaps = targets.some((target) => {
+        const shared = subject.pool.filter(({ photo }) => target.matches(photo)).length;
+        const other = subjects.find((item) => item.id === target.id)!;
+        return shared / Math.min(subject.pool.length, other.pool.length) > 0.6;
+      });
+      if (overlaps) continue;
       const pool = shuffleGamePhotos(
-        unique.filter((photo) => !used.has(photo.path) && subject.matches(photo)),
+        subject.pool.filter(({ photo }) => !used.has(photo.path)),
         random,
       );
       const line = shuffleGamePhotos(lines, random).find((cells) =>
         cells.every((cell) => !tiles[cell]),
       );
       if (pool.length < 3 || !line) continue;
-      line.forEach((cell, i) => {
-        tiles[cell] = pool[i]!;
-        used.add(pool[i]!.path);
-      });
-      targets.push({
-        id: subject.id,
-        label: crosswordClue(subject),
-        cells: line,
-        matches: subject.matches,
-      });
+      const selected: PhotoGamePhoto[] = [];
+      for (const cell of line) {
+        const ranked = pool
+          .filter(({ photo }) => !used.has(photo.path))
+          .sort((a, b) => {
+            const score = (item: typeof a) =>
+              item.clarity * 4 -
+              selected.reduce((penalty, previous) => {
+                const sameOuting =
+                  item.photo.location &&
+                  previous.location &&
+                  item.photo.location.date.slice(0, 10) === previous.location.date.slice(0, 10) &&
+                  Math.abs(item.photo.location.lat - previous.location.lat) < 0.01 &&
+                  Math.abs(item.photo.location.lng - previous.location.lng) < 0.01;
+                return (
+                  penalty + (sameOuting ? 6 : 0) + (item.photo.caption === previous.caption ? 1 : 0)
+                );
+              }, 0);
+            return score(b) - score(a);
+          });
+        const photo = ranked[0]!.photo;
+        tiles[cell] = photo;
+        selected.push(photo);
+        used.add(photo.path);
+      }
+      targets.push({ id: subject.id, label: subject.label, cells: line, matches: subject.matches });
       if (targets.length === 4) break;
     }
     if (targets.length < 4) continue;
@@ -106,8 +157,33 @@ export const buildPhotoWordSearch = (
       unique.filter((photo) => !used.has(photo.path)),
       random,
     );
-    let next = 0;
-    return { size, tiles: Array.from(tiles, (photo) => photo ?? filler[next++]!), targets };
+    const membershipCounts = new Map(
+      unique.map((photo) => [photo, targets.filter((target) => target.matches(photo)).length]),
+    );
+    const memberships = (photo: PhotoGamePhoto) => membershipCounts.get(photo)!;
+    // A few single-topic distractors make searching worthwhile; unrelated photos provide breathing room.
+    let fillIndex = 0;
+    for (let cell = 0; cell < tiles.length; cell++) {
+      if (tiles[cell]) continue;
+      const wanted = fillIndex++ % 4 === 0 ? 1 : 0;
+      filler.sort((a, b) => Math.abs(memberships(a) - wanted) - Math.abs(memberships(b) - wanted));
+      tiles[cell] = filler.shift()!;
+    }
+    const board = tiles as PhotoGamePhoto[];
+    let penalty = 0;
+    for (const target of targets) {
+      const matches = board.filter(target.matches).length;
+      const runs = lines.filter((cells) =>
+        cells.every((cell) => target.matches(board[cell]!)),
+      ).length;
+      penalty += Math.max(0, matches - 5) * 2 + Math.max(0, runs - 1) * 4;
+    }
+    penalty += board.filter((photo) => memberships(photo) > 1).length * 2;
+    if (penalty < bestPenalty) {
+      best = { size, tiles: board, targets };
+      bestPenalty = penalty;
+    }
+    if (!penalty) break;
   }
-  return null;
+  return best;
 };

@@ -24,16 +24,16 @@ export const FUN_GAMES = [
     id: "sight-lines",
     href: "/fun/sight-lines",
     title: "Sight Lines",
-    illustration: "/fun/sight-lines.svg",
+    illustration: "/fun/sight-lines.avif",
     description: "A photo word search. Find lines of three photographs that share a connection.",
   },
   {
     id: "photo-hangman",
     href: "/fun/photo-hangman",
     title: "Photo Hangman",
-    illustration: "/fun/photo-hangman.svg",
+    illustration: "/fun/photo-hangman.avif",
     description:
-      "Find the subject shared by seven photographs. Each wrong guess reveals another clue.",
+      "Find the subject shared by eight photographs. Each wrong guess reveals another clue.",
   },
   {
     id: "relay",

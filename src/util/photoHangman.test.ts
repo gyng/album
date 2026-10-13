@@ -18,22 +18,23 @@ const cats = [
   "A close-up of a cat looking towards the camera.",
   "A cat sits on a bench.",
   "A cat stands beside a bicycle.",
+  "A cat sleeps on a wall.",
   "A street with a cat in the background.",
   "Buildings and signs, with a cat barely visible in the distance.",
   "A tree beside the water.",
   "A person standing near a cat.",
-].map((caption, index) => photo(`cat-${index}`, caption, index === 5 ? "cat, tree" : ""));
-const boats = Array.from({ length: 7 }, (_, index) => photo(`boat-${index}`, "A boat on a lake."));
+].map((caption, index) => photo(`cat-${index}`, caption, index === 6 ? "cat, tree" : ""));
+const boats = Array.from({ length: 8 }, (_, index) => photo(`boat-${index}`, "A boat on a lake."));
 const archive = ["cat", "dog", "train", "bridge", "window", "chair", "bicycle", "boat"].flatMap(
   (subject) =>
-    Array.from({ length: 7 }, (_, index) => photo(`${subject}-${index}`, `A ${subject}.`)),
+    Array.from({ length: 8 }, (_, index) => photo(`${subject}-${index}`, `A ${subject}.`)),
 );
 
-it("builds seven unique matching clues with indirect mentions before prominent ones", () => {
+it("builds eight unique matching clues with indirect mentions before prominent ones", () => {
   const puzzle = buildPhotoHangman([...cats, ...boats], () => 0.3, "BOAT")!;
   expect(puzzle.answer).toBe("CAT");
-  expect(puzzle.photos).toHaveLength(HANGMAN_MISSES + 1);
-  expect(new Set(puzzle.photos.map((p) => p.path)).size).toBe(7);
+  expect(puzzle.photos).toHaveLength(HANGMAN_MISSES + 2);
+  expect(new Set(puzzle.photos.map((p) => p.path)).size).toBe(8);
   const subject = HANGMAN_SUBJECTS.find((subject) => subject.answer === puzzle.answer)!;
   expect(puzzle.photos.every((p) => subject.pattern.test(`${p.caption} ${p.tags}`))).toBe(true);
   expect(puzzle.photos[0]!.tags).toContain("cat");
@@ -46,27 +47,27 @@ it("builds seven unique matching clues with indirect mentions before prominent o
 });
 
 it("uses word boundaries and rejects negated subjects, undersized pools and duplicate paths", () => {
-  expect(buildPhotoHangman(cats.slice(0, 6))).toBeNull();
-  expect(buildPhotoHangman([...cats.slice(0, 6), cats[0]!])).toBeNull();
+  expect(buildPhotoHangman(cats.slice(0, 7))).toBeNull();
+  expect(buildPhotoHangman([...cats.slice(0, 7), cats[0]!])).toBeNull();
   expect(
     buildPhotoHangman([
-      ...cats.slice(0, 6),
+      ...cats.slice(0, 7),
       photo("not-cat", "A cathedral, without a cat in sight.", "cat"),
       ...boats,
     ]),
   ).toBeNull();
   expect(
-    buildPhotoHangman([...cats.slice(0, 6), photo("cathedral", "A cathedral"), ...boats]),
+    buildPhotoHangman([...cats.slice(0, 7), photo("cathedral", "A cathedral"), ...boats]),
   ).toBeNull();
 });
 
 it("declines a one-choice archive and does not confuse modifiers or food names with subjects", () => {
   expect(buildPhotoHangman(cats)).toBeNull();
-  const stations = Array.from({ length: 7 }, (_, index) =>
+  const stations = Array.from({ length: 8 }, (_, index) =>
     photo(`station-${index}`, "A train station at night.", "train_station"),
   );
   expect(buildPhotoHangman([...stations, ...boats])).toBeNull();
-  const meals = Array.from({ length: 7 }, (_, index) =>
+  const meals = Array.from({ length: 8 }, (_, index) =>
     photo(`meal-${index}`, "A hot dog on a plate.", "hot_dog"),
   );
   expect(buildPhotoHangman([...meals, ...boats])).toBeNull();
@@ -77,8 +78,8 @@ it("avoids repeating the previous subject", () => {
   expect(buildPhotoHangman([...cats, ...boats], () => 0, "boat")!.answer).toBe("CAT");
 });
 
-it("accepts every eligible subject shared by all seven clues", () => {
-  const catChairs = Array.from({ length: 7 }, (_, index) =>
+it("accepts every eligible subject shared by all eight clues", () => {
+  const catChairs = Array.from({ length: 8 }, (_, index) =>
     photo(`cat-chair-${index}`, "A cat on a chair."),
   );
   const puzzle = buildPhotoHangman([...catChairs, ...boats], () => 0.3, "BOAT")!;

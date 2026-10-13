@@ -123,3 +123,15 @@
     gap: var(--space-1);
   }
 }
+
+.initialPair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+.initialPair .photo {
+  block-size: clamp(8rem, 25svh, 18rem);
+}
+.singleClue {
+  min-inline-size: 0;
+}

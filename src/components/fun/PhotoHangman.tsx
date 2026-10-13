@@ -7,6 +7,7 @@ import { GameProgress } from "./GameFeedback";
 import { getResizedAlbumImageSrc } from "../../util/getResizedAlbumImageSrc";
 import {
   HANGMAN_MISSES,
+  HANGMAN_INITIAL_CLUES,
   addHangmanSubjectGuess,
   buildPhotoHangman,
   hangmanSubjectStatus,
@@ -23,7 +24,7 @@ export const PhotoHangman = ({ photos }: { photos: PhotoGamePhoto[] }) => {
   const [guesses, setGuesses] = useState<string[]>([]);
   const [query, setQuery] = useState("");
   const [viewed, setViewed] = useState<{ misses: number; index: number } | null>(null);
-  const [readyPath, setReadyPath] = useState<string | null>(null);
+  const [readyPaths, setReadyPaths] = useState<string[]>([]);
   const [failedPath, setFailedPath] = useState<string | null>(null);
   const [imageAttempt, setImageAttempt] = useState(0);
   const [dockHeight, setDockHeight] = useState(0);
@@ -43,14 +44,14 @@ export const PhotoHangman = ({ photos }: { photos: PhotoGamePhoto[] }) => {
   const start = () => {
     const next = buildPhotoHangman(photos, Math.random, puzzle?.answer);
     if (!next) {
-      setError("This archive needs at least seven photographs of each of two subjects.");
+      setError("This archive needs at least eight photographs of each of two subjects.");
       return;
     }
     setPuzzle(next);
     setGuesses([]);
     setQuery("");
     setViewed(null);
-    setReadyPath(null);
+    setReadyPaths([]);
     setFailedPath(null);
     setImageAttempt(0);
     setGaveUp(false);
@@ -60,7 +61,7 @@ export const PhotoHangman = ({ photos }: { photos: PhotoGamePhoto[] }) => {
     return (
       <GameIntro game="photo-hangman">
         <p>
-          Seven photographs share a subject. Every wrong guess reveals another. The round ends after
+          Two photographs start the round. Every wrong guess reveals another. The round ends after
           six misses.
         </p>
         {error ? <p role="alert">{error}</p> : null}
@@ -69,10 +70,12 @@ export const PhotoHangman = ({ photos }: { photos: PhotoGamePhoto[] }) => {
         </Button>
       </GameIntro>
     );
-  const revealed = Math.min(misses + 1, puzzle.photos.length);
+  const revealed = Math.min(misses + HANGMAN_INITIAL_CLUES, puzzle.photos.length);
   const clueIndex = viewed?.misses === misses ? viewed.index : revealed - 1;
-  const photo = puzzle.photos[clueIndex]!;
-  const ready = readyPath === photo.path;
+  const clueIndices = !ended && misses === 0 && viewed === null ? [0, 1] : [clueIndex];
+  const ready = [...new Set([...clueIndices, 0, 1])].every((index) =>
+    readyPaths.includes(puzzle.photos[index]!.path),
+  );
   const answer =
     status === "won"
       ? guesses.find((guess) => puzzle.acceptedAnswers.includes(guess))!
@@ -88,7 +91,6 @@ export const PhotoHangman = ({ photos }: { photos: PhotoGamePhoto[] }) => {
     : last
       ? `${subjectLabel(last)} doesn’t connect the full set. Another photograph revealed.`
       : "Find the subject shared by the photographs.";
-  const src = getResizedAlbumImageSrc(photo.path) + (imageAttempt ? `?retry=${imageAttempt}` : "");
   return (
     <div
       className={styles.game}
@@ -113,42 +115,61 @@ export const PhotoHangman = ({ photos }: { photos: PhotoGamePhoto[] }) => {
             ) : null}
           </div>
           <figure className={styles.frame} aria-label="Current photographic clue">
-            <img
-              key={`${photo.path}:${imageAttempt}`}
-              src={src}
-              className={styles.photo}
-              alt={
-                ended ? photo.caption || subjectLabel(answer) : `Photographic clue ${clueIndex + 1}`
-              }
-              onLoad={(event) => {
-                const image = event.currentTarget;
-                const complete = () => {
-                  if (image.isConnected) {
-                    setReadyPath(photo.path);
-                    setFailedPath(null);
-                  }
-                };
-                const fail = () => {
-                  if (image.isConnected) {
-                    setFailedPath(photo.path);
-                    setReadyPath(null);
-                  }
-                };
-                if (typeof image.decode === "function") void image.decode().then(complete, fail);
-                else complete();
-              }}
-              onError={() => {
-                setFailedPath(photo.path);
-                setReadyPath(null);
-              }}
-            />
-            {!ready && failedPath !== photo.path ? (
-              <div className={styles.loading}>
-                <LoadingIndicator label="Loading photograph…" />
-              </div>
-            ) : null}
+            <div className={clueIndices.length === 2 ? styles.initialPair : styles.singleClue}>
+              {clueIndices.map((index) => {
+                const photo = puzzle.photos[index]!;
+                return (
+                  <div key={photo.path} className={styles.frame}>
+                    <img
+                      key={`${photo.path}:${imageAttempt}`}
+                      src={
+                        getResizedAlbumImageSrc(photo.path) +
+                        (imageAttempt ? `?retry=${imageAttempt}` : "")
+                      }
+                      className={styles.photo}
+                      alt={
+                        ended
+                          ? photo.caption || subjectLabel(answer)
+                          : `Photographic clue ${index + 1}`
+                      }
+                      onLoad={(event) => {
+                        const image = event.currentTarget;
+                        const complete = () => {
+                          if (image.isConnected) {
+                            setReadyPaths((previous) => [...previous, photo.path]);
+                            setFailedPath((previous) =>
+                              previous === photo.path ? null : previous,
+                            );
+                          }
+                        };
+                        const fail = () => {
+                          if (image.isConnected) {
+                            setFailedPath(photo.path);
+                            setReadyPaths((previous) =>
+                              previous.filter((path) => path !== photo.path),
+                            );
+                          }
+                        };
+                        if (typeof image.decode === "function")
+                          void image.decode().then(complete, fail);
+                        else complete();
+                      }}
+                      onError={() => {
+                        setFailedPath(photo.path);
+                        setReadyPaths((previous) => previous.filter((path) => path !== photo.path));
+                      }}
+                    />
+                    {!readyPaths.includes(photo.path) && failedPath !== photo.path ? (
+                      <div className={styles.loading}>
+                        <LoadingIndicator label="Loading photograph…" />
+                      </div>
+                    ) : null}
+                  </div>
+                );
+              })}
+            </div>
           </figure>
-          {failedPath === photo.path ? (
+          {clueIndices.some((index) => failedPath === puzzle.photos[index]!.path) ? (
             <div role="alert">
               <p>The photograph could not be loaded.</p>
               <Button

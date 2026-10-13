@@ -34,7 +34,8 @@ Completed in the October 2026 Fun refinement pass.
 
 - Tinted the illustrations with the active theme's accent colour on both Fun!
   cards and game start screens. Preserve the transparent background and fine
-  engraving detail.
+  pen-and-ink detail. All nine cards now use animal editorial cartoons; Sight
+  Lines has bird portraits hanging along a giraffe's outstretched neck.
 
 ## Further refinements completed
 
@@ -59,7 +60,17 @@ Completed in the October 2026 Fun refinement pass.
 
 ## Photo Hangman refinements
 
-- Photo Hangman: searchable subject tags, seven photographic clues, six misses,
+- Photo Hangman: searchable subject tags, eight photographic clues (two at the start), six misses,
   truthful alternative answers, clue history, retry and linked results.
 - Sight Lines touch refinement: finish taps on click so revealed photo links do
   not receive the same touch; cancel a drag released outside the board.
+
+## Sight Lines selection refinement
+
+- Concrete subjects, prominent caption mentions and varied outings for planted
+  clues; overlapping topic pools are avoided.
+- Mostly unrelated filler with a few single-topic distractors; candidate boards
+  are ranked against topic flooding and accidental runs. Valid alternatives count.
+- Shared subject matching with Photo Hangman. Ten sampled real-archive boards
+  were valid with no extra runs; cached generation averaged 86ms (previously
+  2,496ms), with a 118ms maximum on this machine.

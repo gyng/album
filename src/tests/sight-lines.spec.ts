@@ -8,6 +8,7 @@ import { gotoHydrated } from "./hydrated";
 test.use({ serviceWorkers: "block", hasTouch: true });
 let directory: string;
 let core: Buffer;
+let connectionsCore: Buffer;
 const image = readFileSync("../albums/test-simple/DSCF0506-2.jpg");
 test.beforeAll(() => {
   directory = mkdtempSync(path.join(tmpdir(), "sight-lines-e2e-"));
@@ -15,7 +16,7 @@ test.beforeAll(() => {
   copyFileSync("public/e2e-search.sqlite", corePath);
   const db = new DatabaseSync(corePath);
   db.exec("DELETE FROM images; DELETE FROM metadata;");
-  const subjects = ["people", "water", "food", "snow", "animals", "buildings"];
+  const subjects = ["cat", "bicycle", "boat", "umbrella", "stairs", "clock"];
   for (let index = 0; index < 36; index++) {
     const filename = `sightline-${index}.jpg`;
     const subject = subjects[Math.floor(index / 6)]!;
@@ -31,11 +32,24 @@ test.beforeAll(() => {
   }
   db.close();
   core = readFileSync(corePath);
+  const connectionsDb = new DatabaseSync(corePath);
+  const connectionSubjects = ["people", "water", "food", "snow", "animals", "buildings"];
+  for (let index = 0; index < 36; index++) {
+    const subject = connectionSubjects[Math.floor(index / 6)]!;
+    connectionsDb
+      .prepare("UPDATE images SET tags = ?, alt_text = ? WHERE filename = ?")
+      .run(subject, `A photograph of ${subject}.`, `sightline-${index}.jpg`);
+  }
+  connectionsDb.close();
+  connectionsCore = readFileSync(corePath);
 });
 test.afterAll(() => rmSync(directory, { recursive: true, force: true }));
-test.beforeEach(async ({ page }) => {
+test.beforeEach(async ({ page }, testInfo) => {
   await page.route(/\/(?:e2e-)?search\.sqlite(?:\?.*)?$/, (route) =>
-    route.fulfill({ body: core, contentType: "application/octet-stream" }),
+    route.fulfill({
+      body: testInfo.title.startsWith("Connections") ? connectionsCore : core,
+      contentType: "application/octet-stream",
+    }),
   );
   // Synthetic game metadata uses a committed test photograph for every thumbnail.
   await page.route(/sightline-\d+\.jpg/, (route) =>
@@ -76,12 +90,12 @@ for (const { width, size } of [
       const row = Number(coordinate[1]) - 1,
         column = Number(coordinate[2]) - 1;
       const subjectNames: Record<string, string> = {
-        People: "people",
-        Water: "water",
-        Food: "food",
-        Snow: "snow",
-        Animals: "animals",
-        Architecture: "buildings",
+        Cats: "cat",
+        Bicycles: "bicycle",
+        Boats: "boat",
+        Umbrellas: "umbrella",
+        Stairs: "stairs",
+        Clocks: "clock",
       };
       const targetName = (await targets
         .getByLabel(/: still to find$/)

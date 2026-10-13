@@ -21,9 +21,9 @@ const photos: PhotoGamePhoto[] = [
   "bicycle",
   "boat",
 ].flatMap((subject, group) =>
-  Array.from({ length: 7 }, (_, i) => ({
-    path: `../albums/test-simple/hangman-${group * 7 + i}.jpg`,
-    href: `/album/test-simple#hangman-${group * 7 + i}.jpg`,
+  Array.from({ length: 8 }, (_, i) => ({
+    path: `../albums/test-simple/hangman-${group * 8 + i}.jpg`,
+    href: `/album/test-simple#hangman-${group * 8 + i}.jpg`,
     caption: `A ${subject}.`,
     tags: subject,
     vector: [],
@@ -74,10 +74,11 @@ for (const width of [320, 1280]) {
     const answer = bank.getByRole("button", { name: `Guess ${puzzle.answer.toLowerCase()}` });
     await expect(answer).toBeEnabled();
     await expect(page.getByRole("img", { name: "Photographic clue 1" })).toBeVisible();
+    await expect(page.getByRole("img", { name: "Photographic clue 2" })).toBeVisible();
     await answer.click();
     const result = page.getByRole("region", { name: "Photo Hangman result" });
     await expect(result).toBeFocused();
-    await expect(result.getByRole("link")).toHaveCount(7);
+    await expect(result.getByRole("link")).toHaveCount(8);
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
       width,
     );
@@ -97,13 +98,13 @@ test("each wrong subject reveals a photo, previous clues remain available, and s
     await expect(choice).toBeEnabled();
     await choice.click();
     if (index < 5) {
-      await expect(page.getByRole("img", { name: `Photographic clue ${index + 2}` })).toBeVisible();
+      await expect(page.getByRole("img", { name: `Photographic clue ${index + 3}` })).toBeVisible();
       await expect(choice).toBeDisabled();
     }
   }
   const result = page.getByRole("region", { name: "Photo Hangman result" });
   await expect(result).toBeFocused();
-  await expect(result.getByRole("link")).toHaveCount(7);
+  await expect(result.getByRole("link")).toHaveCount(8);
   await page.getByRole("button", { name: "View clue 1" }).click();
   await expect(
     page.getByRole("figure", { name: "Current photographic clue" }).getByRole("img"),

@@ -1,5 +1,64 @@
 # Fun illustrations
 
+## Current direction — animal editorial cartoons
+
+Updated 13 October 2026 with the built-in imagegen tool, one generation per
+asset, with `transparent_background: true`. All nine game illustrations use
+animal mascots and visual humour: deadpan expressions, misplaced confidence
+and absurd situations. No humans or human body parts, including in the small
+photographs. Keep future artwork original, with no artist signatures or
+magazine branding. Jokes should read without a caption at card scale.
+
+Assets remain at `src/public/fun/*.avif`, shared by cards and game intros.
+Sharp encodes them at 960×640, quality 85, effort 6, with transparent margins
+and source alpha retained. The existing luminance mask supplies theme ink.
+
+## Current prompts (verbatim)
+
+### `guess-where.avif`
+
+> Use case: illustration-story. Asset type: decorative game-card illustration for a photo archive. Create an original witty editorial cartoon with animal-only characters, dry observational humour and gentle visual absurdity. Loose lively pen-and-ink linework, expressive poses, deadpan faces, restrained sparse cross-hatching, strong simple silhouettes, plenty of breathing room. NOT a dense antique engraving. No imitation of a particular artist or existing cartoon. Subject: An earnest mole explorer examines an upside-down street map with a huge magnifying glass, while a pigeon beside it confidently points in the opposite direction. Tiny compass and street photograph. The joke is their mutual misplaced confidence. Composition: single compact centred landscape 3:2 vignette, all subjects visible with generous transparent margins, readable at small card scale. Pure black ink marks on genuinely transparent background; no opaque white fills or paper backdrop. Animal paws/wings/flippers only, no human hands. Photographic scenes contain animals, plants or architecture, no people. No humans, no caption, no speech bubbles, no text, lettering, signatures, initials, bylines, artist attribution, logos, mastheads, magazine branding, borders or watermark. The app recolours the ink for its themes.
+
+### `connect-the-shots.avif`
+
+> Use case: illustration-story. Asset type: decorative game-card illustration for a photo archive. Create an original witty editorial cartoon with animal-only characters, dry observational humour and gentle visual absurdity. Loose lively pen-and-ink linework, expressive poses, deadpan faces, restrained sparse cross-hatching, strong simple silhouettes, plenty of breathing room. NOT a dense antique engraving. No imitation of a particular artist or existing cartoon. Subject: A fussy raccoon sorts sixteen tiny photographs into four neat groups on a tabletop while a cat proudly sits across the carefully organised groups, derailing the entire investigation. Composition: single compact centred landscape 3:2 vignette, all subjects visible with generous transparent margins, readable at small card scale. Pure black ink marks on genuinely transparent background; no opaque white fills or paper backdrop. Animal paws/wings/flippers only, no human hands. Photographic scenes contain animals, plants or architecture, no people. No humans, no caption, no speech bubbles, no text, lettering, signatures, initials, bylines, artist attribution, logos, mastheads, magazine branding, borders or watermark. The app recolours the ink for its themes.
+
+### `cross-exposure.avif`
+
+> Use case: illustration-story. Decorative photo-game card illustration, Cross Exposure. Original humorous editorial pen-and-ink cartoon: a sly fox mascot leaning over a three by three grid of photographic prints, every photograph depicts a different chicken. The fox wears an exaggerated expression of innocent scholarly concentration but its delighted hungry interest is obvious; one furry paw carefully positions a chicken photograph. Chickens in the prints look suspiciously back at the fox. Small magnifying glass and photo box beside grid. Dry visual wit and absurdity with no caption. Lively loose black ink contours, expressive animal face and pose, sparse cross-hatching, strong readable silhouettes, NOT a dense antique engraving. Centred landscape 3:2 vignette, full fox ears and tail visible, generous transparent margins. Pure black ink on genuine transparency, uninked areas transparent, no white paper backdrop. No humans or human body parts, no human hands, animal paws only. No text, speech bubbles, lettering, artist signatures, initials, bylines, attribution, logos, mastheads, magazine branding, border or watermark. Original cartoon rather than imitating a specific artist.
+
+### `sight-lines.avif`
+
+> Use case: illustration-story. Asset type: decorative Sight Lines photo-game card illustration. Original witty animal-only editorial pen-and-ink cartoon. A deadpan giraffe stands in full side profile, its long neck stretched almost horizontally like an absurd washing line: four small photographic prints of birds hang by tiny wooden pegs along the underside of its neck. A real small bird perches on top of the neck directly above the matching bird portraits, looking unimpressed. The giraffe glances sideways towards the bird with patient resignation. Strong unusual horizontal silhouette, natural giraffe anatomy with long legs and neck, whole animal including hooves tail ears and horns visible. Single compact centred landscape 3:2 vignette, generous clear transparent margins, readable at small game-card scale. Loose lively black pen contours, expressive faces, sparse cross-hatching, dry observational humour, no dense antique engraving. Pure black ink on genuine transparency, all uninked areas transparent. No table, no magnifying glass, no grid, no fox, no mouse, no human hands or people. No text, lettering, captions, speech bubbles, signatures, initials, bylines, artist attribution, logos, branding, border or watermark. Original cartoon without imitating any particular artist. The app recolours the ink for its themes.
+
+The final image places four matching birds above their portraits. The giraffe's
+neck supplies the line itself, giving Sight Lines a distinct silhouette from
+Cross Exposure's fox sorting a grid. Generated with the built-in tool; encoded
+to transparent 960×640 AVIF with Sharp, quality 85, effort 6.
+
+### `photo-hangman.avif`
+
+> Use case: illustration-story. Asset type: decorative game-card illustration for a photo archive. Create an original witty editorial cartoon with animal-only characters, dry observational humour and gentle visual absurdity. Loose lively pen-and-ink linework, expressive poses, deadpan faces, restrained sparse cross-hatching, strong simple silhouettes, plenty of breathing room. NOT a dense antique engraving. No imitation of a particular artist or existing cartoon. Subject: An indignant songbird perches beside a fan of photographs all depicting that same bird from different angles, while a scholarly owl with a magnifying glass remains comically baffled. No gallows or violence. Composition: single compact centred landscape 3:2 vignette, all subjects visible with generous transparent margins, readable at small card scale. Pure black ink marks on genuinely transparent background; no opaque white fills or paper backdrop. Animal paws/wings/flippers only, no human hands. Photographic scenes contain animals, plants or architecture, no people. No humans, no caption, no speech bubbles, no text, lettering, signatures, initials, bylines, artist attribution, logos, mastheads, magazine branding, borders or watermark. The app recolours the ink for its themes.
+
+### `photo-relay.avif`
+
+> Use case: illustration-story. Asset type: decorative game-card illustration for a photo archive. Create an original witty editorial cartoon with animal-only characters, dry observational humour and gentle visual absurdity. Loose lively pen-and-ink linework, expressive poses, deadpan faces, restrained sparse cross-hatching, strong simple silhouettes, plenty of breathing room. NOT a dense antique engraving. No imitation of a particular artist or existing cartoon. Subject: Five little photographic prints hang along a looping string; two dachshunds at opposite ends earnestly carry it like a relay baton, their long bodies echoing the winding chain, while a pigeon in the middle tangles the string. Composition: single compact centred landscape 3:2 vignette, all subjects visible with generous transparent margins, readable at small card scale. Pure black ink marks on genuinely transparent background; no opaque white fills or paper backdrop. Animal paws/wings/flippers only, no human hands. Photographic scenes contain animals, plants or architecture, no people. No humans, no caption, no speech bubbles, no text, lettering, signatures, initials, bylines, artist attribution, logos, mastheads, magazine branding, borders or watermark. The app recolours the ink for its themes.
+
+### `blind-frame.avif`
+
+> Use case: illustration-story. Asset type: decorative game-card illustration for a photo archive. Create an original witty editorial cartoon with animal-only characters, dry observational humour and gentle visual absurdity. Loose lively pen-and-ink linework, expressive poses, deadpan faces, restrained sparse cross-hatching, strong simple silhouettes, plenty of breathing room. NOT a dense antique engraving. No imitation of a particular artist or existing cartoon. Subject: A very serious elephant artist sketches a tiny mouse on an open sketchbook using a pencil held in its trunk; the sketch on the page is absurdly enormous, while the real mouse poses proudly beside a reference photograph. Composition: single compact centred landscape 3:2 vignette, all subjects visible with generous transparent margins, readable at small card scale. Pure black ink marks on genuinely transparent background; no opaque white fills or paper backdrop. Animal paws/wings/flippers only, no human hands. Photographic scenes contain animals, plants or architecture, no people. No humans, no caption, no speech bubbles, no text, lettering, signatures, initials, bylines, artist attribution, logos, mastheads, magazine branding, borders or watermark. The app recolours the ink for its themes.
+
+### `photo-oracle.avif`
+
+> Use case: illustration-story. Asset type: decorative game-card illustration for a photo archive. Create an original witty editorial cartoon with animal-only characters, dry observational humour and gentle visual absurdity. Loose lively pen-and-ink linework, expressive poses, deadpan faces, restrained sparse cross-hatching, strong simple silhouettes, plenty of breathing room. NOT a dense antique engraving. No imitation of a particular artist or existing cartoon. Subject: A solemn cat fortune teller peers into a crystal ball containing a fish photograph; a sceptical fish in a small fishbowl beside it eyes the cat. Three small photographs nearby. Dry joke about the oracle's obvious obsession. Composition: single compact centred landscape 3:2 vignette, all subjects visible with generous transparent margins, readable at small card scale. Pure black ink marks on genuinely transparent background; no opaque white fills or paper backdrop. Animal paws/wings/flippers only, no human hands. Photographic scenes contain animals, plants or architecture, no people. No humans, no caption, no speech bubbles, no text, lettering, signatures, initials, bylines, artist attribution, logos, mastheads, magazine branding, borders or watermark. The app recolours the ink for its themes.
+
+### `double-take.avif`
+
+> Use case: illustration-story. Asset type: decorative game-card illustration for a photo archive. Create an original witty editorial cartoon with animal-only characters, dry observational humour and gentle visual absurdity. Loose lively pen-and-ink linework, expressive poses, deadpan faces, restrained sparse cross-hatching, strong simple silhouettes, plenty of breathing room. NOT a dense antique engraving. No imitation of a particular artist or existing cartoon. Subject: Two identical-looking penguins examine two photographic prints through an antique stereoscope while each secretly wears a different ridiculous tiny hat; their matching solemn expressions and mismatched hats make the comparison absurd. Composition: single compact centred landscape 3:2 vignette, all subjects visible with generous transparent margins, readable at small card scale. Pure black ink marks on genuinely transparent background; no opaque white fills or paper backdrop. Animal paws/wings/flippers only, no human hands. Photographic scenes contain animals, plants or architecture, no people. No humans, no caption, no speech bubbles, no text, lettering, signatures, initials, bylines, artist attribution, logos, mastheads, magazine branding, borders or watermark. The app recolours the ink for its themes.
+
+## Previous engraving set (superseded)
+
+
 ## Double Take — `public/fun/double-take.avif`
 
 Generated with the built-in imagegen tool; transparent 960×640 AVIF.
@@ -52,3 +111,28 @@ Each request appends `Subject: ` followed by its subject below.
 Full standalone prompt:
 
 > Use case: illustration-story. Asset type: decorative photo-game illustration. A nineteenth-century hand-drawn copperplate / wood engraving, like antique natural-history plates and classic technical-book cover engravings. Fine black ink contour lines, delicate cross-hatching and stippling, visibly handmade, no cartoon or modern vector style. Single centred vignette, landscape 3:2, generous transparent margins. Subject: sixteen small photographic prints on a table, being sorted into four clear loose clusters of four; recognisable engraved subjects include trees, stone arches, birds and boats. A single antique magnifying glass rests alongside the arrangement. Show the pleasure of finding relationships between pictures. Pure black ink, genuine transparent background, including empty space between groups. No opaque paper backdrop, no gradients, no colour, no lettering, no text, no watermark. This art will become a luminance mask and be recoloured by the application's theme.
+
+## Sight Lines and Photo Hangman — matching engraving replacements
+
+Generated with the built-in imagegen tool using Cross Exposure and Connect the
+Shots as style references. Saved as `public/fun/sight-lines.avif` and
+`public/fun/photo-hangman.avif`: transparent 960×640 AVIF, quality 85, effort 6.
+Both replace the simpler native SVG drawings and use the existing accent ink
+mask on cards and game starts. Source alpha is preserved; the shared luminance
+mask removes pale areas within the engraved objects.
+
+Prompt direction shared by both: nineteenth-century hand-drawn copperplate /
+wood engraving, antique natural-history and classic O'Reilly technical-book
+cover feeling; fine black contours, dense delicate cross-hatching and stippling,
+realistic handmade craftsmanship. Compact centred landscape 3:2 vignette,
+whole subject visible, generous transparent margins. Pure black ink on genuine
+transparency, including hatch gaps. No modern vector style, white backdrop,
+colour, gradients, text, border or watermark.
+
+Sight Lines subject: a small 4×4 array of photographic prints in gentle
+perspective, depicting birds, trees, boats and stone arches, with an antique
+magnifying glass diagonally across a line of matching bird photographs.
+
+Photo Hangman subject: a songbird perched beside a fan of seven photographic
+prints depicting birds and feathers, with an antique magnifying glass. The bird
+is the dominant subject, like an antique zoological plate. No gallows imagery.

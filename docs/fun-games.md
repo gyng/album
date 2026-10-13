@@ -88,7 +88,7 @@ bonsai target 42 instead of 89, and a daffodil-portrait target 26 instead of 78.
 
 ## Illustrations
 
-The seven game illustrations are antique-style hand engravings with transparent
+The nine game illustrations are animal editorial cartoons with transparent
 outer backgrounds, generated using the built-in imagegen tool. Final 960×640
 AVIFs preserve alpha in `src/public/fun/`. The shared `GameIllustration` component renders their inverted
 luminance through an SVG mask, removing pale paper interiors as well as the
@@ -119,7 +119,7 @@ rather than inventing an accuracy score from approximate caption matching.
 
 ## Expanded play — 13 October 2026
 
-All five starts reuse the themed engraving from the Fun! cards. The Guess
+Game starts reuse the themed illustrations from the Fun! cards. The Guess
 Where lobby retains regular navigation geometry; starting play switches to the
 compact viewport shell, with the same short nav translation used between map
 and regular pages. Reduced-motion preferences disable it.
@@ -272,9 +272,19 @@ five untimed rounds and does not overwrite the player's saved choices.
 
 A photograph word search at `/fun/sight-lines`. Four named connections are
 hidden as straight lines of three photographs, across, down or diagonally,
-in either direction. Dynamically generated 5×5 and 6×6 boards use indexed
-subjects and captions, with unique photographs and four guaranteed solutions.
+in either direction. Dynamically generated 5×5 and 6×6 boards use concrete subjects from captions and tags, with unique photographs
+and four guaranteed solutions.
 Any other valid three-photo run also counts; overlapping connections are allowed.
+
+Solutions require three clear caption mentions of a concrete subject, rather than
+broad scenery categories or tag-only matches. Caption prominence is a heuristic,
+not object detection. Selection favours close-ups and earlier mentions, and
+varies outings where location/date metadata permits. Highly overlapping topic
+pools are separated. Fillers mix mostly unrelated photographs with a few
+single-topic distractors. Up to sixteen candidate boards are scored for crowded
+topics, multi-topic photographs and accidental solution lines; the best is used.
+Truthful alternative lines still count, including weaker caption or tag matches.
+Subject matching is shared with Photo Hangman, with results cached per board.
 
 The numbered “Find these” word bank names all four subjects above the board.
 Found subjects are crossed off; their numbers also mark the photographs and
@@ -287,7 +297,8 @@ line; Give up reveals every connection with links to its photographs. Completed
 boards focus the result. Board size is saved with the other game preferences.
 The desktop board has a comfortable width; mobile uses the compact game-grid
 spacing and retains 44px touch targets even for 6×6 on a 320px screen.
-The themed illustration is a native ink drawing of a puzzle and magnifying glass.
+The themed illustration is a deadpan giraffe with bird portraits pegged along
+its outstretched neck and matching birds perched above them.
 
 ## Mobile context docks
 
@@ -306,12 +317,12 @@ add a sticky layer. Guess Where continues to use its viewport-filling map game.
 ## Photo Hangman
 
 At `/fun/photo-hangman`, choose a concrete subject from a searchable tag bank.
-Filtering does not make a guess. One photograph starts the round; each wrong
+Filtering does not make a guess. Two photographs start the round; each wrong
 subject reveals another, with six misses ending the round. The answer's length
 and descriptive captions stay hidden during play. Any bank subject matching all
-seven photographs is accepted, including valid alternatives to the chosen noun.
+eight photographs is accepted, including valid alternatives to the chosen noun.
 
-The bank uses curated visual nouns supported by at least seven unique archive
+The bank uses curated visual nouns supported by at least eight unique archive
 photos. Caption and tag matches exclude simple negations and modifier traps
 such as “train station” and “hot dog”. Caption prominence orders the clues from
 less explicit mentions to clearer ones; this is a heuristic, not object detection.
