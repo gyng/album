@@ -11,7 +11,9 @@ import {
 import { GameProgress, GameScore } from "./GameFeedback";
 import { GamePhoto, PhotoChain } from "./GamePhoto";
 import { GameIntro } from "./GameIllustration";
+import { GameDock } from "./GameDock";
 import styles from "./PhotoGames.module.css";
+import relayStyles from "./PhotoRelay.module.css";
 
 export const PhotoRelay = ({ photos }: { photos: PhotoGamePhoto[] }) => {
   const [puzzle, setPuzzle] = useState<RelayPuzzle | null>(null);
@@ -22,6 +24,7 @@ export const PhotoRelay = ({ photos }: { photos: PhotoGamePhoto[] }) => {
   const [error, setError] = useState<string | null>(null);
   const resultRef = useRef<HTMLDivElement>(null);
   const boardRef = useRef<HTMLDivElement>(null);
+  const slotsRef = useRef<HTMLOListElement>(null);
   const choiceRefs = useRef(new Map<string, HTMLButtonElement>());
   const finishRef = useRef<HTMLButtonElement>(null);
   const requestedFocus = useRef<{ path: string } | { finish: true } | null>(null);
@@ -87,7 +90,7 @@ export const PhotoRelay = ({ photos }: { photos: PhotoGamePhoto[] }) => {
             <p role="status">{order.length} of 5 links placed</p>
             <GameProgress current={order.length} total={5} />
           </div>
-          <ol className={styles.relaySlots} aria-label="Your relay links">
+          <ol className={styles.relaySlots} aria-label="Your relay links" ref={slotsRef}>
             {Array.from({ length: 5 }, (_, index) => (
               // Native drag/drop supplements the move and remove buttons below.
               // oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions
@@ -167,6 +170,46 @@ export const PhotoRelay = ({ photos }: { photos: PhotoGamePhoto[] }) => {
               </li>
             ))}
           </ol>
+          <GameDock
+            {...(relayStyles.reference ? { className: relayStyles.reference } : {})}
+            label="Relay reference"
+          >
+            <ol className={relayStyles.miniChain} aria-hidden="true">
+              {[
+                puzzle.start,
+                ...Array.from({ length: 5 }, (_, index) => order[index] ?? null),
+                puzzle.end,
+              ].map((photo, index) => (
+                <li key={index}>
+                  <span>{index === 0 ? "Start" : index === 6 ? "Finish" : index}</span>
+                  {photo ? (
+                    <GamePhoto photo={photo} />
+                  ) : (
+                    <span className={relayStyles.empty}>·</span>
+                  )}
+                </li>
+              ))}
+            </ol>
+            <div className={relayStyles.referenceActions}>
+              <Caption size="sm">{order.length} / 5 links</Caption>
+              <Button
+                disabled={!order.length}
+                onClick={(event) => {
+                  const control =
+                    slotsRef.current?.querySelector<HTMLButtonElement>("button:not(:disabled)");
+                  control?.scrollIntoView({
+                    block: "center",
+                    behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
+                      ? "auto"
+                      : "smooth",
+                  });
+                  if (event.detail === 0) control?.focus({ preventScroll: true });
+                }}
+              >
+                Edit links
+              </Button>
+            </div>
+          </GameDock>
           <div className={styles.choices}>
             {puzzle.tiles.map((photo, index) => {
               const position = order.findIndex((item) => item.path === photo.path);

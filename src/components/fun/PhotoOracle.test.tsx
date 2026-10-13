@@ -3,6 +3,8 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { PhotoOracle } from "./PhotoOracle";
 import type { PhotoGamePhoto } from "../../util/photoGames";
 
+beforeEach(() => localStorage.clear());
+
 const photos: PhotoGamePhoto[] = [
   "A boat on a river",
   "A person on a city street",
@@ -111,4 +113,20 @@ it("narrows discovery to a single matching photograph and restores the pool on B
   fireEvent.click(screen.getByRole("button", { name: "Back" }));
   expect(screen.getByRole("status")).toHaveTextContent(question!);
   expect(screen.queryByRole("img")).toBeNull();
+});
+
+it("remembers discovery mode while returning to an unanswered lobby after remount", () => {
+  const first = render(<PhotoOracle photos={photos} />);
+  fireEvent.click(screen.getByRole("button", { name: "Find me a photograph" }));
+  first.unmount();
+  render(<PhotoOracle photos={photos} />);
+  expect(screen.getByRole("button", { name: "Find me a photograph" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  expect(screen.getByRole("button", { name: "Meet the oracle" })).toHaveAttribute(
+    "aria-pressed",
+    "false",
+  );
+  expect(screen.queryByRole("button", { name: "Yes" })).toBeNull();
 });

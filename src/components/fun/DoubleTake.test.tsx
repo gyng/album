@@ -39,6 +39,7 @@ let images: Array<{
 }>;
 const originalImage = global.Image;
 beforeEach(() => {
+  localStorage.clear();
   jest.clearAllMocks();
   jest.useFakeTimers();
   hidden = false;
@@ -203,4 +204,16 @@ it("recovers from an image error and gives up without awarding points", async ()
   fireEvent.click(screen.getByRole("button", { name: "Give up this pair" }));
   expect(screen.getByText("No points this round")).toBeTruthy();
   expect(screen.getByRole("region", { name: "Pair revealed" })).toHaveTextContent("Same place");
+});
+
+it("remembers longer viewing time after remount and returns to the lobby", () => {
+  const first = render(<DoubleTake photos={photos} />);
+  fireEvent.click(screen.getByRole("button", { name: "Longer look · off" }));
+  first.unmount();
+  render(<DoubleTake photos={photos} />);
+  expect(screen.getByRole("button", { name: "Longer look · 3 seconds" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  expect(screen.getByRole("button", { name: "Start Double Take" })).toBeTruthy();
 });

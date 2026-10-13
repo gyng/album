@@ -4,19 +4,19 @@ import {
   checkConnection,
   shuffleGamePhotos,
   type ConnectionsPuzzle,
-  type ConnectionSize,
   type PhotoGamePhoto,
 } from "../../util/photoGames";
-import { Button, Caption, Heading } from "../ui";
+import { Button, Caption, Heading, Icon } from "../ui";
 import { GameIntro } from "./GameIllustration";
 import { GamePhoto, PhotoChain } from "./GamePhoto";
 import { GameProgress } from "./GameFeedback";
+import { GameDock } from "./GameDock";
+import { useGameSettings } from "./useGameSettings";
 import styles from "./PhotoGames.module.css";
 
 export const PhotoConnections = ({ photos }: { photos: PhotoGamePhoto[] }) => {
-  const [detail, setDetail] = useState<"broad" | "specific">("broad");
-  const [hints, setHints] = useState(true);
-  const [size, setSize] = useState<ConnectionSize>(4);
+  const [settings, setSettings] = useGameSettings("connections");
+  const { detail, hints, size } = settings;
   const [puzzle, setPuzzle] = useState<ConnectionsPuzzle | null>(null);
   const [tiles, setTiles] = useState<PhotoGamePhoto[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
@@ -61,7 +61,7 @@ export const PhotoConnections = ({ photos }: { photos: PhotoGamePhoto[] }) => {
               active={size === value}
               aria-pressed={size === value}
               onClick={() => {
-                setSize(value);
+                setSettings((previous) => ({ ...previous, size: value }));
                 setMessage("");
               }}
             >
@@ -73,18 +73,22 @@ export const PhotoConnections = ({ photos }: { photos: PhotoGamePhoto[] }) => {
           <Button
             active={detail === "broad"}
             aria-pressed={detail === "broad"}
-            onClick={() => setDetail("broad")}
+            onClick={() => setSettings((previous) => ({ ...previous, detail: "broad" }))}
           >
             Broad subjects
           </Button>
           <Button
             active={detail === "specific"}
             aria-pressed={detail === "specific"}
-            onClick={() => setDetail("specific")}
+            onClick={() => setSettings((previous) => ({ ...previous, detail: "specific" }))}
           >
             Specific subjects
           </Button>
-          <Button active={hints} aria-pressed={hints} onClick={() => setHints(!hints)}>
+          <Button
+            active={hints}
+            aria-pressed={hints}
+            onClick={() => setSettings((previous) => ({ ...previous, hints: !previous.hints }))}
+          >
             One-away hints {hints ? "on" : "off"}
           </Button>
         </div>
@@ -128,6 +132,44 @@ export const PhotoConnections = ({ photos }: { photos: PhotoGamePhoto[] }) => {
           <GameProgress current={4 - mistakes} total={4} />
         </div>
       </div>
+      {!finished ? (
+        <GameDock
+          label="Connection controls"
+          {...(styles.connectionControls ? { className: styles.connectionControls } : {})}
+        >
+          <Caption>
+            {selected.length} / {size} selected
+          </Caption>
+          <Button
+            aria-label="Check connection"
+            variant="primary"
+            disabled={selected.length !== size}
+            onClick={submit}
+          >
+            Check
+          </Button>
+          <Button
+            size="icon"
+            aria-label="Deselect"
+            title="Deselect"
+            disabled={!selected.length}
+            onClick={() => {
+              setSelected([]);
+              setMessage("");
+            }}
+          >
+            <Icon kind="close" />
+          </Button>
+          <Button
+            size="icon"
+            aria-label="Shuffle"
+            title="Shuffle"
+            onClick={() => setTiles(shuffleGamePhotos(tiles))}
+          >
+            <Icon kind="shuffle" />
+          </Button>
+        </GameDock>
+      ) : null}
       {visibleGroups.length ? (
         <div
           className={styles.result}
@@ -201,20 +243,10 @@ export const PhotoConnections = ({ photos }: { photos: PhotoGamePhoto[] }) => {
             </section>
           ) : null}
           <div className={styles.actions}>
-            <Button variant="primary" disabled={selected.length !== size} onClick={submit}>
-              Check connection
-            </Button>
-            <Button disabled={!selected.length} onClick={() => setSelected([])}>
-              Deselect
-            </Button>
-            <Button onClick={() => setTiles(shuffleGamePhotos(tiles))}>Shuffle</Button>
             <Button variant="quiet" onClick={() => setGaveUp(true)}>
               Give up
             </Button>
           </div>
-          <Caption>
-            {selected.length} of {size} selected
-          </Caption>
         </>
       ) : (
         <div className={styles.actions}>

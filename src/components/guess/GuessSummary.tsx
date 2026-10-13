@@ -48,9 +48,9 @@ const buildShareUrl = (seed: string, settings: GameSettings): string => {
   if (settings.daily) return "/fun/guess?daily";
   const params = new URLSearchParams();
   params.set("seed", seed);
-  if (settings.rounds !== 5) params.set("rounds", String(settings.rounds));
-  if (settings.region) params.set("region", settings.region);
-  if (settings.timeLimit) params.set("timer", String(settings.timeLimit));
+  params.set("rounds", String(settings.rounds));
+  params.set("region", settings.region ?? "");
+  params.set("timer", settings.timeLimit === null ? "off" : String(settings.timeLimit));
   return `/fun/guess?${params.toString()}`;
 };
 

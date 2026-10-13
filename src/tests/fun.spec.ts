@@ -109,6 +109,7 @@ test("Fun cards have illustrations and launch each game; old Guess Where challen
     "Connect the Shots",
     "Double Take",
     "Cross Exposure",
+    "Sight Lines",
   ]) {
     const card = page.getByRole("link", { name: new RegExp(`${title}.*Play`) });
     await expect(card).toBeVisible();
@@ -285,4 +286,23 @@ test("relay accepts a native drag into a link slot", async ({ page }) => {
   const firstSrc = await slots.first().locator("img").getAttribute("src");
   await slots.first().locator("[draggable]").dragTo(slots.nth(1));
   await expect(slots.nth(1).locator("img")).toHaveAttribute("src", firstSrc!);
+});
+
+test("Relay keeps its current chain in view while choosing and returns to editable links", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await gotoHydrated(page, "/fun/relay");
+  await page.getByRole("button", { name: "Start relay" }).click();
+  await page.getByRole("button", { name: "Choose photograph 1", exact: true }).click();
+  const finalChoice = page.getByRole("button", { name: "Choose photograph 5", exact: true });
+  await finalChoice.scrollIntoViewIfNeeded();
+  const reference = page.getByRole("group", { name: "Relay reference" });
+  await expect(reference).toBeInViewport({ ratio: 1 });
+  await finalChoice.click();
+  await expect(reference.getByText(/2\s*\/\s*5 links/)).toBeVisible();
+  await reference.getByRole("button", { name: "Edit links" }).click();
+  await expect(page.getByRole("button", { name: "Remove link 1" })).toBeInViewport();
+  await page.getByRole("button", { name: "Give up", exact: true }).click();
+  await expect(reference).toHaveCount(0);
 });

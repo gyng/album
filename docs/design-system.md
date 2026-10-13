@@ -247,3 +247,22 @@ accessible names. Brush-size buttons show stroke-width dots. Fine pointers use
 32px controls; coarse pointers retain 44px targets. Selected tools combine an
 accent border with aria-pressed. Split nav buttons use the same surface, text
 colour and radius as ordinary controls.
+
+
+Active mobile game docks use the sticky z-index, safe-area clearance and an
+opaque theme background. Keep the grid, primary contextual action and compact
+selected-photo preview together; reserve measured scroll clearance for tray
+focus. Long lists scroll below the dock, and result views return to normal flow.
+
+Use a sticky board when photographs outside it need to be compared or placed.
+For Connections, pin its compact action bar instead of the photo grid; for
+Relay, pin a miniature chain reference above the tray. Sight Lines keeps its
+word bank and board together. Docks activate only when the visual viewport has
+at least 144px remaining below them, including safe-area clearance, and return
+to normal flow on completion. Oracle, Blind Frame and Double Take keep their
+self-contained active views in normal flow.
+
+Mobile game grids use 8px page gutters, 4px photo gaps and 1px tile padding at
+720px and below. Cross Exposure uses 2px table spacing and compact coordinate
+labels. Preserve 44px touch targets and safe-area clearance; give the space to
+the photographs rather than nested card padding.

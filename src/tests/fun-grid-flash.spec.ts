@@ -62,10 +62,10 @@ test.beforeAll(() => {
 });
 test.afterAll(() => rmSync(directory, { recursive: true, force: true }));
 test.beforeEach(async ({ page }) => {
-  await page.route("**/e2e-search.sqlite", (route) =>
+  await page.route(/\/(?:e2e-)?search\.sqlite(?:\?.*)?$/, (route) =>
     route.fulfill({ body: core, contentType: "application/octet-stream" }),
   );
-  await page.route("**/e2e-search-embeddings.sqlite", (route) =>
+  await page.route(/\/(?:e2e-)?search-embeddings\.sqlite(?:\?.*)?$/, (route) =>
     route.fulfill({ body: embeddings, contentType: "application/octet-stream" }),
   );
 });
@@ -112,7 +112,8 @@ test("Cross Exposure keeps its whole mobile grid visible and reveals the clue ke
   await expect(
     page.getByRole("group", { name: "Available photographs" }).getByRole("button"),
   ).toHaveCount(6);
-  await page.getByRole("button", { name: "Reveal clues", exact: true }).click();
+  for (let hint = 0; hint < 6; hint++)
+    await page.getByRole("button", { name: "Hint", exact: true }).click();
   await expect(board.getByRole("columnheader").first()).not.toHaveAccessibleName("Column 1");
   const geometry = await board.evaluate((element) => ({
     width: element.clientWidth,
@@ -125,4 +126,178 @@ test("Cross Exposure keeps its whole mobile grid visible and reveals the clue ke
   await page.getByRole("button", { name: "Give up", exact: true }).click();
   await expect(page.getByRole("region", { name: "Cross Exposure result" })).toBeFocused();
   await expect(board.getByRole("img")).toHaveCount(9);
+});
+
+for (const viewport of [
+  { width: 390, height: 844 },
+  { width: 844, height: 390 },
+]) {
+  test(`Cross Exposure keeps the board and selected-shot controls reachable while browsing the tray at ${viewport.width}×${viewport.height}`, async ({
+    page,
+  }) => {
+    await page.setViewportSize(viewport);
+    await gotoHydrated(page, "/fun/cross-exposure");
+    await page
+      .getByRole("group", { name: "Starting photographs" })
+      .getByRole("button", { name: "None", exact: true })
+      .click();
+    await page.getByRole("button", { name: "Start crossing", exact: true }).click();
+    const board = page.getByRole("region", { name: "Crossword board" });
+    const controls = page.getByRole("group", { name: "Crossword controls" });
+    const tray = page.getByRole("group", { name: "Available photographs" });
+    await expect(tray.getByRole("button")).toHaveCount(9);
+    const last = tray.getByRole("button").last();
+    const source = await last.getByRole("img").getAttribute("src");
+    await last.scrollIntoViewIfNeeded();
+    const geometry = () =>
+      board.evaluate((element) => {
+        let dock: HTMLElement | null = element.parentElement;
+        while (dock && getComputedStyle(dock).position !== "sticky") dock = dock.parentElement;
+        const rect = element.getBoundingClientRect();
+        return {
+          stickyTop: dock?.getBoundingClientRect().top ?? -1,
+          top: rect.top,
+          bottom: rect.bottom,
+          height: rect.height,
+          viewport: innerHeight,
+        };
+      });
+    await expect.poll(async () => (await geometry()).stickyTop).toBeGreaterThanOrEqual(7);
+    expect((await geometry()).stickyTop).toBeLessThanOrEqual(9);
+    expect((await geometry()).bottom).toBeLessThanOrEqual(viewport.height - 44);
+    await expect(controls.getByRole("button", { name: "Hint", exact: true })).toBeInViewport({
+      ratio: 1,
+    });
+    await last.click();
+    const preview = controls.locator("img");
+    await expect(preview).toHaveCount(1);
+    await expect(preview).toHaveAttribute("src", source!);
+    await expect(preview).toBeInViewport({ ratio: 1 });
+    const cell = board.getByRole("button", { name: /^Row 1; column 1;/ });
+    await expect(cell).toBeInViewport({ ratio: 1 });
+    await cell.click();
+    await expect(cell).toHaveAccessibleName(/; occupied$/);
+    await expect(cell).toBeInViewport({ ratio: 1 });
+    expect((await geometry()).stickyTop).toBeLessThanOrEqual(9);
+    await expect(tray.getByRole("button")).toHaveCount(8);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+      viewport.width,
+    );
+  });
+}
+
+test("Cross Exposure leaves the desktop board in normal document flow", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await gotoHydrated(page, "/fun/cross-exposure");
+  await page.getByRole("button", { name: "Start crossing", exact: true }).click();
+  const board = page.getByRole("region", { name: "Crossword board" });
+  const stickyAncestors = await board.evaluate((element) => {
+    let node: HTMLElement | null = element.parentElement;
+    const sticky: string[] = [];
+    while (node) {
+      if (getComputedStyle(node).position === "sticky") sticky.push(node.tagName);
+      node = node.parentElement;
+    }
+    return sticky;
+  });
+  expect(stickyAncestors).toEqual([]);
+});
+
+test("Cross Exposure releases a tall tablet board so the photograph tray remains usable", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 768, height: 700 });
+  await gotoHydrated(page, "/fun/cross-exposure");
+  await page.getByRole("button", { name: "Start crossing", exact: true }).click();
+  const board = page.getByRole("region", { name: "Crossword board" });
+  await expect(board).toBeVisible();
+  const stuck = () =>
+    board.evaluate((element) => {
+      let node: HTMLElement | null = element.parentElement;
+      while (node) {
+        if (getComputedStyle(node).position === "sticky") return true;
+        node = node.parentElement;
+      }
+      return false;
+    });
+  await expect.poll(stuck).toBe(false);
+  const candidate = page
+    .getByRole("group", { name: "Available photographs" })
+    .getByRole("button")
+    .last();
+  const focusMargin = await candidate.evaluate(
+    (node) => Number.parseFloat(getComputedStyle(node).scrollMarginBlockStart) || 0,
+  );
+  expect(focusMargin).toBeLessThanOrEqual(16);
+  await candidate.scrollIntoViewIfNeeded();
+  await candidate.click();
+  await expect(candidate).toHaveAttribute("aria-pressed", "true");
+  await expect(board).not.toBeInViewport();
+});
+
+test("game setup choices survive a page reload", async ({ page }) => {
+  const reload = async () => {
+    await page.reload();
+    await expect(page.locator("html")).toHaveAttribute("data-app-hydrated", "true");
+  };
+  const settings = (game: string) =>
+    page.evaluate(
+      (name) => JSON.parse(localStorage.getItem(`snapshots-fun-settings-v1:${name}`) ?? "null"),
+      game,
+    );
+  await gotoHydrated(page, "/fun/cross-exposure");
+  await page
+    .getByRole("group", { name: "Grid size" })
+    .getByRole("button", { name: "5×5", exact: true })
+    .click();
+  await page
+    .getByRole("group", { name: "Clue mode" })
+    .getByRole("button", { name: "Visible clues", exact: true })
+    .click();
+  await page
+    .getByRole("group", { name: "Starting photographs" })
+    .getByRole("button", { name: "None", exact: true })
+    .click();
+  await expect.poll(() => settings("cross")).toEqual({ size: 5, mode: "visible", prefill: "none" });
+  await reload();
+  await expect(page.getByRole("button", { name: "5×5", exact: true })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await expect(page.getByRole("button", { name: "Visible clues", exact: true })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await expect(page.getByRole("button", { name: "None", exact: true })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+
+  await gotoHydrated(page, "/fun/connections");
+  await page.getByRole("button", { name: "6×6", exact: true }).click();
+  await page.getByRole("button", { name: "Specific subjects", exact: true }).click();
+  await page.getByRole("button", { name: "One-away hints on", exact: true }).click();
+  await expect
+    .poll(() => settings("connections"))
+    .toEqual({ size: 6, detail: "specific", hints: false });
+  await reload();
+  await expect(page.getByRole("button", { name: "6×6", exact: true })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await expect(
+    page.getByRole("button", { name: "Specific subjects", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect(
+    page.getByRole("button", { name: "One-away hints off", exact: true }),
+  ).toHaveAttribute("aria-pressed", "false");
+
+  await gotoHydrated(page, "/fun/double-take");
+  await page.getByRole("button", { name: /Longer look/ }).click();
+  await expect.poll(() => settings("doubleTake")).toEqual({ slower: true });
+  await reload();
+  await expect(page.getByRole("button", { name: /Longer look.*3 seconds/ })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
 });

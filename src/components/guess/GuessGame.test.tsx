@@ -197,7 +197,11 @@ describe("GuessGame", () => {
       region: "Japan",
       seed: "i",
     });
-    expect(onSeedGenerated).toHaveBeenCalledWith("i");
+    expect(onSeedGenerated).toHaveBeenCalledWith("i", {
+      rounds: 2,
+      timeLimit: 30,
+      region: "Japan",
+    });
 
     fireEvent.click(screen.getByTestId("guess-map"));
     expect(screen.getByTestId("round")).toHaveAttribute(

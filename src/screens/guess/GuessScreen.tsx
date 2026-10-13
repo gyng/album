@@ -5,6 +5,7 @@ import { ProgressBar } from "../../components/ProgressBar";
 import { GlobalNav } from "../../components/GlobalNav";
 import { GuessGame } from "../../components/guess/GuessGame";
 import type { GameSettings } from "../../components/guess/guessTypes";
+import { useGameSettings } from "../../components/fun/useGameSettings";
 import { Seo } from "../../components/Seo";
 import { Button, Heading, buttonStyles } from "../../components/ui";
 import styles from "./GuessScreen.module.css";
@@ -22,28 +23,41 @@ const GuessScreen = () => {
   const seedFromUrl = getSearchParam("seed") ?? undefined;
   const regionFromUrl = getSearchParam("region") ?? undefined;
   const isDaily = hasSearchParam("daily");
+  const [preferences, , preferencesReady] = useGameSettings("guess");
+  const roundsFromUrl = getSearchParam("rounds");
+  const timerFromUrl = getSearchParam("timer");
+  const settingsForSeed: GameSettings = {
+    rounds:
+      roundsFromUrl !== null
+        ? Math.min(20, Math.max(1, Number(roundsFromUrl) || 5))
+        : preferences.rounds,
+    timeLimit: timerFromUrl !== null ? parseTimer(timerFromUrl) : preferences.timeLimit,
+    ...((regionFromUrl ?? preferences.region)
+      ? { region: regionFromUrl ?? preferences.region }
+      : {}),
+  };
 
   // When a seed or daily flag is in the URL, skip the lobby.
   const initialSettings: GameSettings | undefined = isDaily
     ? { rounds: 5, timeLimit: null, daily: true }
     : seedFromUrl
-      ? {
-          rounds: Math.min(20, Math.max(1, Number(getSearchParam("rounds")) || 5)),
-          timeLimit: parseTimer(getSearchParam("timer") ?? undefined),
-          ...(regionFromUrl ? { region: regionFromUrl } : {}),
-        }
+      ? settingsForSeed
       : undefined;
 
-  const handleSeedGenerated = useCallback(
-    (seed: string) => {
-      if (!seedFromUrl) {
-        const params = new URLSearchParams(window.location.search);
-        params.set("seed", seed);
-        window.history.replaceState(null, "", `?${params.toString()}`);
-      }
-    },
-    [seedFromUrl],
-  );
+  const handleSeedGenerated = useCallback((seed: string, settings: GameSettings) => {
+    const params = new URLSearchParams(window.location.search);
+    if (settings.daily) {
+      params.set("daily", "");
+      for (const field of ["seed", "rounds", "timer", "region"]) params.delete(field);
+    } else {
+      params.delete("daily");
+      params.set("seed", seed);
+      params.set("rounds", String(settings.rounds));
+      params.set("timer", settings.timeLimit === null ? "off" : String(settings.timeLimit));
+      params.set("region", settings.region ?? "");
+    }
+    window.history.replaceState(null, "", `?${params.toString()}`);
+  }, []);
 
   const [active, setActive] = useState(false);
   const isChallenge = Boolean(seedFromUrl) || isDaily;
@@ -80,7 +94,7 @@ const GuessScreen = () => {
               All games
             </AppLink>
           </div>
-        ) : !database || !urlReady ? (
+        ) : !database || !urlReady || !preferencesReady ? (
           <div className={styles.loading}>
             <Heading level={1} as="h1" className={styles.title}>
               Guess Where
@@ -93,7 +107,7 @@ const GuessScreen = () => {
             database={database}
             onActiveChange={setActive}
             {...(initialSettings ? { initialSettings } : {})}
-            {...(seedFromUrl ? { seed: seedFromUrl } : {})}
+            {...(seedFromUrl && !isDaily ? { seed: seedFromUrl } : {})}
             onSeedGenerated={handleSeedGenerated}
           />
         )}

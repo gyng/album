@@ -155,3 +155,28 @@ it("accepts transposed hidden connections but rejects incomplete, reused or unav
     ]),
   ).toBeNull();
 });
+
+it("anchors only hinted lines while the remaining hidden clues can change order", () => {
+  const puzzle: PhotoCrosswordPuzzle = {
+    size: 3,
+    rows: rows.map(tag),
+    columns: columns.map(tag),
+    solution: photos,
+    tiles: photos,
+  };
+  const reordered = [0, 2, 1].flatMap((row) =>
+    [0, 2, 1].map((column) => photos[row * 3 + column]!),
+  );
+  expect(
+    resolveHiddenCrossword(puzzle, reordered, [
+      { axis: "row", index: 0 },
+      { axis: "column", index: 0 },
+    ]),
+  ).not.toBeNull();
+  expect(resolveHiddenCrossword(puzzle, reordered, [{ axis: "row", index: 1 }])).toBeNull();
+  expect(resolveHiddenCrossword(puzzle, reordered, [{ axis: "column", index: 1 }])).toBeNull();
+  const transposed = columns.flatMap((_, column) =>
+    rows.map((_, row) => photos[row * 3 + column]!),
+  );
+  expect(resolveHiddenCrossword(puzzle, transposed, [{ axis: "row", index: 0 }])).toBeNull();
+});

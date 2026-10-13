@@ -1134,7 +1134,14 @@ const fetchEmbeddingsByModel = async (
 export const fetchPhotoGameArchive = async (opts: {
   database: Database;
   embeddingsDatabase?: Database | null;
-  game: "relay" | "blind-frame" | "oracle" | "connections" | "double-take" | "cross-exposure";
+  game:
+    | "relay"
+    | "blind-frame"
+    | "oracle"
+    | "connections"
+    | "double-take"
+    | "cross-exposure"
+    | "sight-lines";
 }): Promise<PhotoGamePhoto[]> => {
   const { database, game } = opts;
   const vectorDatabase = opts.embeddingsDatabase ?? database;
@@ -1165,7 +1172,10 @@ export const fetchPhotoGameArchive = async (opts: {
     });
   }
   const rows =
-    game === "oracle" || game === "connections" || game === "cross-exposure"
+    game === "oracle" ||
+    game === "connections" ||
+    game === "cross-exposure" ||
+    game === "sight-lines"
       ? await fetchRandomResults({ database, pageSize: 10000 })
       : await fetchResultsByPaths(
           database,

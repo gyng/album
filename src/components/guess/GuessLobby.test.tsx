@@ -5,6 +5,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { fetchGuessRegions } from "../search/api";
 import { GuessLobby } from "./GuessLobby";
+import { gameSettingsStorageKey } from "../fun/useGameSettings";
 
 jest.mock("../search/api", () => ({
   fetchGuessRegions: jest.fn(),
@@ -15,6 +16,8 @@ const database = {} as Parameters<typeof GuessLobby>[0]["database"];
 
 describe("GuessLobby", () => {
   beforeEach(() => {
+    localStorage.clear();
+    window.history.replaceState(null, "", "/fun/guess");
     fetchGuessRegionsMock.mockResolvedValue([
       { country: "Japan", count: 12 },
       { country: "France", count: 8 },
@@ -137,5 +140,93 @@ describe("GuessLobby", () => {
     unmount();
     resolveRegions([{ country: "Japan", count: 12 }]);
     await waitFor(() => expect(screen.queryByText("12 photos available")).not.toBeInTheDocument());
+  });
+
+  it("restores selected region, timer and rounds after returning to the lobby", async () => {
+    const first = render(
+      <GuessLobby
+        database={database}
+        defaults={{ rounds: 5, timeLimit: null }}
+        onStart={jest.fn()}
+      />,
+    );
+    await screen.findByText("20 photos available");
+    fireEvent.change(screen.getByLabelText("Region"), { target: { value: "Japan" } });
+    fireEvent.click(screen.getByRole("radio", { name: "15 s" }));
+    fireEvent.click(screen.getByRole("radio", { name: "10" }));
+    first.unmount();
+    const onStart = jest.fn();
+    render(
+      <GuessLobby
+        database={database}
+        defaults={{ rounds: 5, timeLimit: null }}
+        onStart={onStart}
+      />,
+    );
+    await screen.findByText("12 photos available");
+    expect(screen.getByLabelText("Region")).toHaveValue("Japan");
+    expect(screen.getByRole("radio", { name: "15 s" })).toHaveAttribute("aria-checked", "true");
+    expect(screen.getByRole("radio", { name: "10" })).toHaveAttribute("aria-checked", "true");
+    fireEvent.click(screen.getByRole("button", { name: /Play/ }));
+    expect(onStart).toHaveBeenCalledWith({ rounds: 10, timeLimit: 15, region: "Japan" });
+  });
+
+  it("lets explicit URL fields outrank saved choices without resetting unsupplied fields", async () => {
+    localStorage.setItem(
+      gameSettingsStorageKey("guess"),
+      JSON.stringify({ region: "France", rounds: 10, timeLimit: 30 }),
+    );
+    window.history.replaceState(null, "", "/fun/guess?timer=off&region=Japan");
+    const onStart = jest.fn();
+    render(
+      <GuessLobby
+        database={database}
+        defaults={{ rounds: 5, timeLimit: null }}
+        onStart={onStart}
+      />,
+    );
+    await screen.findByText("12 photos available");
+    fireEvent.click(screen.getByRole("button", { name: /Play/ }));
+    expect(onStart).toHaveBeenCalledWith({ rounds: 10, timeLimit: null, region: "Japan" });
+  });
+
+  it("clears an unavailable saved region only after a successful availability lookup", async () => {
+    localStorage.setItem(
+      gameSettingsStorageKey("guess"),
+      JSON.stringify({ region: "Missing", rounds: 3, timeLimit: 15 }),
+    );
+    const onStart = jest.fn();
+    render(
+      <GuessLobby
+        database={database}
+        defaults={{ rounds: 5, timeLimit: null }}
+        onStart={onStart}
+      />,
+    );
+    await screen.findByText("20 photos available");
+    expect(screen.getByLabelText("Region")).toHaveValue("");
+    fireEvent.click(screen.getByRole("button", { name: /Play/ }));
+    expect(onStart).toHaveBeenCalledWith({ rounds: 3, timeLimit: 15 });
+  });
+
+  it("preserves a saved region when availability fails to load", async () => {
+    localStorage.setItem(
+      gameSettingsStorageKey("guess"),
+      JSON.stringify({ region: "France", rounds: 5, timeLimit: null }),
+    );
+    fetchGuessRegionsMock.mockRejectedValue(new Error("offline"));
+    render(
+      <GuessLobby
+        database={database}
+        defaults={{ rounds: 5, timeLimit: null }}
+        onStart={jest.fn()}
+      />,
+    );
+    await waitFor(() => expect(fetchGuessRegionsMock).toHaveBeenCalled());
+    await waitFor(() =>
+      expect(JSON.parse(localStorage.getItem(gameSettingsStorageKey("guess"))!).region).toBe(
+        "France",
+      ),
+    );
   });
 });

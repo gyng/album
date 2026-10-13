@@ -238,3 +238,67 @@ since their clue order cannot be known from an empty start. Revealed labels
 follow the player’s valid arrangement. Visible or revealed clues retain their
 positional meaning; an incomplete hidden board does not report arbitrary
 position-specific errors.
+
+
+## Sticky grid, progressive hints and saved choices
+
+On phones and tablets, the active Cross Exposure grid sticks below the safe
+area while the tray scrolls. Its compact controls include Hint and a thumbnail
+of the selected photograph. Short landscape screens use 44px grid rows; tray
+focus clearance follows the measured dock height. Finished boards return to
+normal flow. Very short landscape viewports also use normal flow so the dock
+cannot cover the entire photo tray.
+
+Each Hint reveals exactly one previously hidden row or column clue and shows
+how many remain. Headers, cell labels and the clue key reveal only those chosen
+clues. A partial hint anchors its own line while unrevealed connections may
+still be reordered; fully revealed and Visible clues retain positional checks.
+New rounds reset hints.
+
+Lobby settings use validated, versioned local storage. Cross Exposure saves
+size, clue mode and starting photographs; Connections saves size, subject
+detail and one-away hints; Double Take saves viewing time; Oracle saves its
+mode; Guess Where saves region, timer and round count. Boards, scores, answers
+and drawings remain per-round state. Storage reads happen after hydration and
+cannot overwrite saved choices with first-render defaults. Invalid fields fall
+back independently; unavailable storage does not prevent play.
+
+Explicit Guess Where URL fields outrank saved preferences. Generated and copied
+non-daily challenge links include all choices, including Everywhere and timer
+Off, so a recipient's preferences cannot change the shared game. Daily stays
+five untimed rounds and does not overwrite the player's saved choices.
+
+## Sight Lines
+
+A photograph word search at `/fun/sight-lines`. Four named connections are
+hidden as straight lines of three photographs, across, down or diagonally,
+in either direction. Dynamically generated 5×5 and 6×6 boards use indexed
+subjects and captions, with unique photographs and four guaranteed solutions.
+Any other valid three-photo run also counts; overlapping connections are allowed.
+
+The numbered “Find these” word bank names all four subjects above the board.
+Found subjects are crossed off; their numbers also mark the photographs and
+linked result rows. Solid accent lines connect found runs. The current selection
+and the unfound runs revealed by Give up use dashed lines.
+
+Drag between endpoints, tap the two ends, or activate them with the keyboard.
+Selected photographs have a larger preview. Hint marks the start of an unfound
+line; Give up reveals every connection with links to its photographs. Completed
+boards focus the result. Board size is saved with the other game preferences.
+The desktop board has a comfortable width; mobile uses the compact game-grid
+spacing and retains 44px touch targets even for 6×6 on a 320px screen.
+The themed illustration is a native ink drawing of a puzzle and magnifying glass.
+
+## Mobile context docks
+
+Sight Lines keeps its word bank, feedback and active board together while the
+selected-photo preview scrolls. Connections keeps selection count and its
+Check, Deselect and Shuffle actions visible above the photo grid. Relay shows
+a compact start-to-finish chain above the tray; Edit links returns focus to the
+editable chain. Cross Exposure retains its grid and compact controls beside the
+tray. Each dock needs at least 144px of usable space below it; oversized boards
+and short viewports use normal flow. Results never retain sticky game controls.
+
+Oracle's questions and answer controls, Blind Frame's drawing dialogue and
+Double Take's sequential frame already contain their active tasks. They do not
+add a sticky layer. Guess Where continues to use its viewport-filling map game.

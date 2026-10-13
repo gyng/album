@@ -7,6 +7,7 @@ import { Button, Caption, Heading } from "../ui";
 import { GameIntro } from "./GameIllustration";
 import { GameProgress, GameScore } from "./GameFeedback";
 import { GamePhoto } from "./GamePhoto";
+import { useGameSettings } from "./useGameSettings";
 import styles from "./DoubleTake.module.css";
 
 type Phase =
@@ -58,7 +59,8 @@ export const DoubleTake = ({ photos }: { photos: PhotoGamePhoto[] }) => {
   const [deck, setDeck] = useState<DoubleTakePair[]>([]);
   const [round, setRound] = useState(0);
   const [phase, setPhase] = useState<Phase>("lobby");
-  const [slower, setSlower] = useState(false);
+  const [settings, setSettings] = useGameSettings("doubleTake");
+  const { slower } = settings;
   const [attempt, setAttempt] = useState(0);
   const [replayed, setReplayed] = useState(false);
   const [streak, setStreak] = useState(0);
@@ -188,7 +190,11 @@ export const DoubleTake = ({ photos }: { photos: PhotoGamePhoto[] }) => {
           apart.
         </Caption>
         <div className={styles.actions}>
-          <Button aria-pressed={slower} active={slower} onClick={() => setSlower(!slower)}>
+          <Button
+            aria-pressed={slower}
+            active={slower}
+            onClick={() => setSettings({ slower: !slower })}
+          >
             Longer look · {slower ? "3 seconds" : "off"}
           </Button>
         </div>

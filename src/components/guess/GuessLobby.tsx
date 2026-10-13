@@ -5,6 +5,8 @@ import { fetchGuessRegions, GuessRegionOption } from "../search/api";
 import { GameSettings } from "./guessTypes";
 import { isInteractiveTarget } from "./guessKeyboard";
 import { GameIllustration } from "../fun/GameIllustration";
+import { useGameSettings, type GameSettingsRegistry } from "../fun/useGameSettings";
+import { useUrlSearchParams } from "../platform";
 import styles from "./GuessLobby.module.css";
 
 type GuessLobbyProps = {
@@ -41,16 +43,35 @@ export const GuessLobby: React.FC<GuessLobbyProps> = ({ database, defaults, onSt
   const dailyDescriptionId = useId();
   const [regions, setRegions] = useState<GuessRegionOption[]>([]);
   const [totalPhotos, setTotalPhotos] = useState(0);
-  const [region, setRegion] = useState(defaults.region ?? "");
-  const [timer, setTimer] = useState<TimerValue>(limitToTimerValue(defaults.timeLimit));
-  const [rounds, setRounds] = useState(String(defaults.rounds));
+  const [regionsLoaded, setRegionsLoaded] = useState(false);
+  const { getSearchParam } = useUrlSearchParams();
+  const overrides: Partial<GameSettingsRegistry["guess"]> = {};
+  if (defaults.region !== undefined) overrides.region = defaults.region;
+  if (defaults.timeLimit === 15 || defaults.timeLimit === 30)
+    overrides.timeLimit = defaults.timeLimit;
+  if (defaults.rounds === 3 || defaults.rounds === 10) overrides.rounds = defaults.rounds;
+  const urlRegion = getSearchParam("region");
+  const urlTimer = getSearchParam("timer");
+  const urlRounds = getSearchParam("rounds");
+  if (urlRegion !== null) overrides.region = urlRegion;
+  if (urlTimer === "off" || urlTimer === "0") overrides.timeLimit = null;
+  else if (urlTimer === "15" || urlTimer === "30")
+    overrides.timeLimit = Number(urlTimer) as 15 | 30;
+  if (urlRounds === "3" || urlRounds === "5" || urlRounds === "10")
+    overrides.rounds = Number(urlRounds) as 3 | 5 | 10;
+  const [settings, setSettings] = useGameSettings("guess", overrides);
+  const region = settings.region;
+  const timer = limitToTimerValue(settings.timeLimit);
+  const rounds = String(settings.rounds);
 
   useEffect(() => {
     let cancelled = false;
+    setRegionsLoaded(false);
     void fetchGuessRegions({ database })
       .then((result) => {
         if (cancelled) return;
         setRegions(result);
+        setRegionsLoaded(true);
         setTotalPhotos(result.reduce((sum, r) => sum + r.count, 0));
       })
       .catch(() => {
@@ -62,6 +83,16 @@ export const GuessLobby: React.FC<GuessLobbyProps> = ({ database, defaults, onSt
       cancelled = true;
     };
   }, [database]);
+
+  useEffect(() => {
+    if (
+      regionsLoaded &&
+      settings.region &&
+      !regions.some((option) => option.country === settings.region)
+    ) {
+      setSettings((previous) => ({ ...previous, region: "" }));
+    }
+  }, [regionsLoaded, regions, settings.region, setSettings]);
 
   const selectedCount = region
     ? (regions.find((r) => r.country === region)?.count ?? 0)
@@ -115,7 +146,7 @@ export const GuessLobby: React.FC<GuessLobbyProps> = ({ database, defaults, onSt
           <span className={styles.optionLabel}>Region</span>
           <Select
             value={region}
-            onChange={(e) => setRegion(e.target.value)}
+            onChange={(e) => setSettings((previous) => ({ ...previous, region: e.target.value }))}
             className={styles.regionSelect}
           >
             <option value="">Everywhere</option>
@@ -133,7 +164,12 @@ export const GuessLobby: React.FC<GuessLobbyProps> = ({ database, defaults, onSt
             className={styles.optionControl}
             options={TIMER_OPTIONS}
             value={timer}
-            onChange={setTimer}
+            onChange={(value) =>
+              setSettings((previous) => ({
+                ...previous,
+                timeLimit: timerValueToLimit(value) as null | 15 | 30,
+              }))
+            }
             ariaLabel="Timer per round"
           />
         </div>
@@ -144,7 +180,9 @@ export const GuessLobby: React.FC<GuessLobbyProps> = ({ database, defaults, onSt
             className={styles.optionControl}
             options={ROUND_OPTIONS}
             value={rounds}
-            onChange={setRounds}
+            onChange={(value) =>
+              setSettings((previous) => ({ ...previous, rounds: Number(value) as 3 | 5 | 10 }))
+            }
             ariaLabel="Number of rounds"
           />
         </div>

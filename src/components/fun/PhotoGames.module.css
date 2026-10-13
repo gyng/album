@@ -144,8 +144,15 @@
 }
 
 @media (max-width: 720px) {
+  .game {
+    gap: var(--space-3);
+  }
   .choices {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-1);
+  }
+  .choice {
+    padding: 1px;
   }
   .comparison {
     grid-template-columns: minmax(0, 1fr);
@@ -277,6 +284,15 @@
   grid-template-columns: repeat(var(--connection-columns, 4), minmax(0, 1fr));
   gap: var(--space-3);
 }
+.connectionControls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.connectionControls p {
+  margin-inline-end: auto;
+}
 .connectionGroup {
   display: grid;
   gap: var(--space-3);
@@ -285,12 +301,19 @@
   padding: var(--space-4);
   background: var(--c-selected);
 }
-@media (max-width: 480px) {
+@media (max-width: 720px) {
   .connectionChoices {
-    gap: var(--space-2);
+    gap: var(--space-1);
   }
   .connectionChoices .choice {
-    padding: var(--space-1);
+    padding: 1px;
+  }
+  .connectionGroup {
+    gap: var(--space-2);
+    padding: var(--space-2);
+  }
+  .chain {
+    gap: var(--space-1);
   }
   .connectionChoices .selectionMark {
     inset-block-start: var(--space-1);

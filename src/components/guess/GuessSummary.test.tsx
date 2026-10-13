@@ -145,6 +145,15 @@ describe("GuessSummary", () => {
     expect(await screen.findByRole("button", { name: "Copied!" })).toBeInTheDocument();
   });
 
+  it("includes default choices explicitly so recipients' saved preferences cannot change the challenge", async () => {
+    renderSummary([result(1_000)], { rounds: 5, timeLimit: null });
+    fireEvent.click(screen.getByRole("button", { name: "Copy challenge link" }));
+    expect(writeText).toHaveBeenCalledWith(
+      "http://localhost/fun/guess?seed=challenge-seed&rounds=5&region=&timer=off",
+    );
+    expect(await screen.findByRole("button", { name: "Copied!" })).toBeInTheDocument();
+  });
+
   it("handles empty and minimal geocodes without inventing a location", () => {
     renderSummary([
       result(0, { photo: photo({ geocode: "   \n  " }) }),

@@ -1,0 +1,153 @@
+.game {
+  display: grid;
+  gap: var(--space-3);
+  min-inline-size: 0;
+}
+.actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.boardDock {
+  display: grid;
+  gap: var(--space-2);
+  max-inline-size: 48rem;
+}
+.targets {
+  display: grid;
+  gap: var(--space-2);
+  max-inline-size: 48rem;
+}
+.targets h2 {
+  margin: 0;
+  font-size: var(--fs-m);
+}
+.clues {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-2) var(--space-3);
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.clues li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  overflow-wrap: anywhere;
+}
+.clues li[data-found="true"] {
+  color: var(--c-accent);
+}
+.clues li[data-found="true"] .targetLabel {
+  text-decoration: line-through;
+}
+.targetNumber {
+  display: grid;
+  place-items: center;
+  flex: none;
+  inline-size: 1.5rem;
+  block-size: 1.5rem;
+  border-radius: 50%;
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  font-size: var(--fs-s);
+  font-variant-numeric: tabular-nums;
+}
+.feedback {
+  min-block-size: 1.5em;
+}
+.board {
+  position: relative;
+  display: grid;
+  inline-size: 100%;
+  max-inline-size: 48rem;
+  grid-template-columns: repeat(var(--search-size), minmax(0, 1fr));
+  gap: var(--space-2);
+  touch-action: none;
+  user-select: none;
+}
+.lines {
+  position: absolute;
+  inset: 0;
+  inline-size: 100%;
+  block-size: 100%;
+  pointer-events: none;
+}
+.lines line {
+  vector-effect: non-scaling-stroke;
+  stroke-linecap: round;
+}
+.lineHalo {
+  stroke: var(--c-bg);
+  stroke-width: 7px;
+  opacity: 0.75;
+}
+.foundLine,
+.selectedLine {
+  stroke: var(--c-accent);
+  stroke-width: 3px;
+}
+.selectedLine,
+.lines g[data-revealed="true"] .foundLine {
+  stroke-dasharray: 5 5;
+}
+.tile {
+  composes: base from "../ui/Control.module.css";
+  position: relative;
+  display: grid;
+  align-content: center;
+  min-inline-size: 0;
+  padding: 1px;
+  cursor: pointer;
+}
+.tile img {
+  pointer-events: none;
+  -webkit-user-drag: none;
+}
+.tile[aria-pressed="true"],
+.tile[data-hint="true"] {
+  border-color: var(--c-accent);
+  outline: 2px solid var(--c-accent);
+  outline-offset: -2px;
+  background: var(--c-selected);
+}
+.tile[data-found="true"] {
+  border-color: var(--c-accent);
+  background: var(--c-selected);
+}
+.tile:disabled {
+  opacity: 1;
+  cursor: default;
+}
+.mark {
+  position: absolute;
+  inset-block-start: 1px;
+  inset-inline-end: 1px;
+  background: var(--c-accent);
+  color: light-dark(var(--c-white), var(--c-black));
+  border-radius: 50%;
+  block-size: 1rem;
+  display: grid;
+  place-items: center;
+  font-size: var(--fs-s);
+  min-inline-size: 1rem;
+  inline-size: auto;
+  padding-inline: 2px;
+}
+.result {
+  display: grid;
+  gap: var(--space-4);
+}
+.result h2 {
+  font-size: var(--fs-m);
+}
+@media (max-width: 720px) {
+  .clues {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .board {
+    gap: var(--space-1);
+  }
+}

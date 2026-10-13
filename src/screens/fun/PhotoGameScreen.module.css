@@ -14,3 +14,11 @@
   min-inline-size: 0;
   max-inline-size: 72rem;
 }
+
+@media (max-width: 720px) {
+  .page {
+    padding-inline: max(var(--space-2), env(safe-area-inset-left, 0px));
+    padding-inline-end: max(var(--space-2), env(safe-area-inset-right, 0px));
+    gap: var(--space-4);
+  }
+}

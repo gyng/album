@@ -14,10 +14,12 @@ import {
 } from "../../util/photoGames";
 import { GamePhoto } from "./GamePhoto";
 import { GameIntro } from "./GameIllustration";
+import { useGameSettings } from "./useGameSettings";
 import styles from "./PhotoGames.module.css";
 
 export const PhotoOracle = ({ photos }: { photos: PhotoGamePhoto[] }) => {
-  const [mode, setMode] = useState<"mind" | "discover">("mind");
+  const [settings, setSettings] = useGameSettings("oracle");
+  const { mode } = settings;
   const [cohort, setCohort] = useState<PhotoGamePhoto[]>([]);
   const [secret, setSecret] = useState<PhotoGamePhoto | null>(null);
   const [stage, setStage] = useState<"lobby" | "choose" | "remember" | "questions" | "finished">(
@@ -46,7 +48,7 @@ export const PhotoOracle = ({ photos }: { photos: PhotoGamePhoto[] }) => {
       setError("These photographs are too alike for the oracle's questions.");
       return;
     }
-    setMode(nextMode);
+    setSettings({ mode: nextMode });
     setError(null);
     setCohort(selection);
     setSecret(null);
@@ -81,10 +83,20 @@ export const PhotoOracle = ({ photos }: { photos: PhotoGamePhoto[] }) => {
           find it.
         </p>
         <div className={styles.actions}>
-          <Button variant="primary" onClick={() => start("mind")}>
+          <Button
+            variant={mode === "mind" ? "primary" : "surface"}
+            aria-pressed={mode === "mind"}
+            onClick={() => start("mind")}
+          >
             Meet the oracle
           </Button>
-          <Button onClick={() => start("discover")}>Find me a photograph</Button>
+          <Button
+            variant={mode === "discover" ? "primary" : "surface"}
+            aria-pressed={mode === "discover"}
+            onClick={() => start("discover")}
+          >
+            Find me a photograph
+          </Button>
         </div>
         <Caption>
           Discovery follows your preferences until one photograph remains, or the archive cannot

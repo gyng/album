@@ -13,7 +13,7 @@ type GuessGameProps = {
   database: Database;
   initialSettings?: GameSettings;
   seed?: string;
-  onSeedGenerated?: (seed: string) => void;
+  onSeedGenerated?: (seed: string, settings: GameSettings) => void;
   onActiveChange?: (active: boolean) => void;
 };
 
@@ -183,7 +183,7 @@ export const GuessGame: React.FC<GuessGameProps> = ({
         dispatch({ type: "loaded", photos: parsed, seed });
         setGuess(null);
         setRevealed(false);
-        onSeedGenerated?.(seed);
+        onSeedGenerated?.(seed, state.settings);
       } catch {
         if (cancelled) return;
         dispatch({

@@ -7,6 +7,7 @@ import { renderWithNextPlatform as render } from "../../renderWithNextPlatform";
 import { useRouter } from "next/router";
 import { useDatabase } from "../../../components/database/useDatabase";
 import GuessPage from "../../../screens/guess/GuessScreen";
+import { gameSettingsStorageKey } from "../../../components/fun/useGameSettings";
 import type { GameSettings } from "../../../components/guess/guessTypes";
 
 jest.mock("next/router", () => ({
@@ -33,6 +34,9 @@ jest.mock("../../../components/Seo", () => ({
   ),
 }));
 
+let mockLoadedSettings: GameSettings | null = null;
+let mockLoadedSeed: string | null = null;
+
 jest.mock("../../../components/guess/GuessGame", () => ({
   GuessGame: ({
     initialSettings,
@@ -41,10 +45,18 @@ jest.mock("../../../components/guess/GuessGame", () => ({
   }: {
     initialSettings?: GameSettings;
     seed?: string;
-    onSeedGenerated?: (seed: string) => void;
+    onSeedGenerated?: (seed: string, settings: GameSettings) => void;
   }) => (
     <div data-testid="guess-game" data-settings={JSON.stringify(initialSettings)} data-seed={seed}>
-      <button type="button" onClick={() => onSeedGenerated?.("generated-seed")}>
+      <button
+        type="button"
+        onClick={() =>
+          onSeedGenerated?.(
+            mockLoadedSeed ?? seed ?? "generated-seed",
+            mockLoadedSettings ?? initialSettings ?? { rounds: 10, timeLimit: 15, region: "Japan" },
+          )
+        }
+      >
         Generate seed
       </button>
     </div>
@@ -62,6 +74,9 @@ const setQuery = (query: Record<string, string | string[] | undefined>, isReady 
 describe("GuessPage", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    localStorage.clear();
+    mockLoadedSettings = null;
+    mockLoadedSeed = null;
     setQuery({});
     useDatabaseMock.mockReturnValue([database, 100] as unknown as ReturnType<typeof useDatabase>);
     window.history.replaceState(null, "", "/guess");
@@ -129,10 +144,14 @@ describe("GuessPage", () => {
     );
     fireEvent.click(screen.getByRole("button", { name: "Generate seed" }));
 
-    expect(replaceState).toHaveBeenLastCalledWith(null, "", "?region=Japan&seed=generated-seed");
+    expect(replaceState).toHaveBeenLastCalledWith(
+      null,
+      "",
+      "?region=Japan&seed=generated-seed&rounds=10&timer=15",
+    );
   });
 
-  it("configures the daily challenge and retains its URL flag when adding the seed", () => {
+  it("keeps the daily challenge URL independent of a generated date-specific seed", () => {
     setQuery({ daily: "" });
     window.history.replaceState(null, "", "/guess?daily");
     const replaceState = jest.spyOn(window.history, "replaceState");
@@ -148,7 +167,17 @@ describe("GuessPage", () => {
       "Today's daily challenge — guess where each photo was taken.",
     );
     fireEvent.click(screen.getByRole("button", { name: "Generate seed" }));
-    expect(replaceState).toHaveBeenCalledWith(null, "", "?daily=&seed=generated-seed");
+    expect(replaceState).toHaveBeenCalledWith(null, "", "?daily=");
+  });
+
+  it("uses today's daily seed even when an older link includes a stale seed", () => {
+    setQuery({ daily: "", seed: "daily-old-date" });
+    render(<GuessPage />);
+    expect(screen.getByTestId("guess-game")).not.toHaveAttribute("data-seed");
+    expect(screen.getByTestId("guess-game")).toHaveAttribute(
+      "data-settings",
+      JSON.stringify({ rounds: 5, timeLimit: null, daily: true }),
+    );
   });
 
   it.each([
@@ -186,7 +215,14 @@ describe("GuessPage", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Generate seed" }));
-    expect(replaceState).not.toHaveBeenCalled();
+    expect(replaceState).toHaveBeenCalled();
+    const params = new URLSearchParams(window.location.search);
+    expect(params.get("seed")).toBe("shared");
+    expect(params.get("rounds")).toBe(String(settings.rounds));
+    expect(params.get("timer")).toBe(
+      settings.timeLimit === null ? "off" : String(settings.timeLimit),
+    );
+    expect(params.get("region")).toBe("region" in settings ? settings.region : "");
   });
 
   it("ignores array-valued seed parameters", () => {
@@ -196,5 +232,76 @@ describe("GuessPage", () => {
 
     expect(screen.getByTestId("guess-game")).not.toHaveAttribute("data-seed");
     expect(screen.getByTestId("seo")).toHaveAttribute("data-pathname", "/fun/guess");
+  });
+
+  it("uses saved choices for a seed-only link before the game mounts", () => {
+    localStorage.setItem(
+      gameSettingsStorageKey("guess"),
+      JSON.stringify({ region: "France", rounds: 10, timeLimit: 30 }),
+    );
+    setQuery({ seed: "shared" });
+    render(<GuessPage />);
+    expect(screen.getByTestId("guess-game")).toHaveAttribute(
+      "data-settings",
+      JSON.stringify({ rounds: 10, timeLimit: 30, region: "France" }),
+    );
+  });
+
+  it("overrides only explicit seeded fields and keeps daily fixed despite saved preferences", () => {
+    localStorage.setItem(
+      gameSettingsStorageKey("guess"),
+      JSON.stringify({ region: "France", rounds: 10, timeLimit: 30 }),
+    );
+    setQuery({ seed: "shared", timer: "off", region: "" });
+    const first = render(<GuessPage />);
+    expect(screen.getByTestId("guess-game")).toHaveAttribute(
+      "data-settings",
+      JSON.stringify({ rounds: 10, timeLimit: null }),
+    );
+    first.unmount();
+    setQuery({ daily: "" });
+    render(<GuessPage />);
+    expect(screen.getByTestId("guess-game")).toHaveAttribute(
+      "data-settings",
+      JSON.stringify({ rounds: 5, timeLimit: null, daily: true }),
+    );
+  });
+
+  it("updates a previously generated URL when another game starts with changed choices", () => {
+    const view = render(<GuessPage />);
+    fireEvent.click(screen.getByRole("button", { name: "Generate seed" }));
+    setQuery({ seed: "generated-seed", rounds: "10", timer: "15", region: "Japan" });
+    view.rerender(<GuessPage />);
+    mockLoadedSeed = "next-seed";
+    mockLoadedSettings = { rounds: 3, timeLimit: null };
+    fireEvent.click(screen.getByRole("button", { name: "Generate seed" }));
+    const params = new URLSearchParams(window.location.search);
+    expect(Object.fromEntries(params)).toEqual({
+      seed: "next-seed",
+      rounds: "3",
+      timer: "off",
+      region: "",
+    });
+  });
+
+  it("removes stale daily flags when a custom game starts and stale settings when Daily starts", () => {
+    window.history.replaceState(
+      null,
+      "",
+      "/fun/guess?daily&seed=old&rounds=10&timer=30&region=Japan&theme=darkroom",
+    );
+    const view = render(<GuessPage />);
+    mockLoadedSeed = "custom";
+    mockLoadedSettings = { rounds: 3, timeLimit: 15, region: "France" };
+    fireEvent.click(screen.getByRole("button", { name: "Generate seed" }));
+    expect(new URLSearchParams(window.location.search).has("daily")).toBe(false);
+    setQuery({ seed: "custom", rounds: "3", timer: "15", region: "France", theme: "darkroom" });
+    view.rerender(<GuessPage />);
+    mockLoadedSettings = { rounds: 5, timeLimit: null, daily: true };
+    fireEvent.click(screen.getByRole("button", { name: "Generate seed" }));
+    expect(Object.fromEntries(new URLSearchParams(window.location.search))).toEqual({
+      theme: "darkroom",
+      daily: "",
+    });
   });
 });

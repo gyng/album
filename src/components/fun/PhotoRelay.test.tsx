@@ -59,3 +59,15 @@ it("supports moving and removing links with buttons and reveals transition simil
     ),
   ).toHaveLength(6);
 });
+
+it("returns keyboard players from the photo tray to the editable links", () => {
+  render(<PhotoRelay photos={photos} />);
+  fireEvent.click(screen.getByRole("button", { name: "Start relay" }));
+  fireEvent.click(screen.getByRole("button", { name: "Choose photograph 1" }));
+  const remove = screen.getByRole("button", { name: "Remove link 1" });
+  remove.scrollIntoView = jest.fn();
+  fireEvent.click(screen.getByRole("button", { name: "Edit links" }));
+  expect(remove).toHaveFocus();
+  fireEvent.click(remove);
+  expect(screen.getByRole("status")).toHaveTextContent("0 of 5");
+});

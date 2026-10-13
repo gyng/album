@@ -43,3 +43,16 @@ Completed in the October 2026 Fun refinement pass.
 - Cross Exposure: generated crossing grids with visible or hidden connections.
 - Adaptive Oracle questions, clearer Relay and Blind Frame results, and loading spinners.
 - Three-column desktop Fun! cards.
+
+
+## Further game refinements
+
+- Mobile Cross Exposure: sticky grid with Hint and selected-photo thumbnail.
+- Hints reveal one row/column clue at a time without leaking the other clues.
+- Saved lobby choices for Cross Exposure, Connect the Shots, Double Take,
+  Photo Oracle and Guess Where, with explicit challenge URLs taking precedence.
+- Compact mobile photo grids, including Connect the Shots and Cross Exposure.
+- Sight Lines: dynamically generated photo word searches, 5×5/6×6, drag or tap
+  endpoints, keyboard play, hints, fair alternate solutions and linked reveals.
+- Height-aware mobile docks: boards and targets for Sight Lines/Cross Exposure,
+  compact controls for Connections, and a miniature chain reference for Relay.

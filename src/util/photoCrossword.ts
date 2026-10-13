@@ -8,6 +8,7 @@ import {
 
 export type CrosswordSize = 3 | 4 | 5;
 export type CrosswordPrefill = "none" | "minimal" | "guided";
+export type CrosswordClueCoordinate = { axis: "row" | "column"; index: number };
 
 export const crosswordSeedIndices = (size: CrosswordSize, prefill: CrosswordPrefill): number[] => {
   if (prefill === "none") return [];
@@ -127,10 +128,14 @@ export const checkPhotoCrossword = (
 const matchLineClues = (
   lines: PhotoGamePhoto[][],
   questions: OracleQuestion[],
+  anchors: ReadonlyMap<number, string>,
 ): OracleQuestion[] | null => {
-  const choices = lines.map((line) =>
+  const choices = lines.map((line, lineIndex) =>
     questions.flatMap((question, index) =>
-      line.every((photo) => question.matches(photo)) ? [index] : [],
+      (!anchors.has(lineIndex) || anchors.get(lineIndex) === question.id) &&
+      line.every((photo) => question.matches(photo))
+        ? [index]
+        : [],
     ),
   );
   const owners = new Map<number, number>();
@@ -156,6 +161,7 @@ const matchLineClues = (
 export const resolveHiddenCrossword = (
   puzzle: PhotoCrosswordPuzzle,
   cells: Array<PhotoGamePhoto | null>,
+  revealed: readonly CrosswordClueCoordinate[] = [],
 ): PhotoCrosswordPuzzle | null => {
   if (cells.length !== puzzle.size ** 2 || cells.some((photo) => !photo)) return null;
   const available = new Map(puzzle.tiles.map((photo) => [photo.path, photo]));
@@ -172,12 +178,19 @@ export const resolveHiddenCrossword = (
   const columns = Array.from({ length: puzzle.size }, (_, column) =>
     rows.map((row) => row[column]!),
   );
+  const rowAnchors = new Map<number, string>();
+  const columnAnchors = new Map<number, string>();
+  for (const clue of revealed) {
+    const question = (clue.axis === "row" ? puzzle.rows : puzzle.columns)[clue.index];
+    if (!question) return null;
+    (clue.axis === "row" ? rowAnchors : columnAnchors).set(clue.index, question.id);
+  }
   for (const [rowQuestions, columnQuestions] of [
     [puzzle.rows, puzzle.columns],
     [puzzle.columns, puzzle.rows],
   ]) {
-    const rowClues = matchLineClues(rows, rowQuestions!);
-    const columnClues = matchLineClues(columns, columnQuestions!);
+    const rowClues = matchLineClues(rows, rowQuestions!, rowAnchors);
+    const columnClues = matchLineClues(columns, columnQuestions!, columnAnchors);
     if (rowClues && columnClues)
       return { ...puzzle, rows: rowClues, columns: columnClues, solution: complete };
   }

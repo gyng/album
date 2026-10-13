@@ -2,6 +2,8 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { PhotoConnections } from "./PhotoConnections";
 import type { PhotoGamePhoto } from "../../util/photoGames";
+beforeEach(() => localStorage.clear());
+
 const photos: PhotoGamePhoto[] = ["A cat", "A lake", "A red flower", "A train"].flatMap(
   (caption, group) =>
     Array.from({ length: 5 }, (_, i) => ({
@@ -75,4 +77,38 @@ it("lets players choose a six-by-six board and reveals all six groups", () => {
   expect(
     within(screen.getByRole("region", { name: "Connections result" })).getAllByRole("img"),
   ).toHaveLength(36);
+});
+
+it("restores lobby preferences after remount without restoring an active round", () => {
+  const first = render(<PhotoConnections photos={photos} />);
+  fireEvent.click(screen.getByRole("button", { name: "6×6" }));
+  fireEvent.click(screen.getByRole("button", { name: "Specific subjects" }));
+  fireEvent.click(screen.getByRole("button", { name: "One-away hints on" }));
+  first.unmount();
+  render(<PhotoConnections photos={photos} />);
+  expect(screen.getByRole("button", { name: "6×6" })).toHaveAttribute("aria-pressed", "true");
+  expect(screen.getByRole("button", { name: "Specific subjects" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  expect(screen.getByRole("button", { name: "One-away hints off" })).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Start connecting" })).toBeTruthy();
+});
+
+it("keeps active selection controls together and removes the dock from the results", () => {
+  render(<PhotoConnections photos={photos} />);
+  fireEvent.click(screen.getByRole("button", { name: "Start connecting" }));
+  const controls = screen.getByRole("group", { name: "Connection controls" });
+  expect(within(controls).getByRole("button", { name: "Check connection" })).toBeDisabled();
+  choose("A cat", 4);
+  expect(within(controls).getByRole("button", { name: "Check connection" })).toBeEnabled();
+  fireEvent.click(within(controls).getByRole("button", { name: "Deselect" }));
+  expect(
+    screen
+      .getAllByRole("button", { name: /Select photograph/ })
+      .every((button) => button.getAttribute("aria-pressed") === "false"),
+  ).toBe(true);
+  fireEvent.click(screen.getByRole("button", { name: "Give up" }));
+  expect(screen.queryByRole("group", { name: "Connection controls" })).toBeNull();
+  expect(screen.getByRole("region", { name: "Connections result" })).toHaveFocus();
 });

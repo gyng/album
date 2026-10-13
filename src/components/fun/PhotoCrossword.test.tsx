@@ -33,7 +33,10 @@ const puzzle: PhotoCrosswordPuzzle = {
   solution: photos,
   tiles: photos,
 };
-beforeEach(() => jest.mocked(buildPhotoCrossword).mockReturnValue(puzzle));
+beforeEach(() => {
+  window.localStorage.clear();
+  jest.mocked(buildPhotoCrossword).mockReturnValue(puzzle);
+});
 const startVisible = () => {
   render(<PhotoCrossword photos={photos} />);
   fireEvent.click(screen.getByRole("button", { name: "Visible clues" }));
@@ -81,7 +84,8 @@ it("starts with hidden connections and fixed seed pairs, preserves them when cle
   fireEvent.click(screen.getByRole("button", { name: /Row 1; column 3/ }));
   fireEvent.click(screen.getByRole("button", { name: "Clear grid" }));
   expect(screen.getAllByRole("button", { name: /fixed starting photograph/ })).toHaveLength(6);
-  fireEvent.click(screen.getByRole("button", { name: "Reveal clues" }));
+  fireEvent.click(screen.getByRole("button", { name: "Hint" }));
+  fireEvent.click(screen.getByRole("button", { name: "Hint" }));
   expect(screen.getByRole("columnheader", { name: "scarlet" })).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "Give up" }));
   expect(screen.getByRole("region", { name: "Cross Exposure result" })).toHaveFocus();
@@ -195,10 +199,65 @@ it("does not judge individual squares against a secret ordering before hidden cl
       .every((button) => !button.hasAttribute("aria-invalid")),
   ).toBe(true);
   expect(screen.queryByRole("region", { name: "Cross Exposure result" })).toBeNull();
-  fireEvent.click(screen.getByRole("button", { name: "Reveal clues" }));
+  for (let hint = 0; hint < 6; hint++)
+    fireEvent.click(screen.getByRole("button", { name: "Hint" }));
   fireEvent.click(screen.getByRole("button", { name: "Check grid" }));
   expect(screen.getByRole("button", { name: /Row 2: square; column 2:/ })).toHaveAttribute(
     "aria-invalid",
     "true",
   );
+});
+
+it("reveals one unique clue per hint without exposing other headers, cells or clue-key entries", () => {
+  render(<PhotoCrossword photos={photos} />);
+  fireEvent.click(screen.getByRole("button", { name: "Start crossing" }));
+  fireEvent.click(screen.getByRole("button", { name: "Hint" }));
+  expect(
+    screen.getAllByRole("rowheader").map((header) => header.getAttribute("aria-label")),
+  ).toEqual(["round", "Row 2", "Row 3"]);
+  expect(
+    screen.getAllByRole("columnheader").map((header) => header.getAttribute("aria-label")),
+  ).toEqual(["Column 1", "Column 2", "Column 3"]);
+  expect(screen.getByRole("button", { name: /Row 1: round; column 1;/ })).toBeTruthy();
+  expect(
+    within(screen.getByRole("region", { name: "Row clues" })).getAllByRole("listitem"),
+  ).toHaveLength(1);
+  expect(
+    within(screen.getByRole("region", { name: "Column clues" })).queryByRole("listitem"),
+  ).toBeNull();
+  expect(screen.getByRole("status")).toHaveTextContent("5 clues still hidden");
+  fireEvent.click(screen.getByRole("button", { name: "Hint" }));
+  expect(screen.getByRole("columnheader", { name: "scarlet" })).toBeTruthy();
+  expect(
+    within(screen.getByRole("region", { name: "Row clues" })).getAllByRole("listitem"),
+  ).toHaveLength(1);
+  for (let hint = 2; hint < 6; hint++)
+    fireEvent.click(screen.getByRole("button", { name: "Hint" }));
+  expect(screen.queryByRole("button", { name: "Hint" })).toBeNull();
+  expect(
+    within(screen.getByRole("region", { name: "Row clues" })).getAllByRole("listitem"),
+  ).toHaveLength(3);
+  expect(
+    within(screen.getByRole("region", { name: "Column clues" })).getAllByRole("listitem"),
+  ).toHaveLength(3);
+  fireEvent.click(screen.getByRole("button", { name: "Give up" }));
+  fireEvent.click(screen.getByRole("button", { name: "Play again" }));
+  expect(screen.getByRole("button", { name: "Hint" })).toHaveTextContent("6");
+  expect(screen.queryByRole("rowheader", { name: "round" })).toBeNull();
+});
+
+it("saves lobby choices without restoring an active puzzle", () => {
+  const { unmount } = render(<PhotoCrossword photos={photos} />);
+  fireEvent.click(screen.getByRole("button", { name: "Visible clues" }));
+  fireEvent.click(screen.getByRole("button", { name: "Guided" }));
+  fireEvent.click(screen.getByRole("button", { name: "5×5" }));
+  unmount();
+  render(<PhotoCrossword photos={photos} />);
+  expect(screen.getByRole("button", { name: "Visible clues" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  expect(screen.getByRole("button", { name: "Guided" })).toHaveAttribute("aria-pressed", "true");
+  expect(screen.getByRole("button", { name: "5×5" })).toHaveAttribute("aria-pressed", "true");
+  expect(screen.queryByRole("table")).toBeNull();
 });

@@ -10,6 +10,7 @@ import { FUN_GAMES, type PhotoGameKind } from "../../components/fun/games";
 import { PhotoRelay } from "../../components/fun/PhotoRelay";
 import { BlindFrame } from "../../components/fun/BlindFrame";
 import { PhotoConnections } from "../../components/fun/PhotoConnections";
+import { SightLines } from "../../components/fun/SightLines";
 import { PhotoCrossword } from "../../components/fun/PhotoCrossword";
 import { DoubleTake } from "../../components/fun/DoubleTake";
 import { GameIntro } from "../../components/fun/GameIllustration";
@@ -120,6 +121,8 @@ export const PhotoGameScreen = ({ game }: { game: PhotoGameKind }) => {
           <DoubleTake photos={photos} />
         ) : game === "cross-exposure" ? (
           <PhotoCrossword photos={photos} />
+        ) : game === "sight-lines" ? (
+          <SightLines photos={photos} />
         ) : game === "connections" ? (
           <PhotoConnections photos={photos} />
         ) : (
@@ -139,3 +142,5 @@ export const PhotoConnectionsScreen = () => <PhotoGameScreen game="connections" 
 export const DoubleTakeScreen = () => <PhotoGameScreen game="double-take" />;
 
 export const PhotoCrosswordScreen = () => <PhotoGameScreen game="cross-exposure" />;
+
+export const SightLinesScreen = () => <PhotoGameScreen game="sight-lines" />;

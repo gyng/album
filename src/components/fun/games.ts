@@ -21,6 +21,13 @@ export const FUN_GAMES = [
     description: "Every photograph has two connections. Find its place in the grid.",
   },
   {
+    id: "sight-lines",
+    href: "/fun/sight-lines",
+    title: "Sight Lines",
+    illustration: "/fun/sight-lines.svg",
+    description: "A photo word search. Find lines of three photographs that share a connection.",
+  },
+  {
     id: "relay",
     href: "/fun/relay",
     title: "Photo Relay",
@@ -58,5 +65,6 @@ export type PhotoGameKind =
   | "oracle"
   | "connections"
   | "double-take"
-  | "cross-exposure";
+  | "cross-exposure"
+  | "sight-lines";
 export type FunPage = "fun" | "guess" | PhotoGameKind;
