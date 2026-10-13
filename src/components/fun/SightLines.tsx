@@ -46,6 +46,7 @@ export const SightLines = ({ photos }: { photos: PhotoGamePhoto[] }) => {
     setHint(null);
     setGaveUp(false);
     setMessage("");
+    drag.current = null;
   };
   const check = (cells: number[]) => {
     if (!puzzle) return;
@@ -194,19 +195,29 @@ export const SightLines = ({ photos }: { photos: PhotoGamePhoto[] }) => {
           style={{ "--search-size": puzzle.size } as React.CSSProperties}
           onPointerMove={(event) => {
             if (!drag.current || drag.current.pointer !== event.pointerId) return;
+            if (event.buttons === 0) {
+              drag.current = null;
+              setSelected(anchor === null ? [] : [anchor]);
+              return;
+            }
             const tile = document
               .elementFromPoint(event.clientX, event.clientY)
               ?.closest<HTMLButtonElement>("button[data-cell]");
             if (!tile || !event.currentTarget.contains(tile)) return;
             drag.current.end = Number(tile.dataset.cell);
+            if (
+              drag.current.end !== drag.current.start &&
+              !event.currentTarget.hasPointerCapture(event.pointerId)
+            )
+              event.currentTarget.setPointerCapture(event.pointerId);
             setSelected(photoSearchLine(drag.current.start, drag.current.end, puzzle.size));
           }}
           onPointerUp={(event) => {
             const gesture = drag.current;
             if (!gesture || gesture.pointer !== event.pointerId) return;
             drag.current = null;
-            if (gesture.start === gesture.end) tap(gesture.start);
-            else check(photoSearchLine(gesture.start, gesture.end, puzzle.size));
+            if (gesture.start !== gesture.end)
+              check(photoSearchLine(gesture.start, gesture.end, puzzle.size));
           }}
           onPointerCancel={() => {
             drag.current = null;
@@ -229,10 +240,11 @@ export const SightLines = ({ photos }: { photos: PhotoGamePhoto[] }) => {
                 onPointerDown={(event) => {
                   if (event.button !== 0) return;
                   drag.current = { start: index, end: index, pointer: event.pointerId };
-                  event.currentTarget.parentElement?.setPointerCapture(event.pointerId);
                 }}
-                onClick={(event) => {
-                  if (event.detail === 0) tap(index);
+                onClick={() => {
+                  // A tap completes on click, after its compatibility events, so
+                  // revealing and focusing result links cannot retarget that tap.
+                  tap(index);
                 }}
               >
                 <GamePhoto photo={photo} />

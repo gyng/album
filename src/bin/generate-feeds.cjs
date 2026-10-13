@@ -329,6 +329,7 @@ const generateSitemap = (albumEntries) => {
       "/fun/double-take",
       "/fun/cross-exposure",
       "/fun/sight-lines",
+      "/fun/photo-hangman",
     ].map((route) => ({
       url: getCanonicalUrl(route),
       lastmod: latestLastmod,

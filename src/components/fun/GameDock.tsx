@@ -7,11 +7,13 @@ export const GameDock = ({
   label,
   active = true,
   className,
+  onStickyHeightChange,
 }: {
   children: ReactNode;
   label: string;
   active?: boolean;
   className?: string;
+  onStickyHeightChange?: (height: number) => void;
 }) => {
   const ref = useRef<HTMLDivElement>(null);
   const [fits, setFits] = useState(false);
@@ -19,12 +21,18 @@ export const GameDock = ({
     const element = ref.current;
     if (!element || !active) {
       setFits(false);
+      onStickyHeightChange?.(0);
       return;
     }
     const measure = () => {
       const viewport = window.visualViewport?.height ?? window.innerHeight;
       const top = Number.parseFloat(getComputedStyle(element).insetBlockStart) || 8;
-      setFits(viewport - element.getBoundingClientRect().height >= 144 + top);
+      const height = element.getBoundingClientRect().height;
+      const canFit = viewport - height >= 144 + top;
+      setFits(canFit);
+      onStickyHeightChange?.(
+        canFit && window.matchMedia("(max-width: 960px)").matches ? Math.ceil(height) : 0,
+      );
     };
     measure();
     const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(measure);
@@ -36,7 +44,7 @@ export const GameDock = ({
       window.removeEventListener("resize", measure);
       window.visualViewport?.removeEventListener("resize", measure);
     };
-  }, [active]);
+  }, [active, onStickyHeightChange]);
   return (
     <div
       ref={ref}

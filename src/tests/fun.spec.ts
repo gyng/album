@@ -110,6 +110,7 @@ test("Fun cards have illustrations and launch each game; old Guess Where challen
     "Double Take",
     "Cross Exposure",
     "Sight Lines",
+    "Photo Hangman",
   ]) {
     const card = page.getByRole("link", { name: new RegExp(`${title}.*Play`) });
     await expect(card).toBeVisible();

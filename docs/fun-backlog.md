@@ -56,3 +56,10 @@ Completed in the October 2026 Fun refinement pass.
   endpoints, keyboard play, hints, fair alternate solutions and linked reveals.
 - Height-aware mobile docks: boards and targets for Sight Lines/Cross Exposure,
   compact controls for Connections, and a miniature chain reference for Relay.
+
+## Photo Hangman refinements
+
+- Photo Hangman: searchable subject tags, seven photographic clues, six misses,
+  truthful alternative answers, clue history, retry and linked results.
+- Sight Lines touch refinement: finish taps on click so revealed photo links do
+  not receive the same touch; cancel a drag released outside the board.

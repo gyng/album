@@ -1,0 +1,125 @@
+.game {
+  display: grid;
+  gap: var(--space-4);
+  min-inline-size: 0;
+}
+.play {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--space-5);
+  align-items: start;
+}
+.clues,
+.guessing {
+  display: grid;
+  gap: var(--space-3);
+  min-inline-size: 0;
+}
+.progress {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+}
+.frame {
+  position: relative;
+  margin: 0;
+}
+.photo {
+  display: block;
+  inline-size: 100%;
+  block-size: clamp(10rem, 34svh, 24rem);
+  object-fit: contain;
+  border: var(--line-hairline) solid var(--c-border);
+  border-radius: var(--radius-preview);
+  background: var(--c-surface);
+}
+.loading {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: var(--c-surface);
+  border-radius: var(--radius-preview);
+}
+.history {
+  display: flex;
+  gap: var(--space-1);
+  overflow-x: auto;
+  scrollbar-width: thin;
+  padding: var(--space-1);
+}
+.thumbnail {
+  composes: base from "../ui/Control.module.css";
+  position: relative;
+  flex: 0 0 var(--tap-target);
+  inline-size: var(--tap-target);
+  block-size: var(--tap-target);
+  padding: 1px;
+  cursor: pointer;
+}
+.thumbnail img {
+  inline-size: 100%;
+  block-size: 100%;
+  object-fit: cover;
+}
+.thumbnail span {
+  position: absolute;
+  inset-block-end: 1px;
+  inset-inline-end: 1px;
+  padding-inline: 2px;
+  background: var(--c-bg);
+  color: var(--c-font);
+  font-size: var(--fs-s);
+}
+.thumbnail[aria-pressed="true"] {
+  outline: 2px solid var(--c-accent);
+  outline-offset: 0;
+}
+.feedback {
+  min-block-size: 3em;
+}
+.guessing h2 {
+  margin: 0;
+  font-size: var(--fs-m);
+}
+.filter {
+  display: grid;
+  gap: var(--space-1);
+  font-size: var(--fs-s);
+}
+.search {
+  composes: base from "../ui/Control.module.css";
+  inline-size: 100%;
+  min-inline-size: 0;
+}
+.subjects {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-content: start;
+}
+.subject[data-used="true"] {
+  opacity: 0.65;
+  text-decoration: line-through;
+}
+.subject,
+.search {
+  scroll-margin-block-start: calc(var(--hangman-dock-height, 0px) + var(--space-3));
+}
+.result {
+  display: grid;
+  gap: var(--space-3);
+}
+.result p {
+  margin: 0;
+}
+@media (max-width: 720px) {
+  .play {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-3);
+  }
+  .subjects {
+    gap: var(--space-1);
+  }
+}

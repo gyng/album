@@ -1141,7 +1141,8 @@ export const fetchPhotoGameArchive = async (opts: {
     | "connections"
     | "double-take"
     | "cross-exposure"
-    | "sight-lines";
+    | "sight-lines"
+    | "photo-hangman";
 }): Promise<PhotoGamePhoto[]> => {
   const { database, game } = opts;
   const vectorDatabase = opts.embeddingsDatabase ?? database;
@@ -1175,7 +1176,8 @@ export const fetchPhotoGameArchive = async (opts: {
     game === "oracle" ||
     game === "connections" ||
     game === "cross-exposure" ||
-    game === "sight-lines"
+    game === "sight-lines" ||
+    game === "photo-hangman"
       ? await fetchRandomResults({ database, pageSize: 10000 })
       : await fetchResultsByPaths(
           database,

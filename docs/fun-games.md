@@ -302,3 +302,23 @@ and short viewports use normal flow. Results never retain sticky game controls.
 Oracle's questions and answer controls, Blind Frame's drawing dialogue and
 Double Take's sequential frame already contain their active tasks. They do not
 add a sticky layer. Guess Where continues to use its viewport-filling map game.
+
+## Photo Hangman
+
+At `/fun/photo-hangman`, choose a concrete subject from a searchable tag bank.
+Filtering does not make a guess. One photograph starts the round; each wrong
+subject reveals another, with six misses ending the round. The answer's length
+and descriptive captions stay hidden during play. Any bank subject matching all
+seven photographs is accepted, including valid alternatives to the chosen noun.
+
+The bank uses curated visual nouns supported by at least seven unique archive
+photos. Caption and tag matches exclude simple negations and modifier traps
+such as “train station” and “hot dog”. Caption prominence orders the clues from
+less explicit mentions to clearer ones; this is a heuristic, not object detection.
+New rounds avoid repeating the previous subject when another is available.
+
+Players can revisit earlier clues. Subject buttons wait for photo decode;
+failed images have a retry action. The clue panel uses the height-aware mobile
+dock, with measured focus clearance for the tag bank and filter. Win, loss and
+Give up reveal linked photos and focus the result. No text is submitted as an
+answer and no word-length clue narrows the choices.

@@ -75,8 +75,23 @@ for (const { width, size } of [
       const coordinate = label.match(/Row (\d+), column (\d+)/)!;
       const row = Number(coordinate[1]) - 1,
         column = Number(coordinate[2]) - 1;
-      let solved = false;
-      for (const [dy, dx] of [
+      const subjectNames: Record<string, string> = {
+        People: "people",
+        Water: "water",
+        Food: "food",
+        Snow: "snow",
+        Animals: "animals",
+        Architecture: "buildings",
+      };
+      const targetName = (await targets
+        .getByLabel(/: still to find$/)
+        .first()
+        .getAttribute("aria-label"))!.split(":")[0]!;
+      const subject = subjectNames[targetName]!;
+      const captions = await board
+        .getByRole("img")
+        .evaluateAll((images) => images.map((image) => image.getAttribute("alt") ?? ""));
+      const direction = [
         [0, 1],
         [0, -1],
         [1, 0],
@@ -85,39 +100,45 @@ for (const { width, size } of [
         [1, -1],
         [-1, 1],
         [-1, -1],
-      ]) {
+      ].find(([dy, dx]) => {
         const endRow = row + dy! * 2,
           endColumn = column + dx! * 2;
-        if (endRow < 0 || endColumn < 0 || endRow >= size || endColumn >= size) continue;
-        const end = board.getByRole("button").nth(endRow * size + endColumn);
-        if (width < 500) {
-          await hint.tap();
-          await end.tap();
-        } else {
-          await board.evaluate((element) => element.scrollIntoView({ block: "start" }));
-          const startBox = (await hint.boundingBox())!,
-            endBox = (await end.boundingBox())!;
-          await page.mouse.move(startBox.x + startBox.width / 2, startBox.y + startBox.height / 2);
-          await page.mouse.down();
-          await page.mouse.move(endBox.x + endBox.width / 2, endBox.y + endBox.height / 2, {
-            steps: 8,
-          });
-          await page.mouse.up();
-        }
-        if (
-          /^(?:Every sight line found!|.+ found\.)$/.test(
-            (await page.getByRole("status").textContent())!,
+        return (
+          endRow >= 0 &&
+          endColumn >= 0 &&
+          endRow < size &&
+          endColumn < size &&
+          [0, 1, 2].every((step) =>
+            captions[(row + dy! * step) * size + column + dx! * step]!.includes(`of ${subject}.`),
           )
-        ) {
-          solved = true;
-          break;
-        }
+        );
+      });
+      expect(direction).toBeTruthy();
+      const end = board
+        .getByRole("button")
+        .nth((row + direction![0]! * 2) * size + column + direction![1]! * 2);
+      if (width < 500) {
+        await hint.tap();
+        // Touch selection commits on click, after compatibility events settle.
+        await expect(hint).toHaveAttribute("aria-pressed", "true");
+        await end.tap();
+      } else {
+        await board.evaluate((element) => element.scrollIntoView({ block: "start" }));
+        const startBox = (await hint.boundingBox())!,
+          endBox = (await end.boundingBox())!;
+        await page.mouse.move(startBox.x + startBox.width / 2, startBox.y + startBox.height / 2);
+        await page.mouse.down();
+        await page.mouse.move(endBox.x + endBox.width / 2, endBox.y + endBox.height / 2, {
+          steps: 8,
+        });
+        await page.mouse.up();
       }
-      expect(solved).toBe(true);
+
       await expect(targets.getByLabel(/: found$/)).toHaveCount(found + 1);
     }
     const result = page.getByRole("region", { name: "Sight Lines result" });
     await expect(result).toBeFocused();
+    await expect(page).toHaveURL(/\/fun\/sight-lines(?:\?|$)/);
     await expect(result.getByRole("link")).toHaveCount(12);
   });
 }
@@ -209,3 +230,21 @@ for (const viewport of [
     );
   });
 }
+
+test("releasing a drag outside the board does not select photographs when the pointer returns", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await gotoHydrated(page, "/fun/sight-lines");
+  await page.getByRole("button", { name: "Start searching" }).click();
+  const board = page.getByRole("group", { name: "Photo search board" });
+  await board.evaluate((element) => element.scrollIntoView({ block: "start" }));
+  const first = (await board.getByRole("button").first().boundingBox())!;
+  const third = (await board.getByRole("button").nth(2).boundingBox())!;
+  await page.mouse.move(first.x + first.width / 2, first.y + first.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(0, first.y + first.height / 2);
+  await page.mouse.up();
+  await page.mouse.move(third.x + third.width / 2, third.y + third.height / 2);
+  await expect(board.getByRole("button").nth(2)).toHaveAttribute("aria-pressed", "false");
+});

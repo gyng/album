@@ -266,3 +266,7 @@ Mobile game grids use 8px page gutters, 4px photo gaps and 1px tile padding at
 720px and below. Cross Exposure uses 2px table spacing and compact coordinate
 labels. Preserve 44px touch targets and safe-area clearance; give the space to
 the photographs rather than nested card padding.
+
+A dock can report its measured sticky height to nearby controls. Use that value
+for scroll focus clearance, and reset it to zero when the dock releases or the
+viewport is too short. Photo Hangman's filter and subject bank use this contract.

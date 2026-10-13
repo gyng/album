@@ -28,6 +28,14 @@ export const FUN_GAMES = [
     description: "A photo word search. Find lines of three photographs that share a connection.",
   },
   {
+    id: "photo-hangman",
+    href: "/fun/photo-hangman",
+    title: "Photo Hangman",
+    illustration: "/fun/photo-hangman.svg",
+    description:
+      "Find the subject shared by seven photographs. Each wrong guess reveals another clue.",
+  },
+  {
     id: "relay",
     href: "/fun/relay",
     title: "Photo Relay",
@@ -66,5 +74,6 @@ export type PhotoGameKind =
   | "connections"
   | "double-take"
   | "cross-exposure"
-  | "sight-lines";
+  | "sight-lines"
+  | "photo-hangman";
 export type FunPage = "fun" | "guess" | PhotoGameKind;
