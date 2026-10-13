@@ -1,0 +1,101 @@
+.currentQuestion {
+  display: grid;
+  gap: var(--space-4);
+  animation: questionArrive 180ms ease-out;
+}
+
+.trail {
+  display: grid;
+  gap: var(--space-3);
+  border-block-start: 1px solid var(--c-border);
+  padding-block-start: var(--space-4);
+}
+
+.trailHeading {
+  margin: 0;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.trailList {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.trailRow {
+  display: grid;
+  grid-template-columns: 1.5rem minmax(0, 1fr) auto;
+  align-items: start;
+  gap: var(--space-2);
+  padding-block: var(--space-3);
+  border-block-end: 1px solid var(--c-border);
+  font-size: var(--fs-sm);
+  line-height: 1.5;
+  animation: answerArrive 220ms ease-out;
+}
+
+.trailRow:last-child {
+  border-block-end: 0;
+}
+
+.number {
+  color: color-mix(in oklch, var(--c-font) 70%, var(--c-bg));
+  font-variant-numeric: tabular-nums;
+}
+
+.trailQuestion {
+  overflow-wrap: anywhere;
+}
+
+.badge {
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-control);
+  padding: 2px var(--space-2);
+  white-space: nowrap;
+  font-size: var(--fs-s);
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.yes {
+  background: var(--c-selected);
+  border-color: var(--c-selected-border);
+}
+
+.no {
+  background: var(--c-surface);
+}
+
+.unsure {
+  color: color-mix(in oklch, var(--c-font) 70%, var(--c-bg));
+}
+
+@keyframes answerArrive {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes questionArrive {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .currentQuestion,
+  .trailRow {
+    animation: none;
+  }
+}

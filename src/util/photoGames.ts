@@ -572,7 +572,7 @@ export const checkConnection = (
 };
 
 export const oracleDiscoveryQuestion = (question: OracleQuestion): string =>
-  `Would you like a photograph featuring ${(CONNECTION_LABELS[question.id] ?? question.id.replace("tag:", "").replaceAll("_", " ")).toLowerCase()}?`;
+  `Include ${(CONNECTION_LABELS[question.id] ?? question.id.replace("tag:", "").replaceAll("_", " ").replaceAll("-", " ")).toLowerCase()}?`;
 
 export const relayLinkClues = (photos: PhotoGamePhoto[]): string[] =>
   photos.slice(0, -1).map((photo, index) => {

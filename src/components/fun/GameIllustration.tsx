@@ -1,6 +1,9 @@
 import { useId, type ReactNode } from "react";
 import { FUN_GAMES, type FunPage } from "./games";
 import styles from "./GameIllustration.module.css";
+import { useGameReadiness } from "./GameReadiness";
+import { Button, LoadingIndicator } from "../ui";
+import { ProgressBar } from "../ProgressBar";
 
 export const GameIllustration = ({ src }: { src: string }) => {
   const id = useId();
@@ -33,11 +36,32 @@ export const GameIntro = ({
 }: {
   game: Exclude<FunPage, "fun">;
   children: ReactNode;
-}) => (
-  <div className={styles.intro}>
-    <div className={styles.artwork}>
-      <GameIllustration src={FUN_GAMES.find((item) => item.id === game)!.illustration} />
+}) => {
+  const { loading, showProgress, progress, error, retry } = useGameReadiness();
+  return (
+    <div className={styles.intro}>
+      <div className={styles.artwork}>
+        <GameIllustration src={FUN_GAMES.find((item) => item.id === game)!.illustration} />
+      </div>
+      <div className={styles.introBody}>
+        <fieldset className={styles.controls} disabled={loading}>
+          <legend className={styles.legend}>Game setup</legend>
+          {children}
+        </fieldset>
+        <div className={styles.loadFeedback}>
+          {error ? (
+            <div role="alert">
+              <p>{error}</p>
+              <Button onClick={retry}>Try again</Button>
+            </div>
+          ) : loading && showProgress ? (
+            <div role="status" aria-busy="true">
+              <LoadingIndicator label="Loading photographs…" />
+              <ProgressBar progress={progress} />
+            </div>
+          ) : null}
+        </div>
+      </div>
     </div>
-    <div className={styles.introBody}>{children}</div>
-  </div>
-);
+  );
+};

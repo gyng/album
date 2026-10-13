@@ -25,7 +25,7 @@ export const FUN_GAMES = [
     href: "/fun/sight-lines",
     title: "Sight Lines",
     illustration: "/fun/sight-lines.avif",
-    description: "A photo word search. Find lines of three photographs that share a connection.",
+    description: "A word search with photographs. Find lines that share a subject.",
   },
   {
     id: "photo-hangman",
@@ -48,8 +48,7 @@ export const FUN_GAMES = [
     href: "/fun/blind-frame",
     title: "Blind Frame",
     illustration: "/fun/blind-frame.avif",
-    description:
-      "A hidden photograph, described in words. Sketch it, then discover what the archive sees.",
+    description: "Draw a hidden photograph from its description. How close will your sketch come?",
   },
   {
     id: "oracle",

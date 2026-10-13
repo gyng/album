@@ -71,7 +71,7 @@ export const PhotoConnections = ({ photos }: { photos: PhotoGamePhoto[] }) => {
     const next = buildConnectionsPuzzle(photos, Math.random, size, detail);
     if (!next) {
       setMessage(
-        `This archive doesn’t have enough photographs with ${size} clear, distinct connections. Try a smaller board.`,
+        `There are not enough photographs for ${size} distinct groups. Try a smaller board.`,
       );
       return;
     }
@@ -128,8 +128,7 @@ export const PhotoConnections = ({ photos }: { photos: PhotoGamePhoto[] }) => {
     return (
       <GameIntro game="connections">
         <p>
-          Find {size} groups of {size} photographs with a shared visual subject.
-          {lives !== null ? ` ${lives} mistakes end the round.` : ""}
+          Make {size} groups of {size} photographs. Each group must share a subject.
         </p>
         <div className={styles.actions} role="group" aria-label="Board size">
           {([4, 5, 6] as const).map((value) => (
@@ -176,9 +175,10 @@ export const PhotoConnections = ({ photos }: { photos: PhotoGamePhoto[] }) => {
           <Button
             active={hints}
             aria-pressed={hints}
+            aria-label={`One-away hints ${hints ? "on" : "off"}`}
             onClick={() => setSettings((previous) => ({ ...previous, hints: !previous.hints }))}
           >
-            One-away hints {hints ? "on" : "off"}
+            One-away hints
           </Button>
         </div>
         <Caption>Specific subjects use finer connections, such as lanterns or bicycles.</Caption>

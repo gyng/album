@@ -16,9 +16,49 @@ import { GamePhoto } from "./GamePhoto";
 import { GameIntro } from "./GameIllustration";
 import { useGameSettings } from "./useGameSettings";
 import styles from "./PhotoGames.module.css";
+import oracleStyles from "./PhotoOracle.module.css";
+import { useGameReadiness } from "./GameReadiness";
 import { useGameShortcuts, GameShortcutHelp } from "./useGameShortcuts";
 
+type OracleAnswer = { id: string; question: string; answer: "yes" | "no" | "unsure" };
+
+const answerLabel = (answer: OracleAnswer["answer"]) =>
+  answer === "yes" ? "Yes" : answer === "no" ? "No" : "Not sure";
+
+const AnswerTrail = ({ answers }: { answers: OracleAnswer[] }) => {
+  if (!answers.length) return null;
+  return (
+    <section className={oracleStyles.trail} aria-label="Your answers">
+      <h2 className={oracleStyles.trailHeading}>Your answers</h2>
+      {/* oxlint-disable-next-line jsx-a11y/no-redundant-roles -- Preserve Safari list semantics when CSS hides the markers. */}
+      <ol className={oracleStyles.trailList} role="list" reversed start={answers.length}>
+        {[...answers].reverse().map((answer, index) => (
+          <li key={answer.id} className={oracleStyles.trailRow}>
+            <span className={oracleStyles.number} aria-hidden="true">
+              {answers.length - index}
+            </span>
+            <span className={oracleStyles.trailQuestion}>{answer.question}</span>
+            <span
+              className={[
+                oracleStyles.badge,
+                answer.answer === "yes"
+                  ? oracleStyles.yes
+                  : answer.answer === "no"
+                    ? oracleStyles.no
+                    : oracleStyles.unsure,
+              ].join(" ")}
+            >
+              {answerLabel(answer.answer)}
+            </span>
+          </li>
+        ))}
+      </ol>
+    </section>
+  );
+};
+
 export const PhotoOracle = ({ photos }: { photos: PhotoGamePhoto[] }) => {
+  const { loading } = useGameReadiness();
   const [settings, setSettings] = useGameSettings("oracle");
   const { mode } = settings;
   const [cohort, setCohort] = useState<PhotoGamePhoto[]>([]);
@@ -27,9 +67,7 @@ export const PhotoOracle = ({ photos }: { photos: PhotoGamePhoto[] }) => {
     "lobby",
   );
   const [candidates, setCandidates] = useState<OracleCandidate[]>([]);
-  const [answers, setAnswers] = useState<
-    Array<{ id: string; question: string; answer: "yes" | "no" | "unsure" }>
-  >([]);
+  const [answers, setAnswers] = useState<OracleAnswer[]>([]);
   const [confirmed, setConfirmed] = useState<PhotoGamePhoto | null>(null);
   const [history, setHistory] = useState<
     Array<{ candidates: OracleCandidate[]; answers: typeof answers }>
@@ -46,7 +84,7 @@ export const PhotoOracle = ({ photos }: { photos: PhotoGamePhoto[] }) => {
         ? buildOracleCohort(eligible)
         : shuffleGamePhotos([...new Map(eligible.map((photo) => [photo.path, photo])).values()]);
     if (selection.length < 2) {
-      setError("These photographs are too alike for the oracle's questions.");
+      setError("These photographs are too alike. The oracle needs more variety.");
       return;
     }
     setSettings({ mode: nextMode });
@@ -72,7 +110,7 @@ export const PhotoOracle = ({ photos }: { photos: PhotoGamePhoto[] }) => {
   const gameRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (stage !== "lobby") gameRef.current?.focus();
-  }, [stage, isGuess, candidates.length]);
+  }, [stage, isGuess, candidates.length, question?.id]);
   const handleAnswer = (answer: "yes" | "no" | "unsure") => {
     if (stage !== "questions" || !question || isGuess) return;
     setHistory([...history, { candidates, answers }]);
@@ -146,16 +184,16 @@ export const PhotoOracle = ({ photos }: { photos: PhotoGamePhoto[] }) => {
     },
   ];
   useGameShortcuts(shortcuts);
-  if (eligible.length < 2)
-    return <p>Photo Oracle needs at least two photographs with captions or tags.</p>;
+  if (!loading && eligible.length < 2)
+    return <p>The oracle needs more photographs. Try another game.</p>;
   if (stage === "lobby")
     return (
       <GameIntro game="oracle">
         {error ? <p role="alert">{error}</p> : null}
         <p>
           {mode === "discover"
-            ? "Follow your visual preferences to a photograph from the archive."
-            : "Keep a photograph in mind while the oracle tries to find it."}
+            ? "Answer a few questions. Find a photograph that suits your mood."
+            : "Choose a photograph. Can the oracle read your mind?"}
         </p>
         <div className={styles.actions}>
           <Button
@@ -173,10 +211,7 @@ export const PhotoOracle = ({ photos }: { photos: PhotoGamePhoto[] }) => {
             Find me a photograph
           </Button>
         </div>
-        <Caption>
-          Discovery follows your preferences until one photograph remains, or the archive cannot
-          distinguish the remaining matches.
-        </Caption>
+        <GameShortcutHelp shortcuts={shortcuts} />
       </GameIntro>
     );
   return (
@@ -234,8 +269,8 @@ export const PhotoOracle = ({ photos }: { photos: PhotoGamePhoto[] }) => {
               </Heading>
               {mode === "discover" && candidates.length > 1 ? (
                 <p role="status">
-                  Your answers leave {candidates.length} matches. No further questions can separate
-                  them; browse the matches or go back to change an answer.
+                  {candidates.length} matches remain. The oracle has run out of questions. Choose a
+                  match, or change an answer.
                 </p>
               ) : null}
               <div className={styles.secret}>
@@ -251,10 +286,8 @@ export const PhotoOracle = ({ photos }: { photos: PhotoGamePhoto[] }) => {
               </div>
             </>
           ) : question ? (
-            <>
-              <Caption>
-                Question {answers.length + 1} · {candidates.length} possible photographs
-              </Caption>
+            <div key={question.id} className={oracleStyles.currentQuestion}>
+              <Caption>Question {answers.length + 1}</Caption>
               <p className={styles.question} role="status">
                 {mode === "mind" ? question.label : oracleDiscoveryQuestion(question)}
               </p>
@@ -269,9 +302,9 @@ export const PhotoOracle = ({ photos }: { photos: PhotoGamePhoto[] }) => {
                   </Button>
                 ))}
               </div>
-            </>
+            </div>
           ) : (
-            <p>No candidates left. Reveal the photograph or start again.</p>
+            <p>No photographs match. Reveal the answer, or start again.</p>
           )}
           <div className={styles.actions}>
             <Button disabled={!history.length} onClick={back}>
@@ -288,6 +321,8 @@ export const PhotoOracle = ({ photos }: { photos: PhotoGamePhoto[] }) => {
               {mode === "mind" ? "Give up" : "Show a match now"}
             </Button>
           </div>
+          <GameShortcutHelp shortcuts={shortcuts} />
+          <AnswerTrail answers={answers} />
         </>
       ) : null}
       {stage === "finished" && (secret || confirmed) ? (
@@ -305,23 +340,7 @@ export const PhotoOracle = ({ photos }: { photos: PhotoGamePhoto[] }) => {
           <Caption>
             {answers.length} {answers.length === 1 ? "question" : "questions"} answered
           </Caption>
-          {answers.length ? (
-            <details>
-              <summary>The oracle&apos;s questions</summary>
-              <ol>
-                {answers.map((answer) => (
-                  <li key={answer.id}>
-                    {answer.question} —{" "}
-                    {answer.answer === "unsure"
-                      ? "Not sure"
-                      : answer.answer === "yes"
-                        ? "Yes"
-                        : "No"}
-                  </li>
-                ))}
-              </ol>
-            </details>
-          ) : null}
+          <AnswerTrail answers={answers} />
           <Button variant="primary" onClick={() => start()}>
             Play again
           </Button>
@@ -330,7 +349,7 @@ export const PhotoOracle = ({ photos }: { photos: PhotoGamePhoto[] }) => {
           </Button>
         </div>
       ) : null}
-      <GameShortcutHelp shortcuts={shortcuts} />
+      {stage !== "questions" ? <GameShortcutHelp shortcuts={shortcuts} /> : null}
     </div>
   );
 };

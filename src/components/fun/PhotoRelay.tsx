@@ -11,12 +11,14 @@ import { describeRelayLinks } from "../../util/photoRelay";
 import { GameProgress, GameScore } from "./GameFeedback";
 import { GamePhoto, PhotoChain } from "./GamePhoto";
 import { GameIntro } from "./GameIllustration";
+import { useGameReadiness } from "./GameReadiness";
 import { GameDock } from "./GameDock";
 import styles from "./PhotoGames.module.css";
 import relayStyles from "./PhotoRelay.module.css";
 import { useGameShortcuts, GameShortcutHelp } from "./useGameShortcuts";
 
 export const PhotoRelay = ({ photos }: { photos: PhotoGamePhoto[] }) => {
+  const { loading } = useGameReadiness();
   const [puzzle, setPuzzle] = useState<RelayPuzzle | null>(null);
   const [order, setOrder] = useState<PhotoGamePhoto[]>([]);
   const [finished, setFinished] = useState(false);
@@ -94,16 +96,15 @@ export const PhotoRelay = ({ photos }: { photos: PhotoGamePhoto[] }) => {
     window.addEventListener("blur", clear);
     return () => window.removeEventListener("blur", clear);
   }, []);
-  if (photos.length < 7)
-    return <p>Photo Relay needs at least seven indexed photographs with image similarity data.</p>;
+  if (!loading && photos.length < 7)
+    return <p>There are not enough photographs ready for a relay yet.</p>;
   if (!puzzle)
     return (
       <GameIntro game="relay">
         {error ? <p role="alert">{error}</p> : null}
         <p>
-          Arrange five photographs between a start and a finish. Aim for a smooth visual change from
-          one frame to the next: connect subjects, colours or shapes. The model scores how closely
-          neighbouring photographs resemble each other, then compares all 120 possible orders.
+          Connect the start and finish with five photographs. Make each pair share a subject, colour
+          or shape.
         </p>
         <Button variant="primary" onClick={start}>
           Start relay
@@ -116,8 +117,7 @@ export const PhotoRelay = ({ photos }: { photos: PhotoGamePhoto[] }) => {
       {!finished ? (
         <>
           <Caption>
-            Make each neighbouring pair resemble each other. Shared subjects, colours or shapes can
-            bridge the start and finish; the whole chain earns the score.
+            Aim for small visual changes between neighbours. Your score covers the whole chain.
           </Caption>
           <div className={relayStyles.workspace}>
             <div className={relayStyles.board}>
@@ -352,13 +352,12 @@ export const PhotoRelay = ({ photos }: { photos: PhotoGamePhoto[] }) => {
           {!gaveUp ? <GameScore label="Visual flow" score={scoreRelay(puzzle, order)} /> : null}
           <Caption>
             {gaveUp
-              ? "This route has the strongest overall resemblance between neighbours."
-              : "Your score ranks this order against all 120 possible arrangements: 100 is the smoothest, 50 is around the middle."}
+              ? "This route has the closest overall visual matches between neighbours."
+              : "Your score compares your order with all 120 possible orders. A score of 100 is the smoothest route; 50 is around the middle."}
           </Caption>
           <Caption>
-            Each link’s resemblance measures how similar the two photographs look. Shared subjects
-            come from their captions and tags; they are clues, rather than an explanation of the
-            score.
+            Resemblance measures how similar each pair looks to the image matcher. Shared subjects
+            come from captions and tags. They can suggest a link, but do not determine the score.
           </Caption>
           <PhotoChain
             photos={[puzzle.start, ...(gaveUp ? puzzle.solution : order), puzzle.end]}

@@ -39,9 +39,7 @@ export const SightLines = ({ photos }: { photos: PhotoGamePhoto[] }) => {
   const start = () => {
     const next = buildPhotoWordSearch(photos, settings.size, Math.random, settings.lineLength);
     if (!next) {
-      setMessage(
-        "This archive needs more photographs with distinct subjects. Try the smaller grid.",
-      );
+      setMessage("There are not enough photographs for this grid. Try a smaller grid.");
       return;
     }
     setPuzzle(next);
@@ -77,7 +75,7 @@ export const SightLines = ({ photos }: { photos: PhotoGamePhoto[] }) => {
       setMessage(
         cells.length !== puzzle.lineLength
           ? `Choose a straight line of ${puzzle.lineLength} photographs.`
-          : "That line doesn’t match an unfound connection.",
+          : "That line does not match a remaining subject.",
       );
   };
   const tap = (index: number) => {

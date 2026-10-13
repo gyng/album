@@ -307,3 +307,41 @@ test("Relay keeps its current chain in view while choosing and returns to editab
   await page.getByRole("button", { name: "Give up", exact: true }).click();
   await expect(reference).toHaveCount(0);
 });
+
+for (const width of [390, 1280]) {
+  test(`photo game lobbies keep their layout while data loads at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 });
+    for (const [game, startName] of [
+      ["connections", "Start connecting"],
+      ["cross-exposure", "Start crossing"],
+    ] as const) {
+      let release!: () => void;
+      const gate = new Promise<void>((done) => {
+        release = done;
+      });
+      await page.route(/\/(?:e2e-)?search\.sqlite(?:\?.*)?$/, async (route) => {
+        await gate;
+        await route.fallback();
+      });
+      try {
+        await gotoHydrated(page, `/fun/${game}`);
+        const start = page.getByRole("button", { name: startName, exact: true });
+        await expect(start).toBeDisabled();
+        const art = page.locator("svg").filter({ has: page.locator('image[href^="/fun/"]') });
+        const before = { art: await art.boundingBox(), start: await start.boundingBox() };
+        await expect(page.getByRole("status")).toHaveAttribute("aria-busy", "true");
+        release();
+        await expect(start).toBeEnabled();
+        const after = { art: await art.boundingBox(), start: await start.boundingBox() };
+        for (const element of ["art", "start"] as const)
+          for (const dimension of ["x", "y", "width", "height"] as const)
+            expect(
+              Math.abs(before[element]![dimension] - after[element]![dimension]),
+            ).toBeLessThanOrEqual(1);
+        await expect(page.getByRole("note", { name: "Keyboard shortcuts" })).toBeVisible();
+      } finally {
+        release();
+      }
+    }
+  });
+}

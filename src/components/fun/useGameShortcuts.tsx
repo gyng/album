@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import styles from "./GameShortcuts.module.css";
+import { useGameReadiness } from "./GameReadiness";
 
 export type GameShortcut = {
   key: string;
@@ -9,12 +10,13 @@ export type GameShortcut = {
 };
 
 export const useGameShortcuts = (shortcuts: readonly GameShortcut[], active = true) => {
+  const { loading } = useGameReadiness();
   const current = useRef(shortcuts);
   useEffect(() => {
     current.current = shortcuts;
   }, [shortcuts]);
   useEffect(() => {
-    if (!active) return;
+    if (!active || loading) return;
     const handle = (event: KeyboardEvent) => {
       if (event.defaultPrevented || event.repeat || event.altKey || event.ctrlKey || event.metaKey)
         return;
@@ -39,23 +41,20 @@ export const useGameShortcuts = (shortcuts: readonly GameShortcut[], active = tr
     };
     window.addEventListener("keydown", handle);
     return () => window.removeEventListener("keydown", handle);
-  }, [active]);
+  }, [active, loading]);
 };
 
 export const GameShortcutHelp = ({ shortcuts }: { shortcuts: readonly GameShortcut[] }) => {
   const available = shortcuts.filter((shortcut) => shortcut.enabled !== false);
   if (!available.length) return null;
   return (
-    <details className={styles.help}>
-      <summary>Keyboard shortcuts</summary>
-      <ul>
-        {available.map(({ key, label }) => (
-          <li key={key}>
-            <kbd>{key === "Escape" ? "Esc" : key}</kbd>
-            <span>{label}</span>
-          </li>
-        ))}
-      </ul>
-    </details>
+    <div className={styles.help} role="note" aria-label="Keyboard shortcuts">
+      {available.map(({ key, label }) => (
+        <span className={styles.hint} key={key}>
+          <kbd>{key === "Escape" ? "Esc" : key.length === 1 ? key.toUpperCase() : key}</kbd>
+          <span>{label}</span>
+        </span>
+      ))}
+    </div>
   );
 };

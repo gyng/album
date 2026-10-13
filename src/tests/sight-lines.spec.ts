@@ -279,6 +279,7 @@ test("Sight Lines preserves a 10×10 five-photo-line game and keeps mobile targe
     "aria-pressed",
     "true",
   );
+  await expect(page.getByRole("button", { name: "Start searching", exact: true })).toBeEnabled();
   await page.keyboard.press("n");
   const board = page.getByRole("group", { name: "Photo search board" });
   await expect(board.getByRole("button")).toHaveCount(100);

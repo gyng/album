@@ -358,10 +358,29 @@ shuffle animates tiles to their new positions, with cancellation on a subsequent
 shuffle and no animation under reduced motion. Oracle defaults to discovery;
 an explicitly saved mode still wins.
 
-Games expose phase-aware shortcuts through a compact Keyboard shortcuts disclosure:
+Games expose phase-aware shortcuts through compact inline keyboard hints:
 N starts a new round where safe; G gives up, H hints and Escape clears selection
 where supported. Oracle uses 1/2/3 for yes/no/unsure, B to undo; Double Take uses
 1/2 for same/different place. Hangman uses / to focus its subject filter.
 Guess Where retains its existing Enter/Space confirm and next controls. Shortcuts
 ignore typing, modifier combinations, held-key repeats and open modal dialogs;
 native activation of focused buttons takes precedence over Enter/Space shortcuts.
+
+## Player copy and stable lobbies
+
+Game copy follows STE-inspired principles: short active sentences, one idea per
+sentence, consistent names and concrete actions. Personality stays in small
+phrases; scoring limits remain explicit in results. This is an adaptation for
+play, not a claim of strict ASD-STE100 dictionary compliance. The reference is
+[ASD-STE100](https://www.asd-ste100.org/assets/files/ASD-STE100_ISSUE9.pdf).
+
+The actual setup stays mounted while archive data loads. A disabled native
+fieldset prevents early starts; shared shortcuts also wait for readiness. The
+illustration is top-aligned and loading feedback has reserved space. Connection
+hint labels keep the same width, and lives do not add a second setup description.
+
+Oracle keeps the current question and its controls above a newest-first answer
+trail. Clear answer badges distinguish Yes, No and Not sure. Back removes the
+latest answer and restores its question; results retain the trail. Entry motion
+is subtle and disabled for reduced-motion preferences. Keyboard hints remain
+beside the active question controls.

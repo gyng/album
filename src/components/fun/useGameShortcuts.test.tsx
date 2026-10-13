@@ -1,5 +1,7 @@
 /** @jest-environment jsdom */
 import { fireEvent, renderHook } from "@testing-library/react";
+import { GameReadinessProvider } from "./GameReadiness";
+import type { ReactNode } from "react";
 import { useGameShortcuts } from "./useGameShortcuts";
 
 it("uses current actions and ignores repeats, disabled actions and modifiers", () => {
@@ -54,5 +56,20 @@ it("does not consume disabled or inactive shortcuts and removes the listener on 
   unmount();
   renderHook(() => useGameShortcuts([{ key: "G", label: "Give up", action }], false));
   fireEvent.keyDown(window, { key: "g" });
+  expect(action).not.toHaveBeenCalled();
+});
+
+it("blocks game actions while photographs load", () => {
+  const action = jest.fn();
+  renderHook(() => useGameShortcuts([{ key: "N", label: "Start", action }]), {
+    wrapper: ({ children }: { children: ReactNode }) => (
+      <GameReadinessProvider
+        value={{ loading: true, showProgress: false, progress: 0, error: null, retry: () => {} }}
+      >
+        {children}
+      </GameReadinessProvider>
+    ),
+  });
+  expect(fireEvent.keyDown(window, { key: "n" })).toBe(true);
   expect(action).not.toHaveBeenCalled();
 });

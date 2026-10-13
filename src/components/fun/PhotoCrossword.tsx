@@ -90,7 +90,7 @@ export const PhotoCrossword = ({ photos }: { photos: PhotoGamePhoto[] }) => {
     const next = buildPhotoCrossword(photos, size);
     if (!next) {
       setMessage(
-        "This archive cannot make a complete grid with distinct crossing clues. Try a smaller grid or another puzzle.",
+        "There are not enough photographs for this grid. Try a smaller grid or another puzzle.",
       );
       return;
     }
@@ -125,7 +125,9 @@ export const PhotoCrossword = ({ photos }: { photos: PhotoGamePhoto[] }) => {
     if (!path) {
       if (cells[index]) {
         setSelected(cells[index]!.path);
-        setMessage("Photograph selected. Choose another square to move or swap it, or remove it.");
+        setMessage(
+          "Choose another square to move this photograph. If it is occupied, the photographs swap.",
+        );
       }
       return;
     }
@@ -179,7 +181,7 @@ export const PhotoCrossword = ({ photos }: { photos: PhotoGamePhoto[] }) => {
         setMessage(
           cells.some((photo) => !photo)
             ? "Place every photograph to check the hidden connections."
-            : "Those rows and columns do not all fit the hidden connections. Rearrange the photographs or ask for a hint.",
+            : "Some rows or columns do not share a connection. Move photographs or ask for a hint.",
         );
       }
       return;
@@ -246,8 +248,8 @@ export const PhotoCrossword = ({ photos }: { photos: PhotoGamePhoto[] }) => {
       <GameIntro game="cross-exposure">
         <p>
           {mode === "hidden"
-            ? "Infer the hidden row and column connections, then place each photograph where both connections meet."
-            : "Each photograph must fit both its row and its column. Every shot is used once; more than one arrangement can work."}
+            ? "Find a shared subject for each row and column. Each photograph must fit both."
+            : "Match each photograph to its row and column clues. Use each photograph once. More than one arrangement can work."}
         </p>
         <div className={styles.actions} role="group" aria-label="Clue mode">
           <Button

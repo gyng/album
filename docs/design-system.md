@@ -279,4 +279,10 @@ then use ordinary vertical flow and height-aware context docks on small screens.
 Drag sources and eligible, hovered and fixed destinations have distinct visual
 states; tap and keyboard alternatives remain first-class. Short verdict and
 shuffle animations respect reduced motion. Keyboard shortcuts are discoverable
-in a compact disclosure and never intercept text entry or native activation.
+as compact inline hints and never intercept text entry or native activation.
+
+Game lobbies keep their real setup mounted during loading, with disabled controls
+and a reserved feedback row. Top-aligned artwork stays fixed as data arrives.
+Player copy uses short active sentences and consistent action names, with light
+humour where it adds character. Oracle answer history uses compact rows, explicit
+answer badges and reduced-motion-aware entry transitions beneath the question.

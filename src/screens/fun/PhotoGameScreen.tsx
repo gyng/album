@@ -1,9 +1,8 @@
 import { useEffect, useState } from "react";
 import { GlobalNav } from "../../components/GlobalNav";
 import { Seo } from "../../components/Seo";
-import { Button, Heading, LoadingIndicator, buttonStyles } from "../../components/ui";
+import { Heading, buttonStyles } from "../../components/ui";
 import { AppLink } from "../../components/platform";
-import { ProgressBar } from "../../components/ProgressBar";
 import { useDatabase, useEmbeddingsDatabase } from "../../components/database/useDatabase";
 import { fetchPhotoGameArchive } from "../../components/search/api";
 import { FUN_GAMES, type PhotoGameKind } from "../../components/fun/games";
@@ -14,11 +13,13 @@ import { PhotoHangman } from "../../components/fun/PhotoHangman";
 import { SightLines } from "../../components/fun/SightLines";
 import { PhotoCrossword } from "../../components/fun/PhotoCrossword";
 import { DoubleTake } from "../../components/fun/DoubleTake";
-import { GameIntro } from "../../components/fun/GameIllustration";
+import { GameReadinessProvider } from "../../components/fun/GameReadiness";
 import { PhotoOracle } from "../../components/fun/PhotoOracle";
 import type { PhotoGamePhoto } from "../../util/photoGames";
 import { formatPageTitle } from "../../lib/seo";
 import styles from "./PhotoGameScreen.module.css";
+
+const EMPTY_PHOTOS: PhotoGamePhoto[] = [];
 
 export const PhotoGameScreen = ({ game }: { game: PhotoGameKind }) => {
   const [database, progress, , databaseError, retryDatabase] = useDatabase();
@@ -32,6 +33,7 @@ export const PhotoGameScreen = ({ game }: { game: PhotoGameKind }) => {
   const [error, setError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
   const [loadingVisible, setLoadingVisible] = useState(false);
+  const availablePhotos = photos ?? EMPTY_PHOTOS;
   const definition = FUN_GAMES.find((item) => item.id === game)!;
   useEffect(() => {
     let cancelled = false;
@@ -79,58 +81,44 @@ export const PhotoGameScreen = ({ game }: { game: PhotoGameKind }) => {
         </Heading>
       </header>
       <div className={styles.content}>
-        {loadError ? (
-          <div role="alert">
-            <p>{loadError}</p>
-            <Button
-              onClick={() => {
-                if (databaseError) retryDatabase();
-                else if (needsVectors && vectorError) retryVectors();
-                else setAttempt((value) => value + 1);
-              }}
-            >
-              Try again
-            </Button>
-            <AppLink href="/fun" className={buttonStyles.base}>
-              All games
-            </AppLink>
-          </div>
-        ) : !photos ? (
-          <GameIntro game={game}>
-            <p>{definition.description}</p>
-            {loadingVisible ? (
-              <div role="status" aria-busy="true">
-                <LoadingIndicator label="Loading photographs…" />
-                <ProgressBar
-                  progress={needsVectors ? Math.min(progress, vectorProgress) : progress}
-                />
-              </div>
-            ) : null}
-          </GameIntro>
-        ) : !photos.length ? (
-          <div>
-            <p>This archive does not have the photographs needed for this game yet.</p>
-            <AppLink href="/fun" className={buttonStyles.base}>
-              All games
-            </AppLink>
-          </div>
-        ) : game === "relay" ? (
-          <PhotoRelay photos={photos} />
-        ) : game === "blind-frame" ? (
-          <BlindFrame photos={photos} />
-        ) : game === "double-take" ? (
-          <DoubleTake photos={photos} />
-        ) : game === "cross-exposure" ? (
-          <PhotoCrossword photos={photos} />
-        ) : game === "sight-lines" ? (
-          <SightLines photos={photos} />
-        ) : game === "photo-hangman" ? (
-          <PhotoHangman photos={photos} />
-        ) : game === "connections" ? (
-          <PhotoConnections photos={photos} />
-        ) : (
-          <PhotoOracle photos={photos} />
-        )}
+        <GameReadinessProvider
+          value={{
+            loading: !photos || Boolean(loadError),
+            showProgress: loadingVisible,
+            progress: needsVectors ? Math.min(progress, vectorProgress) : progress,
+            error: loadError,
+            retry: () => {
+              if (databaseError) retryDatabase();
+              else if (needsVectors && vectorError) retryVectors();
+              else setAttempt((value) => value + 1);
+            },
+          }}
+        >
+          {photos && !photos.length ? (
+            <div>
+              <p>This archive does not have the photographs needed for this game yet.</p>
+              <AppLink href="/fun" className={buttonStyles.base}>
+                All games
+              </AppLink>
+            </div>
+          ) : game === "relay" ? (
+            <PhotoRelay photos={availablePhotos} />
+          ) : game === "blind-frame" ? (
+            <BlindFrame photos={availablePhotos} />
+          ) : game === "double-take" ? (
+            <DoubleTake photos={availablePhotos} />
+          ) : game === "cross-exposure" ? (
+            <PhotoCrossword photos={availablePhotos} />
+          ) : game === "sight-lines" ? (
+            <SightLines photos={availablePhotos} />
+          ) : game === "photo-hangman" ? (
+            <PhotoHangman photos={availablePhotos} />
+          ) : game === "connections" ? (
+            <PhotoConnections photos={availablePhotos} />
+          ) : (
+            <PhotoOracle photos={availablePhotos} />
+          )}
+        </GameReadinessProvider>
       </div>
     </main>
   );

@@ -1,29 +1,15 @@
 .help {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
   font-size: var(--fs-s);
   color: var(--c-bg-contrast-light);
 }
-.help summary {
-  cursor: pointer;
-  inline-size: fit-content;
-  min-block-size: var(--tap-target);
-  padding-block: var(--space-2);
-}
-.help summary:focus-visible {
-  outline: 2px solid var(--c-accent);
-  outline-offset: 3px;
-}
-.help ul {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2) var(--space-4);
-  list-style: none;
-  margin: var(--space-2) 0;
-  padding: 0;
-}
-.help li {
-  display: flex;
+.hint {
+  display: inline-flex;
   align-items: center;
-  gap: var(--space-2);
+  gap: var(--space-1);
 }
 .help kbd {
   border: var(--line-hairline) solid var(--c-border);

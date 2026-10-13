@@ -83,8 +83,8 @@ export const PhotoHangman = ({ photos }: { photos: PhotoGamePhoto[] }) => {
     return (
       <GameIntro game="photo-hangman">
         <p>
-          Two photographs start the round. Every wrong guess reveals another. The round ends after
-          six misses.
+          Guess the subject that connects the photographs. You start with two clues. Each wrong
+          guess reveals another. Six misses end the round.
         </p>
         {error ? <p role="alert">{error}</p> : null}
         <Button variant="primary" onClick={start}>

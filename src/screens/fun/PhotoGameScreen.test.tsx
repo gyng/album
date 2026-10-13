@@ -1,6 +1,7 @@
 /** @jest-environment jsdom */
 import { act, render, screen } from "@testing-library/react";
 import { PhotoGameScreen } from "./PhotoGameScreen";
+import { GameIntro } from "../../components/fun/GameIllustration";
 import { fetchPhotoGameArchive } from "../../components/search/api";
 
 jest.mock("../../components/database/useDatabase", () => {
@@ -14,7 +15,11 @@ jest.mock("../../components/search/api", () => ({ fetchPhotoGameArchive: jest.fn
 jest.mock("../../components/GlobalNav", () => ({ GlobalNav: () => null }));
 jest.mock("../../components/Seo", () => ({ Seo: () => null }));
 jest.mock("../../components/fun/PhotoConnections", () => ({
-  PhotoConnections: () => <button type="button">Start connecting</button>,
+  PhotoConnections: () => (
+    <GameIntro game="connections">
+      <button type="button">Start connecting</button>
+    </GameIntro>
+  ),
 }));
 
 beforeEach(() => {
@@ -58,4 +63,21 @@ it("shows recoverable errors immediately rather than waiting for the loading del
   await act(async () => {});
   expect(screen.getByRole("alert")).toBeTruthy();
   expect(screen.getByRole("button", { name: "Try again" })).toBeTruthy();
+});
+
+it("keeps the real lobby mounted and disabled while data loads, then enables the same start control", async () => {
+  let resolve!: (photos: Awaited<ReturnType<typeof fetchPhotoGameArchive>>) => void;
+  jest.mocked(fetchPhotoGameArchive).mockReturnValue(
+    new Promise((done) => {
+      resolve = done;
+    }),
+  );
+  render(<PhotoGameScreen game="connections" />);
+  const start = screen.getByRole("button", { name: "Start connecting" });
+  expect(start).toBeDisabled();
+  await act(async () =>
+    resolve([{ path: "a", href: "a", caption: "A photo", tags: "", vector: [] }]),
+  );
+  expect(screen.getByRole("button", { name: "Start connecting" })).toBe(start);
+  expect(start).toBeEnabled();
 });

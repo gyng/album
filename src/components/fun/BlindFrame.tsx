@@ -12,10 +12,12 @@ import {
 import { GameScore } from "./GameFeedback";
 import { GamePhoto, PhotoChain } from "./GamePhoto";
 import { GameIntro } from "./GameIllustration";
+import { useGameReadiness } from "./GameReadiness";
 import styles from "./PhotoGames.module.css";
 import { useGameShortcuts, GameShortcutHelp } from "./useGameShortcuts";
 
 export const BlindFrame = ({ photos }: { photos: PhotoGamePhoto[] }) => {
+  const { loading } = useGameReadiness();
   const [target, setTarget] = useState<PhotoGamePhoto | null>(null);
   const [inlinePad, setInlinePad] = useState(false);
   useEffect(() => {
@@ -90,19 +92,14 @@ export const BlindFrame = ({ photos }: { photos: PhotoGamePhoto[] }) => {
     },
   ];
   useGameShortcuts(shortcuts);
-  if (!eligible.length)
-    return (
-      <p>
-        Blind Frame needs photographs with AI descriptions and drawing-compatible image similarity
-        data.
-      </p>
-    );
+  if (!loading && !eligible.length)
+    return <p>There are no photographs ready for Blind Frame yet.</p>;
   if (!target)
     return (
       <GameIntro game="blind-frame">
         <p>
-          A photograph from this archive stays out of sight. Draw what its AI description brings to
-          mind, then discover the original and what your drawing resembles.
+          Draw a hidden photograph from its description. Then meet the original—and your drawing’s
+          closest match.
         </p>
         <Button variant="primary" onClick={start}>
           Start Blind Frame
@@ -128,10 +125,10 @@ export const BlindFrame = ({ photos }: { photos: PhotoGamePhoto[] }) => {
             <>
               <GameScore label="Resemblance to the original" score={result.score} />
               <Caption>
-                The original came {result.rank.toLocaleString("en-GB")} of{" "}
-                {result.total.toLocaleString("en-GB")} photographs when matched to your drawing. A
-                score of 100 means it matched as closely as the best result; 0 means no closer than
-                a typical archive photograph. This is the model’s judgement, not a mark for drawing
+                Your drawing ranked the original {result.rank.toLocaleString("en-GB")} of{" "}
+                {result.total.toLocaleString("en-GB")} photographs. A score of 100 means it matched
+                as closely as the best result. A score of 0 means it matched no better than a
+                typical archive photograph. The image matcher judges resemblance, not your drawing
                 skill.
               </Caption>
             </>
@@ -156,7 +153,6 @@ export const BlindFrame = ({ photos }: { photos: PhotoGamePhoto[] }) => {
             <figure className={styles.frame}>
               <Caption as="figcaption">The original photograph</Caption>
               <GamePhoto photo={target} link />
-              <Caption size="sm">The archive photograph behind the description.</Caption>
             </figure>
             {result && !gaveUp ? (
               <figure className={styles.frame}>
@@ -165,14 +161,14 @@ export const BlindFrame = ({ photos }: { photos: PhotoGamePhoto[] }) => {
                 <Caption size="sm">
                   {result.nearest.path === target.path
                     ? "Your drawing’s closest match was the original."
-                    : "The archive photograph the model matched most closely to your drawing."}
+                    : "The closest visual match to your drawing."}
                 </Caption>
               </figure>
             ) : null}
           </div>
           <section className={styles.result}>
             <Heading level={2}>More like the original</Heading>
-            <Caption>These resemble the original photograph, rather than your drawing.</Caption>
+            <Caption>These match the original, not your drawing.</Caption>
             <PhotoChain photos={nearestGamePhotos(target, photos, 4)} numbered={false} />
           </section>
           <div className={styles.actions}>

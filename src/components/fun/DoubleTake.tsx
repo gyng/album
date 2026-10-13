@@ -80,9 +80,7 @@ export const DoubleTake = ({ photos }: { photos: PhotoGamePhoto[] }) => {
       try {
         const next = buildDoubleTakeDeck(photos);
         if (!next.length) {
-          setMessage(
-            "There aren’t enough well-located, visually similar pairs in this archive yet.",
-          );
+          setMessage("There are not enough similar photographs with known locations yet.");
           setPhase("lobby");
           return;
         }
@@ -365,7 +363,7 @@ export const DoubleTake = ({ photos }: { photos: PhotoGamePhoto[] }) => {
                 ) : phase === "guess" ? (
                   <Heading level={2}>Same place?</Heading>
                 ) : phase === "paused" ? (
-                  <p>The pair was interrupted. Watch both photographs again.</p>
+                  <p>You missed part of the pair. Watch both photographs again.</p>
                 ) : (
                   <p role="alert">A photograph couldn’t load. Try the pair again.</p>
                 )}

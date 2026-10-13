@@ -1,5 +1,5 @@
 /** @jest-environment jsdom */
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { PhotoOracle } from "./PhotoOracle";
 import type { PhotoGamePhoto } from "../../util/photoGames";
 
@@ -144,4 +144,43 @@ it("defaults to discovery and lets number shortcuts answer and undo a question",
   expect(screen.getByText(/1 question answered/)).toBeTruthy();
   fireEvent.keyDown(window, { key: "b" });
   expect(screen.getByRole("status").textContent).toBe(original);
+});
+
+it("keeps newest answers below the current question and removes an answer on undo", () => {
+  render(<PhotoOracle photos={photos} />);
+  fireEvent.keyDown(window, { key: "n" });
+  const firstQuestion = screen.getByRole("status").textContent!;
+  fireEvent.keyDown(window, { key: "3" });
+  const secondQuestion = screen.getByRole("status").textContent!;
+  fireEvent.keyDown(window, { key: "3" });
+  const trail = screen.getByRole("region", { name: "Your answers" });
+  const rows = within(trail).getAllByRole("listitem");
+  expect(rows).toHaveLength(2);
+  expect(rows[0]).toHaveTextContent(secondQuestion);
+  expect(rows[1]).toHaveTextContent(firstQuestion);
+  expect(within(trail).getAllByText("Not sure")).toHaveLength(2);
+  expect(
+    screen.getByRole("status").compareDocumentPosition(trail) & Node.DOCUMENT_POSITION_FOLLOWING,
+  ).toBeTruthy();
+  fireEvent.keyDown(window, { key: "b" });
+  expect(screen.getByRole("status")).toHaveTextContent(secondQuestion);
+  expect(within(trail).getAllByRole("listitem")).toHaveLength(1);
+  expect(within(trail).queryByText(secondQuestion)).toBeNull();
+  fireEvent.keyDown(window, { key: "b" });
+  expect(screen.queryByRole("region", { name: "Your answers" })).toBeNull();
+});
+
+it("keeps the answer trail at the reveal with a clear Yes badge", () => {
+  render(<PhotoOracle photos={photos} />);
+  fireEvent.click(screen.getByRole("button", { name: "Find me a photograph" }));
+  const question = screen.getByRole("status").textContent!;
+  fireEvent.click(screen.getByRole("button", { name: "Yes" }));
+  expect(
+    within(screen.getByRole("region", { name: "Your answers" })).getByText("Yes"),
+  ).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "Keep this one" }));
+  const result = screen.getByRole("region", { name: "Oracle result" });
+  expect(within(result).getByRole("region", { name: "Your answers" })).toHaveTextContent(question);
+  fireEvent.click(screen.getByRole("button", { name: "Play again" }));
+  expect(screen.queryByRole("region", { name: "Your answers" })).toBeNull();
 });
