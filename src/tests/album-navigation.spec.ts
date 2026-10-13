@@ -3,6 +3,7 @@ import { gotoHydrated } from "./hydrated";
 
 test("finishing the initial image load does not undo deliberate scrolling", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.setViewportSize({ width: 390, height: 700 });
   let released = false;
   const pending: Array<() => Promise<void>> = [];
   await page.route("**/data/albums/test-simple/**/*.avif", (route) =>
@@ -39,7 +40,7 @@ test("finishing the initial image load does not undo deliberate scrolling", asyn
   }
 });
 
-for (const width of [390, 1280]) {
+for (const width of [390]) {
   test(`album navigation returns on upward scroll without moving content at ${width}px`, async ({
     page,
   }) => {
@@ -89,6 +90,7 @@ test("linked photos keep the navigation visible, clear its height and respect re
   page,
 }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.setViewportSize({ width: 390, height: 700 });
   await gotoHydrated(page, "/album/test-simple#DSCF0506-2.jpg");
   const nav = page.getByRole("navigation").first();
   await expect(nav).toBeInViewport({ ratio: 1 });
@@ -101,4 +103,45 @@ test("linked photos keep the navigation visible, clear its height and respect re
   await expect(nav).not.toBeInViewport();
   await page.mouse.wheel(0, -100);
   await expect(nav).toBeInViewport({ ratio: 1 });
+});
+
+test("desktop album navigation scrolls normally and the album title keeps its display size", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await gotoHydrated(page, "/album/test-simple");
+  const title = page.getByRole("heading", { name: "test-simple", exact: true });
+  const expected = await page.evaluate(() =>
+    getComputedStyle(document.documentElement).getPropertyValue("--fs-xl").trim(),
+  );
+  expect(await title.evaluate((element) => getComputedStyle(element).fontSize)).toBe(expected);
+  const nav = page.getByRole("navigation").first();
+  await page.mouse.wheel(0, 800);
+  await expect(nav).not.toBeInViewport();
+  await page.evaluate(() => scrollTo(0, 600));
+  await expect(nav).not.toBeInViewport();
+  await page.evaluate(() => scrollTo(0, 0));
+  await expect(nav).toBeInViewport({ ratio: 1 });
+});
+
+test("mobile navigation remains above an open photo details panel", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 700 });
+  await gotoHydrated(page, "/album/test-simple");
+  const nav = page.getByRole("navigation").first();
+  const toggle = page.getByLabel("Photo details", { exact: true }).first();
+  await toggle.click();
+  await expect(toggle.locator("..").locator(":scope > div")).toBeVisible();
+  await page.mouse.wheel(0, 700);
+  await expect(nav).not.toBeInViewport();
+  await page.evaluate(() => scrollTo(0, 600));
+  await expect(nav).toBeInViewport({ ratio: 1 });
+  const link = nav.getByRole("link", { name: "Albums", exact: true });
+  expect(
+    await link.evaluate((element) => {
+      const box = element.getBoundingClientRect();
+      return element.contains(
+        document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2),
+      );
+    }),
+  ).toBe(true);
 });

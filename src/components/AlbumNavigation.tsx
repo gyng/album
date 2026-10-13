@@ -37,6 +37,7 @@ export const AlbumNavigation = ({
     let state = initialScrollReveal(window.scrollY);
     let frame: number | null = null;
     let hasInteracted = false;
+    const mobile = window.matchMedia("(max-width: 720px)");
     setVisible(true);
     const position = () =>
       Math.max(
@@ -56,8 +57,9 @@ export const AlbumNavigation = ({
     const update = () => {
       frame = null;
       const y = position();
-      if (!hasInteracted) {
+      if (!mobile.matches || !hasInteracted) {
         state = initialScrollReveal(y);
+        setVisible(true);
         return;
       }
       // Overscroll and a modal's nested scrolling are not requests to move the nav.

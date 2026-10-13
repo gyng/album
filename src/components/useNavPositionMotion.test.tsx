@@ -117,7 +117,10 @@ it("retains the presented position when navigation interrupts an unfinished anim
   match.mockRestore();
 });
 
-it("keeps sticky album navigation in viewport coordinates when leaving a deeply scrolled page", () => {
+it.each([
+  ["sticky", 24],
+  ["relative", 724],
+] as const)("records %s album navigation in the correct coordinates", (position, expectedY) => {
   history.replaceState(null, "", "/album/motion-sticky");
   const oldScroll = window.scrollY;
   Object.defineProperty(window, "scrollY", { configurable: true, value: 700 });
@@ -133,12 +136,12 @@ it("keeps sticky album navigation in viewport coordinates when leaving a deeply 
     toJSON: () => ({}),
   });
   const view = render(
-    <div data-nav-viewport-motion>
+    <div data-nav-viewport-motion style={{ position }}>
       <Harness layout="regular" />
     </div>,
   );
   view.unmount();
-  expect(JSON.parse(sessionStorage.getItem("gallery-nav-position:left")!).y).toBe(24);
+  expect(JSON.parse(sessionStorage.getItem("gallery-nav-position:left")!).y).toBe(expectedY);
   rect.mockRestore();
   Object.defineProperty(window, "scrollY", { configurable: true, value: oldScroll });
 });

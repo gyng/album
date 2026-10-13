@@ -3,35 +3,47 @@
 }
 
 .slot {
-  position: sticky;
-  inset-block-start: 0;
-  z-index: var(--z-sticky);
-  pointer-events: none;
+  position: relative;
 }
 
 .surface {
   pointer-events: auto;
   background: var(--c-bg);
-  box-shadow: 0 1px 0 color-mix(in oklch, var(--c-border) 65%, transparent);
-  transform: translateY(0);
-  transition: transform 180ms var(--ease-out);
 }
 
-.hidden {
-  transform: translateY(calc(-100% - 1px));
-  pointer-events: none;
+.album > :global(main) {
+  /* Photo overlays keep their local layers beneath the mobile navigation. */
+  isolation: isolate;
 }
 
-/* Keyboard focus can reveal it immediately, including between scheduled frames. */
-.surface:focus-within {
-  transform: translateY(0);
-  pointer-events: auto;
-  transition: none;
-}
+@media (max-width: 720px) {
+  .slot {
+    position: sticky;
+    inset-block-start: 0;
+    z-index: var(--z-sticky);
+    pointer-events: none;
+  }
 
-.album :global(main),
-.album :global(main [id]) {
-  scroll-margin-block-start: calc(var(--album-nav-height) + var(--space-3));
+  .surface {
+    transform: translateY(0);
+    transition: transform 180ms var(--ease-out);
+  }
+
+  .hidden {
+    transform: translateY(calc(-100% - 1px));
+    pointer-events: none;
+  }
+
+  .surface:focus-within {
+    transform: translateY(0);
+    pointer-events: auto;
+    transition: none;
+  }
+
+  .album :global(main),
+  .album :global(main [id]) {
+    scroll-margin-block-start: calc(var(--album-nav-height) + var(--space-3));
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

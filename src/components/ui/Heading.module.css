@@ -1,4 +1,4 @@
-.heading {
+:where(.heading) {
   margin: 0;
   line-height: var(--lh-heading);
   letter-spacing: var(--tracking-heading);
@@ -6,20 +6,20 @@
   text-wrap: balance;
 }
 
-.level1 {
+:where(.level1) {
   font-size: var(--fs-l);
 }
 
-.level2 {
+:where(.level2) {
   font-size: var(--fs-m);
 }
 
-.level3 {
+:where(.level3) {
   font-size: var(--fs-sm);
 }
 
 @media (max-width: 720px) {
-  .level1 {
+  :where(.level1) {
     font-size: var(--fs-m);
   }
 }

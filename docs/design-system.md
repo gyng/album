@@ -298,14 +298,19 @@ pair the dominant family with the leading accent; both chart views use the same
 photos and counts. Representative colour rows reserve a compact control footer
 even when there are no more photos, keeping sparse families on the same rhythm.
 
-Album navigation stays mounted in a sticky slot. Only its surface translates,
+Album navigation scrolls normally on desktop, without a divider. At 720px and
+below it stays mounted in a sticky slot. Only its surface translates,
 so hiding it never changes the photographs' document positions. Beyond the nav
 height plus 80px, 24px of sustained downward travel hides it; 32px upward brings
 it back. Direction reversals restart the threshold. Focus keeps it visible,
 photo anchors clear its measured height, and reduced motion removes the slide.
-Sticky nav regions use viewport coordinates in cross-page position animations.
+The album's main content has its own stacking context so its photos and open
+details stay beneath the mobile nav. Sticky nav regions use viewport coordinates
+in cross-page position animations; ordinary desktop nav uses document coordinates.
 The initial page-load event preserves scroll intent; a browser-history restoration
 resets the navigation to visible.
+Shared heading size defaults have low specificity so album display titles and
+other authored heading sizes remain reliable regardless of CSS chunk order.
 
 Darkroom's safelight accent is `#ed3535`. Default Dark uses `#ff5959` for readable
 accent text on charcoal; both avoid the earlier orange tint. Browser and install
