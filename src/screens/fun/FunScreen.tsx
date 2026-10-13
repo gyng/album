@@ -22,7 +22,9 @@ const FunScreen = () => (
     <div className={styles.games}>
       {FUN_GAMES.map((game) => (
         <AppLink key={game.id} href={game.href} className={styles.game}>
-          <GameIllustration src={game.illustration} />
+          <div className={styles.gameArtwork}>
+            <GameIllustration src={game.illustration} />
+          </div>
           <div className={styles.gameBody}>
             <Heading level={1} as="h2">
               {game.title}

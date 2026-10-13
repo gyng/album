@@ -108,7 +108,12 @@ export const GlobalNav: React.FC<Props> = ({
               </MapLink>
             </li>
             <li>
-              <div className={commonStyles.splitButton}>
+              <div
+                className={cx(
+                  commonStyles.splitButton,
+                  currentPage === "slideshow" && commonStyles.navCurrent,
+                )}
+              >
                 <Link
                   href="/slideshow/shell"
                   className={cx(

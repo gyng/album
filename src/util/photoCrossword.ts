@@ -6,8 +6,20 @@ import {
   type PhotoGamePhoto,
 } from "./photoGames";
 
+export type CrosswordSize = 3 | 4 | 5;
+export type CrosswordPrefill = "none" | "minimal" | "guided";
+
+export const crosswordSeedIndices = (size: CrosswordSize, prefill: CrosswordPrefill): number[] => {
+  if (prefill === "none") return [];
+  return Array.from({ length: size ** 2 }, (_, index) => index).filter(
+    (index) =>
+      index % size === Math.floor(index / size) ||
+      (prefill === "guided" && index % size === (Math.floor(index / size) + 1) % size),
+  );
+};
+
 export type PhotoCrosswordPuzzle = {
-  size: 3 | 4;
+  size: CrosswordSize;
   rows: OracleQuestion[];
   columns: OracleQuestion[];
   solution: PhotoGamePhoto[];
@@ -112,9 +124,69 @@ export const checkPhotoCrossword = (
   });
 };
 
+const matchLineClues = (
+  lines: PhotoGamePhoto[][],
+  questions: OracleQuestion[],
+): OracleQuestion[] | null => {
+  const choices = lines.map((line) =>
+    questions.flatMap((question, index) =>
+      line.every((photo) => question.matches(photo)) ? [index] : [],
+    ),
+  );
+  const owners = new Map<number, number>();
+  const assigned: number[] = [];
+  const visit = (line: number, seen: Set<number>): boolean => {
+    for (const question of choices[line]!) {
+      if (seen.has(question)) continue;
+      seen.add(question);
+      const owner = owners.get(question);
+      if (owner === undefined || visit(owner, seen)) {
+        owners.set(question, line);
+        assigned[line] = question;
+        return true;
+      }
+    }
+    return false;
+  };
+  for (let line = 0; line < lines.length; line++) if (!visit(line, new Set())) return null;
+  return assigned.map((index) => questions[index]!);
+};
+
+// Unlabelled lines have no prescribed order: infer their clues from the completed grid.
+export const resolveHiddenCrossword = (
+  puzzle: PhotoCrosswordPuzzle,
+  cells: Array<PhotoGamePhoto | null>,
+): PhotoCrosswordPuzzle | null => {
+  if (cells.length !== puzzle.size ** 2 || cells.some((photo) => !photo)) return null;
+  const available = new Map(puzzle.tiles.map((photo) => [photo.path, photo]));
+  const placed = cells.map((photo) => available.get(photo!.path));
+  if (
+    placed.some((photo) => !photo) ||
+    new Set(placed.map((photo) => photo!.path)).size !== cells.length
+  )
+    return null;
+  const complete = placed as PhotoGamePhoto[];
+  const rows = Array.from({ length: puzzle.size }, (_, row) =>
+    complete.slice(row * puzzle.size, (row + 1) * puzzle.size),
+  );
+  const columns = Array.from({ length: puzzle.size }, (_, column) =>
+    rows.map((row) => row[column]!),
+  );
+  for (const [rowQuestions, columnQuestions] of [
+    [puzzle.rows, puzzle.columns],
+    [puzzle.columns, puzzle.rows],
+  ]) {
+    const rowClues = matchLineClues(rows, rowQuestions!);
+    const columnClues = matchLineClues(columns, columnQuestions!);
+    if (rowClues && columnClues)
+      return { ...puzzle, rows: rowClues, columns: columnClues, solution: complete };
+  }
+  return null;
+};
+
 export const buildPhotoCrossword = (
   photos: PhotoGamePhoto[],
-  size: 3 | 4 = 3,
+  size: CrosswordSize = 3,
   random: () => number = Math.random,
 ): PhotoCrosswordPuzzle | null => {
   const unique = [...new Map(photos.map((photo) => [photo.path, photo])).values()];
@@ -176,7 +248,11 @@ export const buildPhotoCrossword = (
     const boardSignatures = [...rows, ...columns].map((question) =>
       solution.map((photo) => +question.matches(photo)).join(""),
     );
-    if (new Set(boardSignatures).size !== size * 2) continue;
+    if (
+      new Set(boardSignatures).size !== size * 2 ||
+      boardSignatures.some((signature) => !signature.includes("0") || !signature.includes("1"))
+    )
+      continue;
     return { size, rows, columns, solution, tiles: shuffleGamePhotos(solution, random) };
   }
   return null;

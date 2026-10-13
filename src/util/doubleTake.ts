@@ -72,16 +72,13 @@ export const buildDoubleTakeDeck = (
       });
     }
   }
-  // Rank both answers by visual resemblance, then sample from their strongest
-  // candidates. Round order and photo order disclose neither answer nor class.
-  const sameRanked = shuffleGamePhotos(
-    pools[0].sort((a, b) => b.similarity - a.similarity).slice(0, 48),
-    random,
-  );
-  // Keep strong candidates throughout the resemblance range. Taking only the
-  // strongest distant pairs would make resemblance itself disclose the answer.
+  const sameRanked = pools[0].sort((a, b) => b.similarity - a.similarity).slice(0, 24);
+  const distantSorted = pools[1].sort((a, b) => b.similarity - a.similarity);
+  // Half the rounds use the strongest resemblance in each answer class. The
+  // other half match resemblance across classes, retaining less obvious return
+  // visits without making every very similar pair a distant-place answer.
   const buckets = new Map<number, DoubleTakePair[]>();
-  for (const pair of pools[1].sort((a, b) => b.similarity - a.similarity)) {
+  for (const pair of distantSorted) {
     const bucket = Math.floor(pair.similarity * 40);
     const values = buckets.get(bucket) ?? [];
     if (values.length < 80) values.push(pair);
@@ -90,10 +87,38 @@ export const buildDoubleTakeDeck = (
   const distantRanked = shuffleGamePhotos([...buckets.values()].flat(), random);
   const used = new Set<string>();
   const deck: DoubleTakePair[] = [];
-  for (let round = 0; round < Math.min(12, rounds); round += 2) {
+  const pairedRounds = Math.floor(Math.min(12, rounds) / 2);
+  const available = (pair: DoubleTakePair) => pair.photos.every((photo) => !used.has(photo.path));
+  const strongest = (ranked: DoubleTakePair[]) => {
+    const eligible = ranked.filter(available);
+    const best = eligible[0]?.similarity;
+    return best === undefined
+      ? []
+      : shuffleGamePhotos(
+          eligible.filter((pair) => pair.similarity >= best - 0.025).slice(0, 8),
+          random,
+        );
+  };
+  for (let round = 0; round < pairedRounds; round++) {
     let chosen: [DoubleTakePair, DoubleTakePair] | null = null;
-    for (const same of sameRanked) {
-      if (same.photos.some((photo) => used.has(photo.path))) continue;
+    const strongRound = round < Math.ceil(pairedRounds / 2);
+    const sameCandidates = strongRound
+      ? strongest(sameRanked)
+      : shuffleGamePhotos(sameRanked.filter(available), random);
+    for (const same of sameCandidates) {
+      const independent: DoubleTakePair[] = [];
+      if (strongRound) {
+        for (const pair of distantSorted) {
+          if (independent[0] && pair.similarity < independent[0].similarity - 0.025) break;
+          if (
+            available(pair) &&
+            pair.photos.every((photo) => !same.photos.some((p) => p.path === photo.path))
+          )
+            independent.push(pair);
+          if (independent.length === 8) break;
+        }
+      }
+      const strongOther = shuffleGamePhotos(independent, random)[0];
       const other = distantRanked
         .filter(
           (pair) =>
@@ -106,8 +131,8 @@ export const buildDoubleTakeDeck = (
           (a, b) =>
             Math.abs(a.similarity - same.similarity) - Math.abs(b.similarity - same.similarity),
         )[0];
-      if (other) {
-        chosen = [same, other];
+      if (strongOther || other) {
+        chosen = [same, (strongOther || other)!];
         break;
       }
     }

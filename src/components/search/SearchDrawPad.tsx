@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { Button, LoadingIndicator } from "../ui";
+import { Button, Icon, LoadingIndicator } from "../ui";
 import { warmSearchImageModel } from "./imageEmbeddings";
 import styles from "./SearchDrawPad.module.css";
 
@@ -330,24 +330,58 @@ export const SearchDrawPad: React.FC<Props> = ({
             {error}
           </p>
         ) : null}
-        <div className={styles.toolRow}>
-          <Button active={!eraser} aria-pressed={!eraser} onClick={() => setEraser(false)}>
-            Brush
-          </Button>
-          <Button active={eraser} aria-pressed={eraser} onClick={() => setEraser(true)}>
-            Eraser
+        <div className={styles.toolRow} role="group" aria-label="Drawing actions">
+          <Button
+            size="icon"
+            className={styles.iconTool}
+            aria-label="Brush"
+            title="Brush"
+            active={!eraser}
+            aria-pressed={!eraser}
+            onClick={() => setEraser(false)}
+          >
+            <Icon kind="pencil" />
           </Button>
           <Button
+            size="icon"
+            className={styles.iconTool}
+            aria-label="Eraser"
+            title="Eraser"
+            active={eraser}
+            aria-pressed={eraser}
+            onClick={() => setEraser(true)}
+          >
+            <Icon kind="eraser" />
+          </Button>
+          <Button
+            size="icon"
+            className={styles.iconTool}
+            aria-label="Undo"
+            title="Undo (Ctrl/⌘ Z)"
             disabled={!undoRef.current.length || restoring}
             onClick={() => restoreHistory(undoRef, redoRef)}
           >
-            Undo
+            <Icon kind="undo" />
           </Button>
           <Button
+            size="icon"
+            className={styles.iconTool}
+            aria-label="Redo"
+            title="Redo (Ctrl/⌘ Shift Z)"
             disabled={!redoRef.current.length || restoring}
             onClick={() => restoreHistory(redoRef, undoRef)}
           >
-            Redo
+            <Icon kind="redo" />
+          </Button>
+          <Button
+            size="icon"
+            className={styles.iconTool}
+            aria-label="Clear"
+            title="Clear canvas"
+            onClick={handleClear}
+            disabled={restoring}
+          >
+            <Icon kind="clear" />
           </Button>
         </div>
         <div className={styles.toolRow} role="group" aria-label="Brush colour">
@@ -361,6 +395,7 @@ export const SearchDrawPad: React.FC<Props> = ({
               style={{ backgroundColor: colour }}
               data-colour-swatch
               aria-label={`Brush colour ${colour}`}
+              title={`Brush colour ${colour}`}
               aria-pressed={colour === brushColour}
               onClick={() => {
                 setBrushColour(colour);
@@ -381,21 +416,19 @@ export const SearchDrawPad: React.FC<Props> = ({
                 .filter(Boolean)
                 .join(" ")}
               aria-pressed={size.width === brushWidth}
+              aria-label={size.label}
+              title={`${size.label} brush · ${size.width}px`}
               onClick={() => setBrushWidth(size.width)}
             >
               <span
                 className={styles.brushPreview}
-                style={{ width: size.width, height: size.width }}
+                style={{ width: Math.round(size.width / 2), height: Math.round(size.width / 2) }}
                 aria-hidden="true"
               />
-              {size.label}
             </button>
           ))}
         </div>
         <div className={styles.actionRow}>
-          <Button onClick={handleClear} disabled={restoring}>
-            Clear
-          </Button>
           {!inline ? (
             <Button ref={cancelRef} onClick={handleCancel}>
               {cancelLabel}

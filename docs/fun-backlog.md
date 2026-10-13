@@ -1,5 +1,23 @@
 # Fun improvements queue
 
+## October refinement release
+
+- Cross Exposure: 5×5 boards; None, Minimal and Guided starting photographs;
+  full mobile/tablet grid without horizontal scrolling, compact clue headers,
+  clue key and selected-photo preview. Hidden solutions accept valid reordered
+  rows/columns or swapped axes.
+- Double Take: one-second flashes down to 650 ms; stronger same-place and
+  distant lookalikes mixed with similarity-matched rounds.
+- Guess Where, Connect the Shots and Cross Exposure lead the cards and subnav;
+  illustration insets align with card text.
+- Navigation links and theme controls move independently; the slideshow split
+  button uses the same surface and colours as other controls.
+- Drawing tools use compact SVG icons, tooltips and visual brush-size controls.
+- Game entry keeps its illustration stable and delays loading feedback to avoid
+  transient loading-message flashes.
+
+## Previously completed
+
 Completed in the October 2026 Fun refinement pass.
 
 ## Connect the Shots

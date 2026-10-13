@@ -69,7 +69,7 @@ export const DoubleTake = ({ photos }: { photos: PhotoGamePhoto[] }) => {
   const [message, setMessage] = useState("");
   const resultRef = useRef<HTMLDivElement>(null);
   const pair = deck[round];
-  const duration = slower ? 3000 : Math.max(900, 1600 - streak * 150);
+  const duration = slower ? 3000 : Math.max(650, 1000 - streak * 100);
 
   useEffect(() => {
     if (phase !== "preparing") return;

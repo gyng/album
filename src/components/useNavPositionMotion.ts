@@ -2,38 +2,52 @@ import { useCallback, useLayoutEffect, useRef, type RefObject } from "react";
 
 type Position = { x: number; y: number; path: string; at: number };
 const STORAGE_KEY = "gallery-nav-position";
-let lastPosition: Position | null = null;
+type Region = "left" | "right" | "trailing";
+const lastPositions = new Map<Region, Position>();
 
 // Animate the measured position rather than the page padding: both the map's
 // fixed chrome and the ordinary page shell can participate in the same move.
-export const useNavPositionMotion = (ref: RefObject<HTMLElement | null>) => {
+export const useNavPositionMotion = (
+  ref: RefObject<HTMLElement | null>,
+  region: Region,
+  edge: "left" | "right" = "left",
+) => {
   const previous = useRef<Position | null>(null);
   const animation = useRef<Animation | null>(null);
-  const measure = useCallback((): Position | null => {
-    const node = ref.current;
-    if (!node) return null;
-    const rect = (node.querySelector("ul") ?? node).getBoundingClientRect();
-    const transform = getComputedStyle(node).transform;
-    const matrix =
-      transform !== "none" && typeof DOMMatrixReadOnly !== "undefined"
-        ? new DOMMatrixReadOnly(transform)
-        : null;
-    return {
-      x: rect.x + window.scrollX - (matrix?.m41 ?? 0),
-      y: rect.y + window.scrollY - (matrix?.m42 ?? 0),
-      path: window.location.pathname,
-      at: Date.now(),
-    };
-  }, [ref]);
+  const measure = useCallback(
+    (visual = false): Position | null => {
+      const node = ref.current;
+      if (!node) return null;
+      const rect = node.getBoundingClientRect();
+      if (!rect.width || !rect.height) return null;
+      const transform = getComputedStyle(node).transform;
+      const matrix =
+        transform !== "none" && typeof DOMMatrixReadOnly !== "undefined"
+          ? new DOMMatrixReadOnly(transform)
+          : null;
+      return {
+        x:
+          (edge === "right" ? rect.right : rect.x) +
+          window.scrollX -
+          (visual ? 0 : (matrix?.m41 ?? 0)),
+        y: rect.y + window.scrollY - (visual ? 0 : (matrix?.m42 ?? 0)),
+        path: window.location.pathname,
+        at: Date.now(),
+      };
+    },
+    [ref, edge],
+  );
   useLayoutEffect(() => {
     const node = ref.current;
     const target = measure();
     if (!node || !target) return;
     let from = previous.current;
     if (!from) {
-      from = lastPosition;
+      from = lastPositions.get(region) ?? null;
       try {
-        from ??= JSON.parse(sessionStorage.getItem(STORAGE_KEY) ?? "null") as Position | null;
+        from ??= JSON.parse(
+          sessionStorage.getItem(`${STORAGE_KEY}:${region}`) ?? "null",
+        ) as Position | null;
       } catch {
         /* Storage is optional. */
       }
@@ -61,15 +75,18 @@ export const useNavPositionMotion = (ref: RefObject<HTMLElement | null>) => {
   });
   useLayoutEffect(() => {
     const save = () => {
+      const measured = measure(true) ?? previous.current;
       animation.current?.cancel();
-      const measured = measure() ?? previous.current;
       // Client navigation updates the URL before unmounting the old screen.
       // Keep the path belonging to the measured nav, rather than the new URL.
-      lastPosition = measured
+      const lastPosition = measured
         ? { ...measured, path: previous.current?.path ?? measured.path, at: Date.now() }
         : null;
       try {
-        if (lastPosition) sessionStorage.setItem(STORAGE_KEY, JSON.stringify(lastPosition));
+        if (lastPosition) {
+          lastPositions.set(region, lastPosition);
+          sessionStorage.setItem(`${STORAGE_KEY}:${region}`, JSON.stringify(lastPosition));
+        }
       } catch {
         /* Storage is optional. */
       }
@@ -79,5 +96,5 @@ export const useNavPositionMotion = (ref: RefObject<HTMLElement | null>) => {
       save();
       window.removeEventListener("pagehide", save);
     };
-  }, [measure]);
+  }, [measure, region]);
 };

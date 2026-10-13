@@ -221,19 +221,29 @@ the new unknown-URL regression and HTTP 404 status. Three redundant Chromium
 smoke cases remain intentionally skipped by the existing suite.
 
 
-Navigation position changes use a measured 180ms translation, including the
+Navigation position changes use independent measured 180ms translations for
+the link list, trailing controls and appearance controls, including the
 map-to-page switch and Guess Where’s move into its viewport layout. Initial
-loads stay still and reduced-motion preferences skip the translation. Guess
+loads stay still and reduced-motion preferences skip the translation. Right
+controls anchor to their right edge, so a wider appearance group does not change
+the theme selector’s starting position. Guess
 Where’s lobby keeps the regular page gutter and maximum width until play starts.
 Weather provenance and attribution live inside the left-aligned Estimate details
 disclosure; only the condition and temperature occupy the compact summary.
 
 
 Game illustrations inherit the theme accent rather than body text colour, on
-both cards and illustrated starts. Fun! uses three desktop columns, two on
+both cards and illustrated starts. Card illustrations share the text inset,
+including the gap before the title. Fun! uses three desktop columns, two on
 medium screens and one on phones. Selected photographic tiles retain full
-image opacity and combine an accent outline with a tick badge. Dynamic image
-game grids keep overflow inside a keyboard-scrollable region, with sticky row
-clues. Full-frame flash stages contain their images without cropping. Use the
+image opacity and combine an accent outline with a tick badge. Image game grids fit phones and tablets using a narrow coordinate column,
+compact letter/number headers and a full clue key below the board. Selected
+photographs receive a larger preview. Full-frame flash stages contain their images without cropping. Use the
 shared LoadingIndicator for model warm-up and pending image comparisons;
 respect reduced-motion preferences for its spinner and game countdowns.
+
+Drawing toolbars use the shared SVG icons and native hover tooltips with stable
+accessible names. Brush-size buttons show stroke-width dots. Fine pointers use
+32px controls; coarse pointers retain 44px targets. Selected tools combine an
+accent border with aria-pressed. Split nav buttons use the same surface, text
+colour and radius as ordinary controls.

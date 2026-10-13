@@ -75,6 +75,7 @@
 }
 .cell:disabled {
   cursor: default;
+  opacity: 1;
 }
 .tray {
   display: grid;
@@ -94,6 +95,103 @@
   color: light-dark(var(--c-white), var(--c-black));
   font-size: var(--fs-s);
   font-weight: 700;
+}
+.seedMark {
+  position: absolute;
+  inset-block-start: 2px;
+  inset-inline-end: 2px;
+  display: grid;
+  place-items: center;
+  inline-size: 1rem;
+  block-size: 1rem;
+  border-radius: 50%;
+  background: var(--c-bg);
+  color: var(--c-accent);
+}
+.seedMark svg {
+  inline-size: 0.7rem;
+  block-size: 0.7rem;
+}
+.shortClue,
+.clueKey,
+.selectedPreview {
+  display: none;
+}
+@media (max-width: 960px) {
+  .board {
+    min-inline-size: 0;
+    border-spacing: var(--space-1);
+  }
+  .rowColumn {
+    inline-size: 1.5rem;
+  }
+  .board th {
+    padding: 0;
+    font-size: var(--fs-s);
+  }
+  .board td {
+    padding: 0;
+  }
+  .board th[scope="row"],
+  .board thead td {
+    position: static;
+  }
+  .fullClue {
+    display: none;
+  }
+  .shortClue {
+    display: inline;
+  }
+  .cell {
+    padding: 1px;
+    min-inline-size: 0;
+    min-block-size: var(--tap-target);
+    font-size: var(--fs-s);
+  }
+  .cell[aria-pressed="true"] {
+    outline-width: 2px;
+    outline-offset: 0;
+  }
+  .clueKey {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-3);
+    font-size: var(--fs-s);
+  }
+  .clueKey ul,
+  .clueKey ol {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+  .clueKey li {
+    overflow-wrap: anywhere;
+    margin-block-start: var(--space-1);
+  }
+  .selectedPreview {
+    display: grid;
+    gap: var(--space-2);
+    max-inline-size: 20rem;
+    margin: 0;
+  }
+  .tray {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .mark {
+    inline-size: 1rem;
+    block-size: 1rem;
+    font-size: 0.65rem;
+    inset-block-start: 2px;
+    inset-inline-end: 2px;
+  }
+}
+@media (max-width: 360px) {
+  .board {
+    border-spacing: 2px;
+  }
+  .rowColumn {
+    inline-size: 1.2rem;
+  }
 }
 @media (prefers-reduced-motion: reduce) {
   .cell,

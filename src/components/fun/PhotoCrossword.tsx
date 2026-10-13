@@ -2,19 +2,24 @@ import { useEffect, useRef, useState, type CSSProperties } from "react";
 import {
   buildPhotoCrossword,
   checkPhotoCrossword,
+  resolveHiddenCrossword,
   crosswordClue,
+  crosswordSeedIndices,
+  type CrosswordSize,
+  type CrosswordPrefill,
   type PhotoCrosswordPuzzle,
 } from "../../util/photoCrossword";
 import { shuffleGamePhotos, type PhotoGamePhoto } from "../../util/photoGames";
-import { Button, Caption, Heading } from "../ui";
+import { Button, Caption, Heading, Icon } from "../ui";
 import { GameIntro } from "./GameIllustration";
 import { GamePhoto } from "./GamePhoto";
 import styles from "./PhotoCrossword.module.css";
 
 export const PhotoCrossword = ({ photos }: { photos: PhotoGamePhoto[] }) => {
   const [mode, setMode] = useState<"visible" | "hidden">("hidden");
+  const [prefill, setPrefill] = useState<CrosswordPrefill>("minimal");
   const [cluesRevealed, setCluesRevealed] = useState(false);
-  const [size, setSize] = useState<3 | 4>(3);
+  const [size, setSize] = useState<CrosswordSize>(3);
   const [puzzle, setPuzzle] = useState<PhotoCrosswordPuzzle | null>(null);
   const [tiles, setTiles] = useState<PhotoGamePhoto[]>([]);
   const [cells, setCells] = useState<Array<PhotoGamePhoto | null>>([]);
@@ -37,12 +42,10 @@ export const PhotoCrossword = ({ photos }: { photos: PhotoGamePhoto[] }) => {
     setPuzzle(next);
     setTiles(next.tiles);
     setCluesRevealed(false);
+    const seeds = new Set(crosswordSeedIndices(size, prefill));
     setCells(
-      Array.from({ length: size ** 2 }, (_, i) =>
-        mode === "hidden" &&
-        (i % size === Math.floor(i / size) || i % size === (Math.floor(i / size) + 1) % size)
-          ? next.solution[i]!
-          : null,
+      Array.from({ length: size ** 2 }, (_, index) =>
+        seeds.has(index) ? next.solution[index]! : null,
       ),
     );
     setSelected(null);
@@ -55,27 +58,33 @@ export const PhotoCrossword = ({ photos }: { photos: PhotoGamePhoto[] }) => {
       <GameIntro game="cross-exposure">
         <p>
           {mode === "hidden"
-            ? "Infer the row and column connections from the starting photographs, then place the remaining shots. Each line starts with two fixed photographs."
+            ? "Infer the hidden row and column connections, then place each photograph where both connections meet."
             : "Each photograph must fit both its row and its column. Every shot is used once; more than one arrangement can work."}
         </p>
         <div className={styles.actions} role="group" aria-label="Clue mode">
           <Button
             active={mode === "hidden"}
             aria-pressed={mode === "hidden"}
-            onClick={() => setMode("hidden")}
+            onClick={() => {
+              setMode("hidden");
+              setPrefill("minimal");
+            }}
           >
             Hidden connections
           </Button>
           <Button
             active={mode === "visible"}
             aria-pressed={mode === "visible"}
-            onClick={() => setMode("visible")}
+            onClick={() => {
+              setMode("visible");
+              setPrefill("none");
+            }}
           >
             Visible clues
           </Button>
         </div>
         <div className={styles.actions} role="group" aria-label="Grid size">
-          {([3, 4] as const).map((value) => (
+          {([3, 4, 5] as const).map((value) => (
             <Button
               key={value}
               active={size === value}
@@ -89,16 +98,33 @@ export const PhotoCrossword = ({ photos }: { photos: PhotoGamePhoto[] }) => {
             </Button>
           ))}
         </div>
+        <div className={styles.actions} role="group" aria-label="Starting photographs">
+          {(["none", "minimal", "guided"] as const).map((choice) => (
+            <Button
+              key={choice}
+              active={prefill === choice}
+              aria-pressed={prefill === choice}
+              onClick={() => setPrefill(choice)}
+            >
+              {choice === "none" ? "None" : choice === "minimal" ? "Minimal" : "Guided"}
+            </Button>
+          ))}
+        </div>
+        <Caption>
+          {prefill === "none"
+            ? "All squares start empty."
+            : prefill === "minimal"
+              ? "One fixed photograph in each row and column."
+              : "Two fixed photographs in each row and column."}
+        </Caption>
         {message ? <p role="alert">{message}</p> : null}
         <Button variant="primary" onClick={start}>
           Start crossing
         </Button>
       </GameIntro>
     );
-  const isFixed = (index: number) =>
-    mode === "hidden" &&
-    (index % size === Math.floor(index / size) ||
-      index % size === (Math.floor(index / size) + 1) % size);
+  const seedIndices = new Set(crosswordSeedIndices(size, prefill));
+  const isFixed = (index: number) => seedIndices.has(index);
   const showClues = mode === "visible" || cluesRevealed || !!finished;
   const place = (index: number) => {
     if (finished || isFixed(index)) return;
@@ -142,12 +168,25 @@ export const PhotoCrossword = ({ photos }: { photos: PhotoGamePhoto[] }) => {
       {/* oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- Focus lets keyboard users scroll the wide board on narrow screens. */}
       <div className={styles.boardScroll} role="region" aria-label="Crossword board" tabIndex={0}>
         <table className={styles.board} style={{ "--crossword-size": size } as CSSProperties}>
+          <colgroup>
+            <col className={styles.rowColumn} />
+            <col span={size} />
+          </colgroup>
           <thead>
             <tr>
               <td aria-hidden="true" />
               {puzzle.columns.map((question, index) => (
-                <th key={question.id} scope="col">
-                  {showClues ? crosswordClue(question) : `Column ${index + 1}`}
+                <th
+                  key={question.id}
+                  scope="col"
+                  aria-label={showClues ? crosswordClue(question) : `Column ${index + 1}`}
+                >
+                  <span className={styles.fullClue} aria-hidden="true">
+                    {showClues ? crosswordClue(question) : `Column ${index + 1}`}
+                  </span>
+                  <span className={styles.shortClue} aria-hidden="true">
+                    {String.fromCharCode(65 + index)}
+                  </span>
                 </th>
               ))}
             </tr>
@@ -155,7 +194,14 @@ export const PhotoCrossword = ({ photos }: { photos: PhotoGamePhoto[] }) => {
           <tbody>
             {puzzle.rows.map((question, row) => (
               <tr key={question.id}>
-                <th scope="row">{showClues ? crosswordClue(question) : `Row ${row + 1}`}</th>
+                <th scope="row" aria-label={showClues ? crosswordClue(question) : `Row ${row + 1}`}>
+                  <span className={styles.fullClue} aria-hidden="true">
+                    {showClues ? crosswordClue(question) : `Row ${row + 1}`}
+                  </span>
+                  <span className={styles.shortClue} aria-hidden="true">
+                    {row + 1}
+                  </span>
+                </th>
                 {puzzle.columns.map((column, col) => {
                   const index = row * size + col;
                   return (
@@ -185,6 +231,11 @@ export const PhotoCrossword = ({ photos }: { photos: PhotoGamePhoto[] }) => {
                             {checked[index] ? "✓" : "×"}
                           </span>
                         ) : null}
+                        {isFixed(index) && !finished && !checked ? (
+                          <span className={styles.seedMark} aria-hidden="true">
+                            <Icon kind="pin" />
+                          </span>
+                        ) : null}
                       </button>
                     </td>
                   );
@@ -194,11 +245,41 @@ export const PhotoCrossword = ({ photos }: { photos: PhotoGamePhoto[] }) => {
           </tbody>
         </table>
       </div>
+      {showClues ? (
+        <div className={styles.clueKey}>
+          <section aria-label="Row clues">
+            <Heading level={2}>Rows</Heading>
+            <ol>
+              {puzzle.rows.map((question, index) => (
+                <li key={question.id}>
+                  {index + 1} · {crosswordClue(question)}
+                </li>
+              ))}
+            </ol>
+          </section>
+          <section aria-label="Column clues">
+            <Heading level={2}>Columns</Heading>
+            <ol>
+              {puzzle.columns.map((question, index) => (
+                <li key={question.id}>
+                  {String.fromCharCode(65 + index)} · {crosswordClue(question)}
+                </li>
+              ))}
+            </ol>
+          </section>
+        </div>
+      ) : null}
       <p role="status">
         {message || (selected ? "Choose a square for the selected photograph." : "")}
       </p>
       {!finished ? (
         <>
+          {selected ? (
+            <section className={styles.selectedPreview} aria-label="Selected photograph">
+              <Caption>Selected photograph</Caption>
+              <GamePhoto photo={tiles.find((photo) => photo.path === selected)!} />
+            </section>
+          ) : null}
           <div className={styles.tray} role="group" aria-label="Available photographs">
             {tiles
               .filter((photo) => !used.has(photo.path))
@@ -227,6 +308,23 @@ export const PhotoCrossword = ({ photos }: { photos: PhotoGamePhoto[] }) => {
             <Button
               variant="primary"
               onClick={() => {
+                if (mode === "hidden" && !cluesRevealed) {
+                  const resolved = resolveHiddenCrossword(puzzle, cells);
+                  if (resolved) {
+                    setPuzzle(resolved);
+                    setChecked(cells.map(() => true));
+                    setMessage("Every row and column shares a connection.");
+                    setFinished("solved");
+                  } else {
+                    setChecked(null);
+                    setMessage(
+                      cells.some((photo) => !photo)
+                        ? "Place every photograph to check the hidden connections."
+                        : "Those rows and columns do not all fit the hidden connections. Rearrange the photographs or reveal the clues.",
+                    );
+                  }
+                  return;
+                }
                 const result = checkPhotoCrossword(puzzle, cells);
                 setChecked(result);
                 const count = result.filter(Boolean).length;

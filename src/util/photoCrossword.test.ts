@@ -2,6 +2,8 @@ import {
   assignCrosswordPhotos,
   buildPhotoCrossword,
   checkPhotoCrossword,
+  crosswordSeedIndices,
+  resolveHiddenCrossword,
   type PhotoCrosswordPuzzle,
 } from "./photoCrossword";
 import type { PhotoGamePhoto, OracleQuestion } from "./photoGames";
@@ -28,7 +30,7 @@ it("moves an earlier assignment to satisfy a constrained later cell", () => {
   expect(assignCrosswordPhotos([[a, b], [a]])?.map((p) => p.path)).toEqual([b.path, a.path]);
   expect(assignCrosswordPhotos([[a], [a]])).toBeNull();
 });
-it.each([3, 4] as const)(
+it.each([3, 4, 5] as const)(
   "builds a distinct %i by %i board with a valid non-repeating solution",
   (size) => {
     const pool = Array.from({ length: size }, (_, r) =>
@@ -57,6 +59,31 @@ it.each([3, 4] as const)(
         ),
       ).size,
     ).toBe(size * 2);
+    expect(
+      [...puzzle.rows, ...puzzle.columns].every((question) =>
+        puzzle.solution.some((photo) => !question.matches(photo)),
+      ),
+    ).toBe(true);
+  },
+);
+
+it.each([3, 4, 5] as const)(
+  "provides zero, one or two unique starting shots per line on a %i grid",
+  (size) => {
+    for (const [choice, count] of [
+      ["none", 0],
+      ["minimal", 1],
+      ["guided", 2],
+    ] as const) {
+      const indices = crosswordSeedIndices(size, choice);
+      expect(indices).toHaveLength(size * count);
+      expect(new Set(indices).size).toBe(indices.length);
+      expect(indices.every((index) => index >= 0 && index < size ** 2)).toBe(true);
+      for (let line = 0; line < size; line++) {
+        expect(indices.filter((index) => Math.floor(index / size) === line)).toHaveLength(count);
+        expect(indices.filter((index) => index % size === line)).toHaveLength(count);
+      }
+    }
   },
 );
 it("accepts alternative valid placements but rejects reused photographs", () => {
@@ -81,4 +108,50 @@ it("accepts alternative valid placements but rejects reused photographs", () => 
 });
 it("declines a pool with no distinct crossing clues", () => {
   expect(buildPhotoCrossword(photos.map((p) => ({ ...p, tags: "same" })))).toBeNull();
+});
+
+it("requires twenty-five distinct photographs for a 5×5 board", () => {
+  expect(buildPhotoCrossword([...photos, ...photos], 5)).toBeNull();
+});
+
+it("accepts inferred row and column order while visible clues retain their positions", () => {
+  const puzzle: PhotoCrosswordPuzzle = {
+    size: 3,
+    rows: rows.map(tag),
+    columns: columns.map(tag),
+    solution: photos,
+    tiles: photos,
+  };
+  const reordered = [2, 0, 1].flatMap((row) =>
+    [1, 2, 0].map((column) => photos[row * 3 + column]!),
+  );
+  expect(checkPhotoCrossword(puzzle, reordered).every(Boolean)).toBe(false);
+  const resolved = resolveHiddenCrossword(puzzle, reordered)!;
+  expect(resolved.rows.map((question) => question.id)).toEqual(["triangle", "round", "square"]);
+  expect(resolved.columns.map((question) => question.id)).toEqual(["azure", "golden", "scarlet"]);
+  expect(checkPhotoCrossword(resolved, reordered).every(Boolean)).toBe(true);
+});
+
+it("accepts transposed hidden connections but rejects incomplete, reused or unavailable photographs", () => {
+  const puzzle: PhotoCrosswordPuzzle = {
+    size: 3,
+    rows: rows.map(tag),
+    columns: columns.map(tag),
+    solution: photos,
+    tiles: photos,
+  };
+  const transposed = columns.flatMap((_, column) =>
+    rows.map((_, row) => photos[row * 3 + column]!),
+  );
+  const resolved = resolveHiddenCrossword(puzzle, transposed)!;
+  expect(resolved.rows.map((question) => question.id)).toEqual(columns);
+  expect(checkPhotoCrossword(resolved, transposed).every(Boolean)).toBe(true);
+  expect(resolveHiddenCrossword(puzzle, photos.slice(1))).toBeNull();
+  expect(resolveHiddenCrossword(puzzle, [...photos.slice(0, -1), photos[0]!])).toBeNull();
+  expect(
+    resolveHiddenCrossword(puzzle, [
+      ...photos.slice(0, -1),
+      { ...photos.at(-1)!, path: "missing.jpg" },
+    ]),
+  ).toBeNull();
 });

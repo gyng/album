@@ -98,7 +98,7 @@ test("Double Take decodes a full frame before flashing and keeps it contained", 
   await expect(reveal).toContainText(/metres apart|km apart/);
 });
 
-test("Cross Exposure starts with hidden connections and reveals a scrollable, aligned grid", async ({
+test("Cross Exposure keeps its whole mobile grid visible and reveals the clue key", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
@@ -108,22 +108,19 @@ test("Cross Exposure starts with hidden connections and reveals a scrollable, al
   ).toHaveAttribute("aria-pressed", "true");
   await page.getByRole("button", { name: "Start crossing", exact: true }).click();
   const board = page.getByRole("region", { name: "Crossword board" });
-  await expect(board.getByRole("columnheader").first()).toHaveText("Column 1");
+  await expect(board.getByRole("columnheader").first()).toHaveAccessibleName("Column 1");
   await expect(
     page.getByRole("group", { name: "Available photographs" }).getByRole("button"),
-  ).toHaveCount(3);
+  ).toHaveCount(6);
   await page.getByRole("button", { name: "Reveal clues", exact: true }).click();
-  await expect(board.getByRole("columnheader").first()).not.toHaveText("Column 1");
-  const header = board.getByRole("rowheader").first();
-  const bounds = await board.boundingBox();
-  await board.focus();
-  await board.press("ArrowRight");
-  await board.press("ArrowRight");
-  await board.press("ArrowRight");
-  await expect.poll(() => board.evaluate((element) => element.scrollLeft)).toBeGreaterThan(0);
-  const after = await header.boundingBox();
-  expect(after!.x).toBeGreaterThanOrEqual(bounds!.x - 1);
-  expect(after!.x).toBeLessThanOrEqual(bounds!.x + 12);
+  await expect(board.getByRole("columnheader").first()).not.toHaveAccessibleName("Column 1");
+  const geometry = await board.evaluate((element) => ({
+    width: element.clientWidth,
+    content: element.scrollWidth,
+  }));
+  expect(geometry.content).toBeLessThanOrEqual(geometry.width);
+  await expect(page.getByRole("region", { name: "Row clues" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Column clues" })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
   await page.getByRole("button", { name: "Give up", exact: true }).click();
   await expect(page.getByRole("region", { name: "Cross Exposure result" })).toBeFocused();

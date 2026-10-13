@@ -88,12 +88,17 @@
   display: inline-flex;
   align-items: stretch;
   border: solid var(--line-hairline) var(--c-border);
-  border-radius: var(--m-s);
+  border-radius: var(--radius-control);
   overflow: clip;
-  background-color: var(--c-bg);
+  background-color: var(--c-surface);
+  color: var(--c-font);
   transition:
     background-color var(--t-theme),
     border-color var(--t-theme);
+}
+.splitButton.navCurrent {
+  border-color: var(--c-selected-border);
+  background-color: var(--c-selected);
 }
 
 .splitButtonMain,

@@ -66,7 +66,8 @@ test("Guess Where keeps the regular nav until play and respects reduced motion w
     // oxlint-disable-next-line typescript/unbound-method
     const original = Element.prototype.animate;
     Element.prototype.animate = function (frames, options) {
-      if (this.tagName === "NAV") document.documentElement.dataset.navAnimated = "true";
+      if (this.hasAttribute("data-nav-motion-region"))
+        document.documentElement.dataset.navAnimated = "true";
       return original.call(this, frames, options);
     };
   });
@@ -91,7 +92,9 @@ test("Guess Where keeps the regular nav until play and respects reduced motion w
           .first()
           .evaluate(
             (node) =>
-              node.getAnimations().filter((animation) => animation.playState === "running").length,
+              node
+                .getAnimations({ subtree: true })
+                .filter((animation) => animation.playState === "running").length,
           ),
       )
       .toBe(0);
@@ -109,16 +112,103 @@ test("navigation moves between the map and regular pages in both directions", as
     // oxlint-disable-next-line typescript/unbound-method
     const original = Element.prototype.animate;
     Element.prototype.animate = function (frames, options) {
-      if (this.tagName === "NAV")
-        document.documentElement.dataset.navAnimatedRoute = location.pathname;
-      return original.call(this, frames, options);
+      const animation = original.call(this, frames, options);
+      const region = this.getAttribute("data-nav-motion-region");
+      if (region) {
+        animation.currentTime = 0;
+        const matrix = new DOMMatrixReadOnly(String((frames as Keyframe[])[0]?.transform));
+        const theme = this.querySelector('select[aria-label="Theme"]')?.getBoundingClientRect();
+        const events = JSON.parse(document.documentElement.dataset.navMotions ?? "[]");
+        events.push({
+          path: location.pathname,
+          region,
+          dx: matrix.m41,
+          theme: theme ? { x: theme.x, y: theme.y, right: theme.right } : null,
+        });
+        document.documentElement.dataset.navMotions = JSON.stringify(events);
+      }
+      return animation;
     };
   });
   await gotoHydrated(page, "/fun");
+  const themeBefore = (await page
+    .locator('[data-nav-motion-region="right"]')
+    .getByRole("combobox", { name: "Theme", exact: true })
+    .boundingBox())!;
   await page.getByRole("link", { name: "Map", exact: true }).click();
-  await expect(page).toHaveURL(/\/map/);
-  await expect(page.locator("html")).toHaveAttribute("data-nav-animated-route", "/map");
+  await page.waitForURL(/\/map/);
+  await expect
+    .poll(() =>
+      page
+        .locator("html")
+        .evaluate(
+          (node) =>
+            JSON.parse(node.dataset.navMotions ?? "[]").filter(
+              (event: { path: string }) => event.path === "/map",
+            ).length,
+        ),
+    )
+    .toBeGreaterThanOrEqual(2);
+  const outward = await page.locator("html").evaluate(
+    (node) =>
+      JSON.parse(node.dataset.navMotions ?? "[]") as Array<{
+        path: string;
+        region: string;
+        dx: number;
+        theme: { x: number; y: number; right: number } | null;
+      }>,
+  );
+  expect(
+    outward.find((event) => event.path === "/map" && event.region === "left")!.dx,
+  ).toBeGreaterThan(0);
+  const movingTheme = outward.find((event) => event.path === "/map" && event.region === "right")!;
+  expect(movingTheme.dx).toBeLessThan(0);
+  expect(Math.abs(movingTheme.theme!.x - themeBefore.x)).toBeLessThanOrEqual(1);
+  expect(
+    Math.abs(movingTheme.theme!.right - (themeBefore.x + themeBefore.width)),
+  ).toBeLessThanOrEqual(1);
+  await expect
+    .poll(() =>
+      page
+        .locator('[data-nav-motion-region="right"]')
+        .evaluate(
+          (node) =>
+            node.getAnimations().filter((animation) => animation.playState === "running").length,
+        ),
+    )
+    .toBe(0);
+  const mapTheme = (await page
+    .locator('[data-nav-motion-region="right"]')
+    .getByRole("combobox", { name: "Theme", exact: true })
+    .filter({ visible: true })
+    .boundingBox())!;
   await page.getByRole("link", { name: "Fun!", exact: true }).click();
-  await expect(page).toHaveURL(/\/fun/);
-  await expect(page.locator("html")).toHaveAttribute("data-nav-animated-route", "/fun");
+  await page.waitForURL(/\/fun/);
+  await expect
+    .poll(() =>
+      page
+        .locator("html")
+        .evaluate(
+          (node) =>
+            JSON.parse(node.dataset.navMotions ?? "[]").filter(
+              (event: { path: string }) => event.path === "/fun",
+            ).length,
+        ),
+    )
+    .toBeGreaterThanOrEqual(2);
+  const inward = await page.locator("html").evaluate(
+    (node) =>
+      JSON.parse(node.dataset.navMotions ?? "[]") as Array<{
+        path: string;
+        region: string;
+        dx: number;
+        theme: { x: number; y: number; right: number } | null;
+      }>,
+  );
+  expect(inward.find((event) => event.path === "/fun" && event.region === "left")!.dx).toBeLessThan(
+    0,
+  );
+  const returningTheme = inward.find((event) => event.path === "/fun" && event.region === "right")!;
+  expect(returningTheme.dx).toBeGreaterThan(0);
+  expect(Math.abs(returningTheme.theme!.x - mapTheme.x)).toBeLessThanOrEqual(1);
 });

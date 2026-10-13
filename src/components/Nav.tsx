@@ -23,9 +23,12 @@ export const Nav: React.FC<{
   themeAdjacentItem?: React.ReactNode;
   isHome?: boolean;
 }> = (props) => {
-  const navRef = useRef<HTMLElement>(null);
-  useNavPositionMotion(navRef);
   const ulRef = useRef<HTMLUListElement>(null);
+  const appearanceRef = useRef<HTMLDivElement>(null);
+  const trailingRef = useRef<HTMLDivElement>(null);
+  useNavPositionMotion(ulRef, "left");
+  useNavPositionMotion(appearanceRef, "right", "right");
+  useNavPositionMotion(trailingRef, "trailing", "right");
   // Whether the scrolling nav has hidden content beyond the left/right edges.
   // Drives the edge-fade overlays on .nav.
   const [hasMoreLeft, setHasMoreLeft] = useState(false);
@@ -84,7 +87,6 @@ export const Nav: React.FC<{
 
   return (
     <nav
-      ref={navRef}
       className={[
         styles.nav,
         hasMoreLeft ? styles.scrollableLeft : "",
@@ -102,7 +104,7 @@ export const Nav: React.FC<{
           .filter(Boolean)
           .join(" ")}
       >
-        <ul ref={ulRef} className={commonStyles.topBar}>
+        <ul ref={ulRef} className={commonStyles.topBar} data-nav-motion-region="left">
           <li>
             <Link
               href="/"
@@ -161,9 +163,13 @@ export const Nav: React.FC<{
             is a horizontal scroller, so `overflow-y` is hidden and anything
             escaping the row is invisible and untappable. */}
         {props.trailingItem ? (
-          <div className={styles.trailingItem}>{props.trailingItem}</div>
+          <div ref={trailingRef} className={styles.trailingItem} data-nav-motion-region="trailing">
+            {props.trailingItem}
+          </div>
         ) : null}
         <div
+          ref={appearanceRef}
+          data-nav-motion-region="right"
           className={[
             styles.themeToggleItem,
             styles.appearanceGroup,

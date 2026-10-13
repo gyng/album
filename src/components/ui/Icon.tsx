@@ -74,6 +74,19 @@ const drawings = {
       <path d="m13 7 4 4" />
     </>
   ),
+  eraser: (
+    <>
+      <path d="m13 3 8 8-9 10H7l-5-5Z" />
+      <path d="m7 11 8 8M12 21h9" />
+    </>
+  ),
+  undo: <path d="M8 4 3 9l5 5M3 9h10a7 7 0 0 1 0 14" />,
+  redo: <path d="m16 4 5 5-5 5M21 9H11a7 7 0 0 0 0 14" />,
+  clear: (
+    <>
+      <path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7" />
+    </>
+  ),
   settings: (
     <>
       <path d="M9 3h6l1 3 3 1 2 5-2 5-3 1-1 3H9l-1-3-3-1-2-5 2-5 3-1Z" />

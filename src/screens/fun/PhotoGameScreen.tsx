@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { GlobalNav } from "../../components/GlobalNav";
 import { Seo } from "../../components/Seo";
-import { Button, Heading, buttonStyles } from "../../components/ui";
+import { Button, Heading, LoadingIndicator, buttonStyles } from "../../components/ui";
 import { AppLink } from "../../components/platform";
 import { ProgressBar } from "../../components/ProgressBar";
 import { useDatabase, useEmbeddingsDatabase } from "../../components/database/useDatabase";
@@ -12,6 +12,7 @@ import { BlindFrame } from "../../components/fun/BlindFrame";
 import { PhotoConnections } from "../../components/fun/PhotoConnections";
 import { PhotoCrossword } from "../../components/fun/PhotoCrossword";
 import { DoubleTake } from "../../components/fun/DoubleTake";
+import { GameIntro } from "../../components/fun/GameIllustration";
 import { PhotoOracle } from "../../components/fun/PhotoOracle";
 import type { PhotoGamePhoto } from "../../util/photoGames";
 import { formatPageTitle } from "../../lib/seo";
@@ -22,13 +23,17 @@ export const PhotoGameScreen = ({ game }: { game: PhotoGameKind }) => {
   const needsVectors = game === "relay" || game === "blind-frame" || game === "double-take";
   const [embeddings, vectorProgress, , vectorError, retryVectors] =
     useEmbeddingsDatabase(needsVectors);
-  const [photos, setPhotos] = useState<PhotoGamePhoto[] | null>(null);
+  const [loaded, setLoaded] = useState<{ game: PhotoGameKind; photos: PhotoGamePhoto[] } | null>(
+    null,
+  );
+  const photos = loaded?.game === game ? loaded.photos : null;
   const [error, setError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
+  const [loadingVisible, setLoadingVisible] = useState(false);
   const definition = FUN_GAMES.find((item) => item.id === game)!;
   useEffect(() => {
     let cancelled = false;
-    setPhotos(null);
+    setLoaded(null);
     setError(null);
     if (!database || (needsVectors && !embeddings)) return;
     void fetchPhotoGameArchive({
@@ -37,7 +42,7 @@ export const PhotoGameScreen = ({ game }: { game: PhotoGameKind }) => {
       game,
     })
       .then((result) => {
-        if (!cancelled) setPhotos(result);
+        if (!cancelled) setLoaded({ game, photos: result });
       })
       .catch(() => {
         if (!cancelled) setError("The game photographs could not be loaded.");
@@ -51,6 +56,12 @@ export const PhotoGameScreen = ({ game }: { game: PhotoGameKind }) => {
     (databaseError || (needsVectors && vectorError)
       ? "The game photographs could not be loaded."
       : null);
+  useEffect(() => {
+    setLoadingVisible(false);
+    if (photos || loadError) return;
+    const timer = window.setTimeout(() => setLoadingVisible(true), 180);
+    return () => window.clearTimeout(timer);
+  }, [photos, loadError, game]);
   return (
     <main id="main-content" className={styles.page}>
       <Seo
@@ -83,10 +94,17 @@ export const PhotoGameScreen = ({ game }: { game: PhotoGameKind }) => {
             </AppLink>
           </div>
         ) : !photos ? (
-          <div role="status">
-            <p>Loading photographs…</p>
-            <ProgressBar progress={needsVectors ? Math.min(progress, vectorProgress) : progress} />
-          </div>
+          <GameIntro game={game}>
+            <p>{definition.description}</p>
+            {loadingVisible ? (
+              <div role="status" aria-busy="true">
+                <LoadingIndicator label="Loading photographs…" />
+                <ProgressBar
+                  progress={needsVectors ? Math.min(progress, vectorProgress) : progress}
+                />
+              </div>
+            ) : null}
+          </GameIntro>
         ) : !photos.length ? (
           <div>
             <p>This archive does not have the photographs needed for this game yet.</p>

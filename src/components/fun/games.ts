@@ -7,6 +7,20 @@ export const FUN_GAMES = [
     description: "Place a photograph on the map. How close can you get?",
   },
   {
+    id: "connections",
+    href: "/fun/connections",
+    title: "Connect the Shots",
+    illustration: "/fun/connect-the-shots.avif",
+    description: "Find the hidden connections in a grid of photographs.",
+  },
+  {
+    id: "cross-exposure",
+    href: "/fun/cross-exposure",
+    title: "Cross Exposure",
+    illustration: "/fun/cross-exposure.avif",
+    description: "Every photograph has two connections. Find its place in the grid.",
+  },
+  {
     id: "relay",
     href: "/fun/relay",
     title: "Photo Relay",
@@ -30,25 +44,11 @@ export const FUN_GAMES = [
     description: "Keep a photograph in mind. Can the oracle find it with yes-or-no questions?",
   },
   {
-    id: "connections",
-    href: "/fun/connections",
-    title: "Connect the Shots",
-    illustration: "/fun/connect-the-shots.avif",
-    description: "Find the hidden connections in a grid of photographs.",
-  },
-  {
     id: "double-take",
     href: "/fun/double-take",
     title: "Double Take",
     illustration: "/fun/double-take.avif",
     description: "Two fleeting photographs. Same look. Same place?",
-  },
-  {
-    id: "cross-exposure",
-    href: "/fun/cross-exposure",
-    title: "Cross Exposure",
-    illustration: "/fun/cross-exposure.avif",
-    description: "Every photograph has two connections. Find its place in the grid.",
   },
 ] as const;
 

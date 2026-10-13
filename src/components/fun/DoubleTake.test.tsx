@@ -82,7 +82,7 @@ const tick = (milliseconds: number) =>
   act(() => {
     jest.advanceTimersByTime(milliseconds);
   });
-const watch = async (duration = 1600) => {
+const watch = async (duration = 1000) => {
   await ready();
   tick(duration);
   tick(duration);
@@ -101,9 +101,9 @@ it("waits for both photographs to decode, hides spoilers and reveals the actual 
   expect(screen.getByRole("img", { name: "Photograph 1" })).toBeTruthy();
   expect(screen.queryByText(/Secret place/)).toBeNull();
   expect(screen.queryByRole("img", { name: /Secret subject/ })).toBeNull();
-  tick(1600);
+  tick(1000);
   expect(screen.getByRole("img", { name: "Photograph 2" })).toBeTruthy();
-  tick(1600);
+  tick(1000);
   expect(screen.queryByRole("img")).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "Same place" }));
   expect(screen.getByRole("region", { name: "Pair revealed" })).toHaveTextContent(
@@ -121,6 +121,20 @@ it("shows preparation before computing the deck and cancels it when leaving", ()
   view.unmount();
   tick(0);
   expect(buildDoubleTakeDeck).not.toHaveBeenCalled();
+});
+
+it("retains a three-second look when the longer viewing option is selected", async () => {
+  render(<DoubleTake photos={photos} />);
+  fireEvent.click(screen.getByRole("button", { name: /Longer look/ }));
+  fireEvent.click(screen.getByRole("button", { name: "Start Double Take" }));
+  tick(0);
+  await ready();
+  tick(2999);
+  expect(screen.getByRole("img", { name: "Photograph 1" })).toBeTruthy();
+  tick(1);
+  expect(screen.getByRole("img", { name: "Photograph 2" })).toBeTruthy();
+  tick(3000);
+  expect(screen.getByRole("button", { name: "Same place" })).toBeTruthy();
 });
 
 it("times out a stalled load or decode and lets the player retry", async () => {
@@ -145,9 +159,9 @@ it("awards accuracy and streak points while replay removes the bonus", async () 
   await watch();
   fireEvent.click(screen.getByRole("button", { name: "Same place" }));
   fireEvent.click(screen.getByRole("button", { name: "Next pair" }));
-  await watch(1450);
+  await watch(900);
   fireEvent.click(screen.getByRole("button", { name: "Replay pair" }));
-  await watch(1450);
+  await watch(900);
   fireEvent.click(screen.getByRole("button", { name: "Different places" }));
   expect(screen.getByText("+100 points")).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "See results" }));
@@ -174,7 +188,7 @@ it("requires a fresh watch after a hidden-tab interruption without advancing in 
   fireEvent.click(screen.getByRole("button", { name: "Watch again" }));
   await ready();
   expect(screen.getByRole("img", { name: "Photograph 1" })).toBeTruthy();
-  tick(1599);
+  tick(999);
   expect(screen.getByRole("img", { name: "Photograph 1" })).toBeTruthy();
   tick(1);
   expect(screen.getByRole("img", { name: "Photograph 2" })).toBeTruthy();

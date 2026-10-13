@@ -186,26 +186,32 @@ Double Take flashes two decoded photographs in sequence, then asks Same place
 or Different places. Nearby pairs are within 75 metres on different camera-local
 days; distant pairs are at least 5 km apart. Invalid coordinates, ambiguous
 separations, same-day nearby bursts and near-duplicate vectors are excluded.
-Both answer classes have comparable similarity ranges: ranking only distant
-pairs by maximum resemblance would leak the answer. Eight rounds use distinct
+Half the rounds draw the strongest lookalikes in each answer class; the rest
+match resemblance across classes. This mixes deceptive distant pairs with
+convincing return visits without making every strong resemblance a distant
+answer. A 20-game audit raised average similarity from about 0.79 to 0.90 in
+both classes. Eight rounds use distinct
 photographs, with fewer rounds when the archive supports fewer balanced pairs.
 Correctness earns 100 points; a streak adds up to 100. Replay removes the bonus.
-A longer-look option gives each photograph three seconds. Hidden tabs interrupt
+Default flashes last one second, shortening by 100 ms per streak step to a
+650 ms minimum. A longer-look option gives each photograph three seconds. Hidden tabs interrupt
 the sequence; both frames must be watched again. Image load/decode failures and
 15-second stalls offer retry. Reveals show full photographs, dates, locations
 and actual separation; GPS proximity labels an area, not proof of a building.
 
-Cross Exposure dynamically creates 3×3 or 4×4 crossing grids from captions and
+Cross Exposure dynamically creates 3×3, 4×4 or 5×5 crossing grids from captions and
 subject tags. Distinct row/column predicates must have usable intersections;
 augmenting-path matching proves a complete arrangement with unique photographs.
 Equivalent clue families and duplicate board signatures are excluded. The tray
 contains exactly the solution photographs, shuffled; any alternative arrangement
 that satisfies both predicates for every square is accepted.
-Players choose Visible clues or Hidden connections. Hidden mode starts with two
-fixed photographs per row and column, with an optional clue reveal. Clear keeps
-the starting photographs; swaps and removal apply only to movable shots. Check
-marks which photographs fit both clues. On mobile, the board scrolls within its
-own region and row clues remain visible. Give up reveals one valid arrangement.
+Players choose Visible clues or Hidden connections. Starting photographs can be None, Minimal (one per row/column), or Guided (two
+per row/column). Hidden connections defaults to Minimal; Visible clues defaults
+to None. Clear keeps any starting photographs; swaps and removal apply only to
+movable shots. Check
+marks which photographs fit both clues. On phones and tablets the whole board fits without horizontal scrolling.
+Compact row numbers and column letters reference a full clue key beneath the
+grid; selecting a photograph also shows a larger preview. Give up reveals one valid arrangement.
 
 Oracle now uses indexed subject tags as well as broad caption topics, without an
 eight-question cap. Discovery narrows candidates directly by preferences until
@@ -222,3 +228,13 @@ Validation: all board sizes and subject modes generate against the real archive;
 20 generated crossing grids were valid (10 per size). Native browser reviews
 cover desktop and phone layouts, both crossing modes, complete Double Take
 sessions, replay/interruption, and Oracle singleton/tied results.
+
+Game entry shows its illustration immediately, with loading feedback delayed
+180 ms so already-available photographs do not cause a loading-message flash.
+Real waits retain progress and immediate errors retain retry.
+
+Unrevealed hidden grids accept valid row/column permutations and swapped axes,
+since their clue order cannot be known from an empty start. Revealed labels
+follow the player’s valid arrangement. Visible or revealed clues retain their
+positional meaning; an incomplete hidden board does not report arbitrary
+position-specific errors.
