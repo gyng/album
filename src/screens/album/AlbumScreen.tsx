@@ -12,6 +12,7 @@ import { GlobalNav } from "../../components/GlobalNav";
 import { PhotoAlbum } from "../../components/PhotoAlbum";
 import { AlbumTripsView } from "../../components/AlbumTripsView";
 import { AlbumNeighbours } from "../../components/AlbumNeighbours";
+import { getDisplayDimensions } from "../../util/photoDimensions";
 import { Footer, buttonStyles } from "../../components/ui";
 import commonStyles from "../../styles/common.module.css";
 import type { AlbumPageData } from "../../util/pageDataTypes";
@@ -79,6 +80,17 @@ const AlbumScreen = ({ album }: AlbumScreenProps) => {
     album.blocks.find((b) => b.kind === "photo");
 
   const albumName = album._build.slug;
+  // The neighbouring albums line up with the edges of the album's widest photograph.
+  const widest = album.blocks
+    .filter((block): block is PhotoBlock => block.kind === "photo")
+    .map(getDisplayDimensions)
+    .reduce<{ width: number; height: number } | null>(
+      (best, each) =>
+        !best || each.width / Math.max(1, each.height) > best.width / Math.max(1, best.height)
+          ? each
+          : best,
+      null,
+    );
 
   const coverImageSrc = (cover as PhotoBlock | undefined)?._build.srcset?.[0]?.src;
   const coverImageAbsolute = resolveAbsoluteUrl(coverImageSrc, siteOrigin);
@@ -171,7 +183,7 @@ const AlbumScreen = ({ album }: AlbumScreenProps) => {
       >
         <main id="main-content">
           {view === "trips" ? <AlbumTripsView album={album} /> : <PhotoAlbum album={album} />}
-          <AlbumNeighbours slug={albumName} />
+          <AlbumNeighbours slug={albumName} {...(widest ? { frame: widest } : {})} />
         </main>
         <Footer />
       </AlbumNavigation>

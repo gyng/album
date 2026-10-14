@@ -19,7 +19,7 @@ import styles from "./Album.module.css";
 const HOVER_INTENT_MS = 200;
 
 /** "2024–2026 · 52 snaps": an album's years, in its own order, and its size. */
-export const albumSummary = (album: AlbumPreview): string => {
+const albumSummary = (album: AlbumPreview): string => {
   const timeRange = album._build.timeRange
     ?.filter(Boolean)
     .map((ts) => parseExifLocalDateTime(ts)?.year ?? 0) ?? [0, 0];

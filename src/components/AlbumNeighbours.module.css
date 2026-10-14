@@ -1,8 +1,5 @@
 .neighbours {
-  max-inline-size: var(--content-width-wide);
-  margin-inline: auto;
-  padding: var(--space-6) var(--page-gutter);
-  border-block-start: var(--line-hairline) solid var(--c-border);
+  padding-block-end: var(--space-5);
 }
 
 /* J and K stop here after the last photograph. */
@@ -10,14 +7,23 @@
   scroll-margin-block-start: var(--space-5);
 }
 
+/* Photo.module.css sizes a photograph by --photo-render-width. The album passes
+   its widest photograph's shape; without one, an aspect too wide for the window
+   to limit gives the widest frame any photograph could have. */
+.frame {
+  --photo-aspect: 100;
+}
+
 /* Previous on the left, next on the right — also when there is only a next. */
 .list {
   display: flex;
   justify-content: space-between;
   gap: var(--space-4);
-  margin: 0;
-  padding: 0;
+  inline-size: var(--photo-render-width);
+  margin: 0 auto;
+  padding: var(--space-5) 0 0;
   list-style: none;
+  border-block-start: var(--line-hairline) solid var(--c-border);
 }
 
 .neighbour[data-side="next"] {

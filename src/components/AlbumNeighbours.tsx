@@ -8,9 +8,9 @@ import type { AlbumPreview } from "../util/pageDataTypes";
 import type { PhotoBlock } from "../services/types";
 import { rgbToString } from "../util/colorDistance";
 import { AppLink } from "./platform";
-import { albumSummary } from "./Albums";
 import { Caption, Thumb } from "./ui";
 import { ALBUM_STEP_ATTRIBUTE } from "./useAlbumStepping";
+import photoStyles from "./Photo.module.css";
 import styles from "./AlbumNeighbours.module.css";
 
 const coverOf = (album: AlbumPreview) =>
@@ -38,9 +38,6 @@ const Neighbour = ({ album, side }: { album: AlbumPreview; side: "previous" | "n
             {side === "previous" ? "Previous album" : "Next album"}
           </Caption>
           <span className={styles.title}>{album.title ?? album._build.slug}</span>
-          <Caption as="span" size="sm">
-            {albumSummary(album)}
-          </Caption>
         </span>
       </AppLink>
     </li>
@@ -52,7 +49,14 @@ const Neighbour = ({ album, side }: { album: AlbumPreview; side: "previous" | "n
  * Fetched rather than built into the page — finding them at build time meant
  * every album page loading every album.
  */
-export const AlbumNeighbours = ({ slug }: { slug: string }) => {
+export const AlbumNeighbours = ({
+  slug,
+  frame,
+}: {
+  slug: string;
+  /** The album's widest photograph, whose edges the tiles line up with. */
+  frame?: { width: number; height: number };
+}) => {
   const [neighbours, setNeighbours] = useState<Neighbours>({});
   useEffect(() => {
     let live = true;
@@ -71,10 +75,24 @@ export const AlbumNeighbours = ({ slug }: { slug: string }) => {
   if (!previous && !next) return null;
   return (
     <nav className={styles.neighbours} aria-label="More albums" {...{ [ALBUM_STEP_ATTRIBUTE]: "" }}>
-      <ul className={styles.list}>
-        {previous ? <Neighbour album={previous} side="previous" /> : null}
-        {next ? <Neighbour album={next} side="next" /> : null}
-      </ul>
+      {/* A photograph's own block, sized like the album's widest photograph, so the
+          tiles line up with its edges. */}
+      <div
+        className={[photoStyles.block, styles.frame].join(" ")}
+        {...(frame
+          ? {
+              style: {
+                ["--photo-aspect" as string]: (frame.width / Math.max(1, frame.height)).toFixed(4),
+                ["--photo-intrinsic-width" as string]: `${frame.width}px`,
+              },
+            }
+          : {})}
+      >
+        <ul className={styles.list}>
+          {previous ? <Neighbour album={previous} side="previous" /> : null}
+          {next ? <Neighbour album={next} side="next" /> : null}
+        </ul>
+      </div>
     </nav>
   );
 };
