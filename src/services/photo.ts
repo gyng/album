@@ -49,32 +49,56 @@ export const getPhotoSize = async (
   });
 };
 
+/**
+ * How much of a photograph EXIF is read from. A JPEG keeps EXIF in its APP1
+ * segment, at most 64 KB and at the start of the file; every photograph in the
+ * archive parses identically from its first 256 KB as from the whole file.
+ */
+export const EXIF_HEAD_BYTES = 256 * 1024;
+
+const readHead = async (filepath: string): Promise<Buffer | null> => {
+  let handle: fs.promises.FileHandle | undefined;
+  try {
+    handle = await fs.promises.open(filepath, "r");
+    const buffer = Buffer.alloc(EXIF_HEAD_BYTES);
+    const { bytesRead } = await handle.read(buffer, 0, EXIF_HEAD_BYTES, 0);
+    return buffer.subarray(0, bytesRead);
+  } catch {
+    return null;
+  } finally {
+    await handle?.close();
+  }
+};
+
 export const getNextJsSafeExif = async (filepath: string): Promise<Exif> => {
   return measureBuild("photo.getNextJsSafeExif", async () => {
     // exifr implements chunked but omits it from its Options declaration.
     const options = { reviveValues: true, chunked: false };
-    return (
-      exifr
-        // exifr's chunked reader passes a path to FileHandle.stat(), which newer
-        // Node 26 versions reject and can leave an open file handle behind.
-        .parse(filepath, options)
-        .then((res) => {
-          // Next.js can't serialise Date objects, and a plain JSON round-trip
-          // renders them as UTC — shifting the camera's zone-less wall-clock
-          // time by the build machine's offset. Serialise every Date back to
-          // its wall clock instead (naive ISO, no zone designator), which is
-          // what all date consumers (day keys, hour/year facets, labels) expect.
-          return JSON.parse(
-            JSON.stringify(res, function (key, value) {
-              const raw = (this as Record<string, unknown>)[key];
-              return raw instanceof Date ? dateToNaiveIso(raw) : value;
-            }),
-          );
-        })
-        .catch(() => {
-          return {};
-        })
-    );
+    // exifr's chunked reader passes a path to FileHandle.stat(), which newer
+    // Node 26 versions reject and can leave an open file handle behind; given a
+    // path without it, exifr reads the whole file. Photographs are deserialised
+    // all at once, so a build worker loading every album held every original —
+    // 14 GB — in memory together. Hand exifr the start of the file instead, and
+    // the whole file only when that start holds no EXIF.
+    const head = await readHead(filepath);
+    const fromHead = head ? await exifr.parse(head, options).catch(() => undefined) : undefined;
+    return (fromHead ? Promise.resolve(fromHead) : exifr.parse(filepath, options))
+      .then((res) => {
+        // Next.js can't serialise Date objects, and a plain JSON round-trip
+        // renders them as UTC — shifting the camera's zone-less wall-clock
+        // time by the build machine's offset. Serialise every Date back to
+        // its wall clock instead (naive ISO, no zone designator), which is
+        // what all date consumers (day keys, hour/year facets, labels) expect.
+        return JSON.parse(
+          JSON.stringify(res, function (key, value) {
+            const raw = (this as Record<string, unknown>)[key];
+            return raw instanceof Date ? dateToNaiveIso(raw) : value;
+          }),
+        );
+      })
+      .catch(() => {
+        return {};
+      });
   });
 };
 

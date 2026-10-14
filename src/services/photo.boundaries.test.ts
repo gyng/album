@@ -26,6 +26,7 @@ import { imageSizeFromFile } from "image-size/fromFile";
 import sharp from "sharp";
 import {
   AVIF_OPTIONS,
+  EXIF_HEAD_BYTES,
   getNextJsSafeExif,
   getPhotoSize,
   ICC_PROFILE,
@@ -266,6 +267,36 @@ describe("photo adapter boundaries", () => {
 
     mockExifParse.mockRejectedValueOnce(new Error("invalid EXIF"));
     await expect(getNextJsSafeExif("broken.jpg")).resolves.toEqual({});
+  });
+
+  describe("reading EXIF from the start of a file", () => {
+    let dir: string;
+    beforeEach(() => {
+      dir = fs.mkdtempSync(path.join(os.tmpdir(), "exif-head-"));
+    });
+    afterEach(() => fs.rmSync(dir, { recursive: true, force: true }));
+
+    // Reading whole originals held all 14 GB of them at once in each build
+    // worker that loaded every album; a JPEG's EXIF is in its first 64 KB.
+    it("hands the parser only the start of the photograph", async () => {
+      const file = path.join(dir, "large.jpg");
+      fs.writeFileSync(file, Buffer.alloc(EXIF_HEAD_BYTES * 4, 1));
+      mockExifParse.mockResolvedValueOnce({ Model: "X-T5" });
+
+      await expect(getNextJsSafeExif(file)).resolves.toEqual({ Model: "X-T5" });
+      const input = mockExifParse.mock.calls[0]![0];
+      expect(Buffer.isBuffer(input)).toBe(true);
+      expect((input as Buffer).length).toBe(EXIF_HEAD_BYTES);
+    });
+
+    it("reads the whole file when the start holds no EXIF", async () => {
+      const file = path.join(dir, "late.jpg");
+      fs.writeFileSync(file, Buffer.alloc(EXIF_HEAD_BYTES * 2, 1));
+      mockExifParse.mockResolvedValueOnce(undefined).mockResolvedValueOnce({ Model: "X100T" });
+
+      await expect(getNextJsSafeExif(file)).resolves.toEqual({ Model: "X100T" });
+      expect(mockExifParse.mock.calls[1]![0]).toBe(file);
+    });
   });
 
   it("re-encodes zero-byte cache entries", async () => {
