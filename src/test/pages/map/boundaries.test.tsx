@@ -121,8 +121,9 @@ describe("map page boundaries", () => {
     const { unmount } = render(<WorldMap photos={photos as never} />);
 
     expect(screen.getByText(/2-photo journey/)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Hide date controls" }));
-    fireEvent.click(screen.getByRole("button", { name: "Choose dates" }));
+    // Pinned and in-list copies of the controls share one state; the first is the pinned one.
+    fireEvent.click(screen.getAllByRole("button", { name: "Hide date controls" })[0]!);
+    fireEvent.click(screen.getAllByRole("button", { name: "Choose dates" })[0]!);
     fireEvent.click(screen.getByRole("button", { name: "drag range" }));
     fireEvent.click(screen.getByRole("button", { name: "commit range" }));
     act(() => {
@@ -214,11 +215,11 @@ describe("map page boundaries", () => {
     const { rerender } = render(<WorldMap photos={photos as never} />);
     expect(mapProps).toHaveBeenLastCalledWith(expect.objectContaining({ fitToPhotos: false }));
 
-    const journeys = screen.getByRole("button", { name: "Show 1 journeys" });
-    fireEvent.click(journeys);
+    const [journeys] = screen.getAllByRole("button", { name: "Show 1 journeys" });
+    fireEvent.click(journeys!);
     expect(journeys).toHaveTextContent("Hide journeys");
     rerender(<WorldMap photos={[]} />);
-    expect(screen.getByRole("button", { name: "Choose dates" })).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "Choose dates" })[0]).toBeInTheDocument();
   });
 
   // A geotagged clip is a place you were, exactly like a photo taken next to it,

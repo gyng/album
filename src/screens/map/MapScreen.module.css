@@ -129,8 +129,40 @@
 
 .mapControls {
   display: inline-flex;
-  flex-wrap: wrap;
-  gap: var(--m-s);
+  flex-wrap: nowrap;
+  gap: var(--space-2);
+}
+
+/* The search field with the journeys and dates beside it, pinned at the end of
+   the nav row where the scrolling list cannot clip them. */
+.trailing {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.mapControlsInList {
+  display: none;
+}
+
+/* Pinned they need about 260px beside the field; below 1100px that left the
+   site's own links a single visible item. There, and on a phone (where the
+   field takes its own line and they would add a row of chrome over the map),
+   they stay in the scrolling list. */
+@media (max-width: 1100px) {
+  .mapControlsPinned {
+    display: none;
+  }
+
+  .mapControlsInList {
+    display: list-item;
+  }
+}
+
+@media (max-width: 720px) {
+  .trailing .mapSearch {
+    flex: 1 1 auto;
+  }
 }
 
 /* Safe-area spacing belongs to the map's outer gutter, not both wrappers. */

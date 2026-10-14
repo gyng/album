@@ -150,10 +150,13 @@ describe("WorldMap route controls", () => {
       />,
     );
 
-    const journeysControl = screen.getByRole("button", { name: /journeys/i });
-    fireEvent.click(journeysControl);
+    // The controls render twice — pinned by the search field, and in the nav's
+    // scrolling list for phones — with CSS showing one. Both share one state.
+    const [journeysControl, journeysInList] = screen.getAllByRole("button", { name: /journeys/i });
+    fireEvent.click(journeysControl!);
 
     expect(journeysControl).toHaveAttribute("aria-pressed", "true");
+    expect(journeysInList).toHaveAttribute("aria-pressed", "true");
     expect(mapWorldDeferredMock).toHaveBeenLastCalledWith(
       expect.objectContaining({
         showRoute: true,
@@ -162,10 +165,11 @@ describe("WorldMap route controls", () => {
       }),
     );
 
-    const dateControl = screen.getByRole("button", { name: "Choose dates" });
+    const [dateControl, dateInList] = screen.getAllByRole("button", { name: "Choose dates" });
     expect(dateControl).toHaveAttribute("aria-expanded", "false");
     expect(dateControl).toHaveAttribute("aria-controls", "map-date-controls");
-    fireEvent.click(dateControl);
+    fireEvent.click(dateControl!);
     expect(dateControl).toHaveAttribute("aria-expanded", "true");
+    expect(dateInList).toHaveAttribute("aria-expanded", "true");
   });
 });

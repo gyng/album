@@ -286,6 +286,43 @@ const MapScreen = (props: MapScreenProps) => {
     return () => observer.disconnect();
   }, [showTimeRangeSlider]);
 
+  const dateControlsToggle = (
+    <button
+      type="button"
+      className={[buttonStyles.base, showTimeRangeSlider ? buttonStyles.active : ""]
+        .filter(Boolean)
+        .join(" ")}
+      aria-expanded={showTimeRangeSlider}
+      aria-controls="map-date-controls"
+      onClick={() => {
+        setShowTimeRangeSlider((current) => !current);
+      }}
+    >
+      {showTimeRangeSlider ? "Hide date controls" : "Choose dates"}
+    </button>
+  );
+  // Rendered twice, one copy shown at a time: beside the search field where
+  // the row has room, and in the scrolling list on narrower screens, where
+  // pinned they would crowd out the site's links or, on a phone, push the map
+  // under another row of chrome.
+  const mapControls = (
+    <div className={styles.mapControls}>
+      {!filterAlbum && routableAlbumCount > 0 ? (
+        <button
+          type="button"
+          className={buttonStyles.base}
+          aria-pressed={showAllRoutes}
+          onClick={() => {
+            setShowAllRoutes((current) => !current);
+          }}
+        >
+          {showAllRoutes ? "Hide journeys" : `Show ${routableAlbumCount} journeys`}
+        </button>
+      ) : null}
+      {dateControlsToggle}
+    </div>
+  );
+
   return (
     <div
       className={[styles.container, showTimeRangeSlider ? styles.containerWithSlider : ""]
@@ -321,82 +358,89 @@ const MapScreen = (props: MapScreenProps) => {
           // theme: the two appearance choices sit together, as asked.
           themeAdjacentItem={<MapStyleToggle />}
           trailingItem={
-            <div className={styles.mapSearch} role="search">
-              <input
-                type="search"
-                className={styles.mapSearchInput}
-                value={mapSearchQuery}
-                onFocus={loadMapSearchIndex}
-                onChange={(event) => {
-                  const nextQuery = event.target.value;
-                  setMapSearchQuery(nextQuery);
-                  if (nextQuery.trim()) {
-                    loadMapSearchIndex();
-                  }
-                }}
-                placeholder="Search photos…"
-                aria-label="Search photos on the map"
-                autoComplete="off"
-                spellCheck={false}
-                aria-busy={mapSearchStatus === "loading"}
-              />
-              {/* Beside the field, not below it, and a fixed width: the text
+            <div className={styles.trailing}>
+              {/* Before the field, not after: "Show N journeys" counts the search
+                  results, so its width changes as you type, and the group's right
+                  edge is the fixed one — after the field it pushed the field
+                  sideways on every keystroke. */}
+              <div className={styles.mapControlsPinned}>{mapControls}</div>
+              <div className={styles.mapSearch} role="search">
+                <input
+                  type="search"
+                  className={styles.mapSearchInput}
+                  value={mapSearchQuery}
+                  onFocus={loadMapSearchIndex}
+                  onChange={(event) => {
+                    const nextQuery = event.target.value;
+                    setMapSearchQuery(nextQuery);
+                    if (nextQuery.trim()) {
+                      loadMapSearchIndex();
+                    }
+                  }}
+                  placeholder="Search photos…"
+                  aria-label="Search photos on the map"
+                  autoComplete="off"
+                  spellCheck={false}
+                  aria-busy={mapSearchStatus === "loading"}
+                />
+                {/* Beside the field, not below it, and a fixed width: the text
                     swings between "1444 photos", "935/1444" and "No matches",
                     and anything that let it size itself would shove the field
                     sideways on every keystroke. */}
-              <span className={styles.mapSearchCount} title={searchCountTitle} role="status">
-                {searchCount}
-              </span>
-              {/* Hung below the count rather than laid out in the row, so a
+                <span className={styles.mapSearchCount} title={searchCountTitle} role="status">
+                  {searchCount}
+                </span>
+                {/* Hung below the count rather than laid out in the row, so a
                     Fit or Tour appearing cannot change the height of the nav
                     line the field sits on. */}
-              <div className={styles.mapSearchActions}>
-                {mapSearchStatus === "error" ? (
-                  <button
-                    type="button"
-                    className={styles.mapSearchAction}
-                    onClick={loadMapSearchIndex}
-                  >
-                    Try again
-                  </button>
-                ) : null}
-                {/* Reframe on demand: the search filters the markers in
+                <div className={styles.mapSearchActions}>
+                  {mapSearchStatus === "error" ? (
+                    <button
+                      type="button"
+                      className={styles.mapSearchAction}
+                      onClick={loadMapSearchIndex}
+                    >
+                      Try again
+                    </button>
+                  ) : null}
+                  {/* Reframe on demand: the search filters the markers in
                       place, so this is how the user asks the map to fly to the
                       matches. */}
-                {trimmedQuery && displayedPhotos.length > 0 ? (
-                  <button
-                    type="button"
-                    className={styles.mapSearchAction}
-                    aria-label="Fit the map to the results"
-                    onClick={() => {
-                      setFitRequestId((id) => id + 1);
-                    }}
-                  >
-                    <span aria-hidden="true">⤢</span>
-                    Fit
-                  </button>
-                ) : null}
-                {/* The tour reads as "play these results", so it belongs
+                  {trimmedQuery && displayedPhotos.length > 0 ? (
+                    <button
+                      type="button"
+                      className={styles.mapSearchAction}
+                      aria-label="Fit the map to the results"
+                      onClick={() => {
+                        setFitRequestId((id) => id + 1);
+                      }}
+                    >
+                      <span aria-hidden="true">⤢</span>
+                      Fit
+                    </button>
+                  ) : null}
+                  {/* The tour reads as "play these results", so it belongs
                       with the result count rather than floating over the map,
                       and only once there are results to tour. */}
-                {trimmedQuery && directorSequenceLength > 1 ? (
-                  <button
-                    type="button"
-                    className={[
-                      styles.mapSearchAction,
-                      directorEnabled ? styles.mapSearchActionActive : "",
-                    ]
-                      .filter(Boolean)
-                      .join(" ")}
-                    aria-pressed={directorEnabled}
-                    onClick={() => {
-                      setDirectorEnabled((current) => !current);
-                    }}
-                  >
-                    <span aria-hidden="true">{directorEnabled ? "■" : "▶"}</span>
-                    Tour
-                  </button>
-                ) : null}
+                  {trimmedQuery && directorSequenceLength > 1 ? (
+                    <button
+                      type="button"
+                      className={[
+                        styles.mapSearchAction,
+                        directorEnabled ? styles.mapSearchActionActive : "",
+                      ]
+                        .filter(Boolean)
+                        .join(" ")}
+                      aria-pressed={directorEnabled}
+                      onClick={() => {
+                        setDirectorEnabled((current) => !current);
+                      }}
+                    >
+                      <span aria-hidden="true">{directorEnabled ? "■" : "▶"}</span>
+                      Tour
+                    </button>
+                  ) : null}
+                </div>
               </div>
             </div>
           }
@@ -420,53 +464,7 @@ const MapScreen = (props: MapScreenProps) => {
                   </div>
                 </li>
               ) : null}
-              {!filterAlbum && routableAlbumCount > 0 ? (
-                <li>
-                  <div className={styles.mapControls}>
-                    <button
-                      type="button"
-                      className={buttonStyles.base}
-                      aria-pressed={showAllRoutes}
-                      onClick={() => {
-                        setShowAllRoutes((current) => !current);
-                      }}
-                    >
-                      {showAllRoutes ? "Hide journeys" : `Show ${routableAlbumCount} journeys`}
-                    </button>
-
-                    <button
-                      type="button"
-                      className={[buttonStyles.base, showTimeRangeSlider ? buttonStyles.active : ""]
-                        .filter(Boolean)
-                        .join(" ")}
-                      aria-expanded={showTimeRangeSlider}
-                      aria-controls="map-date-controls"
-                      onClick={() => {
-                        setShowTimeRangeSlider((current) => !current);
-                      }}
-                    >
-                      {showTimeRangeSlider ? "Hide date controls" : "Choose dates"}
-                    </button>
-                  </div>
-                </li>
-              ) : null}
-              {filterAlbum || routableAlbumCount === 0 ? (
-                <li>
-                  <button
-                    type="button"
-                    className={[buttonStyles.base, showTimeRangeSlider ? buttonStyles.active : ""]
-                      .filter(Boolean)
-                      .join(" ")}
-                    aria-expanded={showTimeRangeSlider}
-                    aria-controls="map-date-controls"
-                    onClick={() => {
-                      setShowTimeRangeSlider((current) => !current);
-                    }}
-                  >
-                    {showTimeRangeSlider ? "Hide date controls" : "Choose dates"}
-                  </button>
-                </li>
-              ) : null}
+              <li className={styles.mapControlsInList}>{mapControls}</li>
             </>
           }
         />
