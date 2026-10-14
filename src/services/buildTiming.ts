@@ -32,7 +32,11 @@ const profile: BuildProfile = {
 };
 
 let hasRegisteredExitHandlers = false;
-let hasFlushed = false;
+let pendingWrite: ReturnType<typeof setTimeout> | null = null;
+// Next 16 ends its build workers without running exit handlers, so the profile
+// is also written shortly after each measurement: a worker that is terminated
+// loses at most this window, rather than everything it measured.
+const WRITE_DELAY_MS = 250;
 
 const getMetric = (name: string): BuildMetric => {
   const existing = profile.metrics[name];
@@ -51,16 +55,29 @@ const getMetric = (name: string): BuildMetric => {
 };
 
 const flushProfileSync = () => {
-  if (!enabled || hasFlushed) {
+  if (!enabled) {
     return;
   }
 
-  hasFlushed = true;
+  if (pendingWrite) {
+    clearTimeout(pendingWrite);
+    pendingWrite = null;
+  }
   profile.finishedAt = new Date().toISOString();
   profile.durationMs = Date.now() - startedAtMs;
 
   fs.mkdirSync(path.dirname(outputPath), { recursive: true });
   fs.writeFileSync(outputPath, JSON.stringify(profile, null, 2));
+};
+
+const scheduleWrite = () => {
+  if (!enabled || pendingWrite) {
+    return;
+  }
+
+  pendingWrite = setTimeout(flushProfileSync, WRITE_DELAY_MS);
+  // Never the reason a build process stays alive.
+  pendingWrite.unref?.();
 };
 
 const registerExitHandlers = () => {
@@ -83,6 +100,7 @@ export const incrementBuildCounter = (name: string, delta = 1) => {
   }
 
   profile.counters[name] = (profile.counters[name] ?? 0) + delta;
+  scheduleWrite();
 };
 
 export const recordBuildDuration = (name: string, durationMs: number) => {
@@ -94,6 +112,7 @@ export const recordBuildDuration = (name: string, durationMs: number) => {
   metric.count += 1;
   metric.totalMs += durationMs;
   metric.maxMs = Math.max(metric.maxMs, durationMs);
+  scheduleWrite();
 };
 
 export const measureBuildSync = <T>(name: string, fn: () => T): T => {

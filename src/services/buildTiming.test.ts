@@ -46,7 +46,7 @@ describe("build timing instrumentation", () => {
     expect(work).toHaveBeenCalledTimes(1);
   });
 
-  it("records counters and successful and failed work before flushing once", async () => {
+  it("records counters and successful and failed work, and flushes on exit", async () => {
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "album-build-timing-"));
     const outputPath = path.join(tempDir, "nested", "profile.json");
     process.env.ALBUM_BUILD_PROFILE = "1";
@@ -91,6 +91,34 @@ describe("build timing instrumentation", () => {
     expect(profile.finishedAt).toEqual(expect.any(String));
     expect(profile.durationMs).toEqual(expect.any(Number));
 
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  // Next 16 ends its build workers without running exit handlers, so a profile
+  // written only on exit never reached disk from the workers that do the work.
+  it("writes the profile while the process is still running", async () => {
+    jest.useFakeTimers();
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "album-build-timing-live-"));
+    const outputPath = path.join(tempDir, "profile.json");
+    process.env.ALBUM_BUILD_PROFILE = "1";
+    process.env.ALBUM_BUILD_PROFILE_OUTPUT = outputPath;
+    jest.spyOn(process, "once").mockImplementation((() => process) as never);
+    const timing = loadBuildTiming();
+
+    timing.incrementBuildCounter("photos");
+    await timing.measureBuild("page", async () => "ok");
+    expect(fs.existsSync(outputPath)).toBe(false);
+    jest.advanceTimersByTime(1000);
+    expect(JSON.parse(fs.readFileSync(outputPath, "utf8"))).toMatchObject({
+      counters: { photos: 1 },
+      metrics: { page: { count: 1 } },
+    });
+
+    timing.incrementBuildCounter("photos");
+    jest.advanceTimersByTime(1000);
+    expect(JSON.parse(fs.readFileSync(outputPath, "utf8")).counters.photos).toBe(2);
+
+    jest.useRealTimers();
     fs.rmSync(tempDir, { recursive: true, force: true });
   });
 
