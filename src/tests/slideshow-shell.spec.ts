@@ -7,6 +7,26 @@ import { gotoHydrated } from "./hydrated";
 test.use({ serviceWorkers: "block" });
 
 const slideshowImage = 'img[alt]:not([aria-hidden="true"])';
+
+// Linux WebKit decodes AVIF on the main thread: a 3200px variant, which an iPad
+// viewport selects, blocks it for about half a second, and the slideshow keeps
+// several decoded. Animation frames then barely run, so the shell never sees a
+// photograph presented and Playwright's stability checks never settle. Safari
+// on an iPad decodes off the main thread. These cases are about recovery, not
+// resolution, so WebKit is served the 800px variant (about 50ms to decode)
+// under the URL it asked for.
+test.beforeEach(async ({ page, browserName }) => {
+  if (browserName !== "webkit") return;
+  // Variant URLs encode the "@" as %40.
+  await page.route(/(@|%40)(1600|3200)\.avif(\?|$)/, (route) =>
+    route.continue({
+      url: route
+        .request()
+        .url()
+        .replace(/(@|%40)(1600|3200)\.avif/, "$1800.avif"),
+    }),
+  );
+});
 const updateTestUrl = `/slideshow/shell?mode=random&filter=test-simple&delay=86400&photo=${encodeURIComponent("../albums/test-simple/DSCF2485-2.jpg")}`;
 
 test.describe("touch slideshow controls", () => {
