@@ -74,7 +74,7 @@
 .colorFamilyThumbs {
   display: grid;
   /* Keep empty columns so sparse families use the same tile width as full rows. */
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 96px), 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, var(--size-96)), 1fr));
   inline-size: 100%;
   gap: var(--m-s);
   align-content: start;

@@ -80,8 +80,8 @@
 
 .slots li[data-drop-hover="true"] {
   background: var(--c-selected);
-  border: 2px solid var(--c-accent);
-  box-shadow: inset 0 0 0 2px var(--c-bg);
+  border: var(--line-strong) solid var(--c-accent);
+  box-shadow: inset 0 0 0 var(--line-strong) var(--c-bg);
 }
 
 .slots li[data-drop-hover="true"]::after {
@@ -100,8 +100,8 @@
 .choice[data-dragging="true"],
 .slots li[data-dragging="true"] {
   opacity: 0.4;
-  outline: 2px dashed var(--c-accent);
-  outline-offset: 2px;
+  outline: var(--line-strong) dashed var(--c-accent);
+  outline-offset: var(--size-2);
 }
 
 .choices {

@@ -9,6 +9,8 @@ type Props = {
   barColor?: string;
   actionHref?: string | null;
   actionLabel?: string;
+  /** Hold an action's space on a row without one, so a list's counts line up. */
+  reserveAction?: boolean;
 };
 
 export const StatBar: React.FC<Props> = ({
@@ -19,12 +21,15 @@ export const StatBar: React.FC<Props> = ({
   barColor,
   actionHref,
   actionLabel,
+  reserveAction,
 }) => {
   const pct = maxCount > 0 ? (count / maxCount) * 100 : 0;
 
   return (
     <div className={styles.container}>
-      <div className={[styles.row, actionHref ? styles.rowInteractive : ""].join(" ")}>
+      <div
+        className={[styles.row, actionHref ? styles.rowInteractive : ""].filter(Boolean).join(" ")}
+      >
         <span className={styles.label}>
           {labelPrefix}
           <span>{label}</span>
@@ -49,6 +54,11 @@ export const StatBar: React.FC<Props> = ({
             <span className={styles.actionText}>View</span>
             <span aria-hidden="true">↗</span>
           </Link>
+        ) : reserveAction ? (
+          <span className={[styles.action, styles.actionPlaceholder].join(" ")} aria-hidden="true">
+            <span className={styles.actionText}>View</span>
+            <span>↗</span>
+          </span>
         ) : null}
       </div>
     </div>

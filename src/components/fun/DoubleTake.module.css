@@ -37,7 +37,7 @@
   position: absolute;
   inset-inline: 0;
   inset-block-end: 0;
-  block-size: 3px;
+  block-size: var(--size-3);
   background: var(--c-accent);
   transform-origin: left;
   animation: remaining linear forwards;
@@ -79,7 +79,7 @@
 .spinner {
   inline-size: 1.5rem;
   block-size: 1.5rem;
-  border: 2px solid var(--c-border);
+  border: var(--line-strong) solid var(--c-border);
   border-block-start-color: var(--c-accent);
   border-radius: 50%;
   animation: spin 800ms linear infinite;

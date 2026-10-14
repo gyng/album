@@ -214,7 +214,7 @@
   display: grid;
   gap: var(--space-3);
   padding: var(--space-4);
-  border-inline-start: 3px solid var(--c-accent);
+  border-inline-start: var(--size-3) solid var(--c-accent);
   background: var(--c-surface);
   border-radius: var(--radius-preview);
   max-inline-size: 28rem;
@@ -222,7 +222,7 @@
 .scoreTrack {
   block-size: 0.35rem;
   background: var(--c-bg-contrast-light);
-  border-radius: 1rem;
+  border-radius: var(--radius-pill);
   overflow: hidden;
 }
 .scoreTrack span {
@@ -247,7 +247,7 @@
 .choice[aria-pressed="true"] {
   opacity: 1;
   border-color: var(--c-accent);
-  box-shadow: inset 0 0 0 2px var(--c-accent);
+  box-shadow: inset 0 0 0 var(--line-strong) var(--c-accent);
 }
 @keyframes frameIn {
   from {
@@ -321,7 +321,7 @@
     inline-size: 1rem;
     block-size: 1rem;
     border-width: 1px;
-    font-size: 0.65rem;
+    font-size: var(--fs-xs);
   }
 }
 
@@ -369,7 +369,7 @@
   block-size: 1.75rem;
   background: var(--c-accent);
   color: light-dark(var(--c-white), var(--c-black));
-  border: 2px solid var(--c-bg);
+  border: var(--line-strong) solid var(--c-bg);
   border-radius: 50%;
   font-weight: 700;
 }

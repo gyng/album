@@ -122,3 +122,27 @@ test("photo metadata keeps its columns while deferred content loads", async ({ p
     await page.unrouteAll({ behavior: "ignoreErrors" });
   }
 });
+
+test("selected controls stay distinguishable in forced colours", async ({ page }) => {
+  await page.emulateMedia({ forcedColors: "active" });
+  await gotoHydrated(page, "/design");
+  // Forced colours repaint every author background as Canvas, keeping only its
+  // alpha, so a soft accent surface becomes white on white.
+  const pageBackground = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
+  const selected = page
+    .getByRole("radiogroup", { name: "Standard density view" })
+    .getByRole("radio", {
+      checked: true,
+    });
+  const fill = await selected.evaluate((element) => getComputedStyle(element).backgroundColor);
+  expect(fill).not.toBe(pageBackground);
+  expect(fill).not.toMatch(/rgba\(.*, 0(\.\d+)?\)$/);
+});
+
+test("stat rows keep their counts aligned when only some rows have an action", async ({ page }) => {
+  await page.setViewportSize({ width: 1200, height: 900 });
+  await gotoHydrated(page, "/design");
+  const rows = page.locator("#status").getByText(/^(642|118)$/);
+  const [first, second] = await Promise.all([rows.nth(0).boundingBox(), rows.nth(1).boundingBox()]);
+  expect(Math.abs(first!.x + first!.width - (second!.x + second!.width))).toBeLessThan(1);
+});

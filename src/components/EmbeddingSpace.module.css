@@ -274,7 +274,7 @@
   font-size: var(--fs-s);
 }
 .filterRow select {
-  max-inline-size: min(280px, 70vw);
+  max-inline-size: min(var(--size-280), 70vw);
 }
 .empty {
   position: absolute;

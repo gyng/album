@@ -1330,6 +1330,19 @@ body.theme-desktop :is(button, input, select, textarea, summary) {
     border-color: ButtonText;
   }
 
+  /* Selection is a soft accent surface, which forced colours repaint as Canvas.
+     The system's own selected pair keeps it visible and distinct from focus.
+     Important because every component's selected rule out-ranks a global one. */
+  [aria-pressed="true"],
+  [aria-checked="true"]:not(input),
+  [aria-selected="true"],
+  a[aria-current]:not([aria-current="false"]) {
+    /* biome-ignore lint/complexity/noImportantStyles: must beat each component's own selected rule */
+    background-color: SelectedItem !important;
+    /* biome-ignore lint/complexity/noImportantStyles: must beat each component's own selected rule */
+    color: SelectedItemText !important;
+  }
+
   :where([data-colour-swatch], [data-map-pin], [data-colour-data]) {
     forced-color-adjust: none;
     outline: var(--line-hairline) solid CanvasText;

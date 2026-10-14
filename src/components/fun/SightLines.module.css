@@ -109,8 +109,8 @@
 .tile[aria-pressed="true"],
 .tile[data-hint="true"] {
   border-color: var(--c-accent);
-  outline: 2px solid var(--c-accent);
-  outline-offset: -2px;
+  outline: var(--line-strong) solid var(--c-accent);
+  outline-offset: calc(-1 * var(--line-strong));
   background: var(--c-selected);
 }
 .tile[data-found="true"] {
@@ -134,7 +134,7 @@
   font-size: var(--fs-s);
   min-inline-size: 1rem;
   inline-size: auto;
-  padding-inline: 2px;
+  padding-inline: var(--size-2);
 }
 .result {
   display: grid;
@@ -156,7 +156,7 @@
   overflow-x: auto;
   max-inline-size: 100%;
   min-inline-size: 0;
-  padding: 2px;
+  padding: var(--size-2);
 }
 .board[data-large="true"] {
   min-inline-size: calc(var(--search-size) * (var(--tap-target) + var(--space-1)));

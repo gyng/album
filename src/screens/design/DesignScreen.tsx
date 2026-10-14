@@ -15,6 +15,7 @@ import {
   Caption,
   Input,
   KeyHint,
+  LoadingIndicator,
   OverlayButton,
   OverlayButtonLink,
   Pill,
@@ -23,7 +24,9 @@ import {
   SegmentedToggle,
   Select,
   Thumb,
+  TooltipSurface,
 } from "../../components/ui";
+import { StatBar } from "../../components/StatBar";
 import commonStyles from "../../styles/common.module.css";
 import styles from "./DesignScreen.module.css";
 
@@ -89,6 +92,7 @@ const sections = [
   "pill",
   "overlay-button",
   "chart-tooltip",
+  "status",
   "buttons",
   "stack",
 ] as const;
@@ -577,6 +581,31 @@ const DesignPage = () => {
             </div>
           </div>
           <Code>{"<ChartTooltip>Label · 42</ChartTooltip>"}</Code>
+        </section>
+
+        <section id="status" className={styles.section}>
+          <div className={styles.sectionHeader}>
+            <Heading level={1}>Status and data rows</Heading>
+            <Caption>
+              LoadingIndicator for model warm-up and pending work; the spinner stops under reduced
+              motion.
+            </Caption>
+          </div>
+          <div className={styles.row}>
+            <LoadingIndicator label="Loading photographs…" />
+            <TooltipSurface>Keyword, semantic or both</TooltipSurface>
+          </div>
+          <div className={styles.statBarDemo}>
+            <StatBar label="Fujifilm X-T5" count={642} maxCount={642} reserveAction />
+            <StatBar
+              label="A camera name long enough to wrap onto a second line on a phone"
+              count={118}
+              maxCount={642}
+              actionHref="/search?q=camera"
+              actionLabel="Search this camera"
+            />
+          </div>
+          <Code>{'<LoadingIndicator label="Loading…" /> · <StatBar label count maxCount />'}</Code>
         </section>
 
         {/* Buttons */}

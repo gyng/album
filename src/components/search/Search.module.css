@@ -98,13 +98,13 @@
    mask is painted over the scrollport, so it stays put as the list scrolls. */
 
 .colorFacetPicker :global(.react-colorful__saturation) {
-  border-radius: var(--m-s) var(--m-s) 0 0;
+  border-radius: var(--radius-control) var(--radius-control) 0 0;
   border-bottom: 0;
 }
 
 .colorFacetPicker :global(.react-colorful__hue) {
   block-size: var(--size-16);
-  border-radius: 0 0 var(--m-s) var(--m-s);
+  border-radius: 0 0 var(--radius-control) var(--radius-control);
 }
 
 .colorFacetPicker :global(.react-colorful__pointer) {

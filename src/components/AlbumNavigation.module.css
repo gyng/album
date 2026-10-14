@@ -1,5 +1,5 @@
 .album {
-  --album-nav-height: 80px;
+  --album-nav-height: var(--size-80);
 }
 
 .slot {

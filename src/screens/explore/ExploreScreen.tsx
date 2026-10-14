@@ -273,6 +273,7 @@ const ExploreScreen = ({
                 : null
             }
             actionLabel={`Find photos with ${facet.displayName.toLowerCase()} ${bucket.label}`}
+            reserveAction={isSearchableFacetId(facet.facetId)}
           />
         ))}
       </StatSection>

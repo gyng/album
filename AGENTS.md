@@ -179,23 +179,32 @@ Everything that identifies *this* instance lives in one committed JSON file, rea
 - **`paths.albumsDir` is a data-format constant, not a free choice.** The search database keys photos by that prefix (`../albums/<album>/<file>`) and `deserialize.ts` looks rows up by that exact string. An absolute value is rejected at load; a mismatched relative one is reported once per build with a sample indexed path, because it is otherwise completely silent — every lookup misses and the build succeeds with no tags, alt text, geocodes or colours
 
 ## Design tokens (src/styles/globals.css)
-Always use tokens — never raw px values or colours.
-- **Themes:** system/light/dark plus named palettes `paper`, `ink`, `slate`. Registry in `src/util/theme.ts`; each named theme is a `:root:where(.theme-*)` token-override block in `globals.css` applied alongside its base scheme class (`light`/`dark`). Preference persists as `localStorage.theme` (legacy `darkMode` still read), applied pre-paint in `_document.tsx` and reactively by `ThemeToggle` (a select in the nav). `?theme=` URL param accepts any theme name.
-- Spacing: `--m` 4 / `--m-s` 8 / `--m-m` 12 / `--m-l` 20 / `--m-xl` 40 / `--m-2xl` 64 (px)
-- Font sizes: `--fs-xs` 10 / `--fs-s` 11 / `--fs-sm` 14 / `--fs-m` 18 / `--fs-l` 24 / `--fs-xl` 64 (px)
-- Colours: `--c-bg`, `--c-font`, `--c-bg-contrast-light`, `--c-bg-contrast-dark`, `--c-accent`, `--c-overlay-dark`, `--c-border-on-dark`
+Always use tokens — never raw px values or colours. `docs/design-system.md` is the full reference.
+- **Themes:** system/light/dark plus named palettes `paper`, `ink`, `darkroom`, `slate`, `watercolour`, `ember`, `bling`, `herbarium`, `arcana`, `terminal`, `desktop` (`NAMED_THEMES` in `src/util/theme.ts` is the registry). Each named theme is a `:root:where(.theme-*)` token-override block in `globals.css` applied alongside its base scheme class (`light`/`dark`). Preference persists as `localStorage.theme` (legacy `darkMode` still read), applied pre-paint by `THEME_BOOTSTRAP_SCRIPT` and reactively by `ThemeToggle` (a select in the nav). `?theme=` URL param accepts any theme name.
+- **Spacing:** `--space-1`…`--space-9` = 4 / 8 / 12 / 16 / 24 / 32 / 40 / 48 / 64px — use these in new rules. `--m` 4 / `--m-xs` 6 / `--m-s` 8 / `--m-m` 12 / `--m-l` 20 / `--m-xl` 40 / `--m-2xl` 64 is the legacy scale: do not add uses (`test/spacingTokens.test.ts` ratchets the count) and never remap it globally. `--page-gutter` is the page inset
+- **Geometry:** `--size-*` for fixed sizes, `--line-hairline` 1px / `--line-strong` 2px, `--tap-target` 44px, `--compact-control-size` 32px (44px on coarse pointers), `--radius-control` 8 / `--radius-panel` 12 / `--radius-sheet` 16 / `--radius-preview` 4 / `--radius-pill`
+- **Type:** `--fs-2xs` 9 / `--fs-xs` 10 / `--fs-s` 12 / `--fs-sm` 14 / `--fs-m` 18 / `--fs-l` 24 / `--fs-xl` 64px, `--fs-touch` 16px for touch inputs; line heights `--lh-body`, `--lh-label`, `--lh-caption`, `--lh-heading`
+- **Colours:** surfaces `--c-bg`, `--c-surface`, `--c-surface-hover`; borders `--c-border`, `--c-border-hover`; selection `--c-selected`, `--c-selected-border`; text `--c-font`, `--c-bg-contrast-light`, `--c-bg-contrast-dark`; `--c-accent`; overlays `--c-overlay`, `--c-overlay-dark`, `--c-border-on-dark`; status `--c-success`, `--c-warning`, `--c-danger`
+- **Stacking and motion:** `--z-*` (`--z-raised` … `--z-details`), `--t-fast` / `--t-base` / `--t-slow`, `--ease-out` / `--ease-spring`
+- **Selected states need ARIA, not only a class.** Forced colours repaint the soft accent surface as Canvas; `globals.css` restores selection from `aria-pressed`/`aria-checked`/`aria-selected`/`aria-current`
 
 ## Shared components (src/components/ui/)
-Design system primitives live in `src/components/ui/` with a barrel export. Import via `import { Heading, Card } from "../ui"` (from components) or `"../../components/ui"` (from pages). The `/design` page is the living catalogue.
-- `Thumb` / `Thumb size="small"` — image thumbnail (150px / 112px), sharp corners
-- `Heading level={1|2|3}` + `Caption` — consistent heading hierarchy and muted secondary text
-- `Card` — bordered surface container, theme-adaptive via color-mix
+Design system primitives live in `src/components/ui/` with a barrel export. Import via `import { Heading, Card } from "../ui"` (from components) or `"../../components/ui"` (from screens). The `/design` page is the living catalogue — add new components and states there.
+- `Button` / `ButtonLink` / `buttonStyles` — the action control; `variant` surface/accent/primary/quiet, `size` standard/large/icon; `active` marks a selected option and must be paired with `aria-pressed`
+- `Pill` / `PillButton` / `pillStyles` — legacy rounded link/action on the same control geometry; `variant="surface"` (default) or `"ghost"`; use `pillStyles` for composing with `AppLink`
 - `Input` / `Select` — form controls with consistent border, radius, and focus ring; Input supports forwardRef
-- `ChartTooltip` — accent-tinted hover tooltip for charts; consumer provides the hover trigger via `[data-tooltip]`
-- `SegmentedToggle` — pill-shaped option switcher (generic over value type)
-- `Pill` / `PillButton` / `pillStyles` — rounded nav link / action button; `variant="surface"` (default) or `"ghost"`; use `pillStyles` for composing with `AppLink`
+- `SegmentedToggle` — radio-group option switcher (generic over value type)
+- `Heading level={1|2|3}` + `Caption` — consistent heading hierarchy and muted secondary text
+- `Card` — bordered surface container on the shared surface tokens
+- `Thumb` / `Thumb size="small"` — image thumbnail (150px / 112px), sharp corners
 - `OverlayButton` / `OverlayButtonLink` / `overlayButtonStyles` — dark glass button for media overlays; `size="small"` for icon-only
-- `Footer` — site footer with standard links (GitHub, Fediverse, Bluesky, Design)
+- `Icon` — shared SVG icon set (`IconKind`), inherits `currentColor`
+- `KeyHint` — keyboard shortcut badge inside an action button
+- `LoadingIndicator` — spinner plus label for model warm-up and pending work
+- `ChartTooltip` — accent-tinted hover tooltip for charts; consumer provides the hover trigger via `[data-tooltip]`
+- `TooltipSurface` — the same surface for popover help (`SearchInputBar`'s mode help)
+- `Footer` — site footer with standard links
+- `components/ui/Control.module.css` — shared control geometry (`base`, `compact`, `icon`) for screen-owned controls to compose
 - Stack utilities in `common.module.css`: `.stack` (8px) / `.stackL` (20px) / `.stackXl` (40px) / `.stackPage` (64px)
 
 ## Search

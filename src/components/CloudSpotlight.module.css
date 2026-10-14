@@ -15,6 +15,6 @@
 
 .query {
   min-inline-size: 0;
-  flex: 1 1 180px;
-  max-inline-size: 360px;
+  flex: 1 1 var(--size-180);
+  max-inline-size: var(--size-360);
 }

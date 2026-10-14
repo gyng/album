@@ -40,4 +40,13 @@ describe("StatBar", () => {
     rerender(<StatBar label="No action" count={1} maxCount={2} actionLabel="Missing URL" />);
     expect(screen.queryByRole("link")).toBeNull();
   });
+
+  it("reserves an action's space without exposing a second action", () => {
+    const { container } = render(
+      <StatBar label="Other" count={3} maxCount={10} actionLabel="Unused" reserveAction />,
+    );
+
+    expect(screen.queryByRole("link")).toBeNull();
+    expect(container.querySelector('[aria-hidden="true"]')).toHaveTextContent("View");
+  });
 });

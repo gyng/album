@@ -67,13 +67,13 @@
   position: absolute;
   inset-block-end: 1px;
   inset-inline-end: 1px;
-  padding-inline: 2px;
+  padding-inline: var(--size-2);
   background: var(--c-bg);
   color: var(--c-font);
   font-size: var(--fs-s);
 }
 .thumbnail[aria-pressed="true"] {
-  outline: 2px solid var(--c-accent);
+  outline: var(--line-strong) solid var(--c-accent);
   outline-offset: 0;
 }
 .feedback {
