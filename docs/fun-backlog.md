@@ -1,5 +1,24 @@
 # Fun improvements queue
 
+## Queued — semantic games (14 October 2026)
+
+Both run the in-browser SigLIP v1 text encoder (q4, 154,693,262 bytes) against
+the stored v1 image vectors, so they share one download. Warn in the lobby
+before loading it, as search does, and warm it only on first use. Each starts
+with a placeholder illustration until new artwork can be generated.
+
+- **Warmer.** Semantle for one hidden photograph: the player types words, the
+  text encoder scores each against the photograph's vector, and the answer is
+  freezing → hot. Each guess sharpens a blurred version of the photograph; the
+  reveal shows the closest words and the index caption. Needs calibration so
+  "hot" means the same across photographs (rank the guess against the
+  archive's other photos, not a raw cosine). Daily-capable.
+- **Caption It.** The player writes a caption for a photograph; the encoder
+  scores how well it fits, compared with the index's own caption and with the
+  archive (does it pick this photograph out of the rest?). Shareable result.
+  Guard against keyword stuffing — rank against other photographs rather than
+  rewarding raw similarity.
+
 ## October refinement release
 
 - Cross Exposure: 5×5 boards; None, Minimal and Guided starting photographs;
