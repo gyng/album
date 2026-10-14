@@ -646,6 +646,16 @@ export const PhotoBlockEl: React.FC<{
 
                 <div className={commonStyles.mediaDetailsViewOriginal}>
                   <a href={`#${props.block.id}`}>Permalink</a>
+                  {props.block._build.tags.path ? (
+                    <>
+                      &nbsp;&middot;&nbsp;
+                      <AppLink
+                        href={`/explore?wander=${encodeURIComponent(props.block._build.tags.path)}#wander`}
+                      >
+                        Wander from here
+                      </AppLink>
+                    </>
+                  ) : null}
                   &nbsp;&middot;&nbsp; View{" "}
                   {props.block._build.srcset.map((s, i) => (
                     <React.Fragment key={s.src}>

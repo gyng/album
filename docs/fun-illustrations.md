@@ -24,6 +24,15 @@ horizontal composition. Replace it with a generated Hindsight cartoon in this
 style, encoded like the others, then remove the placeholder comment in
 `components/fun/games.ts`.
 
+## Placeholders — `warmer.avif` and `caption-it.avif`
+
+**Warmer and Caption It have no artwork of their own yet.** `warmer.avif` is
+the retired Photo Oracle engraving (a crystal ball over prints) and
+`caption-it.avif` the retired Blind Frame engraving (a sketchbook and pencil),
+both from before 07549cc. They are the older engraving style rather than the
+animal cartoons. Replace each with a generated cartoon in the current
+direction, then remove its placeholder comment in `components/fun/games.ts`.
+
 ## Current direction — animal editorial cartoons
 
 Updated 13 October 2026 with the built-in imagegen tool, one generation per

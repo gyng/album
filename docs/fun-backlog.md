@@ -1,47 +1,11 @@
 # Fun improvements queue
 
-## Queued — semantic games (14 October 2026)
+## Semantic games and Wander — 14 October 2026
 
-Both run the in-browser SigLIP v1 text encoder (q4, 154,693,262 bytes) against
-the stored v1 image vectors, so they share one download. Warn in the lobby
-before loading it, as search does, and warm it only on first use. Each starts
-with a placeholder illustration until new artwork can be generated.
-
-- **Warmer.** Semantle for one hidden photograph: the player types words, the
-  text encoder scores each against the photograph's vector, and the answer is
-  freezing → hot. Each guess sharpens a blurred version of the photograph; the
-  reveal shows the closest words and the index caption. Needs calibration so
-  "hot" means the same across photographs (rank the guess against the
-  archive's other photos, not a raw cosine). Daily-capable.
-- **Caption It.** The player writes a caption for a photograph; the encoder
-  scores how well it fits, compared with the index's own caption and with the
-  archive (does it pick this photograph out of the rest?). Shareable result.
-  Guard against keyword stuffing — rank against other photographs rather than
-  rewarding raw similarity.
-
-## Queued — Wander, on Explore (14 October 2026)
-
-Not a Fun game: a section of `/explore`, beside the cloud it walks through.
-No goal, score, daily or stats — the player stands inside one photograph and
-drifts to the next.
-
-- **Exits.** Each photograph offers a handful of ways out, each a
-  neighbour in the full 768 dimensions. The explore payload already carries
-  three nearest neighbours per point; widen that at build time rather than
-  loading the embeddings database. Label exits by what changes (a tag the
-  neighbour has and this one lacks, or a palette shift: darker, warmer, more
-  colourful), never by place or date.
-- **Trail.** Keep the path walked as a strip of thumbnails; Back retraces it.
-  Highlight the current photograph and its trail in the cloud above, so
-  walking and the projection explain each other.
-- **Entry.** Start from a random photograph, a cloud click, or a photo page's
-  "Wander from here"; put the current photograph in the URL so a walk can be
-  shared from where it stands.
-- **Optional quest.** "Find a photograph with both a cat and a staircase",
-  drawn from tag pairs that co-occur somewhere in the archive. Light
-  direction, not a score.
-- No text model: everything comes from the build-time payload, so it costs
-  nothing beyond what Explore already downloads.
+- Warmer and Caption It: ranked against the archive with the in-browser text
+  encoder, dailies, stats and placeholder art. Details in `docs/fun-games.md`.
+- Wander: a section of `/explore` rather than a Fun game. Details in
+  `docs/explore-cloud.md`.
 
 ## October refinement release
 

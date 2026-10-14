@@ -34,8 +34,12 @@ for (const width of [390, 1280]) {
     await page.getByLabel("Year", { exact: true }).selectOption("2024");
     await expect(canvas).toHaveAttribute("aria-label", /^2 photographs/);
     await page.getByLabel("Lens", { exact: true }).selectOption("Telephoto");
-    await expect(page.getByRole("link", { name: "Cloud frame 2", exact: true })).toHaveCount(1);
-    await expect(page.getByRole("link", { name: "Cloud frame 0", exact: true })).toHaveCount(0);
+    await expect(
+      page.locator("#embedding-space").getByRole("link", { name: "Cloud frame 2", exact: true }),
+    ).toHaveCount(1);
+    await expect(
+      page.locator("#embedding-space").getByRole("link", { name: "Cloud frame 0", exact: true }),
+    ).toHaveCount(0);
     await page.getByRole("radio", { name: "Overview", exact: true }).click();
     await page.getByRole("radio", { name: "2D", exact: true }).click();
     await page.getByRole("radio", { name: "Sheet", exact: true }).click();

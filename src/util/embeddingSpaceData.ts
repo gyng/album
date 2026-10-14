@@ -24,6 +24,8 @@ export type EmbeddingSpaceEntry = {
   slot?: number;
   /** The photographs the model reads as most like this one, by index. */
   near?: number[];
+  /** The next nearest after `near`, closest first: where Wander can step besides. */
+  around?: number[];
   /** Which named clump it fell in, as an index into the clusters. */
   cluster?: number;
   umap?: { x: number; y: number; z: number };
@@ -149,6 +151,21 @@ export const fetchEmbeddingSpace = async (
     clusters: Array.isArray(payload.clusters) ? payload.clusters.filter(isCluster) : [],
     atlas: isAtlas(payload.atlas) ? payload.atlas : null,
   };
+};
+
+let shared: Promise<EmbeddingSpace> | null = null;
+
+/**
+ * One request per page for everything that reads the cloud — the cloud itself
+ * and Wander beside it — rather than one each for three-quarters of a megabyte.
+ * A failure is forgotten, so the next reader to ask tries again.
+ */
+export const fetchEmbeddingSpaceOnce = (): Promise<EmbeddingSpace> => {
+  shared ??= fetchEmbeddingSpace().catch((error: unknown) => {
+    shared = null;
+    throw error;
+  });
+  return shared;
 };
 
 /**

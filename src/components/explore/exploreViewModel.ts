@@ -36,6 +36,7 @@ export const COLOR_FAMILY_ORDER = COLOUR_FAMILY_LABELS;
 
 export const EXPLORE_SECTION_LINKS = [
   { href: "#embedding-space", label: "Cloud" },
+  { href: "#wander", label: "Wander" },
   { href: "#visual-sameness", label: "Visual sameness" },
   { href: "#fun-stats", label: "Fun stats" },
   { href: "#recent-trends", label: "Recent trends" },

@@ -1,0 +1,116 @@
+.daily {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: start;
+  gap: var(--space-5);
+}
+
+@media (max-width: 720px) {
+  .layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.hidden {
+  overflow: hidden;
+  border-radius: var(--radius-preview);
+}
+
+.hidden img {
+  transition: filter var(--t-slow) var(--ease-out);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hidden img {
+    transition: none;
+  }
+}
+
+.play,
+.form {
+  display: grid;
+  align-content: start;
+  gap: var(--space-3);
+  min-inline-size: 0;
+}
+
+.label {
+  font-weight: 600;
+}
+
+.input {
+  flex: 1 1 12rem;
+  min-inline-size: 0;
+}
+
+/* Announces each guess; the list below already shows it. */
+.latest {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.guesses {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.guesses li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: var(--space-3);
+  align-items: baseline;
+  padding: var(--space-1) var(--space-2);
+  border-inline-start: var(--line-strong) solid var(--temperature, var(--c-border));
+  border-radius: var(--radius-control);
+  background: var(--c-surface);
+}
+
+.guesses li[data-latest="true"] {
+  outline: var(--line-hairline) solid var(--c-selected-border);
+}
+
+.guesses li[data-temperature="freezing"],
+.guesses li[data-temperature="cool"] {
+  --temperature: var(--c-bg-contrast-light);
+}
+
+.guesses li[data-temperature="tepid"] {
+  --temperature: var(--c-font);
+}
+
+.guesses li[data-temperature="warm"] {
+  --temperature: var(--c-warning);
+}
+
+.guesses li[data-temperature="hot"],
+.guesses li[data-temperature="burning"] {
+  --temperature: var(--c-danger);
+}
+
+.guesses li[data-temperature="found"] {
+  --temperature: var(--c-success);
+}
+
+.word {
+  overflow-wrap: anywhere;
+}
+
+.rank {
+  color: var(--c-bg-contrast-light);
+  font-size: var(--fs-s);
+}

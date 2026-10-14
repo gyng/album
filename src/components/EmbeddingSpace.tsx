@@ -23,7 +23,7 @@ import {
   type EmbeddingSpaceAtlas,
   type EmbeddingSpaceCluster,
   type EmbeddingSpaceEntry,
-  fetchEmbeddingSpace,
+  fetchEmbeddingSpaceOnce,
   indexedPathFromSrc,
 } from "../util/embeddingSpaceData";
 import styles from "./EmbeddingSpace.module.css";
@@ -50,6 +50,11 @@ export type EmbeddingSpaceProps = {
    * a cloud wants room, and how much room there is is a CSS question.
    */
   height?: number;
+  /**
+   * A walk to draw through the cloud, as photograph sources, oldest first —
+   * Wander's, beside it. The last is where the walker stands.
+   */
+  trail?: readonly string[];
 };
 
 const INITIAL_CAMERA: Camera = { yaw: 0.7, pitch: 0.22, distance: 3.8 };
@@ -273,7 +278,7 @@ const drawSquare = (
 const radiusOf = (point: Placed, withThumbnail: boolean, thumbnail: number): number =>
   (withThumbnail ? thumbnail / 2 : DOT_RADIUS + 3) * point.scale;
 
-export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, height }) => {
+export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, height, trail }) => {
   // The wash has to be the page's own ground, and the reader can change it
   // without reloading.
   const theme = useActiveTheme();
@@ -414,6 +419,7 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
   /** Screen-space offset, for panning a flat view that has been zoomed into. */
   const panRef = React.useRef({ x: 0, y: 0 });
   const chosenRef = React.useRef<number | null>(null);
+  const trailRef = React.useRef<number[]>([]);
   /** The name elements, positioned from the draw loop. */
   const labelRefs = React.useRef<(HTMLButtonElement | null)[]>([]);
   const showcaseRef = React.useRef<{ index: number; start: number } | null>(null);
@@ -434,12 +440,20 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
 
   driftingRef.current = drifting;
   chosenRef.current = chosen;
+  const indexBySrc = React.useMemo(
+    () => new Map((entries ?? []).map((entry, index) => [entry.src, index])),
+    [entries],
+  );
+  trailRef.current = (trail ?? []).flatMap((src) => {
+    const index = indexBySrc.get(src);
+    return index === undefined ? [] : [index];
+  });
   flatRef.current = arrangement === "flat";
   sheetRef.current = sheet;
 
   React.useEffect(() => {
     let cancelled = false;
-    fetchEmbeddingSpace()
+    fetchEmbeddingSpaceOnce()
       .then((space) => {
         if (cancelled) return;
         setEntries(space.points);
@@ -1093,6 +1107,35 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
             context.fillRect(point.x - size / 2, point.y - size / 2, size, size);
           }
         }
+      }
+
+      // Wander's walk, step by step, over everything but the pointer's lens:
+      // a dark halo under a white line, the cloud's own ink for joining things.
+      const walk = trailRef.current
+        .map((index) => onScreen.get(index))
+        .filter((point): point is Placed => Boolean(point));
+      if (walk.length > 0) {
+        context.globalAlpha = 1;
+        context.lineJoin = "round";
+        for (const [style, lineWidth] of [
+          ["rgba(0, 0, 0, 0.6)", 4],
+          ["rgba(255, 255, 255, 0.95)", 1.5],
+        ] as const) {
+          context.strokeStyle = style;
+          context.lineWidth = lineWidth;
+          context.beginPath();
+          walk.forEach((point, step) => {
+            if (step === 0) context.moveTo(point.x, point.y);
+            else context.lineTo(point.x, point.y);
+          });
+          context.stroke();
+        }
+        const standing = walk.at(-1)!;
+        context.strokeStyle = "rgba(255, 255, 255, 1)";
+        context.lineWidth = 2;
+        context.beginPath();
+        context.arc(standing.x, standing.y, Math.max(6, thumbnail * 0.75), 0, Math.PI * 2);
+        context.stroke();
       }
 
       // Left alone, the cloud shows itself: one photograph at a time comes up

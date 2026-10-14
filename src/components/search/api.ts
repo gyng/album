@@ -1157,20 +1157,23 @@ export const fetchPhotoGameArchive = async (opts: {
     | "cross-exposure"
     | "sight-lines"
     | "photo-hangman"
-    | "hindsight";
+    | "hindsight"
+    | "warmer"
+    | "caption-it";
 }): Promise<PhotoGamePhoto[]> => {
   const { database, game } = opts;
   const vectorDatabase = opts.embeddingsDatabase ?? database;
   let embeddings: EmbeddingRow[] = [];
-  if (game === "relay" || game === "blind-frame" || game === "double-take") {
+  // Drawings and words come from the browser's v1 encoders. Never compare
+  // them to v2 image vectors, even when both spaces have the same dimensions.
+  const browserEncoded = game === "blind-frame" || game === "warmer" || game === "caption-it";
+  if (game === "relay" || game === "double-take" || browserEncoded) {
     try {
-      // Drawings come from the browser's v1 encoder. Never compare them to
-      // v2 image vectors, even when both spaces have the same dimensions.
       embeddings = await fetchEmbeddingsByModel(
         vectorDatabase,
-        game !== "blind-frame" ? PREFERRED_EMBEDDING_MODEL_ID : DEFAULT_EMBEDDING_MODEL_ID,
+        browserEncoded ? DEFAULT_EMBEDDING_MODEL_ID : PREFERRED_EMBEDDING_MODEL_ID,
       );
-      if (game !== "blind-frame" && !embeddings.length)
+      if (!browserEncoded && !embeddings.length)
         embeddings = await fetchEmbeddingsByModel(vectorDatabase, DEFAULT_EMBEDDING_MODEL_ID);
     } catch (error) {
       if (!isMissingEmbeddingsTableError(error)) throw error;

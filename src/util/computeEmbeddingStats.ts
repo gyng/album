@@ -1073,6 +1073,13 @@ export const computeVisualSamenessStats = async (
 const NEIGHBOURS_PER_PHOTO = 3;
 
 /**
+ * How many neighbours Wander may step to: the drawn ones and the next ones
+ * after them. Exits are chosen from these by what changes, so a few more than
+ * a walk shows keeps it from circling one burst of near-identical frames.
+ */
+const WANDER_NEIGHBOURS = 12;
+
+/**
  * How many clumps the cloud is named in.
  *
  * Eight labels is a legend a reader takes in at a glance; twenty is a page of
@@ -1122,6 +1129,8 @@ export type EmbeddingSpacePoint = {
    * same list. Computed in the full space, before the projection flattened it.
    */
   near?: number[];
+  /** The next nearest after `near`, closest first: where Wander can step besides. */
+  around?: number[];
   x: number;
   y: number;
   z: number;
@@ -1209,7 +1218,7 @@ export const loadEmbeddingSpacePoints = async (
         path.join(process.cwd(), "public/data/embedding-umap.json"),
         selectedModelId,
       );
-      const neighbours = nearestNeighbours(vectors, NEIGHBOURS_PER_PHOTO);
+      const neighbours = nearestNeighbours(vectors, WANDER_NEIGHBOURS);
 
       // What each clump turned out to be about, from the tags of whatever
       // landed in it.
@@ -1295,7 +1304,12 @@ export const loadEmbeddingSpacePoints = async (
           ...(entry.photo.swatch ? { swatch: entry.photo.swatch } : {}),
           ...(tags.length > 0 ? { tags } : {}),
           ...(slot === undefined ? {} : { slot }),
-          ...((neighbours[index]?.length ?? 0) > 0 ? { near: neighbours[index] } : {}),
+          ...((neighbours[index]?.length ?? 0) > 0
+            ? { near: neighbours[index]!.slice(0, NEIGHBOURS_PER_PHOTO) }
+            : {}),
+          ...((neighbours[index]?.length ?? 0) > NEIGHBOURS_PER_PHOTO
+            ? { around: neighbours[index]!.slice(NEIGHBOURS_PER_PHOTO) }
+            : {}),
           ...(clusterOf.has(index) ? { cluster: clusterOf.get(index) } : {}),
           ...(semantic.has(entry.path) ? { umap: semantic.get(entry.path)! } : {}),
           x: Number(position.x.toFixed(4)),

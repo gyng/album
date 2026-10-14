@@ -54,8 +54,10 @@
   gap: var(--m-s);
 }
 @media (max-width: 720px) {
+  /* minmax(0, …): a bare 1fr track grows to the widest row, and the rows
+     are meant to scroll inside it rather than widen the page. */
   .jumpNavGroups {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
     gap: var(--m-m);
   }
 }

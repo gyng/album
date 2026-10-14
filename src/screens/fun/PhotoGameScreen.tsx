@@ -16,6 +16,8 @@ import { DoubleTake } from "../../components/fun/DoubleTake";
 import { Hindsight } from "../../components/fun/Hindsight";
 import { GameReadinessProvider } from "../../components/fun/GameReadiness";
 import { PhotoOracle } from "../../components/fun/PhotoOracle";
+import { Warmer } from "../../components/fun/Warmer";
+import { CaptionIt } from "../../components/fun/CaptionIt";
 import type { PhotoGamePhoto } from "../../util/photoGames";
 import { formatPageTitle } from "../../lib/seo";
 import styles from "./PhotoGameScreen.module.css";
@@ -24,7 +26,12 @@ const EMPTY_PHOTOS: PhotoGamePhoto[] = [];
 
 export const PhotoGameScreen = ({ game }: { game: PhotoGameKind }) => {
   const [database, progress, , databaseError, retryDatabase] = useDatabase();
-  const needsVectors = game === "relay" || game === "blind-frame" || game === "double-take";
+  const needsVectors =
+    game === "relay" ||
+    game === "blind-frame" ||
+    game === "double-take" ||
+    game === "warmer" ||
+    game === "caption-it";
   const [embeddings, vectorProgress, , vectorError, retryVectors] =
     useEmbeddingsDatabase(needsVectors);
   const [loaded, setLoaded] = useState<{ game: PhotoGameKind; photos: PhotoGamePhoto[] } | null>(
@@ -116,6 +123,10 @@ export const PhotoGameScreen = ({ game }: { game: PhotoGameKind }) => {
             <PhotoHangman photos={availablePhotos} />
           ) : game === "hindsight" ? (
             <Hindsight photos={availablePhotos} />
+          ) : game === "warmer" ? (
+            <Warmer photos={availablePhotos} />
+          ) : game === "caption-it" ? (
+            <CaptionIt photos={availablePhotos} />
           ) : game === "connections" ? (
             <PhotoConnections photos={availablePhotos} />
           ) : (
@@ -142,3 +153,7 @@ export const SightLinesScreen = () => <PhotoGameScreen game="sight-lines" />;
 export const PhotoHangmanScreen = () => <PhotoGameScreen game="photo-hangman" />;
 
 export const HindsightScreen = () => <PhotoGameScreen game="hindsight" />;
+
+export const WarmerScreen = () => <PhotoGameScreen game="warmer" />;
+
+export const CaptionItScreen = () => <PhotoGameScreen game="caption-it" />;

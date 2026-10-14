@@ -1,0 +1,58 @@
+.daily {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: start;
+  gap: var(--space-5);
+}
+
+@media (max-width: 720px) {
+  .layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.form {
+  display: grid;
+  align-content: start;
+  gap: var(--space-3);
+  min-inline-size: 0;
+}
+
+.label {
+  font-weight: 600;
+}
+
+.text {
+  inline-size: 100%;
+  min-block-size: calc(var(--tap-target) * 2);
+  padding: var(--space-2) var(--space-3);
+  border: var(--line-hairline) solid var(--c-border);
+  border-radius: var(--radius-control);
+  background: var(--c-bg);
+  color: var(--c-font);
+  font: inherit;
+  font-size: var(--fs-touch);
+  line-height: var(--lh-body);
+  resize: vertical;
+}
+
+.text:hover {
+  border-color: var(--c-border-hover);
+}
+
+.text:focus-visible {
+  outline: var(--line-strong) solid var(--c-accent);
+  outline-offset: var(--line-hairline);
+}
+
+.indexCaption {
+  margin: 0;
+  line-height: var(--lh-body);
+}

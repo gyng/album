@@ -438,10 +438,38 @@ with the player's own settings. A finished daily is recorded once, with a
 spoiler-free share text ("5 photographs · 80% in order"); replaying it the same
 day is not recorded again. The lobby shows today's result and the personal record.
 
+## Warmer and Caption It
+
+Both compare the player's words with photographs through the search page's
+SigLIP v1 text encoder (q4, 154,693,262 bytes), so they load v1 image vectors
+like Blind Frame and never v2. Nothing downloads until the first guess or
+caption; the lobby says so. `components/fun/useTextEncoder.ts` wraps the shared
+worker and drops a result that a newer request or a new round replaced.
+
+Scores are ranks, not similarities (`util/semanticGames.ts`): the target is
+ranked among the whole archive by how well it fits the text. A raw cosine means
+different things for different photographs — a busy street matches every word
+a little — and a rank does not. A target in the top three counts as found,
+because bursts of one scene tie for first.
+
+- **Warmer.** A hidden photograph, blurred. Each guess is ranked, and the
+  temperature is a share of the archive (burning under 1%, hot 5%, warm 15%,
+  tepid 35%, cool 60%, else freezing), so it means the same in any collection.
+  The best guess so far sets the blur. Repeated guesses are refused before
+  encoding. Won when found; no best score.
+- **Caption It.** A visible photograph and a caption of at most 120
+  characters. Its fit is `rankDrawing`'s 0–100 score, and the archive's own
+  caption is scored the same way as the bar to beat. Captions of one word, or
+  that repeat a word three times, are refused before encoding — rank scoring
+  already resists keyword stuffing, and this keeps the obvious attempt from
+  costing a model download. Rewriting the same photograph is practice.
+
+Both start with placeholder illustrations (see `docs/fun-illustrations.md`).
+
 ## Dailies, stats and next steps
 
-Connect the Shots, Cross Exposure, Sight Lines, Photo Hangman, Hindsight and
-Guess Where each offer one daily board, numbered from 14 October 2026 (#1) and
+Connect the Shots, Cross Exposure, Sight Lines, Photo Hangman, Hindsight,
+Warmer, Caption It and Guess Where each offer one daily board, numbered from 14 October 2026 (#1) and
 reached from the lobby or `?daily`. A daily follows the reader's local calendar
 day and is dealt from the archive sorted by path with a seed of the game and
 day (`util/gameDaily.ts`, `GameRecord.dailyPuzzle`/`dailyPhotoOrder`), so every
@@ -449,7 +477,8 @@ device with the same archive gets the same board; the archive itself arrives in
 random order. Daily settings are fixed and never saved: Connect the Shots 4×4,
 broad, hints, 4 lives; Cross Exposure 4×4, hidden, no starting photographs;
 Sight Lines 6×6, 4 per line; Hangman its usual rules (never seeded by the
-previous answer); Hindsight 5 photographs across the years; Guess Where five
+previous answer); Hindsight 5 photographs across the years; Warmer and
+Caption It one photograph each; Guess Where five
 untimed rounds with its existing `daily-YYYY-MM-DD` seed. A finished daily is
 kept: the lobby shows its result and Share instead of offering it again, and a
 replay counts as practice. Share text is spoiler-free — title, number and a
@@ -460,8 +489,9 @@ Every game records each finished game once, from the handler that ends it, in
 a best score where one compares across games, and a streak of consecutive days
 played. Best scores: Guess Where total points; Relay its visual-flow
 percentile; Blind Frame its 0–100 resemblance; Double Take correct answers;
-Hangman misses to spare; Hindsight the percentage of pairs in order. Connect
-the Shots, Cross Exposure, Sight Lines and Oracle record no best, since their
+Hangman misses to spare; Hindsight the percentage of pairs in order; Caption
+It its 0–100 fit. Connect the Shots, Cross Exposure, Sight Lines, Oracle and
+Warmer record no best, since their
 measures depend on board size or have no winner. The Fun hub marks games played
 today. Links never write saved settings.
 

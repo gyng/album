@@ -39,6 +39,9 @@ jest.mock("../../components/MiniHistogram", () => ({
 jest.mock("../../components/EmbeddingSpaceDeferred", () => ({
   EmbeddingSpaceDeferred: () => <div data-testid="embedding-space" />,
 }));
+jest.mock("../../components/explore/ExploreWander", () => ({
+  ExploreWander: () => <div data-testid="wander" />,
+}));
 jest.mock("../../components/SankeyChartDeferred", () => ({
   SankeyChartDeferred: ({ emptyMessage }: { emptyMessage?: string }) => (
     <div data-testid="sankey">{emptyMessage}</div>

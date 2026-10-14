@@ -331,6 +331,8 @@ const generateSitemap = (albumEntries) => {
       "/fun/sight-lines",
       "/fun/photo-hangman",
       "/fun/hindsight",
+      "/fun/warmer",
+      "/fun/caption-it",
     ].map((route) => ({
       url: getCanonicalUrl(route),
       lastmod: latestLastmod,
