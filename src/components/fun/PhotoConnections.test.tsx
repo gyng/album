@@ -32,7 +32,9 @@ it("checks groups, avoids charging twice for the same mistake and reveals all co
   choose("A cat", 4);
   fireEvent.click(screen.getByRole("button", { name: "Check connection" }));
   expect(screen.getByRole("status")).toHaveTextContent(/connection found/);
-  expect(screen.getAllByRole("button", { name: /Select photograph/ })).toHaveLength(12);
+  expect(
+    within(screen.getByRole("group", { name: "Photographs" })).getAllByRole("button"),
+  ).toHaveLength(12);
   fireEvent.click(screen.getByRole("button", { name: "Give up" }));
   expect(
     within(screen.getByRole("region", { name: "Connections result" })).getAllByRole("img"),
@@ -69,11 +71,15 @@ it("lets players choose a six-by-six board and reveals all six groups", () => {
   render(<PhotoConnections photos={archive} />);
   fireEvent.click(screen.getByRole("button", { name: "6×6" }));
   fireEvent.click(screen.getByRole("button", { name: "Start connecting" }));
-  expect(screen.getAllByRole("button", { name: /Select photograph/ })).toHaveLength(36);
+  expect(
+    within(screen.getByRole("group", { name: "Photographs" })).getAllByRole("button"),
+  ).toHaveLength(36);
   choose("A cat", 6);
   expect(screen.getByRole("button", { name: "Check connection" })).toBeEnabled();
   fireEvent.click(screen.getByRole("button", { name: "Check connection" }));
-  expect(screen.getAllByRole("button", { name: /Select photograph/ })).toHaveLength(30);
+  expect(
+    within(screen.getByRole("group", { name: "Photographs" })).getAllByRole("button"),
+  ).toHaveLength(30);
   fireEvent.click(screen.getByRole("button", { name: "Give up" }));
   expect(
     within(screen.getByRole("region", { name: "Connections result" })).getAllByRole("img"),
@@ -107,8 +113,8 @@ it("keeps active selection controls together and removes the dock from the resul
   expect(within(controls).getByRole("button", { name: "Check connection" })).toBeEnabled();
   fireEvent.click(within(controls).getByRole("button", { name: "Deselect" }));
   expect(
-    screen
-      .getAllByRole("button", { name: /Select photograph/ })
+    within(screen.getByRole("group", { name: "Photographs" }))
+      .getAllByRole("button")
       .every((button) => button.getAttribute("aria-pressed") === "false"),
   ).toBe(true);
   fireEvent.click(screen.getByRole("button", { name: "Give up" }));
@@ -164,4 +170,47 @@ it.each([6, 8])("ends at the selected %i-life budget", (lives) => {
   fireEvent.keyDown(document.body, { key: "Enter" });
   expect(screen.getByRole("region", { name: "Connections result" })).toHaveFocus();
   expect(screen.queryByRole("button", { name: "Check connection" })).toBeNull();
+});
+
+it("names tiles by their photographs and keeps focus on the board", () => {
+  render(<PhotoConnections photos={photos} />);
+  fireEvent.click(screen.getByRole("button", { name: "Start connecting" }));
+  const board = screen.getByRole("group", { name: "Photographs" });
+  expect(board).toHaveFocus();
+  expect(within(board).getAllByRole("button", { name: "A cat" })).toHaveLength(4);
+  choose("A cat", 4);
+  const check = screen.getByRole("button", { name: "Check connection" });
+  check.focus();
+  fireEvent.click(check);
+  expect(screen.getByRole("region", { name: "Animals" })).toHaveFocus();
+  fireEvent.click(screen.getByRole("button", { name: "Give up" }));
+  fireEvent.click(screen.getByRole("button", { name: "Play again" }));
+  expect(screen.getByRole("group", { name: "Photographs" })).toHaveFocus();
+});
+
+it("keeps focused tiles clear of the sticky dock on small screens", () => {
+  const match = jest.spyOn(window, "matchMedia").mockImplementation(
+    (query) =>
+      ({
+        matches: query.includes("max-width"),
+        media: query,
+        addEventListener: jest.fn(),
+        removeEventListener: jest.fn(),
+      }) as unknown as MediaQueryList,
+  );
+  const rect = jest
+    .spyOn(Element.prototype, "getBoundingClientRect")
+    .mockReturnValue({ height: 60 } as DOMRect);
+  try {
+    const { container } = render(<PhotoConnections photos={photos} />);
+    fireEvent.click(screen.getByRole("button", { name: "Start connecting" }));
+    expect(
+      (container.firstElementChild as HTMLElement).style.getPropertyValue(
+        "--connections-dock-height",
+      ),
+    ).toBe("60px");
+  } finally {
+    match.mockRestore();
+    rect.mockRestore();
+  }
 });

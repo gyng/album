@@ -114,6 +114,11 @@
   padding: var(--space-1);
 }
 
+.choice,
+.slots button {
+  scroll-margin-block-start: calc(var(--relay-dock-height, 0px) + var(--space-3));
+}
+
 .choice span {
   font-size: var(--fs-s);
 }

@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect } from "react";
 import { DataLayer, type LineFeature, type MapPointerEvent, MapView, Marker, useMap } from "../map";
+import { Button } from "../ui";
 import { TIER_DANGER } from "./guessScoring";
 import { computeWrapAwareBounds } from "../../util/mapBounds";
 import { MapLibreStyles } from "../MapLibreStyles";
@@ -23,9 +24,14 @@ const connectionLines = (
   from: { lat: number; lng: number },
   to: { lat: number; lng: number },
 ): LineFeature[] => {
+  // Unwrap the answer by a whole turn when that is the shorter way round, so
+  // a guess and answer either side of ±180° are joined by the short hop
+  // rather than a line across the whole world.
+  const delta = to.lng - from.lng;
+  const toLng = delta > 180 ? to.lng - 360 : delta < -180 ? to.lng + 360 : to.lng;
   const path = [
     { lng: from.lng, lat: from.lat },
-    { lng: to.lng, lat: to.lat },
+    { lng: toLng, lat: to.lat },
   ];
 
   return [
@@ -78,6 +84,33 @@ const RevealFit: React.FC<{
   return null;
 };
 
+/**
+ * The keyboard's way to guess: pan and zoom the focused map with the arrow and
+ * +/- keys, then place the guess where the crosshair sits. Hidden until it has
+ * focus, so pointer players never see it.
+ */
+const KeyboardGuess: React.FC<{ onGuess: (lat: number, lng: number) => void }> = ({ onGuess }) => {
+  const map = useMap();
+  if (!map) return null;
+  return (
+    <>
+      <div className={styles.crosshair} aria-hidden="true" />
+      <Button
+        className={styles.keyboardGuess}
+        onClick={() => {
+          const centre = map.getCenter();
+          onGuess(centre.lat, centre.lng);
+        }}
+      >
+        Guess at map centre
+      </Button>
+    </>
+  );
+};
+
+/** Keys the focused map owns, which must not also advance or confirm the round. */
+const MAP_KEYS = new Set([" ", "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"]);
+
 export const GuessMap: React.FC<GuessMapProps> = ({ guess, reveal, onGuess }) => {
   const handleClick = useCallback(
     (event: MapPointerEvent) => {
@@ -90,7 +123,19 @@ export const GuessMap: React.FC<GuessMapProps> = ({ guess, reveal, onGuess }) =>
   return (
     <>
       <MapLibreStyles />
-      <div className={styles.mapContainer} role="region" aria-label="Guess map">
+      {/* The key handler only marks keys the map owns as handled, so the
+          round's window shortcuts leave them alone. */}
+      {/* oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions */}
+      <div
+        className={styles.mapContainer}
+        role="region"
+        aria-label="Guess map"
+        onKeyDown={(event) => {
+          if (!MAP_KEYS.has(event.key)) return;
+          if (event.target instanceof Element && event.target.closest("button")) return;
+          event.preventDefault();
+        }}
+      >
         {/* Scroll-zoom, drag-pan and one-finger gestures are the provider
             defaults, which is what a guessing map wants. */}
         <MapView
@@ -99,6 +144,8 @@ export const GuessMap: React.FC<GuessMapProps> = ({ guess, reveal, onGuess }) =>
           onClick={handleClick}
           cursor={reveal ? "default" : "crosshair"}
         >
+          {reveal ? null : <KeyboardGuess onGuess={onGuess} />}
+
           {guess ? (
             <Marker at={{ lng: guess.lng, lat: guess.lat }} anchor="center">
               <div className={styles.guessPin} />
@@ -116,7 +163,7 @@ export const GuessMap: React.FC<GuessMapProps> = ({ guess, reveal, onGuess }) =>
           ) : null}
         </MapView>
 
-        {!reveal && !guess ? <div className={styles.hint}>Click to place your guess</div> : null}
+        {!reveal && !guess ? <div className={styles.hint}>Place your guess on the map</div> : null}
       </div>
     </>
   );

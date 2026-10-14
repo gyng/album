@@ -75,7 +75,9 @@ const validFields = <G extends Game>(game: G, value: unknown): Partial<GameSetti
   return fields;
 };
 
-/** Lobby preferences only. Initial overrides (such as explicit URL fields) win over saved values.
+/** Lobby preferences only. Initial overrides (such as explicit URL fields) win over saved values
+ * but are not saved themselves: a shared link must not replace the player's own choices. A field
+ * the player changes afterwards is saved as usual.
  * Read after hydration so the server and first client render agree; write only after that read. */
 export const useGameSettings = <G extends Game>(
   game: G,
@@ -87,6 +89,8 @@ export const useGameSettings = <G extends Game>(
     ...validFields(game, initialOverrides),
   }));
   const [loadedGame, setLoadedGame] = useState<Game | null>(null);
+  const savedRef = useRef<GameSettingsRegistry[G]>(defaults[game]);
+  const linkedRef = useRef<Partial<GameSettingsRegistry[G]>>({});
   useEffect(() => {
     let saved: unknown;
     try {
@@ -95,17 +99,23 @@ export const useGameSettings = <G extends Game>(
     } catch {
       /* Preferences still work when storage is blocked or malformed. */
     }
-    setSettings({
-      ...defaults[game],
-      ...validFields(game, saved),
-      ...validFields(game, overridesRef.current),
-    });
+    const overrides = validFields(game, overridesRef.current);
+    savedRef.current = { ...defaults[game], ...validFields(game, saved) };
+    linkedRef.current = overrides;
+    setSettings({ ...savedRef.current, ...overrides });
     setLoadedGame(game);
   }, [game]);
   useEffect(() => {
     if (loadedGame !== game) return;
+    const persisted = { ...settings };
+    const linked = linkedRef.current;
+    for (const field of Object.keys(linked) as Array<keyof GameSettingsRegistry[G]>) {
+      // Once the player moves a linked field, it is theirs and saved from then on.
+      if (settings[field] !== linked[field]) delete linked[field];
+      else persisted[field] = savedRef.current[field];
+    }
     try {
-      window.localStorage.setItem(gameSettingsStorageKey(game), JSON.stringify(settings));
+      window.localStorage.setItem(gameSettingsStorageKey(game), JSON.stringify(persisted));
     } catch {
       /* Saving preferences is best-effort. */
     }

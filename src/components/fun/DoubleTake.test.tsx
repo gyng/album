@@ -1,12 +1,13 @@
 /** @jest-environment jsdom */
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { DoubleTake } from "./DoubleTake";
-import { buildDoubleTakeDeck } from "../../util/doubleTake";
+import { buildDoubleTakeDeck, prepareDoubleTakePairs } from "../../util/doubleTake";
 import type { PhotoGamePhoto } from "../../util/photoGames";
 
 jest.mock("../../util/doubleTake", () => ({
   ...jest.requireActual("../../util/doubleTake"),
   buildDoubleTakeDeck: jest.fn(),
+  prepareDoubleTakePairs: jest.fn(),
 }));
 const photos: PhotoGamePhoto[] = Array.from({ length: 4 }, (_, index) => ({
   path: `../albums/test-simple/${index}.jpg`,
@@ -59,6 +60,7 @@ beforeEach(() => {
     }
   } as unknown as typeof Image;
   jest.mocked(buildDoubleTakeDeck).mockReturnValue(deck);
+  jest.mocked(prepareDoubleTakePairs).mockReturnValue(true);
 });
 afterEach(() => {
   global.Image = originalImage;
@@ -122,6 +124,20 @@ it("shows preparation before computing the deck and cancels it when leaving", ()
   view.unmount();
   tick(0);
   expect(buildDoubleTakeDeck).not.toHaveBeenCalled();
+});
+
+it("keeps Cancel working while a first comparison is still in progress", () => {
+  jest.mocked(prepareDoubleTakePairs).mockReturnValue(false);
+  render(<DoubleTake photos={photos} />);
+  fireEvent.click(screen.getByRole("button", { name: "Start Double Take" }));
+  tick(0);
+  tick(1);
+  expect(prepareDoubleTakePairs).toHaveBeenCalledTimes(2);
+  fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+  tick(10);
+  expect(prepareDoubleTakePairs).toHaveBeenCalledTimes(2);
+  expect(buildDoubleTakeDeck).not.toHaveBeenCalled();
+  expect(screen.getByRole("button", { name: "Start Double Take" })).toBeTruthy();
 });
 
 it("retains a three-second look when the longer viewing option is selected", async () => {
@@ -231,6 +247,20 @@ it("reports correct and incorrect picks immediately while keeping the reveal foc
   expect(screen.getByRole("region", { name: "Pair revealed" })).toHaveFocus();
   expect(screen.getByRole("region", { name: "Pair revealed" })).toHaveTextContent(
     "Different places",
+  );
+});
+
+it("brings focus back to the question once a new pair has been shown", async () => {
+  start();
+  await watch();
+  fireEvent.click(screen.getByRole("button", { name: "Same place" }));
+  const nextPair = screen.getByRole("button", { name: "Next pair" });
+  nextPair.focus();
+  fireEvent.click(nextPair);
+  await watch(900);
+  expect(document.activeElement).not.toBe(document.body);
+  expect(document.activeElement).toContainElement(
+    screen.getByRole("heading", { name: "Same place?" }),
   );
 });
 

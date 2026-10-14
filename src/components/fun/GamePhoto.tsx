@@ -41,7 +41,7 @@ export const PhotoChain = ({
         {numbered ? <span className={styles.step}>{index + 1}</span> : null}
         {similarities?.[index] !== undefined && similarities[index] !== null ? (
           <span className={styles.step}>
-            {index + 1} → {index + 2} · {similarities[index]}% similarity
+            {index + 1} → {index + 2} · {similarities[index]}% resemblance
           </span>
         ) : null}
         {clues?.[index] ? (

@@ -123,3 +123,43 @@
     transform: translateX(-50%) translateY(0);
   }
 }
+
+/* Keyboard guessing: the button stays out of sight until it is focused, and
+   the crosshair shows where it will place the guess while the map has
+   keyboard focus. */
+.keyboardGuess {
+  position: absolute;
+  inset-block-start: var(--space-4);
+  inset-inline-start: var(--space-4);
+  z-index: 1;
+}
+
+.keyboardGuess:not(:focus) {
+  inline-size: 1px;
+  block-size: 1px;
+  min-inline-size: 0;
+  min-block-size: 0;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+.crosshair {
+  display: none;
+  position: absolute;
+  inset-block-start: 50%;
+  inset-inline-start: 50%;
+  inline-size: var(--space-6);
+  block-size: var(--space-6);
+  translate: -50% -50%;
+  pointer-events: none;
+  background:
+    linear-gradient(var(--c-accent), var(--c-accent)) center / var(--line-strong) 100% no-repeat,
+    linear-gradient(var(--c-accent), var(--c-accent)) center / 100% var(--line-strong) no-repeat;
+}
+
+.mapContainer:has(:focus-visible) .crosshair {
+  display: block;
+}

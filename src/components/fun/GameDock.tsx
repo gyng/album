@@ -17,6 +17,12 @@ export const GameDock = ({
 }) => {
   const ref = useRef<HTMLDivElement>(null);
   const [fits, setFits] = useState(false);
+  const reportRef = useRef(onStickyHeightChange);
+  useEffect(() => {
+    reportRef.current = onStickyHeightChange;
+  }, [onStickyHeightChange]);
+  // A dock that leaves the page no longer holds space above anything.
+  useEffect(() => () => reportRef.current?.(0), []);
   useEffect(() => {
     const element = ref.current;
     if (!element || !active) {
@@ -26,9 +32,11 @@ export const GameDock = ({
     }
     const measure = () => {
       const viewport = window.visualViewport?.height ?? window.innerHeight;
-      const top = Number.parseFloat(getComputedStyle(element).insetBlockStart) || 8;
+      const style = getComputedStyle(element);
+      const top = Number.parseFloat(style.insetBlockStart) || 8;
+      const bottom = Number.parseFloat(style.scrollPaddingBlockEnd) || 0;
       const height = element.getBoundingClientRect().height;
-      const canFit = viewport - height >= 144 + top;
+      const canFit = viewport - height >= 144 + top + bottom;
       setFits(canFit);
       onStickyHeightChange?.(
         canFit && window.matchMedia("(max-width: 960px)").matches ? Math.ceil(height) : 0,

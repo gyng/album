@@ -148,7 +148,9 @@ pair, distinct from the overall relative route score.
 
 Connect the Shots offers 4×4, 5×5 and 6×6 boards with matching group sizes.
 Broad subjects use caption topics; Specific subjects use finer indexed tags,
-excluding generic scene/place labels. Each frame matches exactly one selected
+excluding generic scene/place labels. Singular and plural tags (rock/rocks) are
+one subject when both occur, so two groups can never share an answer; Oracle
+also drops tag questions that repeat a caption topic. Each frame matches exactly one selected
 subject, and competing same-sized partitions are rejected, including those that would
 emerge after removing solved groups. Selection has an
 accent outline and a tick badge without dimming the photograph. One-away hints
@@ -187,6 +189,8 @@ Double Take flashes two decoded photographs in sequence, then asks Same place
 or Different places. Nearby pairs are within 75 metres on different camera-local
 days; distant pairs are at least 5 km apart. Invalid coordinates, ambiguous
 separations, same-day nearby bursts and near-duplicate vectors are excluded.
+Candidate pairs are compared once per collection, in short slices so Cancel
+stays responsive, and reused by Play again.
 Half the rounds draw the strongest lookalikes in each answer class; the rest
 match resemblance across classes. This mixes deceptive distant pairs with
 convincing return visits without making every strong resemblance a distant
@@ -267,7 +271,10 @@ back independently; unavailable storage does not prevent play.
 Explicit Guess Where URL fields outrank saved preferences. Generated and copied
 non-daily challenge links include all choices, including Everywhere and timer
 Off, so a recipient's preferences cannot change the shared game. Daily stays
-five untimed rounds and does not overwrite the player's saved choices.
+five untimed rounds and does not overwrite the player's saved choices. A shared
+or daily seed deals only the first game: Play again deals fresh photographs
+(after a daily, a random untimed practice game), since the answers are known.
+URL fields never overwrite saved settings; only the player's own changes do.
 
 ## Sight Lines
 
@@ -311,7 +318,8 @@ selected-photo preview scrolls. Connections keeps selection count and its
 Check, Deselect and Shuffle actions visible above the photo grid. Relay shows
 a compact start-to-finish chain above the tray; Edit links returns focus to the
 editable chain. Cross Exposure retains its grid and compact controls beside the
-tray. Each dock needs at least 144px of usable space below it; oversized boards
+tray. Each dock needs at least 144px of usable space below it, after the bottom safe
+area; oversized boards
 and short viewports use normal flow. Results never retain sticky game controls.
 
 Oracle's questions and answer controls, Blind Frame's drawing dialogue and
@@ -365,7 +373,10 @@ Games expose phase-aware shortcuts:
 N starts a new round where safe; G gives up, H hints and Escape clears selection
 where supported. Oracle uses 1/2/3 for yes/no/unsure, B to undo; Double Take uses
 1/2 for same/different place. Hangman uses / to focus its subject filter.
-Guess Where retains its existing Enter/Space confirm and next controls. Shortcuts
+Guess Where uses Enter/Space to confirm and Enter/Space/→ for the next round,
+through the same shortcut hook; arrows and Space on a focused map stay with the
+map, and a focusable "Guess at map centre" action places a guess without a
+pointer. Shortcuts
 ignore typing, modifier combinations, held-key repeats and open modal dialogs;
 native activation of focused buttons takes precedence over Enter/Space shortcuts.
 

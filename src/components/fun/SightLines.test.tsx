@@ -82,3 +82,22 @@ it("starts the advanced board with longer lines and supports arrow navigation an
     expect(screen.getByRole("region", { name: "Sight Lines result" })).toHaveFocus(),
   );
 });
+
+it("stops arrow navigation at the edges of the board", () => {
+  render(<SightLines photos={photos} />);
+  fireEvent.click(screen.getByRole("button", { name: "5×5" }));
+  fireEvent.click(screen.getByRole("button", { name: "Start searching" }));
+  const board = screen.getByRole("group", { name: "Photo search board" });
+  const cell = (row: number, column: number) =>
+    within(board).getByRole("button", { name: new RegExp(`^Row ${row}, column ${column}\\b`) });
+  for (const [row, column, key] of [
+    [1, 3, "ArrowUp"],
+    [5, 2, "ArrowDown"],
+    [1, 5, "ArrowRight"],
+    [2, 1, "ArrowLeft"],
+  ] as const) {
+    cell(row, column).focus();
+    fireEvent.keyDown(cell(row, column), { key });
+    expect(cell(row, column)).toHaveFocus();
+  }
+});

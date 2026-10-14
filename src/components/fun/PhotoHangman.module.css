@@ -103,10 +103,6 @@
   opacity: 0.65;
   text-decoration: line-through;
 }
-.subject,
-.search {
-  scroll-margin-block-start: calc(var(--hangman-dock-height, 0px) + var(--space-3));
-}
 .result {
   display: grid;
   gap: var(--space-3);
@@ -121,6 +117,12 @@
   }
   .subjects {
     gap: var(--space-1);
+  }
+  /* GameDock reports its sticky height up to 960px, but only a single column
+     puts the dock above the subjects rather than beside them. */
+  .subject,
+  .search {
+    scroll-margin-block-start: calc(var(--hangman-dock-height, 0px) + var(--space-3));
   }
 }
 

@@ -1,4 +1,4 @@
-import { buildDoubleTakeDeck, doubleTakePoints } from "./doubleTake";
+import { buildDoubleTakeDeck, doubleTakePoints, prepareDoubleTakePairs } from "./doubleTake";
 import type { PhotoGamePhoto } from "./photoGames";
 
 const photo = (
@@ -77,6 +77,40 @@ it("includes the strongest distant lookalikes alongside comparable pairs, withou
   expect(distant.filter((pair) => pair.similarity > 0.93)).toHaveLength(2);
   expect(distant.filter((pair) => pair.similarity < 0.8)).toHaveLength(2);
   expect(new Set(deck.flatMap((pair) => pair.photos.map((photo) => photo.path))).size).toBe(16);
+});
+
+it("prepares the candidate pairs once per collection, so another game only draws a new deck", () => {
+  let reads = 0;
+  const photos = Array.from({ length: 8 }, (_, i) => {
+    const value = photo(String(i), i < 4 ? 35 : 45, i % 2 ? 139.0001 : 139, `2024-01-0${i + 1}`);
+    const { vector } = value;
+    return Object.defineProperty(value, "vector", {
+      get: () => {
+        reads++;
+        return vector;
+      },
+    });
+  });
+  const first = buildDoubleTakeDeck(photos, () => 0.4, 4);
+  expect(reads).toBeGreaterThan(0);
+  reads = 0;
+  expect(buildDoubleTakeDeck(photos, () => 0.4, 4)).toEqual(first);
+  expect(reads).toBe(0);
+  expect(buildDoubleTakeDeck([...photos], () => 0.4, 4)).toEqual(first);
+  expect(reads).toBeGreaterThan(0);
+});
+
+it("compares a collection in resumable slices that yield the same deck as one pass", () => {
+  const photos = Array.from({ length: 8 }, (_, i) =>
+    photo(String(i), i < 4 ? 35 : 45, i % 2 ? 139.0001 : 139, `2024-01-0${i + 1}`),
+  );
+  let slices = 1;
+  while (!prepareDoubleTakePairs(photos, 0)) slices++;
+  expect(slices).toBeGreaterThan(1);
+  expect(prepareDoubleTakePairs(photos, 0)).toBe(true);
+  expect(buildDoubleTakeDeck(photos, () => 0.4, 4)).toEqual(
+    buildDoubleTakeDeck([...photos], () => 0.4, 4),
+  );
 });
 
 it("awards correctness first and removes the streak bonus after a replay", () => {

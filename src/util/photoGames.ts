@@ -205,6 +205,8 @@ export const rankDrawing = (vector: number[], photos: PhotoGamePhoto[], targetPa
 export type OracleCandidate = { photo: PhotoGamePhoto; weight: number };
 export type OracleQuestion = {
   id: string;
+  /** Short subject name for connection groups and discovery prompts. */
+  name?: string;
   label: string;
   matches: (photo: PhotoGamePhoto) => boolean;
 };
@@ -414,24 +416,74 @@ const CONNECTION_LABELS: Record<string, string> = {
 export type ConnectionGroup = { id: string; label: string; photos: PhotoGamePhoto[] };
 export type ConnectionsPuzzle = { groups: ConnectionGroup[]; tiles: PhotoGamePhoto[] };
 
+const photoTags = (photo: PhotoGamePhoto): string[] =>
+  photo.tags.split(",").map((tag) => tag.trim().toLowerCase());
+
+// Candidate singulars for a word. Only ever trusted when the singular also
+// occurs, so "glass" or "bus" can never be reduced to a word nobody wrote.
+const singularCandidates = (word: string): string[] => [
+  ...(word.endsWith("ies") ? [`${word.slice(0, -3)}y`] : []),
+  ...(word.endsWith("es") ? [word.slice(0, -2)] : []),
+  ...(word.endsWith("s") && !word.endsWith("ss") ? [word.slice(0, -1)] : []),
+];
+
 // Indexed subject tags provide finer distinctions than the broad caption topics.
+// Plural and singular forms of one tag are one subject: a photograph tagged
+// "rocks" belongs with one tagged "rock", never in a rival group.
 export const taggedOracleQuestions = (photos: PhotoGamePhoto[]): OracleQuestion[] => {
+  const known = new Set(
+    photos.flatMap(photoTags).filter((tag) => /^[a-z][a-z_-]{2,29}$/.test(tag)),
+  );
+  const baseOf = (tag: string) =>
+    singularCandidates(tag).find((candidate) => known.has(candidate)) ?? tag;
+  const forms = new Map<string, string[]>();
+  for (const tag of known) forms.set(baseOf(tag), [...(forms.get(baseOf(tag)) ?? []), tag]);
   const counts = new Map<string, number>();
   for (const photo of photos)
-    for (const tag of new Set(photo.tags.split(",").map((t) => t.trim().toLowerCase()))) {
-      if (/^[a-z][a-z_-]{2,29}$/.test(tag)) counts.set(tag, (counts.get(tag) ?? 0) + 1);
-    }
+    for (const base of new Set(
+      photoTags(photo)
+        .filter((tag) => known.has(tag))
+        .map(baseOf),
+    ))
+      counts.set(base, (counts.get(base) ?? 0) + 1);
   return [...counts]
     .filter(([, count]) => count >= 2 && count < photos.length * 0.7)
     .sort((a, b) => b[1] - a[1])
     .slice(0, 160)
-    .map(([tag]) => ({
-      id: `tag:${tag}`,
-      label: `Does it feature ${tag.replaceAll("_", " ").replaceAll("-", " ")}?`,
-      matches: (photo: PhotoGamePhoto) =>
-        photo.tags.split(",").some((t) => t.trim().toLowerCase() === tag),
-    }));
+    .map(([base]) => {
+      const variants = new Set(forms.get(base));
+      // A merged subject reads as its plural: "rocks", "pine trees".
+      const name = [...variants]
+        .sort((a, b) => b.length - a.length)[0]!
+        .replaceAll("_", " ")
+        .replaceAll("-", " ");
+      return {
+        id: `tag:${base}`,
+        name,
+        label: `Does it feature ${name}?`,
+        matches: (photo: PhotoGamePhoto) => photoTags(photo).some((tag) => variants.has(tag)),
+      };
+    });
 };
+
+const looseForms = (word: string): string[] => [word, ...singularCandidates(word)];
+const TOPIC_FORMS = new Set(
+  topics.flatMap(([id]) => [
+    ...looseForms(id),
+    ...looseForms((CONNECTION_LABELS[id] ?? id).toLowerCase()),
+  ]),
+);
+
+// Caption topics plus the finer tag subjects, without asking about one
+// subject twice ("Include water?" from a topic and again from a tag).
+export const oracleQuestionsFor = (photos: PhotoGamePhoto[]): OracleQuestion[] => [
+  ...ORACLE_QUESTIONS,
+  ...taggedOracleQuestions(photos).filter(
+    (question) =>
+      !looseForms(question.id.slice(4)).some((form) => TOPIC_FORMS.has(form)) &&
+      !looseForms((question.name ?? "").replaceAll(" ", "_")).some((form) => TOPIC_FORMS.has(form)),
+  ),
+];
 export const oracleDiscoveryCandidates = (
   candidates: OracleCandidate[],
   question: OracleQuestion,
@@ -492,7 +544,11 @@ export const buildConnectionsPuzzle = (
   ]);
   const subjects =
     detail === "specific"
-      ? taggedOracleQuestions(unique).filter((question) => !broadTags.has(question.id.slice(4)))
+      ? taggedOracleQuestions(unique).filter(
+          (question) =>
+            !broadTags.has(question.id.slice(4)) &&
+            !broadTags.has((question.name ?? "").replaceAll(" ", "_")),
+        )
       : ORACLE_QUESTIONS;
   const signatures = unique.map((photo) => ({
     photo,
@@ -519,6 +575,7 @@ export const buildConnectionsPuzzle = (
       const groups = selected.map((item, index) => ({
         id: item.question.id,
         label:
+          item.question.name ??
           CONNECTION_LABELS[item.question.id] ??
           item.question.id.replace("tag:", "").replaceAll("_", " "),
         photos: shuffleGamePhotos(pools[index]!, random)
@@ -572,7 +629,7 @@ export const checkConnection = (
 };
 
 export const oracleDiscoveryQuestion = (question: OracleQuestion): string =>
-  `Include ${(CONNECTION_LABELS[question.id] ?? question.id.replace("tag:", "").replaceAll("_", " ").replaceAll("-", " ")).toLowerCase()}?`;
+  `Include ${(question.name ?? CONNECTION_LABELS[question.id] ?? question.id.replace("tag:", "").replaceAll("_", " ").replaceAll("-", " ")).toLowerCase()}?`;
 
 export const relayLinkClues = (photos: PhotoGamePhoto[]): string[] =>
   photos.slice(0, -1).map((photo, index) => {

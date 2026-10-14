@@ -28,10 +28,13 @@ export const PhotoHangman = ({ photos }: { photos: PhotoGamePhoto[] }) => {
   const [readyPaths, setReadyPaths] = useState<string[]>([]);
   const [failedPath, setFailedPath] = useState<string | null>(null);
   const [imageAttempt, setImageAttempt] = useState(0);
+  const [round, setRound] = useState(0);
+  const [refocusAfter, setRefocusAfter] = useState<string | null>(null);
   const [dockHeight, setDockHeight] = useState(0);
   const [error, setError] = useState("");
   const resultRef = useRef<HTMLElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
+  const subjectsRef = useRef<HTMLDivElement>(null);
   const status = puzzle ? hangmanSubjectStatus(puzzle, guesses) : "playing";
   const misses = puzzle ? wrongHangmanSubjects(puzzle, guesses).length : 0;
   const finished = status !== "playing";
@@ -55,9 +58,33 @@ export const PhotoHangman = ({ photos }: { photos: PhotoGamePhoto[] }) => {
     setReadyPaths([]);
     setFailedPath(null);
     setImageAttempt(0);
+    setRound((previous) => previous + 1);
+    setRefocusAfter(null);
     setGaveUp(false);
     setError("");
   };
+  const revealed = puzzle ? Math.min(misses + HANGMAN_INITIAL_CLUES, puzzle.photos.length) : 0;
+  const clueIndex = viewed?.misses === misses ? viewed.index : revealed - 1;
+  const clueIndices = !ended && misses === 0 && viewed === null ? [0, 1] : [clueIndex];
+  const ready =
+    !!puzzle &&
+    [...new Set([...clueIndices, 0, 1])].every((index) =>
+      readyPaths.includes(puzzle.photos[index]!.path),
+    );
+  // A wrong guess disables its own button and, while the next clue loads, every
+  // other one, so focus would otherwise fall to the document.
+  useEffect(() => {
+    if (!refocusAfter || !puzzle || (!ended && !ready)) return;
+    setRefocusAfter(null);
+    if (ended) return;
+    const buttons = [...(subjectsRef.current?.querySelectorAll<HTMLButtonElement>("button") ?? [])];
+    const after = puzzle.subjects.indexOf(refocusAfter);
+    const open = buttons.filter((button) => !button.disabled);
+    const next =
+      open.find((button) => puzzle.subjects.indexOf(button.dataset.subject ?? "") > after) ??
+      open[0];
+    next?.focus();
+  }, [refocusAfter, puzzle, ready, ended]);
   const shortcuts = [
     {
       key: "N",
@@ -93,12 +120,6 @@ export const PhotoHangman = ({ photos }: { photos: PhotoGamePhoto[] }) => {
         </Button>
       </GameIntro>
     );
-  const revealed = Math.min(misses + HANGMAN_INITIAL_CLUES, puzzle.photos.length);
-  const clueIndex = viewed?.misses === misses ? viewed.index : revealed - 1;
-  const clueIndices = !ended && misses === 0 && viewed === null ? [0, 1] : [clueIndex];
-  const ready = [...new Set([...clueIndices, 0, 1])].every((index) =>
-    readyPaths.includes(puzzle.photos[index]!.path),
-  );
   const answer =
     status === "won"
       ? guesses.find((guess) => puzzle.acceptedAnswers.includes(guess))!
@@ -144,7 +165,7 @@ export const PhotoHangman = ({ photos }: { photos: PhotoGamePhoto[] }) => {
                 return (
                   <div key={photo.path} className={styles.frame}>
                     <img
-                      key={`${photo.path}:${imageAttempt}`}
+                      key={`${round}:${photo.path}:${imageAttempt}`}
                       src={
                         getResizedAlbumImageSrc(photo.path) +
                         (imageAttempt ? `?retry=${imageAttempt}` : "")
@@ -245,6 +266,7 @@ export const PhotoHangman = ({ photos }: { photos: PhotoGamePhoto[] }) => {
                 />
               </label>
               <div
+                ref={subjectsRef}
                 className={styles.subjects}
                 role="group"
                 aria-label="Subject choices"
@@ -255,11 +277,13 @@ export const PhotoHangman = ({ photos }: { photos: PhotoGamePhoto[] }) => {
                     key={subject}
                     aria-label={`Guess ${subject.toLowerCase()}`}
                     {...(styles.subject ? { className: styles.subject } : {})}
+                    data-subject={subject}
                     data-used={guesses.includes(subject)}
                     disabled={!ready || guesses.includes(subject)}
                     onClick={() => {
                       if (!ready) return;
                       searchRef.current?.blur();
+                      setRefocusAfter(subject);
                       setGuesses((previous) => addHangmanSubjectGuess(puzzle, previous, subject));
                       setQuery("");
                     }}

@@ -1,5 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import { buildDoubleTakeDeck, doubleTakePoints, type DoubleTakePair } from "../../util/doubleTake";
+import {
+  buildDoubleTakeDeck,
+  doubleTakePoints,
+  prepareDoubleTakePairs,
+  type DoubleTakePair,
+} from "../../util/doubleTake";
 import type { PhotoGamePhoto } from "../../util/photoGames";
 import { getResizedAlbumImageSrc } from "../../util/getResizedAlbumImageSrc";
 import { exifDayKey } from "../../util/exifTime";
@@ -71,13 +76,20 @@ export const DoubleTake = ({ photos }: { photos: PhotoGamePhoto[] }) => {
   const [points, setPoints] = useState(0);
   const [message, setMessage] = useState("");
   const resultRef = useRef<HTMLDivElement>(null);
+  const stageRef = useRef<HTMLDivElement>(null);
   const pair = deck[round];
   const duration = slower ? 3000 : Math.max(650, 1000 - streak * 100);
 
   useEffect(() => {
     if (phase !== "preparing") return;
-    const task = window.setTimeout(() => {
+    // A first comparison takes seconds; slices keep Cancel and the page responsive.
+    let task = 0;
+    const step = () => {
       try {
+        if (!prepareDoubleTakePairs(photos, 12)) {
+          task = window.setTimeout(step, 0);
+          return;
+        }
         const next = buildDoubleTakeDeck(photos);
         if (!next.length) {
           setMessage("There are not enough similar photographs with known locations yet.");
@@ -90,7 +102,8 @@ export const DoubleTake = ({ photos }: { photos: PhotoGamePhoto[] }) => {
         setMessage("The pairs couldn’t be prepared. Try again.");
         setPhase("lobby");
       }
-    }, 0);
+    };
+    task = window.setTimeout(step, 0);
     return () => window.clearTimeout(task);
   }, [phase, photos]);
 
@@ -139,6 +152,12 @@ export const DoubleTake = ({ photos }: { photos: PhotoGamePhoto[] }) => {
 
   useEffect(() => {
     if (phase === "reveal" || phase === "summary") resultRef.current?.focus();
+    // The control that started the pair unmounted while it played; return focus to the question.
+    else if (
+      phase === "guess" &&
+      (!document.activeElement || document.activeElement === document.body)
+    )
+      stageRef.current?.focus();
   }, [phase]);
 
   const start = () => {
@@ -335,7 +354,7 @@ export const DoubleTake = ({ photos }: { photos: PhotoGamePhoto[] }) => {
         </div>
       ) : (
         <>
-          <div className={styles.stage} aria-live="polite">
+          <div className={styles.stage} ref={stageRef} tabIndex={-1} aria-live="polite">
             {flash !== null ? (
               <>
                 <img

@@ -109,7 +109,9 @@ describe("GuessSummary", () => {
     expect(screen.getByText("Unknown location")).toBeInTheDocument();
     expect(screen.getByText("1.3 km")).toBeInTheDocument();
     expect(screen.getByText("Skipped")).toBeInTheDocument();
-    expect(screen.getByText(`+${MAX_TIME_BONUS.toLocaleString("en-GB")}`)).toBeInTheDocument();
+    expect(
+      screen.getByText(`incl. ${MAX_TIME_BONUS.toLocaleString("en-GB")} time bonus`),
+    ).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Play again" }));
     fireEvent.click(screen.getByRole("button", { name: "Change settings" }));

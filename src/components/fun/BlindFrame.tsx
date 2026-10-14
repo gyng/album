@@ -56,8 +56,14 @@ export const BlindFrame = ({ photos }: { photos: PhotoGamePhoto[] }) => {
     [target, imageQuery, photos],
   );
   useEffect(() => {
-    if (result) resultRef.current?.focus();
-  }, [result]);
+    if (result || gaveUp) resultRef.current?.focus();
+  }, [result, gaveUp]);
+  const comparing = Boolean(imageQuery && !imageQuery.vector);
+  // Abandon any comparison still running, or its late result would replace the reveal.
+  const giveUp = () => {
+    clearImageQuery();
+    setGaveUp(true);
+  };
   const eligible = photos.filter((photo) => photo.caption.length >= 20 && photo.vector.length > 0);
   const start = () => {
     roundRef.current += 1;
@@ -82,12 +88,12 @@ export const BlindFrame = ({ photos }: { photos: PhotoGamePhoto[] }) => {
       key: "D",
       label: "Draw this scene",
       action: () => setDrawing(true),
-      enabled: Boolean(target && !result && !gaveUp && !inlinePad),
+      enabled: Boolean(target && !result && !gaveUp && !inlinePad && !comparing),
     },
     {
       key: "G",
       label: "Give up",
-      action: () => setGaveUp(true),
+      action: giveUp,
       enabled: Boolean(target && !result && !gaveUp),
     },
   ];
@@ -220,11 +226,7 @@ export const BlindFrame = ({ photos }: { photos: PhotoGamePhoto[] }) => {
           ) : null}
           <div className={styles.actions}>
             {!inlinePad ? (
-              <Button
-                variant="primary"
-                disabled={!!imageQuery && !imageQuery.vector}
-                onClick={() => setDrawing(true)}
-              >
+              <Button variant="primary" disabled={comparing} onClick={() => setDrawing(true)}>
                 Draw this scene
                 <KeyHint aria-hidden="true">D</KeyHint>
               </Button>
@@ -232,20 +234,14 @@ export const BlindFrame = ({ photos }: { photos: PhotoGamePhoto[] }) => {
             <Button variant="quiet" onClick={start}>
               Another description
             </Button>
-            <Button
-              variant="quiet"
-              onClick={() => {
-                clearImageQuery();
-                setGaveUp(true);
-              }}
-            >
+            <Button variant="quiet" onClick={giveUp}>
               Give up
               <KeyHint aria-hidden="true">G</KeyHint>
             </Button>
           </div>
         </>
       )}
-      {drawing || (inlinePad && !result && !gaveUp && !imageQuery) ? (
+      {drawing || (inlinePad && !result && !gaveUp && !comparing) ? (
         <SearchDrawPad
           key={round}
           inline={inlinePad}

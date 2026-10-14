@@ -7,9 +7,25 @@ import { distanceMetersBetween } from "../mapRoute";
 import { fireConfetti } from "./confetti";
 import { GuessRound, type RoundResult } from "./GuessRound";
 import type { GuessPhoto } from "./guessTypes";
+import { GuessMap } from "./GuessMap";
+import { computeScore } from "./guessScoring";
 
 jest.mock("../mapRoute", () => ({
   distanceMetersBetween: jest.fn(),
+}));
+
+// The map surface stands in for MapLibre's focusable canvas container.
+jest.mock("../map", () => ({
+  __esModule: true,
+  MapView: ({ children }: React.PropsWithChildren) => (
+    // oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex
+    <div data-testid="map-surface" tabIndex={0}>
+      {children}
+    </div>
+  ),
+  Marker: ({ children }: React.PropsWithChildren) => <div>{children}</div>,
+  DataLayer: () => null,
+  useMap: () => undefined,
 }));
 
 jest.mock("./confetti", () => ({
@@ -307,6 +323,126 @@ describe("GuessRound", () => {
 
     if (label) expect(screen.getByText(label)).toBeInTheDocument();
     else expect(screen.queryByText("Singapore")).not.toBeInTheDocument();
+  });
+
+  it("awards no time bonus when the timer runs out on a placed guess", () => {
+    jest.useFakeTimers();
+    const { props, container } = renderRound({ timeLimit: 15 });
+    fireEvent.load(container.querySelector("img")!);
+
+    act(() => {
+      jest.advanceTimersByTime(15_000);
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Next/ }));
+
+    const result = jest.mocked(props.onComplete).mock.calls[0]![0];
+    expect(result.timeBonus).toBe(0);
+    expect(result.score).toBe(result.distanceScore);
+    jest.useRealTimers();
+  });
+
+  it("separates the distance score from the time bonus in the reveal", () => {
+    jest.useFakeTimers();
+    distanceMetersBetweenMock.mockReturnValue(450_000);
+    const { container } = renderRound({ timeLimit: 30 });
+    fireEvent.load(container.querySelector("img")!);
+    act(() => {
+      jest.advanceTimersByTime(1_000);
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Confirm/ }));
+
+    const distanceScore = computeScore(450);
+    expect(screen.getByText(distanceScore.toLocaleString("en-GB"))).toBeInTheDocument();
+    expect(screen.getByText("+967 time bonus")).toBeInTheDocument();
+    jest.useRealTimers();
+  });
+
+  it("ignores held-key repeats and modified shortcuts", () => {
+    const { props } = renderRound();
+
+    fireEvent.keyDown(window, { key: "Enter", altKey: true });
+    fireEvent.keyDown(window, { key: "Enter", ctrlKey: true });
+    expect(props.onReveal).not.toHaveBeenCalled();
+
+    fireEvent.keyDown(window, { key: "Enter" });
+    expect(props.onReveal).toHaveBeenCalledTimes(1);
+    fireEvent.keyDown(window, { key: "Enter", repeat: true });
+    fireEvent.keyDown(window, { key: "ArrowRight", altKey: true });
+    fireEvent.keyDown(window, { key: "ArrowRight", metaKey: true });
+    expect(props.onComplete).not.toHaveBeenCalled();
+  });
+
+  it("ignores shortcuts already handled or behind an open dialog", () => {
+    const { props } = renderRound();
+    const handled = new KeyboardEvent("keydown", { key: "Enter", cancelable: true });
+    handled.preventDefault();
+    window.dispatchEvent(handled);
+    expect(props.onReveal).not.toHaveBeenCalled();
+
+    const dialog = document.createElement("dialog");
+    dialog.setAttribute("open", "");
+    document.body.append(dialog);
+    fireEvent.keyDown(window, { key: "Enter" });
+    expect(props.onReveal).not.toHaveBeenCalled();
+    dialog.remove();
+  });
+
+  it("leaves Space and the arrow keys to a focused map after the reveal", () => {
+    const { props } = renderRound({
+      mapSlot: <GuessMap guess={{ lat: 35.01, lng: 139.01 }} onGuess={jest.fn()} />,
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Confirm/ }));
+
+    const surface = screen.getByTestId("map-surface");
+    fireEvent.keyDown(surface, { key: " " });
+    fireEvent.keyDown(surface, { key: "ArrowRight" });
+    expect(props.onComplete).not.toHaveBeenCalled();
+
+    fireEvent.keyDown(surface, { key: "Enter" });
+    expect(props.onComplete).toHaveBeenCalledTimes(1);
+  });
+
+  it("moves focus to the result on reveal and to the photo on a new round", () => {
+    const { rerender } = renderRound();
+    expect(mysteryPanel()).toHaveFocus();
+
+    const confirm = screen.getByRole("button", { name: /Confirm/ });
+    confirm.focus();
+    fireEvent.click(confirm);
+
+    expect(screen.getByRole("group", { name: "Result" })).toHaveFocus();
+    expect(screen.getByRole("status")).toHaveTextContent("1.0 km away");
+
+    rerender(<GuessRound {...baseProps} photo={secondPhoto} roundNumber={2} />);
+    expect(mysteryPanel()).toHaveFocus();
+    expect(screen.getByRole("status")).toBeEmptyDOMElement();
+  });
+
+  it("claims the wheel to zoom the photo instead of scrolling the page", () => {
+    const { container } = renderRound();
+    const wheel = new WheelEvent("wheel", { deltaY: -1, bubbles: true, cancelable: true });
+    act(() => {
+      mysteryPanel().dispatchEvent(wheel);
+    });
+
+    expect(wheel.defaultPrevented).toBe(true);
+    expect(container.querySelector("img")!.style.transform).toContain("scale(1.15)");
+  });
+
+  it("reports a photo that fails to load and lets the player skip it", () => {
+    jest.useFakeTimers();
+    const { props, container } = renderRound({ guess: null, timeLimit: 15 });
+    fireEvent.error(container.querySelector("img")!);
+
+    expect(screen.getByRole("alert")).toHaveTextContent("This photo could not be loaded.");
+    act(() => {
+      jest.advanceTimersByTime(20_000);
+    });
+    expect(props.onReveal).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Skip this photo" }));
+    expect(screen.getByText("Skipped")).toBeInTheDocument();
+    jest.useRealTimers();
   });
 
   it("aborts from the top bar", () => {

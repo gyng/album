@@ -16,6 +16,8 @@ import { useGameShortcuts, type GameShortcut } from "./useGameShortcuts";
 import { useGameSettings } from "./useGameSettings";
 import styles from "./PhotoCrossword.module.css";
 
+const columnLetter = (index: number) => String.fromCharCode(65 + index);
+
 export const PhotoCrossword = ({ photos }: { photos: PhotoGamePhoto[] }) => {
   const [settings, setSettings] = useGameSettings("cross");
   const { mode, prefill, size } = settings;
@@ -158,14 +160,14 @@ export const PhotoCrossword = ({ photos }: { photos: PhotoGamePhoto[] }) => {
     setRevealedClues([...revealedClues, next]);
     setChecked(null);
     const question = (next.axis === "row" ? puzzle.rows : puzzle.columns)[next.index]!;
-    const clue = `${next.axis === "row" ? `Row ${next.index + 1}` : `Column ${String.fromCharCode(65 + next.index)}`} · ${crosswordClue(question)}`;
+    const clue = `${next.axis === "row" ? `Row ${next.index + 1}` : `Column ${columnLetter(next.index)}`} · ${crosswordClue(question)}`;
     setLastHint(clue);
     setMessage(
       `${clue}. ${remainingHints - 1} ${remainingHints - 1 === 1 ? "clue" : "clues"} still hidden.`,
     );
   };
   const label = (index: number) =>
-    `Row ${Math.floor(index / size) + 1}${showClue("row", Math.floor(index / size)) ? `: ${crosswordClue(puzzle!.rows[Math.floor(index / size)]!)}` : ""}; column ${(index % size) + 1}${showClue("column", index % size) ? `: ${crosswordClue(puzzle!.columns[index % size]!)}` : ""}${isFixed(index) ? "; fixed starting photograph" : cells[index] ? "; occupied" : "; empty"}`;
+    `Row ${Math.floor(index / size) + 1}${showClue("row", Math.floor(index / size)) ? `: ${crosswordClue(puzzle!.rows[Math.floor(index / size)]!)}` : ""}; column ${columnLetter(index % size)}${showClue("column", index % size) ? `: ${crosswordClue(puzzle!.columns[index % size]!)}` : ""}${isFixed(index) ? "; fixed starting photograph" : cells[index] ? "; occupied" : "; empty"}`;
   const checkGrid = () => {
     if (!puzzle || finished) return;
 
@@ -222,7 +224,12 @@ export const PhotoCrossword = ({ photos }: { photos: PhotoGamePhoto[] }) => {
     setMessage("Move the photograph to an unlocked square. Occupied squares swap photographs.");
   };
   const shortcuts: GameShortcut[] = [
-    { key: "n", label: puzzle ? "New puzzle" : "Start", action: start },
+    {
+      key: "n",
+      label: puzzle ? "New puzzle" : "Start",
+      action: start,
+      enabled: !puzzle || !!finished,
+    },
     {
       key: "h",
       label: "Hint",
@@ -376,16 +383,18 @@ export const PhotoCrossword = ({ photos }: { photos: PhotoGamePhoto[] }) => {
                       key={question.id}
                       scope="col"
                       aria-label={
-                        showClue("column", index) ? crosswordClue(question) : `Column ${index + 1}`
+                        showClue("column", index)
+                          ? crosswordClue(question)
+                          : `Column ${columnLetter(index)}`
                       }
                     >
                       <span className={styles.fullClue} aria-hidden="true">
                         {showClue("column", index)
                           ? crosswordClue(question)
-                          : `Column ${index + 1}`}
+                          : `Column ${columnLetter(index)}`}
                       </span>
                       <span className={styles.shortClue} aria-hidden="true">
-                        {String.fromCharCode(65 + index)}
+                        {columnLetter(index)}
                       </span>
                     </th>
                   ))}
@@ -512,7 +521,7 @@ export const PhotoCrossword = ({ photos }: { photos: PhotoGamePhoto[] }) => {
                   {puzzle.columns.map((question, index) =>
                     showClue("column", index) ? (
                       <li key={question.id}>
-                        {String.fromCharCode(65 + index)} · {crosswordClue(question)}
+                        {columnLetter(index)} · {crosswordClue(question)}
                       </li>
                     ) : null,
                   )}

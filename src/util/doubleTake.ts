@@ -34,13 +34,22 @@ const distance = (
   return 6371000 * 2 * Math.asin(Math.sqrt(Math.min(1, value)));
 };
 
-// Nearby means the same small area, rather than proof of the same building.
-// Leave a wide gap between classes so borderline GPS readings never decide a round.
-export const buildDoubleTakeDeck = (
-  photos: PhotoGamePhoto[],
-  random: () => number = Math.random,
-  rounds = 8,
-): DoubleTakePair[] => {
+type Candidates = { sameRanked: DoubleTakePair[]; distantSorted: DoubleTakePair[] };
+type Comparison = {
+  valid: Array<{ photo: PhotoGamePhoto; vector: number[] }>;
+  pools: [DoubleTakePair[], DoubleTakePair[]];
+  next: number;
+  candidates: Candidates | null;
+};
+
+// Comparing every located pair is about a million 768-dimension dot products for the whole
+// archive — seconds of work — so a collection is compared once, a slice at a time, and each
+// new game only draws from the result. A changed collection must be a new array.
+const comparisons = new WeakMap<readonly PhotoGamePhoto[], Comparison>();
+
+const comparisonFor = (photos: readonly PhotoGamePhoto[]): Comparison => {
+  const existing = comparisons.get(photos);
+  if (existing) return existing;
   const valid = [
     ...new Map(photos.filter(validLocation).map((photo) => [photo.path, photo])).values(),
   ].flatMap((photo) => {
@@ -49,31 +58,70 @@ export const buildDoubleTakeDeck = (
       ? [{ photo, vector: Array.from(photo.vector, (v) => v / norm) }]
       : [];
   });
-  const pools: [DoubleTakePair[], DoubleTakePair[]] = [[], []];
-  for (let i = 0; i < valid.length; i++) {
-    const a = valid[i]!;
-    for (let j = i + 1; j < valid.length; j++) {
-      const b = valid[j]!;
-      if (a.vector.length !== b.vector.length) continue;
-      const metres = distance(a.photo.location!, b.photo.location!);
-      const samePlace = metres <= 75;
-      if (!samePlace && metres < 5000) continue;
-      if (samePlace && exifDayKey(a.photo.location!.date) === exifDayKey(b.photo.location!.date))
-        continue;
-      let similarity = 0;
-      for (let index = 0; index < a.vector.length; index++)
-        similarity += a.vector[index]! * b.vector[index]!;
-      if (similarity < 0.65 || similarity > 0.995) continue;
-      pools[samePlace ? 0 : 1].push({
-        photos: [a.photo, b.photo],
-        samePlace,
-        distanceMetres: metres,
-        similarity,
-      });
-    }
+  const comparison: Comparison = { valid, pools: [[], []], next: 0, candidates: null };
+  comparisons.set(photos, comparison);
+  return comparison;
+};
+
+// Nearby means the same small area, rather than proof of the same building.
+// Leave a wide gap between classes so borderline GPS readings never decide a round.
+const compareRow = ({ valid, pools }: Comparison, i: number) => {
+  const a = valid[i]!;
+  for (let j = i + 1; j < valid.length; j++) {
+    const b = valid[j]!;
+    if (a.vector.length !== b.vector.length) continue;
+    const metres = distance(a.photo.location!, b.photo.location!);
+    const samePlace = metres <= 75;
+    if (!samePlace && metres < 5000) continue;
+    if (samePlace && exifDayKey(a.photo.location!.date) === exifDayKey(b.photo.location!.date))
+      continue;
+    let similarity = 0;
+    for (let index = 0; index < a.vector.length; index++)
+      similarity += a.vector[index]! * b.vector[index]!;
+    if (similarity < 0.65 || similarity > 0.995) continue;
+    pools[samePlace ? 0 : 1].push({
+      photos: [a.photo, b.photo],
+      samePlace,
+      distanceMetres: metres,
+      similarity,
+    });
   }
-  const sameRanked = pools[0].sort((a, b) => b.similarity - a.similarity).slice(0, 24);
-  const distantSorted = pools[1].sort((a, b) => b.similarity - a.similarity);
+};
+
+/** Compares the collection's photographs for up to `budgetMs` (always at least one photograph),
+ * resuming where the last call stopped. Returns true once a deck can be built without more work. */
+export const prepareDoubleTakePairs = (
+  photos: readonly PhotoGamePhoto[],
+  budgetMs = Infinity,
+): boolean => {
+  const comparison = comparisonFor(photos);
+  if (comparison.candidates) return true;
+  if (comparison.next < comparison.valid.length) {
+    // Ranking the pools is a step of its own, so it never extends a full slice.
+    const deadline = performance.now() + budgetMs;
+    do compareRow(comparison, comparison.next++);
+    while (comparison.next < comparison.valid.length && performance.now() < deadline);
+    if (budgetMs !== Infinity) return false;
+  }
+  const [same, distant] = comparison.pools;
+  comparison.candidates = {
+    sameRanked: same.sort((a, b) => b.similarity - a.similarity).slice(0, 24),
+    distantSorted: distant.sort((a, b) => b.similarity - a.similarity),
+  };
+  return true;
+};
+
+const candidatePairs = (photos: readonly PhotoGamePhoto[]): Candidates => {
+  prepareDoubleTakePairs(photos);
+  return comparisonFor(photos).candidates!;
+};
+
+export const buildDoubleTakeDeck = (
+  photos: readonly PhotoGamePhoto[],
+  random: () => number = Math.random,
+  rounds = 8,
+): DoubleTakePair[] => {
+  const { sameRanked, distantSorted } = candidatePairs(photos);
   // Half the rounds use the strongest resemblance in each answer class. The
   // other half match resemblance across classes, retaining less obvious return
   // visits without making every very similar pair a distant-place answer.

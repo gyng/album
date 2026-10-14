@@ -154,9 +154,11 @@ export const GuessSummary: React.FC<GuessSummaryProps> = ({
                 <span className={styles.roundScore} style={{ color: colour }}>
                   {result.score.toLocaleString("en-GB")}
                 </span>
+                {/* The score is already the total; the bonus is named as part of
+                    it so the two never read as added twice. */}
                 {result.timeBonus > 0 ? (
                   <span className={styles.timeBonus}>
-                    +{result.timeBonus.toLocaleString("en-GB")}
+                    {`incl. ${result.timeBonus.toLocaleString("en-GB")} time bonus`}
                   </span>
                 ) : null}
               </span>

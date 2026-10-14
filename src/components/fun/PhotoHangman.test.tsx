@@ -2,6 +2,10 @@
 import { fireEvent, render, screen, within, waitFor } from "@testing-library/react";
 import { PhotoHangman } from "./PhotoHangman";
 import { buildPhotoHangman } from "../../util/photoHangman";
+jest.mock("../../util/photoHangman", () => {
+  const actual = jest.requireActual("../../util/photoHangman");
+  return { ...actual, buildPhotoHangman: jest.fn(actual.buildPhotoHangman) };
+});
 import type { PhotoGamePhoto } from "../../util/photoGames";
 const photos: PhotoGamePhoto[] = [
   "cat",
@@ -21,7 +25,12 @@ const photos: PhotoGamePhoto[] = [
     vector: [],
   })),
 );
-beforeEach(() => jest.spyOn(Math, "random").mockReturnValue(0.37));
+const { buildPhotoHangman: buildActual } =
+  jest.requireActual<typeof import("../../util/photoHangman")>("../../util/photoHangman");
+beforeEach(() => {
+  jest.spyOn(Math, "random").mockReturnValue(0.37);
+  jest.mocked(buildPhotoHangman).mockImplementation(buildActual);
+});
 afterEach(() => jest.restoreAllMocks());
 const start = () => {
   render(<PhotoHangman photos={photos} />);
@@ -30,7 +39,7 @@ const start = () => {
   fireEvent.load(screen.getByRole("img", { name: "Photographic clue 2" }));
 };
 it("offers subject tags, filters without guessing, and reveals linked clues after a correct choice", async () => {
-  const puzzle = buildPhotoHangman(photos, () => 0.37)!;
+  const puzzle = buildActual(photos, () => 0.37)!;
   start();
   expect(screen.getByRole("img", { name: "Photographic clue 1" })).toBeTruthy();
   expect(screen.getByRole("img", { name: "Photographic clue 2" })).toBeTruthy();
@@ -50,7 +59,7 @@ it("offers subject tags, filters without guessing, and reveals linked clues afte
   expect(within(result).getByText(new RegExp(puzzle.answer, "i"))).toBeTruthy();
 });
 it("each wrong tag reveals a new clue, used choices stay disabled, and six misses end the round", async () => {
-  const puzzle = buildPhotoHangman(photos, () => 0.37)!;
+  const puzzle = buildActual(photos, () => 0.37)!;
   start();
   const wrong = puzzle.subjects
     .filter((subject) => !puzzle.acceptedAnswers.includes(subject))
@@ -109,4 +118,34 @@ it("waits for both starting photographs before accepting a guess", () => {
       .getAllByRole("button")
       .every((button) => !button.hasAttribute("disabled")),
   ).toBe(true);
+});
+
+it("moves focus to the next open subject once a wrong guess's clue has loaded", () => {
+  const puzzle = buildActual(photos, () => 0.37)!;
+  start();
+  const wrong = puzzle.subjects.find((subject) => !puzzle.acceptedAnswers.includes(subject))!;
+  const choice = screen.getByRole("button", { name: `Guess ${wrong.toLowerCase()}` });
+  choice.focus();
+  fireEvent.click(choice);
+  fireEvent.load(
+    within(screen.getByRole("figure", { name: "Current photographic clue" })).getByRole("img"),
+  );
+  const focused = document.activeElement as HTMLElement;
+  expect(
+    within(screen.getByRole("group", { name: "Subject choices" })).getAllByRole("button"),
+  ).toContain(focused);
+  expect(focused).toBeEnabled();
+});
+
+it("loads the next round's clues afresh even when one was showing on the result screen", () => {
+  const puzzle = buildActual(photos, () => 0.37)!;
+  jest.mocked(buildPhotoHangman).mockReturnValue(puzzle);
+  start();
+  fireEvent.click(screen.getByRole("button", { name: "Give up" }));
+  const shown = within(screen.getByRole("figure", { name: "Current photographic clue" })).getByRole(
+    "img",
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Play again" }));
+  // A reused element with an unchanged source never fires another load event.
+  expect(screen.getByRole("img", { name: "Photographic clue 2" })).not.toBe(shown);
 });

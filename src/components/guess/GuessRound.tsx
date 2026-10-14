@@ -1,11 +1,11 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { distanceMetersBetween } from "../mapRoute";
 import { Button, Caption, KeyHint } from "../ui";
 import styles from "./GuessRound.module.css";
 import { encodePublicAssetPath } from "../../util/encodePublicAssetPath";
 import { GuessPhoto } from "./guessTypes";
 import { fireConfetti } from "./confetti";
-import { isInteractiveTarget } from "./guessKeyboard";
+import { type GameShortcut, useGameShortcuts } from "../fun/useGameShortcuts";
 import { useAnimatedCounter } from "./useAnimatedCounter";
 import {
   MAX_SCORE,
@@ -83,6 +83,8 @@ export const GuessRound: React.FC<GuessRoundProps> = ({
   // Gate the round timer until the photo has loaded, so a slow connection
   // doesn't burn the round (and the time bonus) on a blank panel.
   const [photoLoaded, setPhotoLoaded] = useState(false);
+  // A missing image would otherwise shimmer forever with the timer held.
+  const [photoFailed, setPhotoFailed] = useState(false);
   // Timer state — declared here so the photo-change reset below can re-seed it.
   const [timeRemaining, setTimeRemaining] = useState(timeLimit);
 
@@ -98,19 +100,23 @@ export const GuessRound: React.FC<GuessRoundProps> = ({
     setZoom(1);
     setPan({ x: 0, y: 0 });
     setPhotoLoaded(false);
+    setPhotoFailed(false);
     setTimeRemaining(timeLimit);
   }
   const panRef = useRef({ x: 0, y: 0 });
   const dragging = useRef(false);
   const dragStart = useRef({ x: 0, y: 0 });
   const photoPanelRef = useRef<HTMLDivElement>(null);
+  const revealPanelRef = useRef<HTMLDivElement>(null);
   // Pinch-to-zoom: track every active pointer; when two are down we treat it
   // as a pinch and scale relative to the initial finger distance.
   const pointersRef = useRef<Map<number, { x: number; y: number }>>(new Map());
   const pinchStartRef = useRef<{ distance: number; zoom: number } | null>(null);
 
   // Animated score counters — ref callbacks that imperatively update textContent
-  const scoreCounterRef = useAnimatedCounter(result?.score ?? 0);
+  // The counter shows the distance score alone; the time bonus is labelled
+  // beside it, so the two never read as one number counted twice.
+  const scoreCounterRef = useAnimatedCounter(result?.distanceScore ?? 0);
   const cumulativeCounterRef = useAnimatedCounter(
     revealed ? cumulativeScore + result!.score : cumulativeScore,
   );
@@ -123,31 +129,42 @@ export const GuessRound: React.FC<GuessRoundProps> = ({
     `/data/albums/${photo.albumName}/.resized_images/${photo.photoName}@1600.avif`,
   );
 
-  const handleConfirm = useCallback(() => {
-    const distanceMeters = distanceMetersBetween(
-      { decLat: guess!.lat, decLng: guess!.lng },
-      { decLat: photo.lat, decLng: photo.lng },
-    );
-    const distanceScore = computeScore(distanceMeters / 1000);
-    const timeBonus = computeTimeBonus(timeLimit, timeRemaining);
-    const score = distanceScore + timeBonus;
-    const roundResult: RoundResult = {
-      photo,
-      distanceMeters,
-      distanceScore,
-      timeBonus,
-      score,
-      skipped: false,
-    };
+  // Seconds left is passed in rather than read from state: on expiry the
+  // interval fires before React has re-rendered, so state would still hold the
+  // last tick and an expired guess would earn a bonus.
+  const confirmGuess = useCallback(
+    (secondsLeft: number | null) => {
+      const distanceMeters = distanceMetersBetween(
+        { decLat: guess!.lat, decLng: guess!.lng },
+        { decLat: photo.lat, decLng: photo.lng },
+      );
+      const distanceScore = computeScore(distanceMeters / 1000);
+      const timeBonus = computeTimeBonus(timeLimit, secondsLeft);
+      const score = distanceScore + timeBonus;
+      const roundResult: RoundResult = {
+        photo,
+        distanceMeters,
+        distanceScore,
+        timeBonus,
+        score,
+        skipped: false,
+      };
 
-    setResult(roundResult);
-    setRevealed(true);
-    onReveal();
+      setResult(roundResult);
+      setRevealed(true);
+      onReveal();
 
-    if (distanceScore / MAX_SCORE >= 0.7) {
-      fireConfetti();
-    }
-  }, [guess, photo, timeLimit, timeRemaining, onReveal]);
+      if (distanceScore / MAX_SCORE >= 0.7) {
+        fireConfetti();
+      }
+    },
+    [guess, photo, timeLimit, onReveal],
+  );
+
+  const handleConfirm = useCallback(
+    () => confirmGuess(timeRemaining),
+    [confirmGuess, timeRemaining],
+  );
 
   const handleSkip = useCallback(() => {
     const roundResult: RoundResult = {
@@ -167,18 +184,26 @@ export const GuessRound: React.FC<GuessRoundProps> = ({
     onComplete(result!);
   }, [result, onComplete]);
 
-  // Photo zoom: scroll wheel zooms, drag pans, double-click resets
-  const handleWheel = useCallback((event: React.WheelEvent) => {
-    event.preventDefault();
-    setZoom((prev) => {
-      const next = event.deltaY < 0 ? prev * ZOOM_STEP : prev / ZOOM_STEP;
-      const clamped = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, next));
-      if (clamped === MIN_ZOOM) {
-        panRef.current = { x: 0, y: 0 };
-        setPan({ x: 0, y: 0 });
-      }
-      return clamped;
-    });
+  // Photo zoom: scroll wheel zooms, drag pans, double-click resets. React
+  // registers onWheel as passive, so it cannot stop the page scrolling; the
+  // listener is attached by hand to claim the gesture.
+  useEffect(() => {
+    const panel = photoPanelRef.current;
+    if (!panel) return;
+    const handleWheel = (event: WheelEvent) => {
+      event.preventDefault();
+      setZoom((prev) => {
+        const next = event.deltaY < 0 ? prev * ZOOM_STEP : prev / ZOOM_STEP;
+        const clamped = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, next));
+        if (clamped === MIN_ZOOM) {
+          panRef.current = { x: 0, y: 0 };
+          setPan({ x: 0, y: 0 });
+        }
+        return clamped;
+      });
+    };
+    panel.addEventListener("wheel", handleWheel, { passive: false });
+    return () => panel.removeEventListener("wheel", handleWheel);
   }, []);
 
   const pointerDistance = (): number => {
@@ -312,40 +337,46 @@ export const GuessRound: React.FC<GuessRoundProps> = ({
 
   const isZoomed = zoom > MIN_ZOOM;
 
-  // Keyboard shortcuts: Enter = confirm, Space/ArrowRight = next.
-  // Skip when focus is on an interactive control (e.g. "I have no idea" or the
-  // abort button) so it keeps its native Enter/Space activation.
+  // Enter/Space confirm; Enter, Space or → advance. The shared hook ignores
+  // held-key repeats (so one long Enter cannot confirm and skip the reveal),
+  // modifier combinations, open dialogs, keys a focused control already
+  // handled, and native activation of focused buttons. The photo panel and the
+  // map mark their own pan/zoom keys as handled.
+  const shortcuts = useMemo<GameShortcut[]>(
+    () =>
+      revealed
+        ? [
+            { key: "Enter", label: "Next", action: handleNext },
+            { key: "Space", label: "Next", action: handleNext },
+            { key: "ArrowRight", label: "Next", action: handleNext },
+          ]
+        : [
+            { key: "Enter", label: "Confirm", action: handleConfirm, enabled: Boolean(guess) },
+            { key: "Space", label: "Confirm", action: handleConfirm, enabled: Boolean(guess) },
+          ],
+    [revealed, guess, handleConfirm, handleNext],
+  );
+  useGameShortcuts(shortcuts);
+
+  // Confirm and Next unmount as they are used, so focus would fall to the
+  // page: move it to the result on reveal and to the photo on a new round.
   useEffect(() => {
-    const handler = (event: KeyboardEvent) => {
-      if (isInteractiveTarget(event.target)) return;
-      // The photo panel has its own +/-/arrow zoom-pan handler; don't also fire
-      // the confirm/next shortcuts when it is the focused target.
-      if (event.target === photoPanelRef.current) return;
-      if ((event.key === "Enter" || event.key === " ") && !revealed && guess) {
-        event.preventDefault();
-        handleConfirm();
-      } else if (
-        revealed &&
-        (event.key === " " || event.key === "ArrowRight" || event.key === "Enter")
-      ) {
-        event.preventDefault();
-        handleNext();
-      }
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [revealed, guess, handleConfirm, handleNext]);
+    if (revealed) revealPanelRef.current?.focus({ preventScroll: true });
+  }, [revealed]);
+  useEffect(() => {
+    photoPanelRef.current?.focus({ preventScroll: true });
+  }, [photo.path]);
 
   // Timer: countdown per round, auto-confirm/skip on expiry.
   useEffect(() => {
     timerCallbackRef.current = () => {
       if (guess) {
-        handleConfirm();
+        confirmGuess(0);
       } else {
         handleSkip();
       }
     };
-  }, [guess, handleConfirm, handleSkip]);
+  }, [guess, confirmGuess, handleSkip]);
 
   useEffect(() => {
     // Hold the countdown until the photo is visible so the round doesn't start
@@ -372,6 +403,19 @@ export const GuessRound: React.FC<GuessRoundProps> = ({
   const geocodeLabel = revealed ? getGeocodeLabel(photo.geocode) : null;
   const tierColour = result && !result.skipped ? scoreTierColour(result.distanceScore) : undefined;
   const isBadGuess = result && !result.skipped && result.distanceScore / MAX_SCORE < 0.1;
+  const announcement = !result
+    ? ""
+    : result.skipped
+      ? "Skipped."
+      : [
+          `${formatDistance(result.distanceMeters)} away.`,
+          `${result.distanceScore.toLocaleString("en-GB")} points`,
+          result.timeBonus > 0
+            ? `plus a ${result.timeBonus.toLocaleString("en-GB")} time bonus.`
+            : "",
+        ]
+          .filter(Boolean)
+          .join(" ");
 
   return (
     <div className={styles.round}>
@@ -425,7 +469,6 @@ export const GuessRound: React.FC<GuessRoundProps> = ({
           tabIndex={0}
           role="img"
           aria-label="Mystery photo. Use plus and minus to zoom, arrow keys to pan."
-          onWheel={handleWheel}
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
@@ -433,13 +476,20 @@ export const GuessRound: React.FC<GuessRoundProps> = ({
           onDoubleClick={handleDoubleClick}
           onKeyDown={handlePhotoKeyDown}
         >
-          {!photoLoaded ? <div className={styles.photoLoading} /> : null}
+          {photoFailed ? (
+            <p className={styles.photoError} role="alert">
+              This photo could not be loaded.
+            </p>
+          ) : !photoLoaded ? (
+            <div className={styles.photoLoading} />
+          ) : null}
           <img
             src={photoSrc}
             alt=""
             className={styles.photo}
             draggable={false}
             onLoad={() => setPhotoLoaded(true)}
+            onError={() => setPhotoFailed(true)}
             style={{
               transform: `scale(${zoom}) translate(${pan.x / zoom}px, ${pan.y / zoom}px)`,
             }}
@@ -472,7 +522,7 @@ export const GuessRound: React.FC<GuessRoundProps> = ({
             {!revealed ? (
               <>
                 <Button variant="quiet" className={styles.skipButton} onClick={handleSkip}>
-                  I have no idea
+                  {photoFailed ? "Skip this photo" : "I have no idea"}
                 </Button>
                 <Button
                   className={[styles.confirmButton, guess ? styles.confirmReady : ""]
@@ -486,11 +536,21 @@ export const GuessRound: React.FC<GuessRoundProps> = ({
                 </Button>
               </>
             ) : (
-              <div className={styles.revealPanel}>
+              <div
+                ref={revealPanelRef}
+                className={styles.revealPanel}
+                role="group"
+                aria-label="Result"
+                tabIndex={-1}
+              >
                 {result?.skipped ? (
-                  <Caption as="span">Skipped</Caption>
+                  <Caption as="span" aria-hidden="true">
+                    Skipped
+                  </Caption>
                 ) : (
-                  <div className={styles.scoreReveal}>
+                  // The status region below speaks the result once; the
+                  // counting digits would otherwise be read mid-animation.
+                  <div className={styles.scoreReveal} aria-hidden="true">
                     <div className={styles.scoreLine}>
                       <span
                         className={[styles.distance, isBadGuess ? styles.distanceBad : ""]
@@ -509,7 +569,7 @@ export const GuessRound: React.FC<GuessRoundProps> = ({
                       </span>
                       {result!.timeBonus > 0 ? (
                         <span className={styles.timeBonusInline}>
-                          +{result!.timeBonus.toLocaleString("en-GB")}
+                          {`+${result!.timeBonus.toLocaleString("en-GB")} time bonus`}
                         </span>
                       ) : null}
                     </div>
@@ -536,6 +596,9 @@ export const GuessRound: React.FC<GuessRoundProps> = ({
               </div>
             )}
           </div>
+          <p className={styles.visuallyHidden} role="status">
+            {announcement}
+          </p>
         </div>
       </div>
     </div>

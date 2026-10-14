@@ -83,6 +83,29 @@ describe("GuessLobby", () => {
     expect(onStart).not.toHaveBeenCalled();
   });
 
+  it("ignores held-key repeats, modified keys and keys behind an open dialog", async () => {
+    const onStart = jest.fn();
+    render(
+      <GuessLobby
+        database={database}
+        defaults={{ rounds: 5, timeLimit: null }}
+        onStart={onStart}
+      />,
+    );
+    await screen.findByText("20 photos available");
+
+    fireEvent.keyDown(window, { key: "Enter", repeat: true });
+    fireEvent.keyDown(window, { key: "Enter", altKey: true });
+    fireEvent.keyDown(window, { key: " ", metaKey: true });
+    const dialog = document.createElement("dialog");
+    dialog.setAttribute("open", "");
+    document.body.append(dialog);
+    fireEvent.keyDown(window, { key: "Enter" });
+    dialog.remove();
+
+    expect(onStart).not.toHaveBeenCalled();
+  });
+
   it("starts a fixed five-round untimed daily challenge", async () => {
     const onStart = jest.fn();
     render(

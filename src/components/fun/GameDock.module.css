@@ -1,6 +1,8 @@
 .dock {
   min-inline-size: 0;
   align-self: start;
+  /* Inert here (the dock never scrolls); GameDock reads it to learn the bottom safe area. */
+  scroll-padding-block-end: env(safe-area-inset-bottom, 0px);
 }
 @media (max-width: 960px) {
   .dock {

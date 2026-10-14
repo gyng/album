@@ -148,9 +148,9 @@ test("Photo Relay supports giving up and completing a new chain on mobile", asyn
   const result = page.getByRole("region", { name: "Relay result" });
   await expect(result.getByRole("link")).toHaveCount(7);
   await page.getByRole("button", { name: "Play again" }).click();
-  await page.getByRole("button", { name: "Choose photograph 1" }).focus();
+  await page.getByRole("button", { name: /Photograph 1$/ }).focus();
   for (let i = 1; i <= 5; i++) {
-    const choice = page.getByRole("button", { name: `Choose photograph ${i}` });
+    const choice = page.getByRole("button", { name: new RegExp(`Photograph ${i}$`) });
     await expect(choice).toBeFocused();
     await choice.press("Enter");
   }
@@ -227,7 +227,7 @@ test("Photo Oracle hides the remembered photo during questions and reveals it on
     page.getByRole("navigation", { name: "Fun games" }).getByRole("link", { name: "Photo Oracle" }),
   ).toBeInViewport({ ratio: 0.98 });
   await page.getByRole("button", { name: "Meet the oracle" }).click();
-  await page.getByRole("button", { name: "Remember photograph 1" }).click();
+  await page.getByRole("button", { name: /Photograph 1$/ }).click();
   const remembered = await page.locator("main img").getAttribute("src");
   await page.getByRole("button", { name: "I have my photograph" }).click();
   await expect(page.locator("main img")).toHaveCount(0);
@@ -278,12 +278,13 @@ test("relay accepts a native drag into a link slot", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
   await gotoHydrated(page, "/fun/relay");
   await page.getByRole("button", { name: "Start relay" }).click();
-  const source = page.getByRole("button", { name: "Choose photograph 1", exact: true });
+  const source = page.getByRole("button", { name: /Photograph 1$/ });
   const slots = page.getByRole("list", { name: "Your relay links" }).getByRole("listitem");
   await source.dragTo(slots.first());
   await expect(page.getByRole("status")).toContainText("1 of 5");
-  await expect(source).toBeDisabled();
-  await page.getByRole("button", { name: "Choose photograph 2", exact: true }).click();
+  // A placed photograph's name ends with its link number instead.
+  await expect(page.getByRole("button", { name: /Link 1$/ })).toBeDisabled();
+  await page.getByRole("button", { name: /Photograph 2$/ }).click();
   const firstSrc = await slots.first().locator("img").getAttribute("src");
   await slots.first().locator("[draggable]").dragTo(slots.nth(1));
   await expect(slots.nth(1).locator("img")).toHaveAttribute("src", firstSrc!);
@@ -295,8 +296,8 @@ test("Relay keeps its current chain in view while choosing and returns to editab
   await page.setViewportSize({ width: 390, height: 844 });
   await gotoHydrated(page, "/fun/relay");
   await page.getByRole("button", { name: "Start relay" }).click();
-  await page.getByRole("button", { name: "Choose photograph 1", exact: true }).click();
-  const finalChoice = page.getByRole("button", { name: "Choose photograph 5", exact: true });
+  await page.getByRole("button", { name: /Photograph 1$/ }).click();
+  const finalChoice = page.getByRole("button", { name: /Photograph 5$/ });
   await finalChoice.scrollIntoViewIfNeeded();
   const reference = page.getByRole("group", { name: "Relay reference" });
   await expect(reference).toBeInViewport({ ratio: 1 });

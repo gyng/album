@@ -108,13 +108,13 @@ test("Cross Exposure keeps its whole mobile grid visible and reveals the clue ke
   ).toHaveAttribute("aria-pressed", "true");
   await page.getByRole("button", { name: "Start crossing", exact: true }).click();
   const board = page.getByRole("region", { name: "Crossword board" });
-  await expect(board.getByRole("columnheader").first()).toHaveAccessibleName("Column 1");
+  await expect(board.getByRole("columnheader").first()).toHaveAccessibleName("Column A");
   await expect(
     page.getByRole("group", { name: "Available photographs" }).getByRole("button"),
   ).toHaveCount(9);
   for (let hint = 0; hint < 6; hint++)
     await page.getByRole("button", { name: "Hint", exact: true }).click();
-  await expect(board.getByRole("columnheader").first()).not.toHaveAccessibleName("Column 1");
+  await expect(board.getByRole("columnheader").first()).not.toHaveAccessibleName("Column A");
   const geometry = await board.evaluate((element) => ({
     width: element.clientWidth,
     content: element.scrollWidth,
@@ -173,7 +173,7 @@ for (const viewport of [
     await expect(preview).toHaveCount(1);
     await expect(preview).toHaveAttribute("src", source!);
     await expect(preview).toBeInViewport({ ratio: 1 });
-    const cell = board.getByRole("button", { name: /^Row 1; column 1;/ });
+    const cell = board.getByRole("button", { name: /^Row 1; column A;/ });
     await expect(cell).toBeInViewport({ ratio: 1 });
     await cell.click();
     await expect(cell).toHaveAccessibleName(/; occupied$/);

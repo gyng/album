@@ -5,6 +5,7 @@
 .tile {
   position: relative;
   transform-origin: center;
+  scroll-margin-block-start: calc(var(--connections-dock-height, 0px) + var(--space-3));
 }
 .tile:focus-visible {
   z-index: 1;

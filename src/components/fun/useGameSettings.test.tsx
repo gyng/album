@@ -75,6 +75,26 @@ it("applies only supplied initial overrides and allows later user changes", () =
   expect(result.current[0].timeLimit).toBe(15);
 });
 
+it("does not save values a link supplied until the player changes them", () => {
+  const saved = { rounds: 10, timeLimit: 30, region: "France" };
+  localStorage.setItem(gameSettingsStorageKey("guess"), JSON.stringify(saved));
+  const stored = () => JSON.parse(localStorage.getItem(gameSettingsStorageKey("guess"))!);
+  const { result } = renderHook(() => useGameSettings("guess", { region: "Japan", rounds: 3 }));
+  expect(result.current[0]).toEqual({ rounds: 3, timeLimit: 30, region: "Japan" });
+  expect(stored()).toEqual(saved);
+  act(() => result.current[1]((previous) => ({ ...previous, timeLimit: 15 })));
+  expect(stored()).toEqual({ ...saved, timeLimit: 15 });
+  act(() => result.current[1]((previous) => ({ ...previous, rounds: 5 })));
+  act(() => result.current[1]((previous) => ({ ...previous, rounds: 3 })));
+  expect(stored()).toEqual({ ...saved, timeLimit: 15, rounds: 3 });
+});
+
+it("keeps a linked value out of a first visit's saved preferences", () => {
+  const { result } = renderHook(() => useGameSettings("guess", { region: "Japan" }));
+  expect(result.current[0].region).toBe("Japan");
+  expect(JSON.parse(localStorage.getItem(gameSettingsStorageKey("guess"))!).region).toBe("");
+});
+
 it("does not read storage while rendering or overwrite a saved choice with defaults before loading", () => {
   localStorage.setItem(gameSettingsStorageKey("doubleTake"), JSON.stringify({ slower: true }));
   const get = jest.spyOn(Storage.prototype, "getItem");

@@ -244,10 +244,35 @@ describe("GuessGame", () => {
     fireEvent.click(screen.getByRole("button", { name: "Play again" }));
     expect(screen.getByText("Loading photos…")).toBeInTheDocument();
     await waitFor(() => expect(fetchGuessPhotosMock).toHaveBeenCalledTimes(2));
+    // The shared seed deals the challenge once; a replay deals new photographs.
+    expect(fetchGuessPhotosMock).toHaveBeenLastCalledWith(expect.objectContaining({ seed: "i" }));
     await screen.findByTestId("round");
     fireEvent.click(screen.getByRole("button", { name: "Abort mocked round" }));
 
     expect(screen.getByTestId("lobby")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Start mocked game" }));
+    await waitFor(() => expect(fetchGuessPhotosMock).toHaveBeenCalledTimes(3));
+    expect(fetchGuessPhotosMock).toHaveBeenLastCalledWith(expect.objectContaining({ seed: "i" }));
+  });
+
+  it("replays a daily challenge as a fresh practice game", async () => {
+    jest.useFakeTimers().setSystemTime(new Date(2026, 6, 14, 12, 0));
+    const onSeedGenerated = jest.fn();
+    render(
+      <GuessGame
+        database={database}
+        initialSettings={{ rounds: 1, timeLimit: null, daily: true }}
+        onSeedGenerated={onSeedGenerated}
+      />,
+    );
+    await screen.findByTestId("round");
+    fireEvent.click(screen.getByRole("button", { name: "Complete mocked round" }));
+    fireEvent.click(screen.getByRole("button", { name: "Play again" }));
+
+    await waitFor(() => expect(fetchGuessPhotosMock).toHaveBeenCalledTimes(2));
+    expect(fetchGuessPhotosMock).toHaveBeenLastCalledWith(expect.objectContaining({ seed: "i" }));
+    await screen.findByTestId("round");
+    expect(onSeedGenerated).toHaveBeenLastCalledWith("i", { rounds: 1, timeLimit: null });
   });
 
   it("uses a camera-local calendar date for daily seeds", async () => {

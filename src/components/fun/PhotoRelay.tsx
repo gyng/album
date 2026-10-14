@@ -32,13 +32,25 @@ export const PhotoRelay = ({ photos }: { photos: PhotoGamePhoto[] }) => {
   const slotsRef = useRef<HTMLOListElement>(null);
   const choiceRefs = useRef(new Map<string, HTMLButtonElement>());
   const finishRef = useRef<HTMLButtonElement>(null);
-  const requestedFocus = useRef<{ path: string } | { finish: true } | null>(null);
+  const [dockHeight, setDockHeight] = useState(0);
+  const requestedFocus = useRef<
+    { path: string } | { finish: true } | { slot: number; move: "earlier" | "later" } | null
+  >(null);
   useEffect(() => {
     const request = requestedFocus.current;
     if (!request) return;
     requestedFocus.current = null;
     if ("finish" in request) finishRef.current?.focus();
-    else choiceRefs.current.get(request.path)?.focus();
+    else if ("slot" in request) {
+      // Follow the moved link. At either end its own direction is disabled,
+      // so the opposite move takes focus instead.
+      const slot = slotsRef.current?.children[request.slot];
+      const opposite = request.move === "earlier" ? "later" : "earlier";
+      [request.move, opposite]
+        .map((move) => slot?.querySelector<HTMLButtonElement>(`[data-move="${move}"]`))
+        .find((button) => button && !button.disabled)
+        ?.focus();
+    } else choiceRefs.current.get(request.path)?.focus();
   }, [order]);
   useEffect(() => {
     if (finished) resultRef.current?.focus();
@@ -56,6 +68,13 @@ export const PhotoRelay = ({ photos }: { photos: PhotoGamePhoto[] }) => {
     setDragged(path);
     setDropTarget(null);
   };
+  // A link can only land in the next free slot, so that is the slot a drag
+  // over any later, empty one highlights and fills.
+  const landingSlot = (index: number) =>
+    Math.min(
+      index,
+      order.length - (order.some((photo) => photo.path === activeDrag.current) ? 1 : 0),
+    );
   const start = () => {
     const next = buildRelayPuzzle(photos);
     setError(next ? null : "There aren't enough comparable photographs for a relay.");
@@ -113,7 +132,10 @@ export const PhotoRelay = ({ photos }: { photos: PhotoGamePhoto[] }) => {
       </GameIntro>
     );
   return (
-    <div className={styles.game}>
+    <div
+      className={styles.game}
+      style={{ "--relay-dock-height": `${dockHeight}px` } as React.CSSProperties}
+    >
       {!finished ? (
         <>
           <Caption>
@@ -157,11 +179,13 @@ export const PhotoRelay = ({ photos }: { photos: PhotoGamePhoto[] }) => {
                       if (!activeDrag.current) return;
                       event.preventDefault();
                       event.dataTransfer.dropEffect = "move";
-                      setDropTarget(index);
+                      setDropTarget(landingSlot(index));
                     }}
                     onDragLeave={(event) => {
                       if (!event.currentTarget.contains(event.relatedTarget as Node | null))
-                        setDropTarget((current) => (current === index ? null : current));
+                        setDropTarget((current) =>
+                          current === landingSlot(index) ? null : current,
+                        );
                     }}
                     onDrop={(event) => {
                       event.preventDefault();
@@ -173,7 +197,7 @@ export const PhotoRelay = ({ photos }: { photos: PhotoGamePhoto[] }) => {
                       cancelDrag();
                       if (!photo) return;
                       const next = order.filter((item) => item.path !== path);
-                      next.splice(Math.min(index, next.length), 0, photo);
+                      next.splice(landingSlot(index), 0, photo);
                       setOrder(next);
                     }}
                   >
@@ -194,8 +218,11 @@ export const PhotoRelay = ({ photos }: { photos: PhotoGamePhoto[] }) => {
                         <Button
                           variant="quiet"
                           aria-label={`Move link ${index + 1} earlier`}
+                          data-move="earlier"
                           disabled={index === 0}
-                          onClick={() => {
+                          onClick={(event) => {
+                            if (event.detail === 0)
+                              requestedFocus.current = { slot: index - 1, move: "earlier" };
                             const next = [...order];
                             [next[index - 1], next[index]] = [next[index]!, next[index - 1]!];
                             setOrder(next);
@@ -217,8 +244,11 @@ export const PhotoRelay = ({ photos }: { photos: PhotoGamePhoto[] }) => {
                         <Button
                           variant="quiet"
                           aria-label={`Move link ${index + 1} later`}
+                          data-move="later"
                           disabled={index === order.length - 1}
-                          onClick={() => {
+                          onClick={(event) => {
+                            if (event.detail === 0)
+                              requestedFocus.current = { slot: index + 1, move: "later" };
                             const next = [...order];
                             [next[index + 1], next[index]] = [next[index]!, next[index + 1]!];
                             setOrder(next);
@@ -235,6 +265,7 @@ export const PhotoRelay = ({ photos }: { photos: PhotoGamePhoto[] }) => {
             <GameDock
               {...(relayStyles.reference ? { className: relayStyles.reference } : {})}
               label="Relay reference"
+              onStickyHeightChange={setDockHeight}
             >
               <ol className={relayStyles.miniChain} aria-hidden="true">
                 {[
@@ -282,7 +313,6 @@ export const PhotoRelay = ({ photos }: { photos: PhotoGamePhoto[] }) => {
                       key={photo.path}
                       className={[styles.choice, relayStyles.choice].join(" ")}
                       data-dragging={dragged === photo.path}
-                      aria-label={`Choose photograph ${index + 1}`}
                       ref={(element) => {
                         if (element) choiceRefs.current.set(photo.path, element);
                         else choiceRefs.current.delete(photo.path);
@@ -361,14 +391,7 @@ export const PhotoRelay = ({ photos }: { photos: PhotoGamePhoto[] }) => {
             Resemblance measures how similar each pair looks to the image matcher. Shared subjects
             come from captions and tags. They can suggest a link, but do not determine the score.
           </Caption>
-          <PhotoChain
-            photos={[puzzle.start, ...(gaveUp ? puzzle.solution : order), puzzle.end]}
-            similarities={relayLinkSimilarities([
-              puzzle.start,
-              ...(gaveUp ? puzzle.solution : order),
-              puzzle.end,
-            ])}
-          />
+          <PhotoChain photos={[puzzle.start, ...(gaveUp ? puzzle.solution : order), puzzle.end]} />
           <ol className={relayStyles.linkReasons} aria-label="Relay connections">
             {describeRelayLinks([
               puzzle.start,

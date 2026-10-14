@@ -28,6 +28,9 @@ export const PhotoConnections = ({ photos }: { photos: PhotoGamePhoto[] }) => {
   const [message, setMessage] = useState("");
   const attempted = useRef(new Set<string>());
   const resultRef = useRef<HTMLDivElement>(null);
+  const boardRef = useRef<HTMLDivElement>(null);
+  const groupRefs = useRef(new Map<string, HTMLElement>());
+  const [dockHeight, setDockHeight] = useState(0);
   const tileRefs = useRef(new Map<string, HTMLButtonElement>());
   const shufflePositions = useRef(new Map<string, DOMRect>());
   const animations = useRef<Animation[]>([]);
@@ -67,6 +70,14 @@ export const PhotoConnections = ({ photos }: { photos: PhotoGamePhoto[] }) => {
   useEffect(() => {
     if (finished) resultRef.current?.focus();
   }, [finished]);
+  // A solved group's tiles leave the board, taking focus with them.
+  useEffect(() => {
+    const latest = found.at(-1);
+    if (latest && !finished) groupRefs.current.get(latest)?.focus();
+  }, [found, finished]);
+  useEffect(() => {
+    if (puzzle) boardRef.current?.focus();
+  }, [puzzle]);
   const start = () => {
     const next = buildConnectionsPuzzle(photos, Math.random, size, detail);
     if (!next) {
@@ -193,7 +204,10 @@ export const PhotoConnections = ({ photos }: { photos: PhotoGamePhoto[] }) => {
     ? puzzle.groups
     : puzzle.groups.filter((group) => found.includes(group.id));
   return (
-    <div className={styles.game}>
+    <div
+      className={styles.game}
+      style={{ "--connections-dock-height": `${dockHeight}px` } as React.CSSProperties}
+    >
       <div className={styles.roundProgress}>
         <p role="status">{message || `${found.length} of ${size} connections found`}</p>
         <div className={styles.actions}>
@@ -210,6 +224,7 @@ export const PhotoConnections = ({ photos }: { photos: PhotoGamePhoto[] }) => {
       {!finished ? (
         <GameDock
           label="Connection controls"
+          onStickyHeightChange={setDockHeight}
           {...(styles.connectionControls ? { className: styles.connectionControls } : {})}
         >
           <Caption>
@@ -253,7 +268,16 @@ export const PhotoConnections = ({ photos }: { photos: PhotoGamePhoto[] }) => {
             </Heading>
           ) : null}
           {visibleGroups.map((group) => (
-            <section key={group.id} className={styles.connectionGroup}>
+            <section
+              key={group.id}
+              ref={(element) => {
+                if (element) groupRefs.current.set(group.id, element);
+                else groupRefs.current.delete(group.id);
+              }}
+              tabIndex={-1}
+              aria-label={group.label}
+              className={styles.connectionGroup}
+            >
               <Heading level={2}>{group.label}</Heading>
               <PhotoChain photos={group.photos} linked={finished} numbered={false} />
             </section>
@@ -263,6 +287,10 @@ export const PhotoConnections = ({ photos }: { photos: PhotoGamePhoto[] }) => {
       {!finished ? (
         <>
           <div
+            ref={boardRef}
+            tabIndex={-1}
+            role="group"
+            aria-label="Photographs"
             className={[styles.connectionChoices, shuffleStyles.board].join(" ")}
             style={{ "--connection-columns": size } as React.CSSProperties}
           >
@@ -275,7 +303,7 @@ export const PhotoConnections = ({ photos }: { photos: PhotoGamePhoto[] }) => {
                       group.photos.some((item) => item.path === photo.path),
                   ),
               )
-              .map((photo, index) => (
+              .map((photo) => (
                 <button
                   key={photo.path}
                   type="button"
@@ -284,7 +312,6 @@ export const PhotoConnections = ({ photos }: { photos: PhotoGamePhoto[] }) => {
                     if (tile) tileRefs.current.set(photo.path, tile);
                     else tileRefs.current.delete(photo.path);
                   }}
-                  aria-label={`Select photograph ${index + 1}`}
                   aria-pressed={selected.includes(photo.path)}
                   disabled={selected.length === size && !selected.includes(photo.path)}
                   onClick={() => {

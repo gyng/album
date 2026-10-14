@@ -10,6 +10,9 @@ import {
   answerOracle,
   buildOracleCohort,
   ORACLE_QUESTIONS,
+  oracleQuestionsFor,
+  oracleDiscoveryQuestion,
+  taggedOracleQuestions,
 } from "./photoGames";
 import type { PhotoGamePhoto } from "./photoGames";
 
@@ -273,4 +276,51 @@ it("rejects competing connections that emerge after another group is solved", ()
     ),
   );
   expect(buildConnectionsPuzzle(archive, () => 0.4)).toBeNull();
+});
+
+const tagged = (path: string, tags: string): PhotoGamePhoto => ({ ...photo(path, []), tags });
+
+it("treats singular and plural tags as one specific subject", () => {
+  const archive = [
+    ...["rock", "rocks", "lantern", "bicycle", "bench"].flatMap((tag) =>
+      Array.from({ length: 4 }, (_, i) => tagged(`${tag}-${i}.jpg`, tag)),
+    ),
+    ...Array.from({ length: 8 }, (_, i) => tagged(`glass-${i}.jpg`, i < 4 ? "glass" : "glasses")),
+  ];
+  const rock = taggedOracleQuestions(archive).filter((q) => /rock/.test(q.id));
+  expect(rock).toHaveLength(1);
+  expect(rock[0]!.matches(tagged("x.jpg", "rocks"))).toBe(true);
+  expect(rock[0]!.matches(tagged("y.jpg", "rock"))).toBe(true);
+  // "glass" is not a plural, but "glasses" is its plural form here.
+  expect(taggedOracleQuestions(archive).filter((q) => /glas/.test(q.id))).toHaveLength(1);
+  for (let seed = 0; seed < 20; seed++) {
+    let state = seed + 1;
+    const random = () => ((state = (state * 16807) % 2147483647) - 1) / 2147483646;
+    const puzzle = buildConnectionsPuzzle(archive, random, 4, "specific");
+    if (!puzzle) continue;
+    expect(puzzle.groups.filter((group) => /^rocks?$/.test(group.label))).toHaveLength(
+      puzzle.groups.some((group) => /^rocks?$/.test(group.label)) ? 1 : 0,
+    );
+  }
+});
+
+it("does not stem words that merely end in s", () => {
+  const archive = ["glass", "bus", "grass", "dress"].flatMap((tag) =>
+    Array.from({ length: 2 }, (_, i) => tagged(`${tag}-${i}.jpg`, tag)),
+  );
+  expect(
+    taggedOracleQuestions([...archive, tagged("other.jpg", "tree")])
+      .map((q) => q.id)
+      .sort(),
+  ).toEqual(["tag:bus", "tag:dress", "tag:glass", "tag:grass"]);
+});
+
+it("never asks a tag question that repeats a caption topic", () => {
+  const archive = ["water", "people", "windows", "window", "sign", "signs", "lantern"].flatMap(
+    (tag) => Array.from({ length: 3 }, (_, i) => tagged(`${tag}-${i}.jpg`, tag)),
+  );
+  const asked = oracleQuestionsFor(archive).map(oracleDiscoveryQuestion);
+  expect(new Set(asked).size).toBe(asked.length);
+  expect(asked).toContain("Include lantern?");
+  expect(asked.filter((q) => /window|sign|water|people/i.test(q))).toHaveLength(4);
 });

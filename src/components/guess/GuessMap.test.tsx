@@ -6,7 +6,9 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { GuessMap } from "./GuessMap";
 
 const mockFitBounds = jest.fn();
-let mockCurrentMap: { fitBounds: typeof mockFitBounds } | null = { fitBounds: mockFitBounds };
+const mockGetCenter = jest.fn(() => ({ lng: -0.12, lat: 51.5 }));
+type MockMap = { fitBounds: typeof mockFitBounds; getCenter: typeof mockGetCenter };
+let mockCurrentMap: MockMap | null = { fitBounds: mockFitBounds, getCenter: mockGetCenter };
 
 jest.mock("../map", () => ({
   __esModule: true,
@@ -42,14 +44,14 @@ const renderedLines = () =>
 describe("GuessMap", () => {
   beforeEach(() => {
     mockFitBounds.mockClear();
-    mockCurrentMap = { fitBounds: mockFitBounds };
+    mockCurrentMap = { fitBounds: mockFitBounds, getCenter: mockGetCenter };
   });
 
   it("prompts for a guess and forwards map coordinates", () => {
     const onGuess = jest.fn();
     render(<GuessMap guess={null} onGuess={onGuess} />);
 
-    expect(screen.getByText("Click to place your guess")).toBeInTheDocument();
+    expect(screen.getByText("Place your guess on the map")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Map surface" })).toHaveAttribute(
       "data-cursor",
       "crosshair",
@@ -59,11 +61,22 @@ describe("GuessMap", () => {
     expect(onGuess).toHaveBeenCalledWith(1.25, 103.75);
   });
 
+  it("places a guess at the map centre from the keyboard", () => {
+    const onGuess = jest.fn();
+    const { rerender } = render(<GuessMap guess={null} onGuess={onGuess} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Guess at map centre" }));
+    expect(onGuess).toHaveBeenCalledWith(51.5, -0.12);
+
+    rerender(<GuessMap guess={null} reveal={{ lat: 1, lng: 2 }} onGuess={onGuess} />);
+    expect(screen.queryByRole("button", { name: "Guess at map centre" })).not.toBeInTheDocument();
+  });
+
   it("shows a guess marker before reveal", () => {
     render(<GuessMap guess={{ lat: 35, lng: 139 }} onGuess={jest.fn()} />);
 
     expect(screen.getByTestId("marker")).toHaveAttribute("data-position", "35,139");
-    expect(screen.queryByText("Click to place your guess")).not.toBeInTheDocument();
+    expect(screen.queryByText("Place your guess on the map")).not.toBeInTheDocument();
   });
 
   it("frames a skipped answer and prevents further guesses", () => {
@@ -97,9 +110,10 @@ describe("GuessMap", () => {
     );
 
     expect(screen.getAllByTestId("marker")).toHaveLength(2);
+    // Unwrapped past 180° so the line takes the 2° hop, not the 358° one.
     const path = [
       { lng: 179, lat: 10 },
-      { lng: -179, lat: 12 },
+      { lng: 181, lat: 12 },
     ];
     // A wide soft glow underneath, the dashed line over it.
     expect(renderedLines()).toEqual([

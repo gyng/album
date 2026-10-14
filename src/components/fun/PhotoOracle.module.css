@@ -1,6 +1,10 @@
 .currentQuestion {
   display: grid;
   gap: var(--space-4);
+}
+
+.questionText {
+  display: block;
   animation: questionArrive 180ms ease-out;
 }
 
@@ -94,7 +98,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .currentQuestion,
+  .questionText,
   .trailRow {
     animation: none;
   }

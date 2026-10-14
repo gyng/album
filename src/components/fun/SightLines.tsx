@@ -96,7 +96,7 @@ export const SightLines = ({ photos }: { photos: PhotoGamePhoto[] }) => {
     setHint(target.cells[0]!);
     setSelected([]);
     setAnchor(null);
-    setMessage(`A ${target.label.toLowerCase()} line starts at the marked photograph.`);
+    setMessage(`${target.label}: the line starts at the marked photograph.`);
   };
   const giveUp = () => {
     setGaveUp(true);
@@ -288,16 +288,16 @@ export const SightLines = ({ photos }: { photos: PhotoGamePhoto[] }) => {
                     let next = index;
                     switch (event.key) {
                       case "ArrowRight":
-                        next = Math.min(index + 1, puzzle.tiles.length - 1);
+                        if (column < puzzle.size - 1) next = index + 1;
                         break;
                       case "ArrowLeft":
-                        next = Math.max(0, index - 1);
+                        if (column > 0) next = index - 1;
                         break;
                       case "ArrowDown":
-                        next = Math.min(index + puzzle.size, puzzle.tiles.length - 1);
+                        if (index + puzzle.size < puzzle.tiles.length) next = index + puzzle.size;
                         break;
                       case "ArrowUp":
-                        next = Math.max(0, index - puzzle.size);
+                        if (index >= puzzle.size) next = index - puzzle.size;
                         break;
                       case "Home":
                         next = index - column;

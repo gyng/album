@@ -67,8 +67,24 @@ const useRouterMock = jest.mocked(useRouter);
 const useDatabaseMock = jest.mocked(useDatabase);
 const database = {} as NonNullable<ReturnType<typeof useDatabase>[0]>;
 
-const setQuery = (query: Record<string, string | string[] | undefined>, isReady = true) => {
-  useRouterMock.mockReturnValue({ query, isReady } as ReturnType<typeof useRouter>);
+// Next's shallow replace, as far as the screen can observe it: the URL changes.
+const routerReplace = jest.fn((href: string) => {
+  window.history.replaceState(null, "", href);
+  return Promise.resolve(true);
+});
+
+const setQuery = (
+  query: Record<string, string | string[] | undefined>,
+  isReady = true,
+  asPath?: string,
+) => {
+  useRouterMock.mockReturnValue({
+    query,
+    isReady,
+    pathname: "/fun/guess",
+    replace: routerReplace,
+    ...(asPath ? { asPath } : {}),
+  } as unknown as ReturnType<typeof useRouter>);
 };
 
 describe("GuessPage", () => {
@@ -131,8 +147,7 @@ describe("GuessPage", () => {
   });
 
   it("starts at the lobby and persists a newly generated seed in the URL", () => {
-    window.history.replaceState(null, "", "/guess?region=Japan");
-    const replaceState = jest.spyOn(window.history, "replaceState");
+    setQuery({}, true, "/fun/guess?region=Japan");
 
     render(<GuessPage />);
 
@@ -144,17 +159,15 @@ describe("GuessPage", () => {
     );
     fireEvent.click(screen.getByRole("button", { name: "Generate seed" }));
 
-    expect(replaceState).toHaveBeenLastCalledWith(
-      null,
-      "",
-      "?region=Japan&seed=generated-seed&rounds=10&timer=15",
+    expect(routerReplace).toHaveBeenLastCalledWith(
+      "/fun/guess?region=Japan&seed=generated-seed&rounds=10&timer=15",
+      undefined,
+      { shallow: true },
     );
   });
 
   it("keeps the daily challenge URL independent of a generated date-specific seed", () => {
-    setQuery({ daily: "" });
-    window.history.replaceState(null, "", "/guess?daily");
-    const replaceState = jest.spyOn(window.history, "replaceState");
+    setQuery({ daily: "" }, true, "/fun/guess?daily");
 
     render(<GuessPage />);
 
@@ -167,7 +180,7 @@ describe("GuessPage", () => {
       "Today's daily challenge — guess where each photo was taken.",
     );
     fireEvent.click(screen.getByRole("button", { name: "Generate seed" }));
-    expect(replaceState).toHaveBeenCalledWith(null, "", "?daily=");
+    expect(routerReplace).toHaveBeenCalledWith("/fun/guess?daily=", undefined, { shallow: true });
   });
 
   it("uses today's daily seed even when an older link includes a stale seed", () => {
@@ -199,7 +212,6 @@ describe("GuessPage", () => {
     ],
   ])("parses seeded challenge query %p", (query, settings) => {
     setQuery(query);
-    const replaceState = jest.spyOn(window.history, "replaceState");
 
     render(<GuessPage />);
 
@@ -215,7 +227,7 @@ describe("GuessPage", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Generate seed" }));
-    expect(replaceState).toHaveBeenCalled();
+    expect(routerReplace).toHaveBeenCalled();
     const params = new URLSearchParams(window.location.search);
     expect(params.get("seed")).toBe("shared");
     expect(params.get("rounds")).toBe(String(settings.rounds));
@@ -285,11 +297,7 @@ describe("GuessPage", () => {
   });
 
   it("removes stale daily flags when a custom game starts and stale settings when Daily starts", () => {
-    window.history.replaceState(
-      null,
-      "",
-      "/fun/guess?daily&seed=old&rounds=10&timer=30&region=Japan&theme=darkroom",
-    );
+    setQuery({}, true, "/fun/guess?daily&seed=old&rounds=10&timer=30&region=Japan&theme=darkroom");
     const view = render(<GuessPage />);
     mockLoadedSeed = "custom";
     mockLoadedSettings = { rounds: 3, timeLimit: 15, region: "France" };

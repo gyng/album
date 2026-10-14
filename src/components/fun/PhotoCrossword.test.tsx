@@ -45,20 +45,20 @@ const startVisible = () => {
 it("checks both crossing clues, lets players remove or swap a placement, and completes a valid grid", () => {
   startVisible();
   fireEvent.click(screen.getByRole("button", { name: "Select photograph 1" }));
-  fireEvent.click(screen.getByRole("button", { name: /Row 1: round; column 2/ }));
+  fireEvent.click(screen.getByRole("button", { name: /Row 1: round; column B/ }));
   fireEvent.click(screen.getByRole("button", { name: "Check grid" }));
-  expect(screen.getByRole("button", { name: /Row 1: round; column 2/ })).toHaveAttribute(
+  expect(screen.getByRole("button", { name: /Row 1: round; column B/ })).toHaveAttribute(
     "aria-invalid",
     "true",
   );
-  fireEvent.click(screen.getByRole("button", { name: /Row 1: round; column 2/ }));
+  fireEvent.click(screen.getByRole("button", { name: /Row 1: round; column B/ }));
   fireEvent.click(screen.getByRole("button", { name: "Remove selected" }));
   for (let i = 0; i < 9; i++) {
     fireEvent.click(screen.getByRole("button", { name: "Select photograph 1" }));
     fireEvent.click(
       screen.getByRole("button", {
         name: new RegExp(
-          `Row ${Math.floor(i / 3) + 1}: ${rows[Math.floor(i / 3)]}; column ${(i % 3) + 1}:`,
+          `Row ${Math.floor(i / 3) + 1}: ${rows[Math.floor(i / 3)]}; column ${"ABC"[i % 3]}:`,
         ),
       }),
     );
@@ -76,12 +76,12 @@ it("offers hidden connections and fixed shots, preserves them when clearing, and
   fireEvent.click(screen.getByRole("button", { name: "4 starting photographs" }));
   fireEvent.click(screen.getByRole("button", { name: "Start crossing" }));
   expect(screen.getAllByRole("button", { name: /fixed starting photograph/ })).toHaveLength(4);
-  expect(screen.getByRole("button", { name: /Row 1; column 1/ })).toBeDisabled();
+  expect(screen.getByRole("button", { name: /Row 1; column A/ })).toBeDisabled();
   expect(
     within(screen.getByRole("group", { name: "Available photographs" })).getAllByRole("button"),
   ).toHaveLength(5);
   fireEvent.click(screen.getByRole("button", { name: "Select photograph 1" }));
-  fireEvent.click(screen.getByRole("button", { name: /Row 1; column 3/ }));
+  fireEvent.click(screen.getByRole("button", { name: /Row 1; column C/ }));
   fireEvent.click(screen.getByRole("button", { name: "Clear grid" }));
   expect(screen.getAllByRole("button", { name: /fixed starting photograph/ })).toHaveLength(4);
   fireEvent.click(screen.getByRole("button", { name: "Hint" }));
@@ -155,8 +155,8 @@ it("reports an unavailable puzzle without inventing a board", () => {
 
 it("swaps two occupied squares without losing or duplicating a photograph", () => {
   startVisible();
-  const first = () => screen.getByRole("button", { name: /Row 1: round; column 1/ });
-  const second = () => screen.getByRole("button", { name: /Row 1: round; column 2/ });
+  const first = () => screen.getByRole("button", { name: /Row 1: round; column A/ });
+  const second = () => screen.getByRole("button", { name: /Row 1: round; column B/ });
   fireEvent.click(screen.getByRole("button", { name: "Select photograph 1" }));
   fireEvent.click(first());
   fireEvent.click(screen.getByRole("button", { name: "Select photograph 1" }));
@@ -181,7 +181,7 @@ it("accepts a hidden grid with inferred row order and reveals clues in that orde
     fireEvent.click(screen.getByRole("button", { name: `Select photograph ${index + 1}` }));
     fireEvent.click(
       screen.getByRole("button", {
-        name: new RegExp(`Row ${Math.floor(cell / 3) + 1}; column ${(cell % 3) + 1};`),
+        name: new RegExp(`Row ${Math.floor(cell / 3) + 1}; column ${"ABC"[cell % 3]};`),
       }),
     );
     remaining.splice(index, 1);
@@ -198,7 +198,7 @@ it("does not judge individual squares against a secret ordering before hidden cl
   fireEvent.click(screen.getByRole("button", { name: "0 starting photographs" }));
   fireEvent.click(screen.getByRole("button", { name: "Start crossing" }));
   fireEvent.click(screen.getByRole("button", { name: "Select photograph 1" }));
-  fireEvent.click(screen.getByRole("button", { name: /Row 2; column 2;/ }));
+  fireEvent.click(screen.getByRole("button", { name: /Row 2; column B;/ }));
   fireEvent.click(screen.getByRole("button", { name: "Check grid" }));
   expect(
     within(screen.getByRole("table"))
@@ -209,7 +209,7 @@ it("does not judge individual squares against a secret ordering before hidden cl
   for (let hint = 0; hint < 6; hint++)
     fireEvent.click(screen.getByRole("button", { name: "Hint" }));
   fireEvent.click(screen.getByRole("button", { name: "Check grid" }));
-  expect(screen.getByRole("button", { name: /Row 2: square; column 2:/ })).toHaveAttribute(
+  expect(screen.getByRole("button", { name: /Row 2: square; column B:/ })).toHaveAttribute(
     "aria-invalid",
     "true",
   );
@@ -224,8 +224,8 @@ it("reveals one unique clue per hint without exposing other headers, cells or cl
   ).toEqual(["round", "Row 2", "Row 3"]);
   expect(
     screen.getAllByRole("columnheader").map((header) => header.getAttribute("aria-label")),
-  ).toEqual(["Column 1", "Column 2", "Column 3"]);
-  expect(screen.getByRole("button", { name: /Row 1: round; column 1;/ })).toBeTruthy();
+  ).toEqual(["Column A", "Column B", "Column C"]);
+  expect(screen.getByRole("button", { name: /Row 1: round; column A;/ })).toBeTruthy();
   expect(
     within(screen.getByRole("region", { name: "Row clues" })).getAllByRole("listitem"),
   ).toHaveLength(1);
@@ -283,8 +283,8 @@ const dragTransfer = () => {
 };
 it("drags a tray photograph into a square and swaps occupied squares without duplicates", () => {
   startVisible();
-  const first = () => screen.getByRole("button", { name: /Row 1: round; column 1/ });
-  const second = () => screen.getByRole("button", { name: /Row 1: round; column 2/ });
+  const first = () => screen.getByRole("button", { name: /Row 1: round; column A/ });
+  const second = () => screen.getByRole("button", { name: /Row 1: round; column B/ });
   const transfer = dragTransfer();
   const tile = screen.getByRole("button", { name: "Select photograph 1" });
   expect(tile).toHaveAttribute("draggable", "true");
@@ -307,7 +307,7 @@ it("marks fixed photographs, rejects their drops and ignores unrelated dragged d
   render(<PhotoCrossword photos={photos} />);
   fireEvent.click(screen.getByRole("button", { name: "1 starting photographs" }));
   fireEvent.click(screen.getByRole("button", { name: "Start crossing" }));
-  const fixed = screen.getByRole("button", { name: /Row 1; column 1/ });
+  const fixed = screen.getByRole("button", { name: /Row 1; column A/ });
   expect(fixed).toHaveAttribute("draggable", "false");
   expect(within(fixed).getByText("Fixed")).toBeTruthy();
   const transfer = dragTransfer();
@@ -316,7 +316,7 @@ it("marks fixed photographs, rejects their drops and ignores unrelated dragged d
   });
   fireEvent.drop(fixed, { dataTransfer: transfer });
   expect(within(fixed).getByRole("img")).toHaveAttribute("alt", "round scarlet");
-  const empty = screen.getByRole("button", { name: /Row 1; column 2/ });
+  const empty = screen.getByRole("button", { name: /Row 1; column B/ });
   fireEvent.dragEnd(screen.getByRole("button", { name: "Select photograph 1" }));
   const unrelated = dragTransfer();
   unrelated.setData("text/plain", photos[1]!.path);
@@ -326,7 +326,7 @@ it("marks fixed photographs, rejects their drops and ignores unrelated dragged d
 
 it("returns a placed photograph to the tray and clears a cancelled drag", () => {
   startVisible();
-  const first = screen.getByRole("button", { name: /Row 1: round; column 1/ });
+  const first = screen.getByRole("button", { name: /Row 1: round; column A/ });
   const tray = screen.getByRole("group", { name: "Available photographs" });
   fireEvent.click(screen.getByRole("button", { name: "Select photograph 1" }));
   fireEvent.click(first);
@@ -363,4 +363,13 @@ it("supports start, hints, cancellation, checking and give up shortcuts", () => 
   expect(screen.getByRole("region", { name: "Cross Exposure result" })).toHaveFocus();
   fireEvent.keyDown(window, { key: "n" });
   expect(screen.queryByRole("region", { name: "Cross Exposure result" })).toBeNull();
+});
+
+it("ignores the new-puzzle shortcut while a board is in progress", () => {
+  startVisible();
+  fireEvent.click(screen.getByRole("button", { name: "Select photograph 1" }));
+  const first = () => screen.getByRole("button", { name: /Row 1: round; column A/ });
+  fireEvent.click(first());
+  fireEvent.keyDown(window, { key: "n" });
+  expect(within(first()).getByRole("img")).toHaveAttribute("alt", "round scarlet");
 });

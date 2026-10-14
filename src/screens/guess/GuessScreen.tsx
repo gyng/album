@@ -17,7 +17,13 @@ const parseTimer = (value: string | undefined): number | null => {
 };
 
 const GuessScreen = () => {
-  const { ready: urlReady, getSearchParam, hasSearchParam } = useUrlSearchParams();
+  const {
+    ready: urlReady,
+    searchParams,
+    getSearchParam,
+    hasSearchParam,
+    replaceSearchParams,
+  } = useUrlSearchParams();
   const [database, progress, , databaseError, retryDatabase] = useDatabase();
 
   const seedFromUrl = getSearchParam("seed") ?? undefined;
@@ -44,20 +50,25 @@ const GuessScreen = () => {
       ? settingsForSeed
       : undefined;
 
-  const handleSeedGenerated = useCallback((seed: string, settings: GameSettings) => {
-    const params = new URLSearchParams(window.location.search);
-    if (settings.daily) {
-      params.set("daily", "");
-      for (const field of ["seed", "rounds", "timer", "region"]) params.delete(field);
-    } else {
-      params.delete("daily");
-      params.set("seed", seed);
-      params.set("rounds", String(settings.rounds));
-      params.set("timer", settings.timeLimit === null ? "off" : String(settings.timeLimit));
-      params.set("region", settings.region ?? "");
-    }
-    window.history.replaceState(null, "", `?${params.toString()}`);
-  }, []);
+  // Through the platform port rather than the History API, so the renderer's
+  // router keeps its own record of the URL it is showing.
+  const handleSeedGenerated = useCallback(
+    (seed: string, settings: GameSettings) => {
+      const params = new URLSearchParams(searchParams);
+      if (settings.daily) {
+        params.set("daily", "");
+        for (const field of ["seed", "rounds", "timer", "region"]) params.delete(field);
+      } else {
+        params.delete("daily");
+        params.set("seed", seed);
+        params.set("rounds", String(settings.rounds));
+        params.set("timer", settings.timeLimit === null ? "off" : String(settings.timeLimit));
+        params.set("region", settings.region ?? "");
+      }
+      replaceSearchParams(params);
+    },
+    [searchParams, replaceSearchParams],
+  );
 
   const [active, setActive] = useState(false);
   const isChallenge = Boolean(seedFromUrl) || isDaily;

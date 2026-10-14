@@ -1,9 +1,9 @@
-import React, { useCallback, useEffect, useId, useState } from "react";
+import React, { useCallback, useEffect, useId, useMemo, useState } from "react";
 import { Database } from "@sqlite.org/sqlite-wasm";
 import { Button, Caption, Heading, KeyHint, Select, SegmentedToggle } from "../ui";
 import { fetchGuessRegions, GuessRegionOption } from "../search/api";
 import { GameSettings } from "./guessTypes";
-import { isInteractiveTarget } from "./guessKeyboard";
+import { type GameShortcut, useGameShortcuts } from "../fun/useGameShortcuts";
 import { GameIllustration } from "../fun/GameIllustration";
 import { useGameSettings, type GameSettingsRegistry } from "../fun/useGameSettings";
 import { useUrlSearchParams } from "../platform";
@@ -114,20 +114,17 @@ export const GuessLobby: React.FC<GuessLobbyProps> = ({ database, defaults, onSt
     });
   }, [onStart]);
 
-  // Enter/Space to start — but only when focus is not on an interactive
-  // control, so tabbing to the Daily/Timer/Rounds buttons keeps their native
-  // activation instead of always starting the game.
-  useEffect(() => {
-    const handler = (event: KeyboardEvent) => {
-      if (event.key === "Enter" || event.key === " ") {
-        if (isInteractiveTarget(event.target)) return;
-        event.preventDefault();
-        handleStart();
-      }
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [handleStart]);
+  // Enter/Space start the game. The shared hook leaves focused controls their
+  // native activation, so tabbing to Daily/Timer/Rounds and pressing Enter does
+  // what that control says, and ignores repeats, modifiers and open dialogs.
+  const shortcuts = useMemo<GameShortcut[]>(
+    () => [
+      { key: "Enter", label: "Play", action: handleStart },
+      { key: "Space", label: "Play", action: handleStart },
+    ],
+    [handleStart],
+  );
+  useGameShortcuts(shortcuts);
 
   return (
     <div className={styles.lobby}>

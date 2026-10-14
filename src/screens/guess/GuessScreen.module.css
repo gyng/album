@@ -15,12 +15,19 @@
      summary, which can exceed the viewport, overflow this box and scroll the
      document as usual. */
   block-size: 100dvh;
-  padding: var(--m-s) var(--m-l) var(--m-l);
+  /* A full-screen surface: the gutters grow to clear a notch, rounded corners
+     or the home indicator. The insets are physical, so these sides are too. */
+  --playing-gutter-block: var(--space-2);
+  --playing-gutter-inline: var(--space-5);
+  padding-top: max(var(--playing-gutter-block), env(safe-area-inset-top));
+  padding-right: max(var(--playing-gutter-inline), env(safe-area-inset-right));
+  padding-bottom: max(var(--playing-gutter-inline), env(safe-area-inset-bottom));
+  padding-left: max(var(--playing-gutter-inline), env(safe-area-inset-left));
 }
 
 @media (max-width: 480px) {
   .playing {
-    padding: var(--m-s) var(--m-s) var(--m-s);
+    --playing-gutter-inline: var(--space-2);
   }
 }
 

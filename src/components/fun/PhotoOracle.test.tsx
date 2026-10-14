@@ -20,7 +20,7 @@ const photos: PhotoGamePhoto[] = [
 it("lets the player remember a photo, answer uncertainty and reveal it on giving up", () => {
   render(<PhotoOracle photos={photos} />);
   fireEvent.click(screen.getByRole("button", { name: "Meet the oracle" }));
-  fireEvent.click(screen.getByRole("button", { name: "Remember photograph 1" }));
+  fireEvent.click(screen.getByRole("button", { name: /Photograph 1$/ }));
   const remembered = screen.getByRole("img").getAttribute("src");
   fireEvent.click(screen.getByRole("button", { name: "I have my photograph" }));
   expect(screen.queryByRole("img")).toBeNull();
@@ -29,13 +29,13 @@ it("lets the player remember a photo, answer uncertainty and reveal it on giving
   expect(screen.getByRole("region", { name: "Oracle result" })).toBeTruthy();
   expect(screen.getByRole("img")).toHaveAttribute("src", remembered);
   fireEvent.click(screen.getByRole("button", { name: "Play again" }));
-  expect(screen.getAllByRole("button", { name: /Remember photograph/ })).toHaveLength(3);
+  expect(screen.getAllByRole("button", { name: /Photograph \d+$/ })).toHaveLength(3);
 });
 
 it("continues after an incorrect guess without showing the rejected candidate again", () => {
   render(<PhotoOracle photos={photos} />);
   fireEvent.click(screen.getByRole("button", { name: "Meet the oracle" }));
-  fireEvent.click(screen.getByRole("button", { name: "Remember photograph 1" }));
+  fireEvent.click(screen.getByRole("button", { name: /Photograph 1$/ }));
   fireEvent.click(screen.getByRole("button", { name: "I have my photograph" }));
   for (let i = 0; i < 16 && screen.queryByRole("button", { name: "Yes" }); i++)
     fireEvent.click(screen.getByRole("button", { name: "Yes" }));
@@ -51,7 +51,7 @@ it("continues after an incorrect guess without showing the rejected candidate ag
 it("lets the player undo an uncertain answer and answer the same question again", () => {
   render(<PhotoOracle photos={photos} />);
   fireEvent.click(screen.getByRole("button", { name: "Meet the oracle" }));
-  fireEvent.click(screen.getByRole("button", { name: "Remember photograph 1" }));
+  fireEvent.click(screen.getByRole("button", { name: /Photograph 1$/ }));
   fireEvent.click(screen.getByRole("button", { name: "I have my photograph" }));
   const question = screen.getByRole("status").textContent;
   fireEvent.click(screen.getByRole("button", { name: "Not sure" }));
@@ -63,14 +63,14 @@ it("lets the player undo an uncertain answer and answer the same question again"
 it("discovers a photograph through answers without asking the player to remember one", () => {
   render(<PhotoOracle photos={photos} />);
   fireEvent.click(screen.getByRole("button", { name: "Find me a photograph" }));
-  expect(screen.queryByRole("button", { name: /Remember photograph/ })).toBeNull();
+  expect(screen.queryByRole("button", { name: /Photograph \d+$/ })).toBeNull();
   expect(screen.queryByRole("img")).toBeNull();
   for (let i = 0; i < 8 && screen.queryByRole("button", { name: "Yes" }); i++)
     fireEvent.click(screen.getByRole("button", { name: "Yes" }));
   fireEvent.click(screen.getByRole("button", { name: "Keep this one" }));
   expect(screen.getByRole("region", { name: "Oracle result" }).querySelector("img")).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "Play again" }));
-  expect(screen.queryByRole("button", { name: /Remember photograph/ })).toBeNull();
+  expect(screen.queryByRole("button", { name: /Photograph \d+$/ })).toBeNull();
 });
 
 it("keeps asking useful tag questions after eight answers", () => {
@@ -95,7 +95,7 @@ it("acknowledges indistinguishable matches and lets the player browse them", () 
     />,
   );
   fireEvent.click(screen.getByRole("button", { name: "Find me a photograph" }));
-  expect(screen.getByRole("status")).toHaveTextContent("2 matches");
+  expect(screen.getByText(/2 matches remain/)).toBeTruthy();
   const first = screen.getByRole("img").getAttribute("src");
   fireEvent.click(screen.getByRole("button", { name: "Another match" }));
   expect(screen.getByRole("img").getAttribute("src")).not.toBe(first);
@@ -138,7 +138,7 @@ it("defaults to discovery and lets number shortcuts answer and undo a question",
     "true",
   );
   fireEvent.keyDown(window, { key: "n" });
-  expect(screen.queryByRole("button", { name: /Remember photograph/ })).toBeNull();
+  expect(screen.queryByRole("button", { name: /Photograph \d+$/ })).toBeNull();
   const original = screen.getByRole("status").textContent;
   fireEvent.keyDown(window, { key: "3" });
   expect(screen.getByText(/1 question answered/)).toBeTruthy();
@@ -183,4 +183,24 @@ it("keeps the answer trail at the reveal with a clear Yes badge", () => {
   expect(within(result).getByRole("region", { name: "Your answers" })).toHaveTextContent(question);
   fireEvent.click(screen.getByRole("button", { name: "Play again" }));
   expect(screen.queryByRole("region", { name: "Your answers" })).toBeNull();
+});
+
+it("names each photograph to remember by its description", () => {
+  render(<PhotoOracle photos={photos} />);
+  fireEvent.click(screen.getByRole("button", { name: "Meet the oracle" }));
+  expect(screen.getByRole("button", { name: /^A cat in a room/ })).toBeTruthy();
+});
+
+it("announces each question in one persistent status region and keeps the answer focused", () => {
+  render(<PhotoOracle photos={photos} />);
+  fireEvent.click(screen.getByRole("button", { name: "Find me a photograph" }));
+  const status = screen.getByRole("status");
+  expect(status).toHaveFocus();
+  const first = status.textContent;
+  const unsure = screen.getByRole("button", { name: "Not sure" });
+  unsure.focus();
+  fireEvent.click(unsure);
+  expect(screen.getByRole("status")).toBe(status);
+  expect(status.textContent).not.toBe(first);
+  expect(screen.getByRole("button", { name: "Not sure" })).toHaveFocus();
 });

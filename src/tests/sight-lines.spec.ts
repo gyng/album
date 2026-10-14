@@ -217,7 +217,9 @@ for (const viewport of [
     await page.getByRole("button", { name: "6×6", exact: true }).click();
     await page.getByRole("button", { name: "Start connecting" }).click();
     const controls = page.getByRole("group", { name: "Connection controls" });
-    const choices = page.getByRole("button", { name: /Select photograph/ });
+    const choices = page
+      .getByRole("group", { name: "Photographs", exact: true })
+      .getByRole("button");
     await expect(choices).toHaveCount(36);
     for (let index = 0; index < 6; index++) await choices.nth(index).click();
     if (viewport.width <= 720)

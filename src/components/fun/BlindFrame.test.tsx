@@ -80,15 +80,45 @@ it("allows giving up while matching a sketch and ignores its late completion", a
   fireEvent.click(screen.getByRole("button", { name: "Draw this scene" }));
   fireEvent.click(screen.getByRole("button", { name: "Submit sketch" }));
   fireEvent.click(screen.getByRole("button", { name: "Give up" }));
-  expect(screen.getByRole("region", { name: "Blind Frame result" })).toBeTruthy();
+  expect(screen.getByRole("region", { name: "Blind Frame result" })).toHaveFocus();
   expect(screen.getAllByRole("img")).toHaveLength(2);
   await act(async () => complete([1, 0]));
   expect(screen.queryByText(/\/ 100/)).toBeNull();
   expect(screen.getAllByRole("img")).toHaveLength(2);
 });
 
-it("opens the drawing pad as soon as a desktop round starts", () => {
-  const match = jest.spyOn(window, "matchMedia").mockImplementation((query) => ({
+it("gives up from the keyboard like the button: the reveal takes focus and a late match is ignored", async () => {
+  let complete!: (vector: number[]) => void;
+  jest.mocked(encodeSearchImage).mockReturnValue(
+    new Promise((resolve) => {
+      complete = resolve;
+    }),
+  );
+  render(<BlindFrame photos={photos} />);
+  fireEvent.click(screen.getByRole("button", { name: "Start Blind Frame" }));
+  fireEvent.click(screen.getByRole("button", { name: "Draw this scene" }));
+  fireEvent.click(screen.getByRole("button", { name: "Submit sketch" }));
+  fireEvent.keyDown(document.body, { key: "g" });
+  const reveal = screen.getByRole("region", { name: "Blind Frame result" });
+  expect(reveal).toHaveFocus();
+  await act(async () => complete([1, 0]));
+  expect(screen.queryByText(/\/ 100/)).toBeNull();
+  expect(reveal).toHaveFocus();
+});
+
+it("does not open the sketch from the keyboard while a sketch is being compared", () => {
+  jest.mocked(encodeSearchImage).mockReturnValue(new Promise(() => {}));
+  render(<BlindFrame photos={photos} />);
+  fireEvent.click(screen.getByRole("button", { name: "Start Blind Frame" }));
+  fireEvent.click(screen.getByRole("button", { name: "Draw this scene" }));
+  fireEvent.click(screen.getByRole("button", { name: "Submit sketch" }));
+  expect(screen.getByRole("button", { name: "Draw this scene" })).toBeDisabled();
+  fireEvent.keyDown(document.body, { key: "d" });
+  expect(screen.queryByRole("dialog")).toBeNull();
+});
+
+const desktop = () =>
+  jest.spyOn(window, "matchMedia").mockImplementation((query) => ({
     matches: query.includes("min-width"),
     media: query,
     onchange: null,
@@ -98,6 +128,25 @@ it("opens the drawing pad as soon as a desktop round starts", () => {
     removeListener: jest.fn(),
     dispatchEvent: jest.fn(),
   }));
+
+it("offers the desktop pad again when a sketch cannot be compared", async () => {
+  const match = desktop();
+  try {
+    jest.mocked(encodeSearchImage).mockResolvedValue([1, 0, 0]);
+    render(<BlindFrame photos={photos} />);
+    fireEvent.click(screen.getByRole("button", { name: "Start Blind Frame" }));
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Submit sketch" }));
+    });
+    expect(screen.getByRole("alert")).toHaveTextContent("could not be compared");
+    expect(screen.getByRole("region", { name: "Blind Frame sketch" })).toBeTruthy();
+  } finally {
+    match.mockRestore();
+  }
+});
+
+it("opens the drawing pad as soon as a desktop round starts", () => {
+  const match = desktop();
   try {
     render(<BlindFrame photos={photos} />);
     fireEvent.click(screen.getByRole("button", { name: "Start Blind Frame" }));

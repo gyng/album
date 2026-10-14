@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useReducer, useState } from "react";
+import React, { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import { Database } from "@sqlite.org/sqlite-wasm";
 import { fetchGuessPhotos, RandomPhotoRow } from "../search/api";
 import { extractGPSFromExifString } from "../../util/extractExifFromDb";
@@ -111,9 +111,13 @@ const reducer = (state: State, action: Action): State => {
           results.length >= state.photos.length ? state.currentRound : state.currentRound + 1,
       };
     }
-    case "play_again":
+    case "play_again": {
+      // Replaying today's daily would deal the same photographs again, so a
+      // replay is an ordinary practice game with the daily's five untimed rounds.
+      const { daily: _daily, ...settings } = state.settings;
       return {
         ...state,
+        settings,
         phase: "loading",
         photos: [],
         currentRound: 0,
@@ -122,6 +126,7 @@ const reducer = (state: State, action: Action): State => {
         activeSeed: "",
         loadKey: state.loadKey + 1,
       };
+    }
     case "change_settings":
       return { ...state, phase: "lobby" };
   }
@@ -155,13 +160,23 @@ export const GuessGame: React.FC<GuessGameProps> = ({
   const [guess, setGuess] = useState<{ lat: number; lng: number } | null>(null);
   const [revealed, setRevealed] = useState(false);
 
+  // Held in a ref so a renderer that recreates the callback when the URL it
+  // writes changes cannot re-run (or cancel) a load.
+  const onSeedGeneratedRef = useRef(onSeedGenerated);
+  useEffect(() => {
+    onSeedGeneratedRef.current = onSeedGenerated;
+  }, [onSeedGenerated]);
+
   // Fetch photos when entering loading phase
   useEffect(() => {
     if (state.phase !== "loading" || state.loadKey === 0) return;
     let cancelled = false;
 
     const load = async () => {
-      const seed = seedProp || (state.settings.daily ? getDailySeed() : generateSeed());
+      // A shared seed deals only the first game (load 1); Play again and a new
+      // start from the lobby deal fresh photographs.
+      const sharedSeed = state.loadKey === 1 ? seedProp : undefined;
+      const seed = sharedSeed || (state.settings.daily ? getDailySeed() : generateSeed());
       try {
         const rows = await fetchGuessPhotos({
           database,
@@ -183,7 +198,7 @@ export const GuessGame: React.FC<GuessGameProps> = ({
         dispatch({ type: "loaded", photos: parsed, seed });
         setGuess(null);
         setRevealed(false);
-        onSeedGenerated?.(seed, state.settings);
+        onSeedGeneratedRef.current?.(seed, state.settings);
       } catch {
         if (cancelled) return;
         dispatch({
@@ -197,7 +212,7 @@ export const GuessGame: React.FC<GuessGameProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [database, state.phase, state.loadKey, state.settings, seedProp, onSeedGenerated]);
+  }, [database, state.phase, state.loadKey, state.settings, seedProp]);
 
   const handleGuess = useCallback((lat: number, lng: number) => {
     setGuess({ lat, lng });

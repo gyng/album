@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { Button, Caption, Heading, KeyHint } from "../ui";
 import {
   answerOracle,
@@ -7,8 +7,7 @@ import {
   shuffleGamePhotos,
   oracleDiscoveryQuestion,
   oracleDiscoveryCandidates,
-  taggedOracleQuestions,
-  ORACLE_QUESTIONS,
+  oracleQuestionsFor,
   type OracleCandidate,
   type PhotoGamePhoto,
 } from "../../util/photoGames";
@@ -74,10 +73,7 @@ export const PhotoOracle = ({ photos }: { photos: PhotoGamePhoto[] }) => {
   >([]);
   const [error, setError] = useState<string | null>(null);
   const eligible = useMemo(() => photos.filter((photo) => photo.caption || photo.tags), [photos]);
-  const questions = useMemo(
-    () => [...ORACLE_QUESTIONS, ...taggedOracleQuestions(eligible)],
-    [eligible],
-  );
+  const questions = useMemo(() => oracleQuestionsFor(eligible), [eligible]);
   const start = (nextMode: "mind" | "discover" = mode) => {
     const selection =
       nextMode === "mind"
@@ -107,10 +103,18 @@ export const PhotoOracle = ({ photos }: { photos: PhotoGamePhoto[] }) => {
   const total = candidates.reduce((sum, item) => sum + item.weight, 0);
   const isGuess =
     !question || candidates.length === 1 || (mode === "mind" && top && top.weight / total >= 0.85);
-  const gameRef = useRef<HTMLDivElement>(null);
+  // Each view names its own focus target. A new question only changes the
+  // persistent status text, so focus stays on the answer the player chose.
+  const focusRef = useRef<HTMLElement | null>(null);
+  const focusTarget = (element: HTMLElement | null) => {
+    focusRef.current = element;
+  };
+  const matchesNoteId = useId();
+  const hasQuestion = Boolean(question);
+  const hasTop = Boolean(top);
   useEffect(() => {
-    if (stage !== "lobby") gameRef.current?.focus();
-  }, [stage, isGuess, candidates.length, question?.id]);
+    if (stage !== "lobby") focusRef.current?.focus();
+  }, [stage, isGuess, hasQuestion, hasTop]);
   const handleAnswer = (answer: "yes" | "no" | "unsure") => {
     if (stage !== "questions" || !question || isGuess) return;
     setHistory([...history, { candidates, answers }]);
@@ -216,9 +220,14 @@ export const PhotoOracle = ({ photos }: { photos: PhotoGamePhoto[] }) => {
       </GameIntro>
     );
   return (
-    <div className={styles.game} ref={gameRef} tabIndex={-1}>
+    <div className={styles.game}>
       {stage === "choose" ? (
-        <>
+        <section
+          ref={focusTarget}
+          tabIndex={-1}
+          aria-label="Choose a photograph to remember"
+          className={styles.game}
+        >
           <Heading level={1}>Choose a photograph to remember</Heading>
           <div className={styles.choices}>
             {cohort.map((photo, index) => (
@@ -226,7 +235,6 @@ export const PhotoOracle = ({ photos }: { photos: PhotoGamePhoto[] }) => {
                 key={photo.path}
                 type="button"
                 className={styles.choice}
-                aria-label={`Remember photograph ${index + 1}`}
                 onClick={() => {
                   setSecret(photo);
                   setStage("remember");
@@ -237,11 +245,11 @@ export const PhotoOracle = ({ photos }: { photos: PhotoGamePhoto[] }) => {
               </button>
             ))}
           </div>
-        </>
+        </section>
       ) : null}
       {stage === "remember" && secret ? (
         <>
-          <figure className={`${styles.frame} ${styles.secret}`}>
+          <figure ref={focusTarget} tabIndex={-1} className={`${styles.frame} ${styles.secret}`}>
             <GamePhoto photo={secret} />
             <figcaption>Keep this photograph in mind.</figcaption>
           </figure>
@@ -265,12 +273,20 @@ export const PhotoOracle = ({ photos }: { photos: PhotoGamePhoto[] }) => {
             </Caption>
           </div>
           {isGuess && top ? (
-            <>
+            <section
+              ref={focusTarget}
+              tabIndex={-1}
+              className={styles.game}
+              aria-label={mode === "mind" ? "Is this your photograph?" : "A photograph for you"}
+              {...(mode === "discover" && candidates.length > 1
+                ? { "aria-describedby": matchesNoteId }
+                : {})}
+            >
               <Heading level={1}>
                 {mode === "mind" ? "Is this your photograph?" : "A photograph for you"}
               </Heading>
               {mode === "discover" && candidates.length > 1 ? (
-                <p role="status">
+                <p id={matchesNoteId}>
                   {candidates.length} matches remain. The oracle has run out of questions. Choose a
                   match, or change an answer.
                 </p>
@@ -288,12 +304,14 @@ export const PhotoOracle = ({ photos }: { photos: PhotoGamePhoto[] }) => {
                   <KeyHint aria-hidden="true">2</KeyHint>
                 </Button>
               </div>
-            </>
+            </section>
           ) : question ? (
-            <div key={question.id} className={oracleStyles.currentQuestion}>
+            <div className={oracleStyles.currentQuestion}>
               <Caption>Question {answers.length + 1}</Caption>
-              <p className={styles.question} role="status">
-                {mode === "mind" ? question.label : oracleDiscoveryQuestion(question)}
+              <p className={styles.question} role="status" ref={focusTarget} tabIndex={-1}>
+                <span key={question.id} className={oracleStyles.questionText}>
+                  {mode === "mind" ? question.label : oracleDiscoveryQuestion(question)}
+                </span>
               </p>
               <div className={styles.actions}>
                 {(["yes", "no", "unsure"] as const).map((answer) => (
@@ -311,7 +329,9 @@ export const PhotoOracle = ({ photos }: { photos: PhotoGamePhoto[] }) => {
               </div>
             </div>
           ) : (
-            <p>No photographs match. Reveal the answer, or start again.</p>
+            <p ref={focusTarget} tabIndex={-1}>
+              No photographs match. Reveal the answer, or start again.
+            </p>
           )}
           <div className={styles.actions}>
             <Button disabled={!history.length} onClick={back}>
@@ -334,7 +354,13 @@ export const PhotoOracle = ({ photos }: { photos: PhotoGamePhoto[] }) => {
         </>
       ) : null}
       {stage === "finished" && (secret || confirmed) ? (
-        <div className={styles.result} role="region" aria-label="Oracle result">
+        <div
+          className={styles.result}
+          ref={focusTarget}
+          tabIndex={-1}
+          role="region"
+          aria-label="Oracle result"
+        >
           <Heading level={1}>
             {mode === "discover"
               ? "Your discovery"
