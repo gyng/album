@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef } from "react";
 import { BUILD_VERSION } from "../lib/buildVersion";
 import { SLIDESHOW_RUNTIME_STATE_MESSAGE } from "../util/slideshowShell";
 import { RUNTIME_HEARTBEAT_MS } from "../util/slideshowRuntimeHealth";
@@ -14,7 +14,10 @@ export const useSlideshowRuntimeHealth = (input: {
   nextAdvanceAt: number | null;
 }) => {
   const current = useRef(input);
-  current.current = input;
+  // Before any effect below reads it, and never during render.
+  useLayoutEffect(() => {
+    current.current = input;
+  });
   const presented = useRef<{ key: string; at: number } | null>(null);
   const pendingSince = useRef<number | null>(null);
   const send = useCallback(() => {

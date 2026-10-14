@@ -7,6 +7,7 @@ import { Caption, Heading, OverlayButtonLink, PillButton, Thumb } from "../ui";
 import sharedStyles from "./ExploreShared.module.css";
 import localStyles from "./ExplorePrimitives.module.css";
 import { formatCoverage } from "./exploreViewModel";
+import { useIntersectionObserverMissing } from "../useNearViewport";
 
 const styles = mergeCssModuleStyles(
   sharedStyles,
@@ -99,30 +100,28 @@ export const ExploreStatGroup: React.FC<{
       return;
     }
 
-    const sync = () => setIsLinkedTarget(window.location.hash === `#${id}`);
+    const sync = () => {
+      const linked = window.location.hash === `#${id}`;
+      setIsLinkedTarget(linked);
+      // A group the reader was sent to shows its content at once, and keeps it.
+      if (linked) setIsDeferredContentVisible(true);
+    };
     sync();
     window.addEventListener("hashchange", sync);
     return () => window.removeEventListener("hashchange", sync);
   }, [id]);
 
   const isCollapsed = isNarrowViewport && !isOpenedByReader && !isLinkedTarget;
+  // Without an observer there is no way to defer, so the content shows at once.
+  const unobservable = useIntersectionObserverMissing();
+  const showDeferredContent = isDeferredContentVisible || (deferContent && unobservable);
 
   React.useEffect(() => {
     // `isCollapsed` is a dependency because the observed element only exists
     // once the group is open: while collapsed the ref is null, so without this
     // the observer never attaches and an expanded group would sit on its
     // placeholder forever.
-    if (!deferContent || isDeferredContentVisible || isCollapsed) {
-      return;
-    }
-
-    if (id && window.location.hash === `#${id}`) {
-      setIsDeferredContentVisible(true);
-      return;
-    }
-
-    if (typeof IntersectionObserver === "undefined") {
-      setIsDeferredContentVisible(true);
+    if (!deferContent || showDeferredContent || isCollapsed) {
       return;
     }
 
@@ -141,7 +140,7 @@ export const ExploreStatGroup: React.FC<{
     }
 
     return () => observer.disconnect();
-  }, [deferContent, id, isDeferredContentVisible, isCollapsed, isLinkedTarget]);
+  }, [deferContent, showDeferredContent, isCollapsed]);
 
   return (
     <section id={id} className={styles.group}>
@@ -165,7 +164,7 @@ export const ExploreStatGroup: React.FC<{
         </div>
         {description ? <p className={styles.groupDescription}>{description}</p> : null}
       </div>
-      {(isCollapsed || (deferContent && !isDeferredContentVisible)) && deferredSummary ? (
+      {(isCollapsed || (deferContent && !showDeferredContent)) && deferredSummary ? (
         <div className={styles.groupDeferredSummary}>{deferredSummary}</div>
       ) : null}
       {isNarrowViewport ? (
@@ -192,9 +191,9 @@ export const ExploreStatGroup: React.FC<{
           ref={deferredContentRef}
           {...(id ? { id: `${id}-content` } : {})}
           className={styles.groupDeferredContent}
-          aria-busy={!isDeferredContentVisible}
+          aria-busy={!showDeferredContent}
         >
-          {isDeferredContentVisible ? (
+          {showDeferredContent ? (
             <div className={styles.groupGrid}>{children}</div>
           ) : (
             <div className={styles.groupDeferredPlaceholder} aria-hidden="true" />

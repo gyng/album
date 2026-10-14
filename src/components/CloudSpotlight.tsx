@@ -58,14 +58,20 @@ const RankScene = ({
   onMatches: (paths: string[] | null) => void;
 }) => {
   const [embeddings, , , embeddingsError] = useEmbeddingsDatabase();
-  const [busy, setBusy] = useState(true);
   const [stage, setStage] = useState("Loading image search…");
-  const [error, setError] = useState(false);
+  // Which request the outcome belongs to: a new database or callback starts a
+  // new search, which reads as busy again until it settles.
+  const [outcome, setOutcome] = useState<{
+    embeddings: typeof embeddings;
+    onMatches: typeof onMatches;
+    failed: boolean;
+  } | null>(null);
+  const settled = outcome?.embeddings === embeddings && outcome.onMatches === onMatches;
+  const busy = !settled;
+  const error = settled && outcome.failed;
   useEffect(() => {
     if (!embeddings) return;
     let cancelled = false;
-    setBusy(true);
-    setError(false);
     encodeSearchText(query, (_progress, nextStage) => {
       if (!cancelled && nextStage)
         setStage(
@@ -76,14 +82,11 @@ const RankScene = ({
       .then((result) => {
         if (!cancelled && result) {
           onMatches(result);
-          setBusy(false);
+          setOutcome({ embeddings, onMatches, failed: false });
         }
       })
       .catch(() => {
-        if (!cancelled) {
-          setError(true);
-          setBusy(false);
-        }
+        if (!cancelled) setOutcome({ embeddings, onMatches, failed: true });
       });
     return () => {
       cancelled = true;

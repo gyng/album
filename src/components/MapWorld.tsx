@@ -177,7 +177,10 @@ const MapClickAway = ({
 }) => {
   const map = useMap();
   const handlersRef = React.useRef({ onGestureStart, onGestureClick });
-  handlersRef.current = { onGestureStart, onGestureClick };
+  // Updated after commit rather than during render; gestures only arrive after it.
+  React.useEffect(() => {
+    handlersRef.current = { onGestureStart, onGestureClick };
+  });
 
   React.useEffect(() => {
     if (!map) {
@@ -308,7 +311,7 @@ export const MMap: React.FC<MapWorldProps> = ({
     setClickInfo(null);
     setHoverInfo(null);
     setContextPoint(null);
-  }, []);
+  }, [setClickInfo, setHoverInfo, setContextPoint]);
   // Without clustering, many photos can share the same pixel and only the
   // topmost marker intercepts a tap. As a minimal mitigation, repeated clicks
   // on a stacked location cycle through every co-located photo so occluded
@@ -336,7 +339,7 @@ export const MMap: React.FC<MapWorldProps> = ({
         return coLocated[(currentIndex + 1) % coLocated.length]!;
       });
     },
-    [stopDirector, visiblePhotos],
+    [setClickInfo, stopDirector, visiblePhotos],
   );
   const routeDataByAlbum = React.useMemo(() => {
     const albums = new globalThis.Map<string, MapWorldEntry[]>();
@@ -370,11 +373,14 @@ export const MMap: React.FC<MapWorldProps> = ({
       onDirectorEnabledChange?.(false);
     }
   }, [directorSequence.length, onDirectorEnabledChange]);
-  const visitDirectorPhoto = React.useCallback((photo: MapWorldEntry) => {
-    setClickInfo(photo);
-    setHoverInfo(null);
-    setContextPoint(null);
-  }, []);
+  const visitDirectorPhoto = React.useCallback(
+    (photo: MapWorldEntry) => {
+      setClickInfo(photo);
+      setHoverInfo(null);
+      setContextPoint(null);
+    },
+    [setClickInfo, setHoverInfo, setContextPoint],
+  );
   const activeRouteTarget = clickInfo?.href ?? hoverInfo?.href ?? null;
   const activeRoutePhoto = React.useMemo(
     () => photosWithStyles.find((photo) => photo.href === activeRouteTarget) ?? null,
@@ -410,14 +416,13 @@ export const MMap: React.FC<MapWorldProps> = ({
     return null;
   }, [routeDataByAlbum, routeDisplayMode, routeMode, showRoute]);
 
-  React.useEffect(() => {
-    if (clickInfo && !timeFilteredPhotos.some((photo) => photo.href === clickInfo.href)) {
-      setClickInfo(null);
-    }
-    if (hoverInfo && !timeFilteredPhotos.some((photo) => photo.href === hoverInfo.href)) {
-      setHoverInfo(null);
-    }
-  }, [clickInfo, hoverInfo, timeFilteredPhotos]);
+  // A popup for a photo the time range has filtered away closes with it.
+  if (clickInfo && !timeFilteredPhotos.some((photo) => photo.href === clickInfo.href)) {
+    setClickInfo(null);
+  }
+  if (hoverInfo && !timeFilteredPhotos.some((photo) => photo.href === hoverInfo.href)) {
+    setHoverInfo(null);
+  }
   const alwaysVisibleRouteGeoJson = React.useMemo(() => {
     if (!showRoute || routeDisplayMode !== "always") {
       return null;

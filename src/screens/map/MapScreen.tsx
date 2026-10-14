@@ -75,15 +75,18 @@ const MapScreen = (props: MapScreenProps) => {
   );
   const urlSyncTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Sync from URL on navigation (back/forward)
-  React.useEffect(() => {
+  // Sync from URL on navigation (back/forward): a new range in the URL replaces
+  // the one on screen, and its arrival opens the slider.
+  const [urlRange, setUrlRange] = React.useState({ urlFrom, urlTo });
+  if (urlRange.urlFrom !== urlFrom || urlRange.urlTo !== urlTo) {
+    setUrlRange({ urlFrom, urlTo });
     if (urlFrom !== null && urlTo !== null) {
       setTimeRange({ fromMs: urlFrom, toMs: urlTo });
       setShowTimeRangeSlider(true);
     } else {
       setTimeRange(null);
     }
-  }, [urlFrom, urlTo]);
+  }
 
   const handleTimeRangeDrag = React.useCallback((fromMs: number, toMs: number) => {
     setTimeRange({ fromMs, toMs });
@@ -162,11 +165,11 @@ const MapScreen = (props: MapScreenProps) => {
   // The tour reads as "play these results": clearing the query back to the
   // full library removes the only control that can stop it, so stop it here
   // instead of leaving it to run over every photo unattended.
-  React.useEffect(() => {
-    if (!deferredMapSearchQuery.trim()) {
-      setDirectorEnabled(false);
-    }
-  }, [deferredMapSearchQuery]);
+  const [tourQuery, setTourQuery] = React.useState(deferredMapSearchQuery);
+  if (tourQuery !== deferredMapSearchQuery) {
+    setTourQuery(deferredMapSearchQuery);
+    if (!deferredMapSearchQuery.trim()) setDirectorEnabled(false);
+  }
   const filteredPhotos = React.useMemo(
     () =>
       deferredMapSearchQuery.trim() && !mapSearchIndex
@@ -246,11 +249,9 @@ const MapScreen = (props: MapScreenProps) => {
     [displayedPhotos],
   );
   const [showAllRoutes, setShowAllRoutes] = React.useState(false);
-  React.useEffect(() => {
-    if (routableAlbumCount === 0) {
-      setShowAllRoutes(false);
-    }
-  }, [routableAlbumCount]);
+  if (showAllRoutes && routableAlbumCount === 0) {
+    setShowAllRoutes(false);
+  }
 
   // How much of the bottom edge the date panel actually occupies, measured
   // rather than assumed. `--range-slider-clearance` was a hardcoded 82px whose
@@ -259,9 +260,12 @@ const MapScreen = (props: MapScreenProps) => {
   // on a narrow viewport would have been under-cleared by both at once. The
   // token stays as the value before the first measurement.
   const [panelHeight, setPanelHeight] = React.useState<number | null>(null);
+  // A closed panel occupies nothing, and a reopened one is measured afresh.
+  if (!showTimeRangeSlider && panelHeight !== null) {
+    setPanelHeight(null);
+  }
   React.useEffect(() => {
     if (!showTimeRangeSlider) {
-      setPanelHeight(null);
       return;
     }
 
@@ -277,6 +281,7 @@ const MapScreen = (props: MapScreenProps) => {
       }
     });
     observer.observe(panel);
+    // oxlint-disable-next-line react/set-state-in-effect -- a layout measurement can only be read from the DOM after commit
     setPanelHeight(panel.getBoundingClientRect().height);
     return () => observer.disconnect();
   }, [showTimeRangeSlider]);

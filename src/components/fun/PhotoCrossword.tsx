@@ -187,6 +187,7 @@ export const PhotoCrossword = ({ photos }: { photos: PhotoGamePhoto[] }) => {
   useEffect(() => {
     if (dailyRequested.current || !urlReady || loading || !stats || !photos.length) return;
     dailyRequested.current = true;
+    // oxlint-disable-next-line react/set-state-in-effect -- a linked daily opens once the URL and stored record are readable after hydration; dealing writes the URL and refs, so it cannot run in render
     if (hasSearchParam("daily") && !stats.dailies[today.day]) startDaily();
   });
   const { mode, prefill } = round;

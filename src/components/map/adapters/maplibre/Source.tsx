@@ -109,6 +109,7 @@ export const Source = (props: SourceProps): React.JSX.Element | null => {
     map.addSource(id, toSourceSpec(propsRef.current));
     appliedOptionsRef.current = toSourceOptions(propsRef.current);
     addedSourceRef.current = true;
+    // oxlint-disable-next-line react/set-state-in-effect -- the source now exists in MapLibre; the bump is what lets its layers mount
     setGeneration((current) => current + 1);
   }, [map, id, styleVersion, propsRef]);
 
@@ -195,7 +196,7 @@ export const Source = (props: SourceProps): React.JSX.Element | null => {
 
   // Layers are mounted only once the source exists, so their own effects — which
   // React runs after this one — can always find it.
-  if (!attachment) {
+  if (generation === 0) {
     return null;
   }
 

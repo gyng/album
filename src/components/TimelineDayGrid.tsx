@@ -2,6 +2,7 @@ import { Icon } from "./ui/Icon";
 import { AppLink as Link } from "./platform";
 import React from "react";
 import { MapWorldDeferred } from "./MapWorldDeferred";
+import { useIntersectionObserverMissing } from "./useNearViewport";
 import type { MapWorldEntry, TimelineEntry } from "../util/pageDataTypes";
 import { HydratedRelativeTime } from "./HydratedRelativeTime";
 import { Caption, Heading, Thumb, buttonStyles, overlayButtonStyles } from "./ui";
@@ -68,13 +69,12 @@ export const TimelineDayGrid = ({
     placeholderHeight: entry.placeholderHeight,
   }));
 
-  React.useEffect(() => {
-    if (!date || mapPhotos.length === 0 || isMapVisible) {
-      return;
-    }
+  // Without an observer there is no way to defer the map, so it loads at once.
+  const unobservable = useIntersectionObserverMissing();
+  const showMap = isMapVisible || unobservable;
 
-    if (typeof IntersectionObserver === "undefined") {
-      setIsMapVisible(true);
+  React.useEffect(() => {
+    if (!date || mapPhotos.length === 0 || showMap) {
       return;
     }
 
@@ -93,7 +93,7 @@ export const TimelineDayGrid = ({
     }
 
     return () => observer.disconnect();
-  }, [date, isMapVisible, mapPhotos.length]);
+  }, [date, showMap, mapPhotos.length]);
 
   if (!date) {
     return (
@@ -264,8 +264,8 @@ export const TimelineDayGrid = ({
             </Caption>
           </div>
 
-          <div ref={mapLoadTargetRef} className={styles.mapWrap} aria-busy={!isMapVisible}>
-            {isMapVisible ? (
+          <div ref={mapLoadTargetRef} className={styles.mapWrap} aria-busy={!showMap}>
+            {showMap ? (
               <MapWorldDeferred
                 photos={mapPhotos}
                 className={styles.mapCanvas ?? ""}

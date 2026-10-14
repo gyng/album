@@ -17,19 +17,16 @@ const readTheme = (): ThemeName => {
   return classes.contains("dark") ? "dark" : "light";
 };
 
-export const useActiveTheme = (): ThemeName => {
-  // The server renders the default; the first effect corrects it, which is the
-  // same shape every other client-only preference here takes.
-  const [theme, setTheme] = React.useState<ThemeName>("light");
-
-  React.useEffect(() => {
-    setTheme(readTheme());
-
-    if (typeof MutationObserver === "undefined") return;
-    const observer = new MutationObserver(() => setTheme(readTheme()));
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
-    return () => observer.disconnect();
-  }, []);
-
-  return theme;
+const subscribe = (onChange: () => void) => {
+  if (typeof MutationObserver === "undefined") return () => {};
+  const observer = new MutationObserver(onChange);
+  observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+  return () => observer.disconnect();
 };
+
+// The server renders the default and hydration corrects it, which is the same
+// shape every other client-only preference here takes.
+const serverTheme = (): ThemeName => "light";
+
+export const useActiveTheme = (): ThemeName =>
+  React.useSyncExternalStore(subscribe, readTheme, serverTheme);

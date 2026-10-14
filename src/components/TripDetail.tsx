@@ -154,9 +154,7 @@ const TripRoute = ({ trip, activeDate }: { trip: Trip; activeDate: string | null
 
   // A map that has gone gives its place back to the drawing, so scrolling away
   // and back does not leave an empty box behind.
-  React.useEffect(() => {
-    if (!near) setMapped(false);
-  }, [near]);
+  if (!near && mapped) setMapped(false);
 
   if (!trip.days.some((day) => day.point)) return null;
 

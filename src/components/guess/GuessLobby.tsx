@@ -44,6 +44,8 @@ const limitToTimerValue = (limit: number | null): TimerValue => {
   return "off";
 };
 
+const NO_REGIONS: GuessRegionOption[] = [];
+
 export const GuessLobby: React.FC<GuessLobbyProps> = ({
   database,
   defaults,
@@ -55,9 +57,17 @@ export const GuessLobby: React.FC<GuessLobbyProps> = ({
   const siteOrigin = useShareOrigin();
   const today = localDayKey();
   const todaysDaily = stats?.dailies[today];
-  const [regions, setRegions] = useState<GuessRegionOption[]>([]);
-  const [totalPhotos, setTotalPhotos] = useState(0);
-  const [regionsLoaded, setRegionsLoaded] = useState(false);
+  // The regions last fetched, and for which database: a new database keeps showing
+  // the previous list until its own arrives, but does not count as loaded.
+  const [fetched, setFetched] = useState<{
+    database: typeof database;
+    regions: GuessRegionOption[];
+    totalPhotos: number;
+    loaded: boolean;
+  } | null>(null);
+  const regions = fetched?.regions ?? NO_REGIONS;
+  const totalPhotos = fetched?.totalPhotos ?? 0;
+  const regionsLoaded = fetched?.database === database && fetched.loaded;
   const { getSearchParam } = useUrlSearchParams();
   const overrides: Partial<GameSettingsRegistry["guess"]> = {};
   if (defaults.region !== undefined) overrides.region = defaults.region;
@@ -80,18 +90,19 @@ export const GuessLobby: React.FC<GuessLobbyProps> = ({
 
   useEffect(() => {
     let cancelled = false;
-    setRegionsLoaded(false);
     void fetchGuessRegions({ database })
       .then((result) => {
         if (cancelled) return;
-        setRegions(result);
-        setRegionsLoaded(true);
-        setTotalPhotos(result.reduce((sum, r) => sum + r.count, 0));
+        setFetched({
+          database,
+          regions: result,
+          totalPhotos: result.reduce((sum, r) => sum + r.count, 0),
+          loaded: true,
+        });
       })
       .catch(() => {
         if (cancelled) return;
-        setRegions([]);
-        setTotalPhotos(0);
+        setFetched({ database, regions: [], totalPhotos: 0, loaded: false });
       });
     return () => {
       cancelled = true;

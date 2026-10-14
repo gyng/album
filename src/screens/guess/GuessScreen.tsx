@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { AppLink, useUrlSearchParams } from "../../components/platform";
 import { useDatabase } from "../../components/database/useDatabase";
 import { ProgressBar } from "../../components/ProgressBar";
 import { GlobalNav } from "../../components/GlobalNav";
+import { useHydrated } from "../../components/useHydrated";
 import { GuessGame } from "../../components/guess/GuessGame";
 import type { GameSettings } from "../../components/guess/guessTypes";
 import { useGameSettings } from "../../components/fun/useGameSettings";
@@ -35,10 +36,12 @@ const GuessScreen = () => {
   const photosFromUrl = guessPhotosFromParams(searchParams);
   // Stats live in this browser's storage, so they are read after mount: null
   // until then, and the page waits rather than starting a daily it then drops.
-  const [dailyFinished, setDailyFinished] = useState<boolean | null>(null);
-  useEffect(() => {
-    setDailyFinished(Boolean(readGameStats("guess").dailies[localDayKey()]));
-  }, []);
+  const hydrated = useHydrated();
+  // Read once: finishing today's daily on this page must not send it back to the lobby.
+  const dailyFinished = useMemo(
+    () => (hydrated ? Boolean(readGameStats("guess").dailies[localDayKey()]) : null),
+    [hydrated],
+  );
   const [preferences, , preferencesReady] = useGameSettings("guess");
   const roundsFromUrl = getSearchParam("rounds");
   const timerFromUrl = getSearchParam("timer");

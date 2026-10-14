@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useId, useRef, useState } from "react";
 import { useUrlSearchParams } from "../platform";
 import { Button, Caption, LoadingIndicator, KeyHint } from "../ui";
 import { GameIntro } from "./GameIllustration";
@@ -60,7 +60,8 @@ export const PhotoHangman = ({ photos }: { photos: PhotoGamePhoto[] }) => {
   const [failedPath, setFailedPath] = useState<string | null>(null);
   const [imageAttempt, setImageAttempt] = useState(0);
   const [round, setRound] = useState(0);
-  const [refocusAfter, setRefocusAfter] = useState<string | null>(null);
+  // The subject just guessed, waiting for the next clue before focus moves on from it.
+  const refocusAfter = useRef<string | null>(null);
   const [dockHeight, setDockHeight] = useState(0);
   const [error, setError] = useState("");
   const resultRef = useRef<HTMLElement>(null);
@@ -90,7 +91,7 @@ export const PhotoHangman = ({ photos }: { photos: PhotoGamePhoto[] }) => {
     setFailedPath(null);
     setImageAttempt(0);
     setRound((previous) => previous + 1);
-    setRefocusAfter(null);
+    refocusAfter.current = null;
     setGaveUp(false);
     setError("");
   };
@@ -103,12 +104,12 @@ export const PhotoHangman = ({ photos }: { photos: PhotoGamePhoto[] }) => {
   const todaysDaily = stats?.dailies[today];
   // A linked daily starts once the archive and the player's record are both known.
   const linkedDaily = useRef(false);
-  const startLinkedDaily = useRef(startDaily);
-  startLinkedDaily.current = startDaily;
+  const startLinkedDaily = useEffectEvent(startDaily);
   useEffect(() => {
     if (linkedDaily.current || !urlReady || !stats || !photos.length) return;
     linkedDaily.current = true;
-    if (hasSearchParam("daily") && !stats.dailies[localDayKey()]) startLinkedDaily.current();
+    // oxlint-disable-next-line react/set-state-in-effect -- a linked daily opens once the URL and stored record are readable after hydration; dealing writes refs, so it cannot run in render
+    if (hasSearchParam("daily") && !stats.dailies[localDayKey()]) startLinkedDaily();
   }, [urlReady, hasSearchParam, stats, photos.length]);
   // Score: misses to spare on a solved round, so higher is better; an unsolved round has none.
   const finish = (won: boolean, finalMisses: number) =>
@@ -134,17 +135,19 @@ export const PhotoHangman = ({ photos }: { photos: PhotoGamePhoto[] }) => {
   // A wrong guess disables its own button and, while the next clue loads, every
   // other one, so focus would otherwise fall to the document.
   useEffect(() => {
-    if (!refocusAfter || !puzzle || (!ended && !ready)) return;
-    setRefocusAfter(null);
+    const subject = refocusAfter.current;
+    if (!subject || !puzzle || (!ended && !ready)) return;
+    refocusAfter.current = null;
     if (ended) return;
     const buttons = [...(subjectsRef.current?.querySelectorAll<HTMLButtonElement>("button") ?? [])];
-    const after = puzzle.subjects.indexOf(refocusAfter);
+    const after = puzzle.subjects.indexOf(subject);
     const open = buttons.filter((button) => !button.disabled);
     const next =
       open.find((button) => puzzle.subjects.indexOf(button.dataset.subject ?? "") > after) ??
       open[0];
     next?.focus();
-  }, [refocusAfter, puzzle, ready, ended]);
+    // Every guess replaces `guesses`, so this runs after each one as well as when its clue is ready.
+  }, [guesses, puzzle, ready, ended]);
   const shortcuts = [
     {
       key: "N",
@@ -366,7 +369,7 @@ export const PhotoHangman = ({ photos }: { photos: PhotoGamePhoto[] }) => {
                     onClick={() => {
                       if (!ready) return;
                       searchRef.current?.blur();
-                      setRefocusAfter(subject);
+                      refocusAfter.current = subject;
                       const next = addHangmanSubjectGuess(puzzle, guesses, subject);
                       setGuesses(next);
                       setQuery("");

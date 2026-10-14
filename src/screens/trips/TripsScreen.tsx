@@ -49,7 +49,9 @@ const TripsScreen = ({ trips }: TripsScreenProps) => {
   const order: Order = rawOrder === "days" || rawOrder === "distance" ? rawOrder : "date";
   const rawYear = ready ? getSearchParam("year") : null;
   const year = rawYear && trips.some((trip) => yearOf(trip) === rawYear) ? rawYear : ALL_YEARS;
-  const [linkedTrip, setLinkedTrip] = React.useState<string | null>(null);
+  // A fresh object per link, so following the same trip's link again scrolls again.
+  const [linked, setLinked] = React.useState<{ id: string } | null>(null);
+  const linkedTrip = linked?.id ?? null;
   const seenHash = React.useRef<string | null>(null);
   const readHash = React.useCallback(() => {
     if (!ready || seenHash.current === window.location.hash) return;
@@ -62,7 +64,8 @@ const TripsScreen = ({ trips }: TripsScreenProps) => {
     }
     const target = trips.find((trip) => `trip-${trip.id}` === hash);
     if (!target) return;
-    setLinkedTrip(hash);
+    // oxlint-disable-next-line react/set-state-in-effect -- the URL hash is an external system, read on mount and on every hashchange
+    setLinked({ id: hash });
     if (
       (year !== ALL_YEARS && yearOf(target) !== year) ||
       (kind !== "all" && target.isOuting !== (kind === "outings"))
@@ -104,18 +107,20 @@ const TripsScreen = ({ trips }: TripsScreenProps) => {
     else params.set(key, value);
     replaceSearchParams(params);
     setVisible(INITIAL_TRIPS);
-    setLinkedTrip(null);
+    setLinked(null);
   };
   const linkedIndex = linkedTrip
     ? listed.findIndex((trip) => `trip-${trip.id}` === linkedTrip)
     : -1;
+  // The list grows to include a linked trip, and stays grown once it has.
+  if (linkedIndex >= 0 && visible < linkedIndex + 1) setVisible(linkedIndex + 1);
   const visibleCount = Math.max(visible, linkedIndex + 1);
+  const scrolledTo = React.useRef<{ id: string } | null>(null);
   React.useEffect(() => {
-    if (!linkedTrip || linkedIndex < 0) return;
-    document.getElementById(linkedTrip)?.scrollIntoView({ block: "start" });
-    setVisible((count) => Math.max(count, linkedIndex + 1));
-    setLinkedTrip(null);
-  }, [linkedTrip, linkedIndex]);
+    if (!linked || linkedIndex < 0 || scrolledTo.current === linked) return;
+    scrolledTo.current = linked;
+    document.getElementById(linked.id)?.scrollIntoView({ block: "start" });
+  }, [linked, linkedIndex]);
 
   return (
     <div className={styles.page}>

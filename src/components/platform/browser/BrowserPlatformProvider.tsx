@@ -16,9 +16,14 @@ const BrowserLink = React.forwardRef<HTMLAnchorElement, React.ComponentProps<"a"
   },
 );
 
+const noSubscription = () => () => {};
+
 const BrowserHead = ({ children }: React.PropsWithChildren) => {
-  const [mounted, setMounted] = React.useState(false);
-  React.useEffect(() => setMounted(true), []);
+  const mounted = React.useSyncExternalStore(
+    noSubscription,
+    () => true,
+    () => false,
+  );
   // Match the server's empty portal during hydration before updating its head.
   return mounted ? createPortal(children, document.head) : null;
 };

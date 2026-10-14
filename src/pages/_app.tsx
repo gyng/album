@@ -1,6 +1,6 @@
 import "../styles/globals.css";
 import type { AppProps } from "next/app";
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 import { Analytics } from "@vercel/analytics/react";
 import { AppRuntime } from "../components/AppRuntime";
 import { siteConfig } from "../lib/siteConfig";
@@ -20,11 +20,15 @@ export const shouldEnableAnalytics = (
   enabled: boolean = siteConfig.analytics.vercel,
 ): boolean => enabled && hostname !== "localhost" && hostname !== "127.0.0.1";
 
+const noSubscription = () => () => {};
+
 const HostGatedAnalytics = () => {
-  const [enabled, setEnabled] = useState(false);
-  useEffect(() => {
-    setEnabled(shouldEnableAnalytics(window.location.hostname));
-  }, []);
+  // Off in the server render; the hostname decides once hydrated.
+  const enabled = useSyncExternalStore(
+    noSubscription,
+    () => shouldEnableAnalytics(window.location.hostname),
+    () => false,
+  );
   return enabled ? <Analytics /> : null;
 };
 

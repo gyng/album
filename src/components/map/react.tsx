@@ -857,7 +857,11 @@ const usePointInteractions = (
   // Read through a ref so a caller's inline arrow does not resubscribe the map
   // on every render — the point of this path is to stop doing per-frame work.
   const handlersRef = React.useRef({ onPointClick, onPointHover });
-  handlersRef.current = { onPointClick, onPointHover };
+  // Updated after commit rather than during render, which React may abandon;
+  // the map's events only ever fire after it.
+  React.useEffect(() => {
+    handlersRef.current = { onPointClick, onPointHover };
+  });
   const wantsClick = onPointClick !== undefined;
   const wantsHover = onPointHover !== undefined;
 
@@ -1036,7 +1040,10 @@ const StackOrder = ({
   // The ids are rebuilt every render, so the effect keys off their names.
   const idKey = ids.join("\u0000");
   const idsRef = React.useRef(ids);
-  idsRef.current = ids;
+  // Declared before the stacking effect, so it has the current ids when that runs.
+  React.useEffect(() => {
+    idsRef.current = ids;
+  });
 
   React.useEffect(() => {
     if (!map) {

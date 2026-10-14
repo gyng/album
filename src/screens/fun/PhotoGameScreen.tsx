@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { GlobalNav } from "../../components/GlobalNav";
 import { Seo } from "../../components/Seo";
 import { Heading, buttonStyles } from "../../components/ui";
@@ -34,19 +34,23 @@ export const PhotoGameScreen = ({ game }: { game: PhotoGameKind }) => {
     game === "caption-it";
   const [embeddings, vectorProgress, , vectorError, retryVectors] =
     useEmbeddingsDatabase(needsVectors);
-  const [loaded, setLoaded] = useState<{ game: PhotoGameKind; photos: PhotoGamePhoto[] } | null>(
-    null,
-  );
-  const photos = loaded?.game === game ? loaded.photos : null;
-  const [error, setError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
-  const [loadingVisible, setLoadingVisible] = useState(false);
+  // One load per combination of these; its result and error belong to it alone,
+  // so a new game, database or retry starts with neither.
+  const request = useMemo(
+    () => ({ database, embeddings, needsVectors, game, attempt }),
+    [database, embeddings, needsVectors, game, attempt],
+  );
+  const [loaded, setLoaded] = useState<{ request: object; photos: PhotoGamePhoto[] } | null>(null);
+  const photos = loaded?.request === request ? loaded.photos : null;
+  const [failed, setFailed] = useState<{ request: object; error: string } | null>(null);
+  const error = failed?.request === request ? failed.error : null;
+  const [loadingShownFor, setLoadingShownFor] = useState<object | null>(null);
   const availablePhotos = photos ?? EMPTY_PHOTOS;
   const definition = FUN_GAMES.find((item) => item.id === game)!;
   useEffect(() => {
     let cancelled = false;
-    setLoaded(null);
-    setError(null);
+    const { database, embeddings, needsVectors, game } = request;
     if (!database || (needsVectors && !embeddings)) return;
     void fetchPhotoGameArchive({
       database,
@@ -54,26 +58,27 @@ export const PhotoGameScreen = ({ game }: { game: PhotoGameKind }) => {
       game,
     })
       .then((result) => {
-        if (!cancelled) setLoaded({ game, photos: result });
+        if (!cancelled) setLoaded({ request, photos: result });
       })
       .catch(() => {
-        if (!cancelled) setError("The game photographs could not be loaded.");
+        if (!cancelled) setFailed({ request, error: "The game photographs could not be loaded." });
       });
     return () => {
       cancelled = true;
     };
-  }, [database, embeddings, needsVectors, game, attempt]);
+  }, [request]);
   const loadError =
     error ??
     (databaseError || (needsVectors && vectorError)
       ? "The game photographs could not be loaded."
       : null);
+  // Shown only once this load has taken a moment, so a quick one never flashes it.
+  const loadingVisible = !photos && !loadError && loadingShownFor === request;
   useEffect(() => {
-    setLoadingVisible(false);
     if (photos || loadError) return;
-    const timer = window.setTimeout(() => setLoadingVisible(true), 180);
+    const timer = window.setTimeout(() => setLoadingShownFor(request), 180);
     return () => window.clearTimeout(timer);
-  }, [photos, loadError, game]);
+  }, [photos, loadError, request]);
   return (
     <main id="main-content" className={styles.page}>
       <Seo

@@ -15,17 +15,42 @@ export const PhotoSimilarPhotos: React.FC<{
   const [database, progress, , databaseError] = useDatabase();
   const [embeddingsDatabase, embeddingsProgress] = useEmbeddingsDatabase(Boolean(props.path));
   const [results, setResults] = React.useState<SearchResultRow[]>([]);
-  const [error, setError] = React.useState<string | null>(null);
   const [offset, setOffset] = React.useState(0);
   const [hasNextPage, setHasNextPage] = React.useState(false);
-  const [isLoadingResults, setIsLoadingResults] = React.useState(false);
 
-  React.useEffect(() => {
+  // A new photograph, database or page size starts the list again — during
+  // render, so no request ever goes out with the previous photograph's offset.
+  const [listFor, setListFor] = React.useState({ database, initialVisibleCount, path: props.path });
+  if (
+    listFor.database !== database ||
+    listFor.initialVisibleCount !== initialVisibleCount ||
+    listFor.path !== props.path
+  ) {
+    setListFor({ database, initialVisibleCount, path: props.path });
     setResults([]);
-    setError(null);
     setOffset(0);
     setHasNextPage(false);
-  }, [database, initialVisibleCount, props.path]);
+  }
+
+  // Loading and failure belong to a request: the one on screen is loading until
+  // a request with exactly these inputs has finished.
+  const request = {
+    database,
+    embeddingsDatabase,
+    initialVisibleCount,
+    offset,
+    pageSize,
+    path: props.path,
+  };
+  type Request = typeof request;
+  const [settled, setSettled] = React.useState<{ request: Request; error: string | null } | null>(
+    null,
+  );
+  const isCurrent = (other: Request) =>
+    (Object.keys(request) as Array<keyof Request>).every((key) => other[key] === request[key]);
+  const current = settled && isCurrent(settled.request) ? settled : null;
+  const isLoadingResults = Boolean(database && embeddingsDatabase && props.path) && !current;
+  const error = current?.error ?? null;
 
   React.useEffect(() => {
     if (!database || !embeddingsDatabase || !props.path) {
@@ -33,9 +58,14 @@ export const PhotoSimilarPhotos: React.FC<{
     }
 
     let isCancelled = false;
-
-    setIsLoadingResults(true);
-    setError(null);
+    const started = {
+      database,
+      embeddingsDatabase,
+      initialVisibleCount,
+      offset,
+      pageSize,
+      path: props.path,
+    };
 
     fetchSimilarResults({
       database,
@@ -61,6 +91,7 @@ export const PhotoSimilarPhotos: React.FC<{
               ],
         );
         setHasNextPage(response.next != null);
+        setSettled({ request: started, error: null });
       })
       .catch((err: unknown) => {
         if (isCancelled) {
@@ -68,14 +99,7 @@ export const PhotoSimilarPhotos: React.FC<{
         }
 
         console.error("Failed to load similar photos", err);
-        setError("Could not load similar photos.");
-      })
-      .finally(() => {
-        if (isCancelled) {
-          return;
-        }
-
-        setIsLoadingResults(false);
+        setSettled({ request: started, error: "Could not load similar photos." });
       });
 
     return () => {

@@ -35,9 +35,12 @@ export const BlindFrame = ({ photos }: { photos: PhotoGamePhoto[] }) => {
   }, []);
   const [drawing, setDrawing] = useState(false);
   const [gaveUp, setGaveUp] = useState(false);
+  // The round keys the sketch pad; the ref lets an old pad's late callbacks see it is stale.
+  const [round, setRound] = useState(0);
   const roundRef = useRef(0);
-  const round = roundRef.current;
   const blobRef = useRef<Blob | null>(null);
+  // The sketch so far, restored when the pad mounts again (it is read only on mount).
+  const [draft, setDraft] = useState<Blob | null>(null);
   const previousTarget = useRef<string | null>(null);
   const resultRef = useRef<HTMLDivElement>(null);
   const promptRef = useRef<HTMLQuoteElement>(null);
@@ -87,6 +90,7 @@ export const BlindFrame = ({ photos }: { photos: PhotoGamePhoto[] }) => {
   const eligible = photos.filter((photo) => photo.caption.length >= 20 && photo.vector.length > 0);
   const start = () => {
     roundRef.current += 1;
+    setRound(roundRef.current);
     const next =
       shuffleGamePhotos(eligible.filter((photo) => photo.path !== previousTarget.current))[0] ??
       eligible[0]!;
@@ -94,6 +98,7 @@ export const BlindFrame = ({ photos }: { photos: PhotoGamePhoto[] }) => {
     setTarget(next);
     clearImageQuery();
     blobRef.current = null;
+    setDraft(null);
     setDrawing(false);
     setGaveUp(false);
   };
@@ -271,14 +276,17 @@ export const BlindFrame = ({ photos }: { photos: PhotoGamePhoto[] }) => {
           {...(!inlinePad ? { description: target.caption } : {})}
           submitLabel="Reveal"
           cancelLabel="Close sketch"
-          {...(blobRef.current ? { initialDrawing: blobRef.current } : {})}
+          {...(draft ? { initialDrawing: draft } : {})}
           onDraft={(blob) => {
-            if (round === roundRef.current) blobRef.current = blob;
+            if (round !== roundRef.current) return;
+            blobRef.current = blob;
+            setDraft(blob);
           }}
           onCancel={() => setDrawing(false)}
           onSubmit={(blob) => {
             if (round !== roundRef.current) return;
             blobRef.current = blob;
+            setDraft(blob);
             setDrawing(false);
             startImageQuery(blob, "drawing");
           }}

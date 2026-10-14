@@ -228,11 +228,13 @@ export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
   // Set when the user dismisses the chip so focus returns to the reappearing
   // input instead of dropping to the document body.
   const topicDismissedRef = React.useRef(false);
+  const [draftFor, setDraftFor] = React.useState(activeTopic);
+  if (draftFor !== activeTopic) {
+    setDraftFor(activeTopic);
+    if (activeTopic) setTopicDraft("");
+  }
   React.useEffect(() => {
-    if (activeTopic) {
-      setTopicDraft("");
-      return;
-    }
+    if (activeTopic) return;
     if (topicDismissedRef.current) {
       topicDismissedRef.current = false;
       topicInputRef.current?.focus();

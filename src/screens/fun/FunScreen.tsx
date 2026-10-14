@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useMemo } from "react";
 import { GlobalNav } from "../../components/GlobalNav";
+import { useHydrated } from "../../components/useHydrated";
 import { AppLink } from "../../components/platform";
 import { Heading, Icon } from "../../components/ui";
 import { Seo } from "../../components/Seo";
@@ -12,16 +13,14 @@ import styles from "./FunScreen.module.css";
 
 /** Games finished today; read from this browser's storage after mount. */
 const usePlayedToday = (): ReadonlySet<string> => {
-  const [played, setPlayed] = useState<ReadonlySet<string>>(() => new Set());
-  useEffect(() => {
+  const hydrated = useHydrated();
+  return useMemo(() => {
+    if (!hydrated) return new Set<string>();
     const today = localDayKey();
-    setPlayed(
-      new Set(
-        FUN_GAMES.filter((game) => readGameStats(game.id).lastDay === today).map((game) => game.id),
-      ),
+    return new Set(
+      FUN_GAMES.filter((game) => readGameStats(game.id).lastDay === today).map((game) => game.id),
     );
-  }, []);
-  return played;
+  }, [hydrated]);
 };
 
 const FunScreen = () => {

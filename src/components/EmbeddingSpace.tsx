@@ -289,8 +289,8 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
   const [failed, setFailed] = React.useState(false);
   const [projectionMode, setProjectionMode] = React.useState<"semantic" | "overview">("semantic");
   const hasSemantic = Boolean(entries?.length && entries.every((entry) => entry.umap));
-  const semanticRef = React.useRef(false);
-  semanticRef.current = projectionMode === "semantic" && hasSemantic;
+  const semantic = projectionMode === "semantic" && hasSemantic;
+  const semanticRef = React.useRef(semantic);
   const [yearFilter, setYearFilter] = React.useState("");
   const [lensFilter, setLensFilter] = React.useState("");
   const [rankedPaths, setRankedPaths] = React.useState<string[] | null>(null);
@@ -299,7 +299,6 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
     [entries, yearFilter, lensFilter, rankedPaths],
   );
   const visibleRef = React.useRef(visibleIndices);
-  visibleRef.current = visibleIndices;
   const years = React.useMemo(
     () =>
       [...new Set((entries ?? []).flatMap((entry) => (entry.year ? [entry.year] : [])))].sort(
@@ -428,7 +427,7 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
   const lastUnderRef = React.useRef<Placed | null>(null);
   /** Per photograph: how much of a photograph it currently is, rather than a dot. */
   const photonessRef = React.useRef<Float32Array | null>(null);
-  const lastNamedRef = React.useRef<EmbeddingSpaceEntry | null>(null);
+  const [lastNamedState, setLastNamedState] = React.useState<EmbeddingSpaceEntry | null>(null);
   /** The chip naming what is being looked at, moved to sit under it. */
   const captionRef = React.useRef<HTMLElement | null>(null);
   /** The words drifting through the cloud: which photograph each belongs to, and since when. */
@@ -438,18 +437,30 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
   );
   const driftingRef = React.useRef(true);
 
-  driftingRef.current = drifting;
-  chosenRef.current = chosen;
   const indexBySrc = React.useMemo(
     () => new Map((entries ?? []).map((entry, index) => [entry.src, index])),
     [entries],
   );
-  trailRef.current = (trail ?? []).flatMap((src) => {
-    const index = indexBySrc.get(src);
-    return index === undefined ? [] : [index];
+  const trailIndices = React.useMemo(
+    () =>
+      (trail ?? []).flatMap((src) => {
+        const index = indexBySrc.get(src);
+        return index === undefined ? [] : [index];
+      }),
+    [trail, indexBySrc],
+  );
+  // The draw loop and the handlers read what is rendered through refs. Synced
+  // after commit but before paint, so no frame is drawn from a render that
+  // React might still have thrown away, nor a frame behind one it kept.
+  React.useLayoutEffect(() => {
+    semanticRef.current = semantic;
+    visibleRef.current = visibleIndices;
+    driftingRef.current = drifting;
+    chosenRef.current = chosen;
+    trailRef.current = trailIndices;
+    flatRef.current = arrangement === "flat";
+    sheetRef.current = sheet;
   });
-  flatRef.current = arrangement === "flat";
-  sheetRef.current = sheet;
 
   React.useEffect(() => {
     let cancelled = false;
@@ -1642,14 +1653,19 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
     tappedRef.current = hit.entry.href;
   };
 
+  // A different set of photographs starts with nothing chosen, hovered or shown off.
+  const [selectionFor, setSelectionFor] = React.useState(visibleIndices);
+  if (selectionFor !== visibleIndices) {
+    setSelectionFor(visibleIndices);
+    setChosen(null);
+    setHovered(null);
+    setShowcased(null);
+  }
   React.useEffect(() => {
     sheetLayoutRef.current.width = 0;
     showcaseRef.current = null;
     pickRef.current = null;
     tappedRef.current = null;
-    setChosen(null);
-    setHovered(null);
-    setShowcased(null);
   }, [visibleIndices]);
   if (failed) return null;
   const count = visibleIndices.size;
@@ -1657,8 +1673,8 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
   // showing off by itself.
   const named = hovered?.entry ?? showcased;
   // Kept while the chip fades out, or the words would vanish before it does.
-  if (named) lastNamedRef.current = named;
-  const lastNamed = named ?? lastNamedRef.current;
+  if (named && named !== lastNamedState) setLastNamedState(named);
+  const lastNamed = named ?? lastNamedState;
   const selected =
     chosen === null
       ? []

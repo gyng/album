@@ -57,13 +57,13 @@ export const AlbumNeighbours = ({
   /** The album's widest photograph, whose edges the tiles line up with. */
   frame?: { width: number; height: number };
 }) => {
-  const [neighbours, setNeighbours] = useState<Neighbours>({});
+  // Kept with the album they were found for, so another album's never show.
+  const [found, setFound] = useState<{ slug: string; neighbours: Neighbours } | null>(null);
   useEffect(() => {
     let live = true;
-    setNeighbours({});
     fetchAlbumPreviews()
       .then((albums) => {
-        if (live) setNeighbours(albumNeighbours(albums, slug));
+        if (live) setFound({ slug, neighbours: albumNeighbours(albums, slug) });
       })
       // The album is complete without them; a failed list leaves nothing behind.
       .catch(() => {});
@@ -71,7 +71,7 @@ export const AlbumNeighbours = ({
       live = false;
     };
   }, [slug]);
-  const { previous, next } = neighbours;
+  const { previous, next } = found?.slug === slug ? found.neighbours : {};
   if (!previous && !next) return null;
   return (
     <nav className={styles.neighbours} aria-label="More albums" {...{ [ALBUM_STEP_ATTRIBUTE]: "" }}>

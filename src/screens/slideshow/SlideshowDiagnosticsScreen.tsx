@@ -21,20 +21,59 @@ import { useDiagnosticsClock } from "../../components/useDiagnosticsClock";
 import { SlideshowEventTime } from "./SlideshowEventTime";
 
 type Reading = {
-  now: number;
   status: ShellStatusSnapshot | null;
   heartbeat: number | null;
   log: ShellLogEntry[];
 };
 
-const emptyReading: Reading = { now: 0, status: null, heartbeat: null, log: [] };
+const emptyReading: Reading = { status: null, heartbeat: null, log: [] };
 
-const takeReading = (): Reading => ({
-  now: Date.now(),
-  status: readShellStatus(),
-  heartbeat: readHeartbeat(),
-  log: readShellLog(),
-});
+// The shell's record in storage, as one snapshot that keeps its identity until
+// what is stored changes — useSyncExternalStore needs that to settle.
+let lastReading = { key: JSON.stringify(emptyReading), reading: emptyReading };
+const readShellRecord = (): Reading => {
+  const reading = { status: readShellStatus(), heartbeat: readHeartbeat(), log: readShellLog() };
+  const key = JSON.stringify(reading);
+  if (key !== lastReading.key) lastReading = { key, reading };
+  return lastReading.reading;
+};
+// Storage is unavailable when this page is prerendered; reading it there would
+// hydrate into a mismatch, so the server and hydration render read nothing.
+const serverReading = () => emptyReading;
+
+// Returning to this page (from the slideshow, or from a backgrounded tab), or the
+// shell writing from another window, should show what happened meanwhile.
+const subscribeToShellRecord = (onChange: () => void) => {
+  const refresh = () => {
+    if (document.visibilityState === "visible") onChange();
+  };
+  document.addEventListener("visibilitychange", refresh);
+  window.addEventListener("storage", refresh);
+  return () => {
+    document.removeEventListener("visibilitychange", refresh);
+    window.removeEventListener("storage", refresh);
+  };
+};
+
+// This page writes the pill preference itself, and a write raises no `storage`
+// event in its own window.
+const pillListeners = new Set<() => void>();
+const subscribeToStatusPill = (onChange: () => void) => {
+  pillListeners.add(onChange);
+  window.addEventListener("storage", onChange);
+  return () => {
+    pillListeners.delete(onChange);
+    window.removeEventListener("storage", onChange);
+  };
+};
+const setStatusPillVisible = (visible: boolean) => {
+  writeStatusPillVisible(visible);
+  pillListeners.forEach((listener) => listener());
+};
+
+const noSubscription = () => () => {};
+const browserCanShare = () => typeof navigator.share === "function";
+const off = () => false;
 
 const ago = (at: number, now: number): string => `${formatGapDuration(Math.max(0, now - at))} ago`;
 
@@ -54,34 +93,20 @@ const NOT_REPORTED = "Not reported yet";
  * slideshow, or on a device whose shell was relaunched hours after the incident.
  */
 export const SlideshowDiagnosticsScreen = () => {
-  // Read after mount, never during render: storage is unavailable when this page
-  // is prerendered, and reading it inline would hydrate into a mismatch.
-  const [reading, setReading] = React.useState<Reading>(emptyReading);
+  const reading = React.useSyncExternalStore(
+    subscribeToShellRecord,
+    readShellRecord,
+    serverReading,
+  );
   const [copied, setCopied] = React.useState(false);
-  // Read after mount for the same reason as the reading above: this page is
-  // prerendered, and storage does not exist then.
-  const [statusPillVisible, setStatusPillVisible] = React.useState(false);
-  const [canShare, setCanShare] = React.useState(false);
+  // Off until hydrated, for the same reason as the reading.
+  const statusPillVisible = React.useSyncExternalStore(
+    subscribeToStatusPill,
+    () => readStatusPillVisible(),
+    off,
+  );
+  const canShare = React.useSyncExternalStore(noSubscription, browserCanShare, off);
   const copiedTimerRef = React.useRef<number | null>(null);
-
-  React.useEffect(() => {
-    setReading(takeReading());
-    setStatusPillVisible(readStatusPillVisible());
-    setCanShare(typeof navigator !== "undefined" && typeof navigator.share === "function");
-    // Returning to this page (from the slideshow, or from a backgrounded tab)
-    // should show what happened while it was away.
-    const refresh = () => {
-      if (document.visibilityState === "visible") {
-        setReading(takeReading());
-      }
-    };
-    document.addEventListener("visibilitychange", refresh);
-    window.addEventListener("storage", refresh);
-    return () => {
-      document.removeEventListener("visibilitychange", refresh);
-      window.removeEventListener("storage", refresh);
-    };
-  }, []);
 
   React.useEffect(
     () => () => {
@@ -97,10 +122,12 @@ export const SlideshowDiagnosticsScreen = () => {
   const shellAlive = heartbeat !== null && now - heartbeat <= HEARTBEAT_GAP_THRESHOLD_MS;
 
   const buildReport = React.useCallback((): string => {
-    const current = takeReading();
+    // Read afresh when the report is made, which may be long after the last render.
+    const current = readShellRecord();
+    const now = Date.now();
     return serialiseDiagnostics({
-      now: current.now,
-      sessionStart: current.status?.sessionStart ?? current.now,
+      now,
+      sessionStart: current.status?.sessionStart ?? now,
       buildVersion: current.status?.shellVersion ?? BUILD_VERSION,
       runtimeVersion: current.status?.runtimeVersion ?? BUILD_VERSION,
       ...(current.status?.runtimeHealth ? { runtimeHealth: current.status.runtimeHealth } : {}),
@@ -208,9 +235,7 @@ export const SlideshowDiagnosticsScreen = () => {
             active={statusPillVisible}
             aria-pressed={statusPillVisible}
             onClick={() => {
-              const next = !statusPillVisible;
-              setStatusPillVisible(next);
-              writeStatusPillVisible(next);
+              setStatusPillVisible(!statusPillVisible);
             }}
           >
             Show status pill

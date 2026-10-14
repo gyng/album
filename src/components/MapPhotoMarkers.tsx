@@ -177,38 +177,28 @@ const pinSortKey = (
  * client only — the server has no pointer, and guessing one would render a
  * layer the first paint then has to take away.
  */
-const useCoarsePointer = (): boolean => {
-  const [isCoarse, setIsCoarse] = React.useState(false);
+// `any-pointer`, not `pointer`: `pointer` describes the *primary* pointer, so
+// a laptop with a touchscreen and a mouse reports `fine` and its touch users
+// would be left with the 18px target. Keep this in step with the same query
+// in `mapPin.module.css`.
+const COARSE_POINTER_QUERY = "(any-pointer: coarse)";
 
-  React.useEffect(() => {
-    if (typeof window.matchMedia !== "function") {
-      return;
-    }
-
-    // `any-pointer`, not `pointer`: `pointer` describes the *primary* pointer, so
-    // a laptop with a touchscreen and a mouse reports `fine` and its touch users
-    // would be left with the 18px target. Keep this in step with the same query
-    // in `mapPin.module.css`.
-    const query = window.matchMedia("(any-pointer: coarse)");
-    setIsCoarse(query.matches);
-    // A hybrid device can gain or lose a fine pointer mid-session, but not every
-    // environment's media query list is subscribable.
-    if (typeof query.addEventListener !== "function") {
-      return;
-    }
-
-    const sync = () => {
-      setIsCoarse(query.matches);
-    };
-    query.addEventListener("change", sync);
-
-    return () => {
-      query.removeEventListener("change", sync);
-    };
-  }, []);
-
-  return isCoarse;
+const subscribeCoarsePointer = (onChange: () => void) => {
+  if (typeof window.matchMedia !== "function") return () => {};
+  const query = window.matchMedia(COARSE_POINTER_QUERY);
+  // A hybrid device can gain or lose a fine pointer mid-session, but not every
+  // environment's media query list is subscribable.
+  if (typeof query.addEventListener !== "function") return () => {};
+  query.addEventListener("change", onChange);
+  return () => query.removeEventListener("change", onChange);
 };
+
+const readCoarsePointer = () =>
+  typeof window.matchMedia === "function" && window.matchMedia(COARSE_POINTER_QUERY).matches;
+
+// False on the server and during hydration, as it always was before mount.
+const useCoarsePointer = (): boolean =>
+  React.useSyncExternalStore(subscribeCoarsePointer, readCoarsePointer, () => false);
 
 /**
  * The viewport the keyboard list is holding still, and the entry holding it.
@@ -295,9 +285,9 @@ const MapPhotoKeyboardList = ({
   // `focusout` and `focusin` are separate tasks, and a render committed between
   // them sees `<body>` focused mid-tab, which would let go exactly as a reader
   // moves from one entry to the next.
-  React.useEffect(() => {
-    setHeld((current) => (current && !available.has(current.focusedHref) ? null : current));
-  }, [available]);
+  if (held && !available.has(held.focusedHref)) {
+    setHeld(null);
+  }
 
   if (listed.length === 0) {
     return null;

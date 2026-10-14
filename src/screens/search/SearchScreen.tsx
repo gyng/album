@@ -1,11 +1,12 @@
 import { Icon } from "../../components/ui/Icon";
 import DynamicSearchWithCoi from "../../components/search/DynamicSearchWithCoi";
 import { GlobalNav } from "../../components/GlobalNav";
+import { useHydrated } from "../../components/useHydrated";
 import { Footer, Heading } from "../../components/ui";
 import { ProgressBar } from "../../components/ProgressBar";
 import baseStyles from "../ScreenLayout.module.css";
 import styles from "./SearchScreen.module.css";
-import React, { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Seo } from "../../components/Seo";
 import { buildCollectionPageJsonLd, formatPageTitle } from "../../lib/seo";
 import commonStyles from "../../styles/common.module.css";
@@ -16,13 +17,9 @@ import { usePublicConfig } from "../../components/platform";
 const SearchPage = () => {
   const { siteOrigin } = usePublicConfig();
   const [searchNavState, setSearchNavState] = useState<SearchNavState | null>(null);
-  const [isMounted, setIsMounted] = useState(false);
+  const isMounted = useHydrated();
   const handleNavStateChange = useCallback((state: SearchNavState) => {
     setSearchNavState(state);
-  }, []);
-
-  React.useEffect(() => {
-    setIsMounted(true);
   }, []);
 
   // The database/model download progress streams through onNavStateChange on

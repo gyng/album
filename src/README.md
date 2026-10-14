@@ -43,20 +43,24 @@ Fast-track is now the default behavior, so `npm run publish:wizard` asks the ind
 
 The gallery uses Next.js 16.4 and React 19.3. Keep SQLite WASM on
 `3.51.2-build9`: `3.53.4-build2` introduces a dynamic worker URL that Turbopack
-cannot resolve during a production build. Oxlint is pinned to `1.75.0` because
-newer releases enable React Compiler diagnostics that require a separate review
-of the existing effects, refs and memoisation.
+cannot resolve during a production build. Oxlint `1.88` enforces the React
+Compiler rules (`set-state-in-effect`, `refs`, `purity`,
+`preserve-manual-memoization`) as errors. The few remaining suppressions each
+name the external system an effect synchronises with.
 
-Playwright is pinned to `1.61.1`: the WebKit bundled with `1.64.0` stalls
-animation-frame callbacks in the iPad slideshow recovery tests, leaving decoded
-photographs hidden. The same application presents successfully with `1.61.1`.
+Playwright is pinned to `1.64.1`. It was held at `1.61.1` because the WebKit
+bundled with `1.64.0` appeared to stall the iPad slideshow recovery tests, but
+as of October 2026 those tests (`PLAYWRIGHT_SLIDESHOW_WEBKIT=1`) fail the same
+way on `1.61.1`, so the pin no longer avoids anything; the cause is open.
 
 Local-file EXIF reads disable exifr's chunked reader: it passes a file path to
-`FileHandle.stat()`, which Node 26.11 rejects. Whole-file reads preserve the
-metadata and avoid leaking the handle when that call fails.
+`FileHandle.stat()`, which Node 26.11 rejects. The build reads each photograph's
+first 256 KB itself and hands exifr that buffer, falling back to the whole file
+only when the start holds no EXIF; reading whole files held every original in
+memory at once in the workers that load every album.
 
-The geotag tool retains its existing major-version bounds. The Python indexer's
-inference runtime bounds are documented in [index/README.md](../index/README.md).
+The Python indexer's inference runtime bounds are documented in
+[index/README.md](../index/README.md).
 
 ## Search Database
 

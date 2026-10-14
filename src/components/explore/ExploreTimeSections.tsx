@@ -110,11 +110,24 @@ export const ExploreArchiveGaps = ({
  * The same calendar day in previous years.
  *
  * The page is statically built, so the build indexes every day and the browser
- * picks the one it is. `now` is null until an effect supplies it, which keeps
+ * picks the one it is. The day is null until the browser supplies it, which keeps
  * the server from committing to a date it cannot know and keeps hydration
  * matching. Around half the calendar has no photograph on it, and on those days
  * this renders nothing rather than an empty panel.
  */
+const noSubscription = () => () => {};
+// The reader's calendar day as a string, so repeated reads compare equal; null
+// on the server and during hydration, which cannot know it.
+const readLocalDay = () => {
+  const date = new Date();
+  return `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`;
+};
+const serverDay = () => null;
+const dayToDate = (day: string) => {
+  const [year, month, date] = day.split("-").map(Number);
+  return new Date(year!, month! - 1, date!);
+};
+
 export const ExploreThisDaySection = ({
   memories,
   now,
@@ -122,15 +135,9 @@ export const ExploreThisDaySection = ({
   memories: PhotoStats["dayOfYearMemories"];
   now?: Date | null;
 }) => {
-  const [browserNow, setBrowserNow] = React.useState<Date | null>(null);
+  const browserDay = React.useSyncExternalStore(noSubscription, readLocalDay, serverDay);
   const isControlled = now !== undefined;
-
-  React.useEffect(() => {
-    if (isControlled) return;
-    setBrowserNow(new Date());
-  }, [isControlled]);
-
-  const today = isControlled ? now : browserNow;
+  const today = isControlled ? now : browserDay ? dayToDate(browserDay) : null;
   if (!today) return null;
 
   const monthDay = `${String(today.getMonth() + 1).padStart(2, "0")}-${String(

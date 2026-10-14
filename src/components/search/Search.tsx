@@ -80,29 +80,44 @@ export type SearchNavState = {
   randomExploreError: string | null;
 };
 
+// Stable empties, so "already cleared" can be told apart from a fresh result.
+const EMPTY_FACET_SECTIONS: SearchFacetSection[] = [];
+const EMPTY_REFINEMENT_COUNTS: Record<string, number> = {};
+
 export const Search: React.FC<{
   disabled?: boolean;
   onNavStateChange?: (state: SearchNavState) => void;
 }> = ({ disabled, onNavStateChange }) => {
-  const [searchInputValue, setSearchInputValue] = useState<string>("");
-  const [searchMode, setSearchMode] = useState<SearchMode>(DEFAULT_SEARCH_MODE);
-  const [similarPath, setSimilarPath] = useState<string | null>(null);
-  const [similarityOrder, setSimilarityOrder] = useState<SimilarityOrder>(DEFAULT_SIMILARITY_ORDER);
-  const [colorSearch, setColorSearch] = useState<RGB | null>(null);
+  // Search renders only on the client, so its first state can come straight from the URL.
+  const [initialSearchState] = useState(getInitialSearchState);
+  const [searchInputValue, setSearchInputValue] = useState<string>(() =>
+    initialSearchState.searchQuery.join(","),
+  );
+  const [searchMode, setSearchMode] = useState<SearchMode>(initialSearchState.searchMode);
+  const [similarPath, setSimilarPath] = useState<string | null>(initialSearchState.similarPath);
+  const [similarityOrder, setSimilarityOrder] = useState<SimilarityOrder>(
+    initialSearchState.similarityOrder,
+  );
+  const [colorSearch, setColorSearch] = useState<RGB | null>(initialSearchState.colorSearch);
   const [colorTolerance, setColorTolerance] = useState<number>(35);
   const [similarTrail, setSimilarTrail] = useState<SimilarTrailItem[]>([]);
-  const [hasHydratedFromUrl, setHasHydratedFromUrl] = useState<boolean>(false);
-  const [selectedFacets, setSelectedFacets] = useState<SearchFacetSelection[]>([]);
-  const [facetCatalogSections, setFacetCatalogSections] = useState<SearchFacetSection[]>([]);
-  const [facetSections, setFacetSections] = useState<SearchFacetSection[]>([]);
-  const [isFacetSectionsLoading, setIsFacetSectionsLoading] = useState<boolean>(false);
+  const hasHydratedFromUrl = initialSearchState.hasHydratedFromUrl;
+  const [selectedFacets, setSelectedFacets] = useState<SearchFacetSelection[]>(
+    initialSearchState.selectedFacets,
+  );
+  const [facetCatalogSections, setFacetCatalogSections] =
+    useState<SearchFacetSection[]>(EMPTY_FACET_SECTIONS);
+  const [facetSections, setFacetSections] = useState<SearchFacetSection[]>(EMPTY_FACET_SECTIONS);
+  // The facet request the panel last heard back from; it is loading until that is the current one.
+  const [facetsAnsweredFor, setFacetsAnsweredFor] = useState<object | null>(null);
   const [selectedFilterCategory, setSelectedFilterCategory] = useState<
     "tags" | "color" | "time" | "place" | "gear" | "settings" | "weather" | "framing"
   >("tags");
   const [isRandomSimilarLoading, setIsRandomSimilarLoading] = useState<boolean>(false);
   const [randomExploreError, setRandomExploreError] = useState<string | null>(null);
   const [tags, setTags] = useState<Tag[]>([]);
-  const [refinementCounts, setRefinementCounts] = useState<Record<string, number>>({});
+  const [refinementCounts, setRefinementCounts] =
+    useState<Record<string, number>>(EMPTY_REFINEMENT_COUNTS);
   const [isDrawPadOpen, setIsDrawPadOpen] = useState<boolean>(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const modeSourceRef = useRef<HTMLDivElement | null>(null);
@@ -231,23 +246,12 @@ export const Search: React.FC<{
     isAwaitingVectorDatabase ||
     isAwaitingImageVector;
 
-  useEffect(() => {
-    const initialSearchState = getInitialSearchState();
-
-    setSearchInputValue(initialSearchState.searchQuery.join(","));
-    setSimilarPath(initialSearchState.similarPath);
-    setSimilarityOrder(initialSearchState.similarityOrder);
-    setColorSearch(initialSearchState.colorSearch);
-    setSearchMode(initialSearchState.searchMode);
-    setSelectedFacets(initialSearchState.selectedFacets);
-    setHasHydratedFromUrl(initialSearchState.hasHydratedFromUrl);
-  }, []);
-
-  useEffect(() => {
-    if (normalizedSearchTerms.length > 0) {
-      setSelectedFilterCategory("tags");
-    }
-  }, [normalizedSearchTerms.length]);
+  // Typing terms brings the tag filters forward.
+  const [previousTermCount, setPreviousTermCount] = useState(normalizedSearchTerms.length);
+  if (normalizedSearchTerms.length !== previousTermCount) {
+    setPreviousTermCount(normalizedSearchTerms.length);
+    if (normalizedSearchTerms.length > 0) setSelectedFilterCategory("tags");
+  }
 
   useEffect(() => {
     if (!hasHydratedFromUrl) {
@@ -342,11 +346,10 @@ export const Search: React.FC<{
       .catch(console.error);
   }, [database]);
 
+  if (!database && facetCatalogSections !== EMPTY_FACET_SECTIONS)
+    setFacetCatalogSections(EMPTY_FACET_SECTIONS);
   useEffect(() => {
-    if (!database) {
-      setFacetCatalogSections([]);
-      return;
-    }
+    if (!database) return;
 
     let didCancel = false;
 
@@ -359,7 +362,7 @@ export const Search: React.FC<{
       .catch((err) => {
         if (!didCancel) {
           console.error("Failed to fetch search facet catalog", err);
-          setFacetCatalogSections([]);
+          setFacetCatalogSections(EMPTY_FACET_SECTIONS);
         }
       });
 
@@ -368,21 +371,26 @@ export const Search: React.FC<{
     };
   }, [database]);
 
+  const facetRequest = useMemo(
+    () => ({
+      database,
+      isColorMode,
+      isSimilarMode,
+      liveFacetQueryTerms,
+      searchMode,
+      selectedFacets,
+    }),
+    [database, isColorMode, isSimilarMode, liveFacetQueryTerms, searchMode, selectedFacets],
+  );
+  const facetsInactive = !database || isSimilarMode;
+  if (facetsInactive && facetSections !== EMPTY_FACET_SECTIONS)
+    setFacetSections(EMPTY_FACET_SECTIONS);
+  const isFacetSectionsLoading = !facetsInactive && facetsAnsweredFor !== facetRequest;
   useEffect(() => {
-    if (!database) {
-      setFacetSections([]);
-      setIsFacetSectionsLoading(false);
-      return;
-    }
-
-    if (isSimilarMode) {
-      setFacetSections([]);
-      setIsFacetSectionsLoading(false);
-      return;
-    }
+    if (!database || isSimilarMode) return;
 
     let didCancel = false;
-    setIsFacetSectionsLoading(true);
+    const request = facetRequest;
 
     fetchSearchFacetSections({
       database,
@@ -392,36 +400,32 @@ export const Search: React.FC<{
       .then((sections) => {
         if (!didCancel) {
           setFacetSections(sections);
+          setFacetsAnsweredFor(request);
         }
       })
       .catch((err) => {
         if (!didCancel) {
           console.error("Failed to fetch search facets", err);
-          setFacetSections([]);
-        }
-      })
-      .finally(() => {
-        if (!didCancel) {
-          setIsFacetSectionsLoading(false);
+          setFacetSections(EMPTY_FACET_SECTIONS);
+          setFacetsAnsweredFor(request);
         }
       });
 
     return () => {
       didCancel = true;
     };
-  }, [database, isColorMode, isSimilarMode, liveFacetQueryTerms, searchMode, selectedFacets]);
+  }, [database, isSimilarMode, liveFacetQueryTerms, selectedFacets, facetRequest]);
 
+  const refinementsInactive =
+    !database ||
+    searchMode !== "keyword" ||
+    isSimilarMode ||
+    isColorMode ||
+    (normalizedDebouncedSearchTerms.length === 0 && selectedFacets.length === 0);
+  if (refinementsInactive && refinementCounts !== EMPTY_REFINEMENT_COUNTS)
+    setRefinementCounts(EMPTY_REFINEMENT_COUNTS);
   useEffect(() => {
-    if (
-      !database ||
-      searchMode !== "keyword" ||
-      isSimilarMode ||
-      isColorMode ||
-      (normalizedDebouncedSearchTerms.length === 0 && selectedFacets.length === 0)
-    ) {
-      setRefinementCounts({});
-      return;
-    }
+    if (!database || refinementsInactive) return;
 
     let didCancel = false;
 
@@ -439,7 +443,7 @@ export const Search: React.FC<{
       .catch((err) => {
         if (!didCancel) {
           console.error("Failed to fetch refinement tag counts", err);
-          setRefinementCounts({});
+          setRefinementCounts(EMPTY_REFINEMENT_COUNTS);
         }
       });
 
@@ -448,9 +452,7 @@ export const Search: React.FC<{
     };
   }, [
     database,
-    isSimilarMode,
-    isColorMode,
-    searchMode,
+    refinementsInactive,
     normalizedDebouncedSearchTerms,
     normalizedTagNames,
     selectedFacets,

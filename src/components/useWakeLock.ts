@@ -80,8 +80,19 @@ const REACQUIRE_CAP_DECAY_MS = 600000;
 // visible page — the platform fires the sentinel's "release" event without any
 // deliberate release() call, so the hook re-acquires (capped, to avoid fighting
 // the OS forever) and a slow watchdog recovers transiently rejected requests.
+const noSubscription = () => () => {};
+const browserSupportsWakeLock = () =>
+  typeof (navigator as WakeLockNavigator).wakeLock?.request === "function";
+const unsupported = () => false;
+
 export const useWakeLock = (disabled: boolean): UseWakeLock => {
-  const [isSupported, setIsSupported] = React.useState(false);
+  // Capability detection is client-only: `navigator` is undefined during SSR, so
+  // the server and hydration render report no support.
+  const isSupported = React.useSyncExternalStore(
+    noSubscription,
+    browserSupportsWakeLock,
+    unsupported,
+  );
   const [isActive, setIsActive] = React.useState(false);
   const [status, setStatus] = React.useState<WakeLockStatus>("idle");
   const wakeLockRef = React.useRef<WakeLockSentinel | null>(null);
@@ -121,15 +132,6 @@ export const useWakeLock = (disabled: boolean): UseWakeLock => {
   useEffect(() => {
     disabledRef.current = disabled;
   }, [disabled]);
-
-  useEffect(() => {
-    const wakeLock = (navigator as WakeLockNavigator).wakeLock;
-
-    // Capability detection must run in an effect (client-only): `navigator` is
-    // undefined during SSR, so a lazy useState initialiser would throw.
-
-    setIsSupported(typeof wakeLock?.request === "function");
-  }, []);
 
   const emitEvent = useCallback((event: WakeLockEvent, details?: WakeLockDetails) => {
     for (const listener of eventListenersRef.current) {
@@ -376,7 +378,7 @@ export const useWakeLock = (disabled: boolean): UseWakeLock => {
     // Releasing the platform wake lock is an external-system sync; the state
     // update merely reflects its result, which is the legitimate use of an
     // effect here (not a derived-state cascade).
-
+    // oxlint-disable-next-line react/set-state-in-effect -- releases the platform lock; the state records its result
     release().catch(console.error);
   }, [disabled, release]);
 
@@ -388,7 +390,7 @@ export const useWakeLock = (disabled: boolean): UseWakeLock => {
     // Try once on load so kiosk/photo-frame sessions wake-lock automatically
     // where browsers permit non-gesture acquisition. External-system sync —
     // the state update reflects the acquired lock.
-
+    // oxlint-disable-next-line react/set-state-in-effect -- requests the platform lock; the state records its result
     acquire().catch(console.error);
   }, [disabled, acquire]);
 

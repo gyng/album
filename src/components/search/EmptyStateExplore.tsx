@@ -1,5 +1,5 @@
 import { mergeCssModuleStyles } from "../../util/mergeCssModuleStyles";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Database } from "@sqlite.org/sqlite-wasm";
 import { AppLink as Link } from "../platform";
 import sharedStyles from "./Search.module.css";
@@ -57,6 +57,9 @@ type Props = {
   isColorCategoryActive?: boolean;
 };
 
+const EMPTY_RESULTS: SearchResultRow[] = [];
+const EMPTY_MEMORY_CLUSTERS: ResolvedMemoryCluster<MemoryResult>[] = [];
+
 export const EmptyStateExplore: React.FC<Props> = ({
   database,
   onStartSimilarSearch,
@@ -71,32 +74,63 @@ export const EmptyStateExplore: React.FC<Props> = ({
     const day = `${date.getDate()}`.padStart(2, "0");
     return `${year}-${month}-${day}`;
   });
-  const [memoryClusters, setMemoryClusters] = useState<ResolvedMemoryCluster<MemoryResult>[]>([]);
-  const [visibleMemoryClusterCount, setVisibleMemoryClusterCount] = useState<number>(
-    MEMORY_CLUSTER_INITIAL_SIZE,
+  // Each section's result belongs to the request it answered: a section is
+  // loading until its current request has answered, and keeps showing what it
+  // had meanwhile, so a larger page or another day does not blank it first.
+  const memoryRequest = useMemo(() => ({ database, todayDate }), [database, todayDate]);
+  const [memories, setMemories] = useState<{
+    request: object;
+    clusters: ResolvedMemoryCluster<MemoryResult>[];
+  } | null>(null);
+  const memoryClusters = database && memories ? memories.clusters : EMPTY_MEMORY_CLUSTERS;
+  const isMemoriesLoading = Boolean(database) && memories?.request !== memoryRequest;
+  // How many clusters are shown, for this request only: a new one starts from the first few.
+  const [memoryShown, setMemoryShown] = useState<{ request: object | null; count: number }>({
+    request: null,
+    count: MEMORY_CLUSTER_INITIAL_SIZE,
+  });
+  const visibleMemoryClusterCount =
+    memoryShown.request === memoryRequest ? memoryShown.count : MEMORY_CLUSTER_INITIAL_SIZE;
+
+  const recentRequest = useMemo(
+    () => ({ database, pageSize: recentVisibleCount }),
+    [database, recentVisibleCount],
   );
-  const [isMemoriesLoading, setIsMemoriesLoading] = useState<boolean>(false);
-  const [recentResults, setRecentResults] = useState<SearchResultRow[]>([]);
-  const [isRecentLoading, setIsRecentLoading] = useState<boolean>(false);
-  const [recentExploreError, setRecentExploreError] = useState<string | null>(null);
-  const [randomResults, setRandomResults] = useState<SearchResultRow[]>([]);
-  const [hasMoreRandomResults, setHasMoreRandomResults] = useState<boolean>(true);
-  const [randomAutoLoadCount, setRandomAutoLoadCount] = useState<number>(0);
-  const [isRandomResultsLoading, setIsRandomResultsLoading] = useState<boolean>(false);
-  const [randomResultsError, setRandomResultsError] = useState<string | null>(null);
+  const [recent, setRecent] = useState<{ request: object; results: SearchResultRow[] } | null>(
+    null,
+  );
+  const [recentFailedRequest, setRecentFailedRequest] = useState<object | null>(null);
+  const recentResults = database && recent ? recent.results : EMPTY_RESULTS;
+  const recentExploreError =
+    recentFailedRequest === recentRequest ? "Couldn't load recent photos right now." : null;
+  const isRecentLoading =
+    Boolean(database) && recent?.request !== recentRequest && recentFailedRequest !== recentRequest;
+
+  const randomRequest = useMemo(() => ({ database }), [database]);
+  const [random, setRandom] = useState<{
+    request: object;
+    results: SearchResultRow[];
+    hasMore: boolean;
+    autoLoads: number;
+    loading: boolean;
+    error: string | null;
+  } | null>(null);
+  const currentRandom = random?.request === randomRequest ? random : null;
+  const randomResults = !database
+    ? EMPTY_RESULTS
+    : (currentRandom?.results ?? random?.results ?? EMPTY_RESULTS);
+  const hasMoreRandomResults = currentRandom?.hasMore ?? true;
+  const randomAutoLoadCount = currentRandom?.autoLoads ?? 0;
+  const isRandomResultsLoading = currentRandom ? currentRandom.loading : Boolean(database);
+  const randomResultsError = currentRandom?.error ?? null;
   const randomLoadMoreButtonRef = useRef<HTMLButtonElement | null>(null);
   const randomLoadInFlightRef = useRef(false);
 
   useEffect(() => {
-    if (!database) {
-      setMemoryClusters([]);
-      setVisibleMemoryClusterCount(MEMORY_CLUSTER_INITIAL_SIZE);
-      return;
-    }
+    if (!database) return;
 
     let didCancel = false;
-    setIsMemoriesLoading(true);
-    setVisibleMemoryClusterCount(MEMORY_CLUSTER_INITIAL_SIZE);
+    const request = memoryRequest;
 
     fetchMemoryCandidates({ database, todayDate })
       .then((results) => {
@@ -112,95 +146,81 @@ export const EmptyStateExplore: React.FC<Props> = ({
           todayDate,
         );
 
-        setMemoryClusters(resolved);
+        setMemories({ request, clusters: resolved });
       })
       .catch((err) => {
         if (!didCancel) {
           console.error(err);
-          setMemoryClusters([]);
-        }
-      })
-      .finally(() => {
-        if (!didCancel) {
-          setIsMemoriesLoading(false);
+          setMemories({ request, clusters: [] });
         }
       });
 
     return () => {
       didCancel = true;
     };
-  }, [database, todayDate]);
+  }, [database, todayDate, memoryRequest]);
 
   useEffect(() => {
-    if (!database) {
-      setRecentResults([]);
-      setRecentExploreError(null);
-      return;
-    }
+    if (!database) return;
 
     let didCancel = false;
-    setIsRecentLoading(true);
-    setRecentExploreError(null);
+    const request = recentRequest;
 
     fetchRecentResults({ database, pageSize: recentVisibleCount })
       .then((results) => {
         if (!didCancel) {
-          setRecentResults(results);
+          setRecent({ request, results });
         }
       })
       .catch((err) => {
         if (!didCancel) {
           console.error(err);
-          setRecentExploreError("Couldn't load recent photos right now.");
-        }
-      })
-      .finally(() => {
-        if (!didCancel) {
-          setIsRecentLoading(false);
+          setRecentFailedRequest(request);
         }
       });
 
     return () => {
       didCancel = true;
     };
-  }, [database, recentVisibleCount]);
+  }, [database, recentVisibleCount, recentRequest]);
 
   useEffect(() => {
-    if (!database) {
-      setRandomResults([]);
-      setRandomResultsError(null);
-      return;
-    }
+    if (!database) return;
 
     let didCancel = false;
-    setHasMoreRandomResults(true);
-    setRandomAutoLoadCount(0);
-    setIsRandomResultsLoading(true);
-    setRandomResultsError(null);
+    const request = randomRequest;
 
     fetchRandomResults({ database, pageSize: RANDOM_ROW_INITIAL_SIZE })
       .then((results) => {
         if (!didCancel) {
-          setRandomResults(results);
-          setHasMoreRandomResults(results.length === RANDOM_ROW_INITIAL_SIZE);
+          setRandom({
+            request,
+            results,
+            hasMore: results.length === RANDOM_ROW_INITIAL_SIZE,
+            autoLoads: 0,
+            loading: false,
+            error: null,
+          });
         }
       })
       .catch((err) => {
         if (!didCancel) {
           console.error(err);
-          setRandomResultsError("Couldn't load random photos right now.");
-        }
-      })
-      .finally(() => {
-        if (!didCancel) {
-          setIsRandomResultsLoading(false);
+          setRandom((previous) => ({
+            request,
+            results: previous?.results ?? [],
+            hasMore: true,
+            autoLoads: 0,
+            loading: false,
+            error: "Couldn't load random photos right now.",
+          }));
         }
       });
 
     return () => {
       didCancel = true;
     };
-  }, [database]);
+  }, [database, randomRequest]);
 
   const loadMoreRandomResults = useCallback(
     async (trigger: "manual" | "auto" = "manual") => {
@@ -208,9 +228,13 @@ export const EmptyStateExplore: React.FC<Props> = ({
         return;
       }
 
+      // Only the current database's row grows; a load that outlives it is dropped.
+      const update = (change: (current: NonNullable<typeof random>) => Partial<typeof current>) =>
+        setRandom((previous) =>
+          previous?.request === randomRequest ? { ...previous, ...change(previous) } : previous,
+        );
       randomLoadInFlightRef.current = true;
-      setIsRandomResultsLoading(true);
-      setRandomResultsError(null);
+      update(() => ({ loading: true, error: null }));
 
       try {
         const results = await fetchRandomResults({
@@ -219,20 +243,20 @@ export const EmptyStateExplore: React.FC<Props> = ({
           excludePaths: randomResults.map((result) => result.path),
         });
 
-        setRandomResults((prev) => [...prev, ...results]);
-        setHasMoreRandomResults(results.length === RANDOM_ROW_LOAD_MORE_SIZE);
-        if (trigger === "auto") {
-          setRandomAutoLoadCount((prev) => prev + 1);
-        }
+        update((current) => ({
+          results: [...current.results, ...results],
+          hasMore: results.length === RANDOM_ROW_LOAD_MORE_SIZE,
+          autoLoads: current.autoLoads + (trigger === "auto" ? 1 : 0),
+        }));
       } catch (err) {
         console.error(err);
-        setRandomResultsError("Couldn't load random photos right now.");
+        update(() => ({ error: "Couldn't load random photos right now." }));
       } finally {
         randomLoadInFlightRef.current = false;
-        setIsRandomResultsLoading(false);
+        update(() => ({ loading: false }));
       }
     },
-    [database, randomResults],
+    [database, randomResults, randomRequest],
   );
 
   useEffect(() => {
@@ -419,9 +443,15 @@ export const EmptyStateExplore: React.FC<Props> = ({
                 type="button"
                 className={`${buttonStyles.base} ${styles.memoryLoadMoreButton}`}
                 onClick={() => {
-                  setVisibleMemoryClusterCount((current) =>
-                    Math.min(current + MEMORY_CLUSTER_LOAD_MORE_SIZE, memoryClusters.length),
-                  );
+                  setMemoryShown((shown) => ({
+                    request: memoryRequest,
+                    count: Math.min(
+                      (shown.request === memoryRequest
+                        ? shown.count
+                        : MEMORY_CLUSTER_INITIAL_SIZE) + MEMORY_CLUSTER_LOAD_MORE_SIZE,
+                      memoryClusters.length,
+                    ),
+                  }));
                 }}
               >
                 More memories…

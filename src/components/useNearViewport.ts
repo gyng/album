@@ -3,6 +3,19 @@ import React from "react";
 /** Mounted well before it is reached, so the map is ready rather than arriving. */
 const DEFAULT_ROOT_MARGIN = "600px 0px";
 
+const noSubscription = () => () => {};
+
+/**
+ * Whether this browser lacks `IntersectionObserver`. False on the server and
+ * during hydration, so the first client render matches the server's.
+ */
+export const useIntersectionObserverMissing = (): boolean =>
+  React.useSyncExternalStore(
+    noSubscription,
+    () => typeof IntersectionObserver === "undefined",
+    () => false,
+  );
+
 /**
  * Whether an element is near enough to the viewport to be worth rendering.
  *
@@ -24,12 +37,10 @@ export const useNearViewport = (
   whenUnobservable = true,
 ): boolean => {
   const [isNear, setIsNear] = React.useState(false);
+  const unobservable = useIntersectionObserverMissing();
 
   React.useEffect(() => {
-    if (typeof IntersectionObserver === "undefined") {
-      setIsNear(whenUnobservable);
-      return;
-    }
+    if (unobservable) return;
 
     const element = ref.current;
     if (!element) {
@@ -46,7 +57,7 @@ export const useNearViewport = (
     observer.observe(element);
 
     return () => observer.disconnect();
-  }, [ref, rootMargin, whenUnobservable]);
+  }, [ref, rootMargin, unobservable]);
 
-  return isNear;
+  return unobservable ? whenUnobservable : isNear;
 };

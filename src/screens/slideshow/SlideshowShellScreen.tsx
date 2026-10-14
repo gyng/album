@@ -159,9 +159,9 @@ export const SlideshowShellScreen = () => {
     },
     [],
   );
-  // When this session started, for the copied report. A ref (not state) — it is
-  // read only on demand and must never trigger a render.
-  const sessionStartRef = React.useRef(Date.now());
+  // When this session started, for the copied report. Taken once, in a lazy
+  // initialiser, and never set again — so it never triggers a render.
+  const [sessionStart] = React.useState(() => Date.now());
   // The live state as last mirrored into storage, so the heartbeat can re-stamp
   // it without depending on (and re-subscribing to) every state value.
   const statusRef = React.useRef<ShellStatusSnapshot | null>(null);
@@ -257,6 +257,7 @@ export const SlideshowShellScreen = () => {
   // Load the persisted event timeline once on mount so an overnight incident is
   // still readable the morning after a relaunch.
   React.useEffect(() => {
+    // oxlint-disable-next-line react/set-state-in-effect -- storage is read after hydration: this page is prerendered, where it does not exist
     setEventHistory(readShellLog());
   }, []);
 
@@ -281,6 +282,7 @@ export const SlideshowShellScreen = () => {
       return;
     }
     if (!isWakeLockActive && document.visibilityState === "visible") {
+      // oxlint-disable-next-line react/set-state-in-effect -- a loss is judged by page visibility at the moment the lock drops, and is written to storage
       setWakeLossCount((count) => count + 1);
       setLastWakeLossAt(new Date());
       hadWakeLossRef.current = true;
@@ -299,7 +301,7 @@ export const SlideshowShellScreen = () => {
   React.useEffect(() => {
     const snapshot: ShellStatusSnapshot = {
       at: Date.now(),
-      sessionStart: sessionStartRef.current,
+      sessionStart,
       shellVersion: BUILD_VERSION,
       runtimeVersion,
       codeStatus: codeStatusLabel(codeStatus),
@@ -309,7 +311,15 @@ export const SlideshowShellScreen = () => {
     };
     statusRef.current = snapshot;
     writeShellStatus(snapshot);
-  }, [codeStatus, isOnline, isWakeLockActive, isWakeLockSupported, runtimeVersion, wakeLossCount]);
+  }, [
+    codeStatus,
+    isOnline,
+    isWakeLockActive,
+    isWakeLockSupported,
+    runtimeVersion,
+    sessionStart,
+    wakeLossCount,
+  ]);
 
   // A lock lost long after the launch tap must bring the one-tap gate back, but
   // only on a SUSTAINED loss — a brief blip while the hook re-acquires must not
@@ -460,7 +470,7 @@ export const SlideshowShellScreen = () => {
   const copyDiagnostics = React.useCallback(async () => {
     const payload = serialiseDiagnostics({
       now: Date.now(),
-      sessionStart: sessionStartRef.current,
+      sessionStart,
       buildVersion: BUILD_VERSION,
       runtimeVersion: runtimeVersionRef.current,
       ...(runtimeHealthRef.current ? { runtimeHealth: runtimeHealthRef.current } : {}),
@@ -509,7 +519,7 @@ export const SlideshowShellScreen = () => {
     } catch (error) {
       console.error("Failed to copy slideshow diagnostics", error);
     }
-  }, [codeStatus, isOnline, isWakeLockActive, isWakeLockSupported, wakeLossCount]);
+  }, [codeStatus, isOnline, isWakeLockActive, isWakeLockSupported, sessionStart, wakeLossCount]);
 
   // Recover a frame that never reports it is ready — e.g. a first-ever visit
   // whose runtime request failed transiently, where the version poll cannot
@@ -642,6 +652,7 @@ export const SlideshowShellScreen = () => {
   }, [attemptRuntimeReload, clearPendingReload]);
 
   React.useEffect(() => {
+    // oxlint-disable-next-line react/set-state-in-effect -- polls the server for a new build; the state records the response
     void checkForCodeUpdate();
     const interval = window.setInterval(() => {
       void checkForCodeUpdate();
@@ -725,7 +736,7 @@ export const SlideshowShellScreen = () => {
           type: SLIDESHOW_SHELL_STATE_MESSAGE,
           isSupported: isWakeLockSupported,
           isActive: isWakeLockActive,
-          sessionStart: sessionStartRef.current,
+          sessionStart,
         },
         window.location.origin,
       );
@@ -817,6 +828,7 @@ export const SlideshowShellScreen = () => {
     isWakeLockActive,
     isWakeLockSupported,
     runtimeFrame?.generation,
+    sessionStart,
   ]);
 
   const diagnosticsSummary = [

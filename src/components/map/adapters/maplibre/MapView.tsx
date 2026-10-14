@@ -211,6 +211,7 @@ const MapViewImpl = (
       report("construct", error);
       // Terminal, and said so: a caller waiting on `onLoad` would otherwise
       // wait for ever with nothing to distinguish that from a slow network.
+      // oxlint-disable-next-line react/set-state-in-effect -- MapLibre's constructor is the external system, and only it can say a map is impossible here
       setUnavailable(true);
 
       return;

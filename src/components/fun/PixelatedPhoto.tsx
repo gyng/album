@@ -8,15 +8,16 @@ type Props = { src: string; blocks: number; label: string; className?: string | 
  */
 export const PixelatedPhoto = ({ src, blocks, label, className }: Props) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [image, setImage] = useState<HTMLImageElement | null>(null);
+  const [loaded, setLoaded] = useState<{ src: string; image: HTMLImageElement } | null>(null);
+  // A new source shows nothing until its own image has loaded.
+  const image = loaded?.src === src ? loaded.image : null;
   useEffect(() => {
     let live = true;
     const next = new Image();
     next.onload = () => {
-      if (live) setImage(next);
+      if (live) setLoaded({ src, image: next });
     };
     next.src = src;
-    setImage(null);
     return () => {
       live = false;
     };

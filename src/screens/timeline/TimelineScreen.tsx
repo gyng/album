@@ -34,6 +34,8 @@ const getLocalDateKey = (date = new Date()) => {
   const day = `${date.getDate()}`.padStart(2, "0");
   return `${year}-${month}-${day}`;
 };
+const noSubscription = () => () => {};
+const serverDateKey = () => null;
 
 const getClusterAlbumLabel = (albums: string[]) => {
   const uniqueAlbums = Array.from(new Set(albums.filter(Boolean)));
@@ -107,7 +109,12 @@ const TimelineScreen = ({ entries: suppliedEntries, entryRows }: TimelineScreenP
   // The static server never sees query parameters, so initialise from album
   // data only. Route state is applied after the hydration snapshot matches.
   const [selectedDate, setSelectedDate] = React.useState<string | null>(availableDates[0] ?? null);
-  const [todayDate, setTodayDate] = React.useState<string | null>(null);
+  // The reader's day; null on the server and during hydration, which cannot know it.
+  const todayDate = React.useSyncExternalStore(
+    noSubscription,
+    () => getLocalDateKey(),
+    serverDateKey,
+  );
   const [memoryScrollTargetDate, setMemoryScrollTargetDate] = React.useState<string | null>(null);
   const layoutRef = React.useRef<HTMLDivElement | null>(null);
   const dayHeadingRef = React.useRef<HTMLDivElement | null>(null);
@@ -120,10 +127,6 @@ const TimelineScreen = ({ entries: suppliedEntries, entryRows }: TimelineScreenP
     return todayDate ? availableDates.filter((date) => date <= todayDate) : availableDates;
   }, [availableDates, todayDate]);
 
-  React.useEffect(() => {
-    setTodayDate(getLocalDateKey());
-  }, []);
-
   const memories = React.useMemo(() => {
     if (!todayDate) {
       return [];
@@ -135,9 +138,12 @@ const TimelineScreen = ({ entries: suppliedEntries, entryRows }: TimelineScreenP
     MAX_TIMELINE_MEMORY_CLUSTERS,
   );
 
-  React.useEffect(() => {
+  // New entries or a new day start the memories from the top again.
+  const [memoriesFor, setMemoriesFor] = React.useState({ filteredEntries, todayDate });
+  if (memoriesFor.filteredEntries !== filteredEntries || memoriesFor.todayDate !== todayDate) {
+    setMemoriesFor({ filteredEntries, todayDate });
     setVisibleMemoryClusterCount(MAX_TIMELINE_MEMORY_CLUSTERS);
-  }, [filteredEntries, todayDate]);
+  }
 
   const visibleMemories = React.useMemo(() => {
     return memories.slice(0, visibleMemoryClusterCount);
@@ -251,38 +257,49 @@ const TimelineScreen = ({ entries: suppliedEntries, entryRows }: TimelineScreenP
     };
   }, [updateSelectedConnectorPath, filteredEntries, todayDate]);
 
-  // If the available dates change and no date is selected, default to the
-  // latest selectable date. Using all available dates here would repeatedly
-  // reselect a future date that the validity effect immediately clears.
-  React.useEffect(() => {
-    if (!selectedDate && selectableDates.length > 0) {
-      // invariant: length checked above
-      setSelectedDate(selectableDates[0]!);
-    }
-  }, [selectableDates, selectedDate]);
-
   // The date the URL and the selection are agreed on — either because the
   // reader just picked it, or because it arrived in the URL and was adopted.
   // Only a reader's pick should be written back: echoing an incoming date, or
   // writing the hydration default, would clobber a real deep link.
-  const chosenDateRef = React.useRef<string | null>(null);
+  const [chosenDate, setChosenDate] = React.useState<string | null>(null);
   const chooseDate = React.useCallback((date: string | null) => {
-    chosenDateRef.current = date;
+    setChosenDate(date);
     setSelectedDate(date);
   }, []);
 
-  // On mount or when router.query.date changes, update selectedDate if needed
-  React.useEffect(() => {
-    if (!routeReady) return;
-    if (routeDateQuery && availableDates.includes(routeDateQuery)) {
-      // Adopting the URL's date counts as the current intent: the two now agree,
-      // so there is nothing to write back. Claiming it here rather than after
-      // the state lands also closes the window where this effect and the sync
-      // effect run in the same pass and the sync still sees the previous date.
-      chosenDateRef.current = routeDateQuery;
-      setSelectedDate((current) => (current === routeDateQuery ? current : routeDateQuery));
+  // On mount or when the URL's date changes, adopt it if it is one of ours.
+  // Adopting counts as the current intent: the two now agree, so there is
+  // nothing to write back. Done during render, so the selection and the
+  // agreement land together and the URL sync never sees one without the other.
+  const [routeInputs, setRouteInputs] = React.useState<{
+    availableDates: string[];
+    routeDateQuery: string | null;
+    routeReady: boolean;
+  } | null>(null);
+  if (
+    routeInputs?.availableDates !== availableDates ||
+    routeInputs.routeDateQuery !== routeDateQuery ||
+    routeInputs.routeReady !== routeReady
+  ) {
+    setRouteInputs({ availableDates, routeDateQuery, routeReady });
+    if (routeReady && routeDateQuery && availableDates.includes(routeDateQuery)) {
+      setChosenDate(routeDateQuery);
+      if (selectedDate !== routeDateQuery) setSelectedDate(routeDateQuery);
     }
-  }, [availableDates, routeDateQuery, routeReady]);
+  }
+
+  // A selection that is no longer offered, or lies in the future, is cleared;
+  // with nothing selected, the latest selectable date is. Using all available
+  // dates for the default would reselect a future date only to clear it again.
+  if (
+    selectedDate &&
+    (!availableDates.includes(selectedDate) || (todayDate && selectedDate > todayDate))
+  ) {
+    setSelectedDate(null);
+  } else if (!selectedDate && selectableDates.length > 0) {
+    // invariant: length checked above
+    setSelectedDate(selectableDates[0]!);
+  }
 
   // When selectedDate changes, update the URL param (shallow push).
   // Gated until the platform has populated query state so hydration cannot
@@ -294,22 +311,21 @@ const TimelineScreen = ({ entries: suppliedEntries, entryRows }: TimelineScreenP
     // the deep link being applied or the hydration default, and echoing those
     // back would clobber a real ?date=. Inferring this from "the URL disagrees"
     // instead froze ?date= on whichever day was opened first.
-    if (chosenDateRef.current !== selectedDate) return;
+    if (chosenDate !== selectedDate) return;
     if (routeDateQuery !== selectedDate) {
       const next = new URLSearchParams(searchParams);
       next.set("date", selectedDate);
       replaceSearchParams(next);
     }
-  }, [availableDates, replaceSearchParams, routeDateQuery, routeReady, searchParams, selectedDate]);
-
-  React.useEffect(() => {
-    if (
-      selectedDate &&
-      (!availableDates.includes(selectedDate) || (todayDate && selectedDate > todayDate))
-    ) {
-      setSelectedDate(null);
-    }
-  }, [availableDates, selectedDate, todayDate]);
+  }, [
+    availableDates,
+    chosenDate,
+    replaceSearchParams,
+    routeDateQuery,
+    routeReady,
+    searchParams,
+    selectedDate,
+  ]);
 
   const handleSelectRandomDate = React.useCallback(() => {
     if (selectableDates.length === 0) {

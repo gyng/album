@@ -134,12 +134,10 @@ export const DoubleTake = ({ photos }: { photos: PhotoGamePhoto[] }) => {
 
   useEffect(() => {
     if (phase !== "first" && phase !== "second") return;
-    if (document.hidden) {
-      setPhase("paused");
-      return;
-    }
+    // A flash only starts on a visible page (the preload checks) and hiding it
+    // pauses through visibilitychange; this covers a timer that lands while hidden.
     const timer = window.setTimeout(
-      () => setPhase(phase === "first" ? "second" : "guess"),
+      () => setPhase(document.hidden ? "paused" : phase === "first" ? "second" : "guess"),
       duration,
     );
     return () => window.clearTimeout(timer);

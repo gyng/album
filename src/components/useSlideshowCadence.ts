@@ -34,7 +34,7 @@ export const useSlideshowCadence = (input: {
 }): UseSlideshowCadence => {
   const { timeDelay, alignCadence, controlsVisible, showClock, hasCurrentPhoto, onAdvance } = input;
 
-  const [nextChangeAt, setNextChangeAt] = React.useState<Date>(new Date());
+  const [nextChangeAt, setNextChangeAt] = React.useState<Date>(() => new Date());
   const [secondsLeft, setSecondsLeft] = React.useState<number>(0);
   // Wall-clock output cannot be rendered during SSR: the build server and the
   // browser never share an exact clock or necessarily a timezone.
@@ -94,6 +94,7 @@ export const useSlideshowCadence = (input: {
     }
     hasAutoAlignedRef.current = true;
     if (alignCadence) {
+      // oxlint-disable-next-line react/set-state-in-effect -- the first slide is timed from the wall clock when its photograph arrives, which render cannot read
       alignNextChangeToCadence();
     } else {
       scheduleNextChange();
@@ -119,6 +120,7 @@ export const useSlideshowCadence = (input: {
     if (isPaused) {
       const remaining = Math.max(0, nextChangeAt.getTime() - Date.now());
       pausedRemainingMsRef.current = remaining;
+      // oxlint-disable-next-line react/set-state-in-effect -- the remaining time is measured against the wall clock whenever pause or the scheduled change moves
       setSecondsLeft(remaining / 1000);
       return;
     }

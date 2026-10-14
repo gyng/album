@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useId, useRef, useState } from "react";
 import { useUrlSearchParams } from "../platform";
 import { Button, Caption, KeyHint } from "../ui";
 import { GameIntro } from "./GameIllustration";
@@ -107,12 +107,12 @@ export const SightLines = ({ photos }: { photos: PhotoGamePhoto[] }) => {
   const todaysDaily = stats?.dailies[today];
   // A linked daily starts once the archive and the player's record are both known.
   const linkedDaily = useRef(false);
-  const startLinkedDaily = useRef(startDaily);
-  startLinkedDaily.current = startDaily;
+  const startLinkedDaily = useEffectEvent(startDaily);
   useEffect(() => {
     if (linkedDaily.current || !urlReady || !stats || !photos.length) return;
     linkedDaily.current = true;
-    if (hasSearchParam("daily") && !stats.dailies[localDayKey()]) startLinkedDaily.current();
+    // oxlint-disable-next-line react/set-state-in-effect -- a linked daily opens once the URL and stored record are readable after hydration; dealing writes the URL and refs, so it cannot run in render
+    if (hasSearchParam("daily") && !stats.dailies[localDayKey()]) startLinkedDaily();
   }, [urlReady, hasSearchParam, stats, photos.length]);
   // No score: boards of different sizes would not compare. A win is every line, unaided by Give up.
   const finish = (board: PhotoWordSearch, foundCount: number) =>

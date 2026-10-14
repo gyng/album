@@ -36,9 +36,12 @@ export const useStaggeredMarkerMounts = <T extends { href: string }>(
   const [admitted, setAdmitted] = React.useState<ReadonlySet<string>>(() => new Set());
   // Derived rather than stored, so a marker that leaves is gone on the very
   // next render without waiting for a frame to be granted.
+  // Without frames to spread them over (a test environment), everything mounts.
+  const canStagger = typeof requestAnimationFrame === "function";
   const mounted = React.useMemo(
-    () => (enabled ? photos.filter((photo) => admitted.has(photo.href)) : []),
-    [admitted, enabled, photos],
+    () =>
+      !enabled ? [] : canStagger ? photos.filter((photo) => admitted.has(photo.href)) : [...photos],
+    [admitted, canStagger, enabled, photos],
   );
 
   // Nothing admitted at all — the map has just been handed a set it has never
@@ -49,22 +52,19 @@ export const useStaggeredMarkerMounts = <T extends { href: string }>(
   if (enabled && photos.length > 0 && mounted.length === 0) {
     setAdmitted(new Set(photos.slice(0, chunk).map((photo) => photo.href)));
   }
+  // Forgotten rather than kept while disabled: the next reveal has to stagger
+  // from nothing, and holding the set would let it mount everything at once.
+  if (!enabled && admitted.size > 0) {
+    setAdmitted(new Set());
+  }
 
   React.useEffect(() => {
-    if (!enabled) {
-      // Forgotten rather than kept: the next reveal has to stagger from
-      // nothing, and holding the set would let it mount everything at once.
-      setAdmitted((current) => (current.size > 0 ? new Set() : current));
+    if (!enabled || !canStagger) {
       return;
     }
 
     const pending = photos.filter((photo) => !admitted.has(photo.href));
     if (pending.length === 0) {
-      return;
-    }
-
-    if (typeof requestAnimationFrame !== "function") {
-      setAdmitted(new Set(photos.map((photo) => photo.href)));
       return;
     }
 
@@ -89,7 +89,7 @@ export const useStaggeredMarkerMounts = <T extends { href: string }>(
     return () => {
       cancelAnimationFrame(handle);
     };
-  }, [admitted, chunk, enabled, photos]);
+  }, [admitted, canStagger, chunk, enabled, photos]);
 
   return mounted;
 };

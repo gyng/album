@@ -62,7 +62,10 @@ export const SearchDrawPad: React.FC<Props> = ({
   const [warming, setWarming] = useState(false);
   const undoRef = useRef<Array<{ pixels: ImageData; hasStrokes: boolean }>>([]);
   const redoRef = useRef<Array<{ pixels: ImageData; hasStrokes: boolean }>>([]);
-  const [historyVersion, setHistoryVersion] = useState(0);
+  // History refs hold bounded pixel snapshots; their sizes are state so undo and redo enable reactively.
+  const [historySizes, setHistorySizes] = useState({ undo: 0, redo: 0 });
+  const syncHistorySizes = () =>
+    setHistorySizes({ undo: undoRef.current.length, redo: redoRef.current.length });
   const [eraser, setEraser] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -76,15 +79,10 @@ export const SearchDrawPad: React.FC<Props> = ({
   }, []);
 
   useEffect(() => {
+    // Runs once per mount, when stroke, error and restoring state still hold their initial values.
     const saved = initialBlobRef.current;
     fillBackground();
-    setHasStrokes(false);
-    setError(null);
-    if (!saved) {
-      setRestoring(false);
-      return;
-    }
-    setRestoring(true);
+    if (!saved) return;
     let cancelled = false;
     const url = URL.createObjectURL(saved);
     const image = new Image();
@@ -146,7 +144,7 @@ export const SearchDrawPad: React.FC<Props> = ({
     if (!current) return;
     undoRef.current = [...undoRef.current.slice(-19), current];
     redoRef.current = [];
-    setHistoryVersion((version) => version + 1);
+    syncHistorySizes();
   };
   const restoreHistory = (source: typeof undoRef, destination: typeof redoRef) => {
     const previous = source.current.pop();
@@ -157,7 +155,7 @@ export const SearchDrawPad: React.FC<Props> = ({
     context.putImageData(previous.pixels, 0, 0);
     setHasStrokes(previous.hasStrokes);
     setError(null);
-    setHistoryVersion((version) => version + 1);
+    syncHistorySizes();
     saveInlineDraft();
   };
 
@@ -280,8 +278,6 @@ export const SearchDrawPad: React.FC<Props> = ({
     }, "image/png");
   };
 
-  // History refs hold bounded pixel snapshots; the version makes availability reactive.
-  void historyVersion;
   const panel = (
     // Shortcuts bubble from the canvas and toolbar controls within this group.
     // oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions
@@ -358,7 +354,7 @@ export const SearchDrawPad: React.FC<Props> = ({
             className={styles.iconTool}
             aria-label="Undo"
             title="Undo (Ctrl/⌘ Z)"
-            disabled={!undoRef.current.length || restoring}
+            disabled={!historySizes.undo || restoring}
             onClick={() => restoreHistory(undoRef, redoRef)}
           >
             <Icon kind="undo" />
@@ -368,7 +364,7 @@ export const SearchDrawPad: React.FC<Props> = ({
             className={styles.iconTool}
             aria-label="Redo"
             title="Redo (Ctrl/⌘ Shift Z)"
-            disabled={!redoRef.current.length || restoring}
+            disabled={!historySizes.redo || restoring}
             onClick={() => restoreHistory(redoRef, undoRef)}
           >
             <Icon kind="redo" />
