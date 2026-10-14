@@ -13,6 +13,7 @@ import { PhotoHangman } from "../../components/fun/PhotoHangman";
 import { SightLines } from "../../components/fun/SightLines";
 import { PhotoCrossword } from "../../components/fun/PhotoCrossword";
 import { DoubleTake } from "../../components/fun/DoubleTake";
+import { Hindsight } from "../../components/fun/Hindsight";
 import { GameReadinessProvider } from "../../components/fun/GameReadiness";
 import { PhotoOracle } from "../../components/fun/PhotoOracle";
 import type { PhotoGamePhoto } from "../../util/photoGames";
@@ -113,6 +114,8 @@ export const PhotoGameScreen = ({ game }: { game: PhotoGameKind }) => {
             <SightLines photos={availablePhotos} />
           ) : game === "photo-hangman" ? (
             <PhotoHangman photos={availablePhotos} />
+          ) : game === "hindsight" ? (
+            <Hindsight photos={availablePhotos} />
           ) : game === "connections" ? (
             <PhotoConnections photos={availablePhotos} />
           ) : (
@@ -137,3 +140,5 @@ export const PhotoCrosswordScreen = () => <PhotoGameScreen game="cross-exposure"
 export const SightLinesScreen = () => <PhotoGameScreen game="sight-lines" />;
 
 export const PhotoHangmanScreen = () => <PhotoGameScreen game="photo-hangman" />;
+
+export const HindsightScreen = () => <PhotoGameScreen game="hindsight" />;

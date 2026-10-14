@@ -1,8 +1,11 @@
 /** @jest-environment jsdom */
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { SightLines } from "./SightLines";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { buildDailySightLines, SightLines } from "./SightLines";
+import { readGameStats } from "./useGameStats";
 import { buildPhotoWordSearch } from "../../util/photoWordSearch";
-import type { PhotoGamePhoto } from "../../util/photoGames";
+import { dailyNumber, localDayKey } from "../../util/gameDaily";
+import { seededRandom } from "../../util/seededRandom";
+import { shuffleGamePhotos, type PhotoGamePhoto } from "../../util/photoGames";
 const photos: PhotoGamePhoto[] = ["cat", "bicycle", "boat", "umbrella", "stairs", "clock"].flatMap(
   (tag) =>
     Array.from({ length: 12 }, (_, i) => ({
@@ -15,6 +18,7 @@ const photos: PhotoGamePhoto[] = ["cat", "bicycle", "boat", "umbrella", "stairs"
 );
 beforeEach(() => {
   localStorage.clear();
+  window.history.replaceState(null, "", "/");
   jest.spyOn(Math, "random").mockReturnValue(0.37);
 });
 afterEach(() => jest.restoreAllMocks());
@@ -57,7 +61,11 @@ it("hints identify a starting cell, rejects non-lines, and reveals photos on giv
   const result = screen.getByRole("region", { name: "Sight Lines result" });
   await waitFor(() => expect(result).toHaveFocus());
   expect(within(board).getAllByRole("button", { name: /revealed/ })).toHaveLength(12);
-  expect(within(result).getAllByRole("link")).toHaveLength(12);
+  expect(
+    within(result)
+      .getAllByRole("link")
+      .filter((link) => link.querySelector("img")),
+  ).toHaveLength(12);
 });
 
 it("starts the advanced board with longer lines and supports arrow navigation and shortcuts", async () => {
@@ -100,4 +108,107 @@ it("stops arrow navigation at the edges of the board", () => {
     fireEvent.keyDown(cell(row, column), { key });
     expect(cell(row, column)).toHaveFocus();
   }
+});
+
+describe("daily board", () => {
+  const today = localDayKey();
+  const label = `Daily #${dailyNumber(today)}`;
+  const boardOf = (puzzle: ReturnType<typeof buildDailySightLines>) => ({
+    tiles: puzzle!.tiles.map((photo) => photo.path),
+    targets: puzzle!.targets.map((target) => [target.id, target.cells]),
+  });
+  const solve = (puzzle: NonNullable<ReturnType<typeof buildDailySightLines>>) => {
+    const board = screen.getByRole("group", { name: "Photo search board" });
+    for (const target of puzzle.targets) {
+      const cells = within(board).getAllByRole("button");
+      fireEvent.click(cells[target.cells[0]!]!);
+      fireEvent.click(cells[target.cells.at(-1)!]!);
+    }
+  };
+
+  it("deals the same board however the archive arrives and whatever Math.random does", () => {
+    const shuffled = shuffleGamePhotos(photos, seededRandom("another order"));
+    const first = buildDailySightLines(photos, "2026-10-20");
+    jest.spyOn(Math, "random").mockReturnValue(0.91);
+    const second = buildDailySightLines([...shuffled].reverse(), "2026-10-20");
+    expect(first).not.toBeNull();
+    expect(first!.size).toBe(6);
+    expect(first!.lineLength).toBe(4);
+    expect(boardOf(second)).toEqual(boardOf(first));
+    // An ordinary game played first must not shape the daily.
+    buildPhotoWordSearch(shuffled, 6, Math.random, 4);
+    expect(boardOf(buildDailySightLines(shuffled, "2026-10-20"))).toEqual(boardOf(first));
+    expect(boardOf(buildDailySightLines(photos, "2026-10-21"))).not.toEqual(boardOf(first));
+  });
+
+  it("plays today's fixed board from the lobby without changing saved settings, then shares it", async () => {
+    const writeText = jest.fn().mockResolvedValue(undefined);
+    Object.assign(navigator, { clipboard: { writeText } });
+    localStorage.setItem(
+      "snapshots-fun-settings-v1:sightLines",
+      JSON.stringify({ size: 5, lineLength: 3 }),
+    );
+    const puzzle = buildDailySightLines(photos, today)!;
+    const { unmount } = render(<SightLines photos={[...photos].reverse()} />);
+    fireEvent.click(screen.getByRole("button", { name: label }));
+    const board = screen.getByRole("group", { name: "Photo search board" });
+    expect(within(board).getAllByRole("button")).toHaveLength(36);
+    fireEvent.click(screen.getByRole("button", { name: "Hint" }));
+    solve(puzzle);
+    const result = screen.getByRole("region", { name: "Sight Lines result" });
+    await act(async () => {
+      fireEvent.click(within(result).getByRole("button", { name: "Share result" }));
+    });
+    const text = writeText.mock.calls[0]![0] as string;
+    expect(text).toContain(`Sight Lines #${dailyNumber(today)}`);
+    expect(text).toContain("6×6 · 4/4 lines · 1 hint");
+    for (const target of puzzle.targets) expect(text).not.toMatch(new RegExp(target.label, "i"));
+    expect(JSON.parse(localStorage.getItem("snapshots-fun-settings-v1:sightLines")!)).toEqual({
+      size: 5,
+      lineLength: 3,
+    });
+    expect(readGameStats("sight-lines")).toMatchObject({ played: 1, won: 1 });
+    unmount();
+
+    // The lobby now shows today's result instead of offering the daily again.
+    render(<SightLines photos={photos} />);
+    expect(screen.queryByRole("button", { name: label })).toBeNull();
+    expect(screen.getByText(/4\/4 lines · 1 hint/)).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Share result" })).toBeTruthy();
+    expect(screen.getByText("Played 1 · won 1")).toBeTruthy();
+  });
+
+  it("opens straight into the daily from ?daily, and shows the result once it is finished", () => {
+    window.history.replaceState(null, "", "/fun/sight-lines?daily");
+    const puzzle = buildDailySightLines(photos, today)!;
+    const { unmount } = render(<SightLines photos={photos} />);
+    const board = screen.getByRole("group", { name: "Photo search board" });
+    expect(within(board).getAllByRole("button")).toHaveLength(36);
+    solve(puzzle);
+    unmount();
+    render(<SightLines photos={photos} />);
+    expect(screen.queryByRole("group", { name: "Photo search board" })).toBeNull();
+    expect(screen.getByText(/4\/4 lines · no hints/)).toBeTruthy();
+    expect(readGameStats("sight-lines").played).toBe(1);
+  });
+
+  it("waits for the archive before dealing a linked daily", () => {
+    window.history.replaceState(null, "", "/fun/sight-lines?daily");
+    const { rerender } = render(<SightLines photos={[]} />);
+    expect(screen.queryByRole("group", { name: "Photo search board" })).toBeNull();
+    rerender(<SightLines photos={photos} />);
+    expect(screen.getByRole("group", { name: "Photo search board" })).toBeTruthy();
+  });
+});
+
+it("records each finished game once and summarises it in the lobby", () => {
+  const { unmount } = render(<SightLines photos={photos} />);
+  fireEvent.click(screen.getByRole("button", { name: "Start searching" }));
+  fireEvent.click(screen.getByRole("button", { name: "Give up" }));
+  fireEvent.keyDown(window, { key: "g" });
+  expect(readGameStats("sight-lines")).toMatchObject({ played: 1, won: 0 });
+  expect(readGameStats("sight-lines").dailies).toEqual({});
+  unmount();
+  render(<SightLines photos={photos} />);
+  expect(screen.getByText("Played 1 · won 0")).toBeTruthy();
 });

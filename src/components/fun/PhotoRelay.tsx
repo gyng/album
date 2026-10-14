@@ -16,9 +16,15 @@ import { GameDock } from "./GameDock";
 import styles from "./PhotoGames.module.css";
 import relayStyles from "./PhotoRelay.module.css";
 import { useGameShortcuts } from "./useGameShortcuts";
+import { useGameStats } from "./useGameStats";
+import { GameStatsLine } from "./GameRecord";
+import { ResultNextSteps } from "./ResultNextSteps";
+
+const outOf100 = (value: number) => `${value}/100`;
 
 export const PhotoRelay = ({ photos }: { photos: PhotoGamePhoto[] }) => {
   const { loading } = useGameReadiness();
+  const { stats, record } = useGameStats("relay");
   const [puzzle, setPuzzle] = useState<RelayPuzzle | null>(null);
   const [order, setOrder] = useState<PhotoGamePhoto[]>([]);
   const [finished, setFinished] = useState(false);
@@ -85,6 +91,10 @@ export const PhotoRelay = ({ photos }: { photos: PhotoGamePhoto[] }) => {
     cancelDrag();
   };
   const finish = (abandoned: boolean) => {
+    if (!puzzle || finished) return;
+    // A completed relay is a win; its score is its visual-flow percentile.
+    const score = abandoned ? null : scoreRelay(puzzle, order);
+    record({ won: !abandoned, ...(score === null ? {} : { score }) });
     cancelDrag();
     setFinished(true);
     setGaveUp(abandoned);
@@ -125,6 +135,7 @@ export const PhotoRelay = ({ photos }: { photos: PhotoGamePhoto[] }) => {
           Connect the start and finish with five photographs. Make each pair share a subject, colour
           or shape.
         </p>
+        <GameStatsLine stats={stats} wins={false} formatBest={outOf100} />
         <Button variant="primary" onClick={start}>
           Start relay
           <KeyHint aria-hidden="true">N</KeyHint>
@@ -453,6 +464,9 @@ export const PhotoRelay = ({ photos }: { photos: PhotoGamePhoto[] }) => {
               </details>
             </>
           ) : null}
+          <ResultNextSteps
+            photos={[puzzle.start, ...(gaveUp ? puzzle.solution : order), puzzle.end]}
+          />
           <Button variant="primary" onClick={start}>
             Play again
             <KeyHint aria-hidden="true">N</KeyHint>

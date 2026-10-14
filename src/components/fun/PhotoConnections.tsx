@@ -6,19 +6,73 @@ import {
   type ConnectionsPuzzle,
   type PhotoGamePhoto,
 } from "../../util/photoGames";
+import { useUrlSearchParams } from "../platform";
 import { Button, Caption, Heading, Icon, KeyHint } from "../ui";
 import { GameIntro } from "./GameIllustration";
 import { GamePhoto, PhotoChain } from "./GamePhoto";
 import { GameProgress } from "./GameFeedback";
 import { GameDock } from "./GameDock";
-import { useGameSettings } from "./useGameSettings";
+import { useGameReadiness } from "./GameReadiness";
+import {
+  dailyPhotoOrder,
+  dailyPuzzle,
+  dailyShareText,
+  GameStatsLine,
+  ShareResult,
+  useShareOrigin,
+} from "./GameRecord";
+import { useGameSettings, type GameSettingsRegistry } from "./useGameSettings";
+import { useGameStats } from "./useGameStats";
 import { useGameShortcuts } from "./useGameShortcuts";
 import shuffleStyles from "./PhotoConnections.module.css";
+import { ResultNextSteps } from "./ResultNextSteps";
 import styles from "./PhotoGames.module.css";
+
+type RoundSettings = GameSettingsRegistry["connections"];
+
+/** Everyone's daily board is the same: four groups of four broad subjects, four lives. */
+const DAILY_SETTINGS: RoundSettings = { size: 4, detail: "broad", hints: true, lives: 4 };
+
+/** Today's board, identical on every device whatever order the archive arrived in. */
+export const dailyConnectionsPuzzle = (photos: PhotoGamePhoto[], day?: string) =>
+  buildConnectionsPuzzle(
+    dailyPhotoOrder(photos),
+    dailyPuzzle("connections", day).random(),
+    DAILY_SETTINGS.size,
+    DAILY_SETTINGS.detail,
+  );
+
+const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? "" : "s"}`;
+
+// Spoiler-free: how the round went, never which photographs or subjects.
+const dailySummary = (
+  outcome: "won" | "lost" | "gave-up",
+  found: number,
+  mistakes: number,
+  size: number,
+) =>
+  outcome === "won"
+    ? `${size}×${size} · ${mistakes ? plural(mistakes, "mistake") : "No mistakes"}`
+    : `${outcome === "gave-up" ? "Gave up" : "Out of lives"} · ${found} of ${size} connections`;
 
 export const PhotoConnections = ({ photos }: { photos: PhotoGamePhoto[] }) => {
   const [settings, setSettings] = useGameSettings("connections");
-  const { detail, hints, size, lives } = settings;
+  // The board in play keeps the settings it was dealt with; a daily's are fixed and never saved.
+  const [round, setRound] = useState<RoundSettings>(settings);
+  const [daily, setDaily] = useState<string | null>(null);
+  const { hints, size, lives } = round;
+  const { stats, record } = useGameStats("connections");
+  const shareOrigin = useShareOrigin();
+  const { loading } = useGameReadiness();
+  const {
+    ready: urlReady,
+    searchParams,
+    hasSearchParam,
+    replaceSearchParams,
+  } = useUrlSearchParams();
+  const today = dailyPuzzle("connections");
+  const todaysResult = stats?.dailies[today.day];
+  const dailyRequested = useRef(false);
   const [puzzle, setPuzzle] = useState<ConnectionsPuzzle | null>(null);
   const [tiles, setTiles] = useState<PhotoGamePhoto[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
@@ -78,14 +132,27 @@ export const PhotoConnections = ({ photos }: { photos: PhotoGamePhoto[] }) => {
   useEffect(() => {
     if (puzzle) boardRef.current?.focus();
   }, [puzzle]);
-  const start = () => {
-    const next = buildConnectionsPuzzle(photos, Math.random, size, detail);
+  const setDailyUrl = (on: boolean) => {
+    if (hasSearchParam("daily") === on) return;
+    const params = new URLSearchParams(searchParams);
+    if (on) params.set("daily", "");
+    else params.delete("daily");
+    replaceSearchParams(params);
+  };
+  const deal = (
+    next: ConnectionsPuzzle | null,
+    roundSettings: RoundSettings,
+    day: string | null,
+  ) => {
     if (!next) {
       setMessage(
-        `There are not enough photographs for ${size} distinct groups. Try a smaller board.`,
+        `There are not enough photographs for ${roundSettings.size} distinct groups. Try a smaller board.`,
       );
       return;
     }
+    setRound(roundSettings);
+    setDaily(day);
+    setDailyUrl(day !== null);
     setPuzzle(next);
     setTiles(next.tiles);
     setSelected([]);
@@ -94,6 +161,35 @@ export const PhotoConnections = ({ photos }: { photos: PhotoGamePhoto[] }) => {
     setGaveUp(false);
     setMessage("");
     attempted.current.clear();
+  };
+  const start = () =>
+    deal(
+      buildConnectionsPuzzle(photos, Math.random, settings.size, settings.detail),
+      settings,
+      null,
+    );
+  const startDaily = () => {
+    if (todaysResult) return;
+    deal(dailyConnectionsPuzzle(photos, today.day), DAILY_SETTINGS, today.day);
+  };
+  // `?daily` opens today's board, or its result once it has been played.
+  useEffect(() => {
+    if (dailyRequested.current || !urlReady || loading || !stats || !photos.length) return;
+    dailyRequested.current = true;
+    if (hasSearchParam("daily") && !stats.dailies[today.day]) startDaily();
+  });
+  // Recorded where the round ends, so a re-render can never count it twice.
+  const finish = (outcome: "won" | "lost" | "gave-up", foundCount: number, mistakeCount: number) =>
+    record({
+      won: outcome === "won",
+      ...(daily
+        ? { daily: { day: daily, summary: dailySummary(outcome, foundCount, mistakeCount, size) } }
+        : {}),
+    });
+  const giveUp = () => {
+    if (!puzzle || finished) return;
+    setGaveUp(true);
+    finish("gave-up", found.length, mistakes);
   };
   const submit = () => {
     if (!puzzle || finished || selected.length !== size) return;
@@ -107,9 +203,11 @@ export const PhotoConnections = ({ photos }: { photos: PhotoGamePhoto[] }) => {
       setFound([...found, result.group.id]);
       setSelected([]);
       setMessage(`${result.group.label} — connection found.`);
+      if (found.length + 1 === size) finish("won", size, mistakes);
     } else {
       attempted.current.add(key);
       setMistakes(mistakes + 1);
+      if (lives !== null && mistakes + 1 >= lives) finish("lost", found.length, mistakes + 1);
       setMessage(
         result.kind === "near" && hints
           ? "One photograph away."
@@ -131,7 +229,7 @@ export const PhotoConnections = ({ photos }: { photos: PhotoGamePhoto[] }) => {
       enabled: !!puzzle && !finished && !!selected.length,
     },
     { key: "s", label: "Shuffle", action: shuffle, enabled: !!puzzle && !finished },
-    { key: "g", label: "Give up", action: () => setGaveUp(true), enabled: !!puzzle && !finished },
+    { key: "g", label: "Give up", action: giveUp, enabled: !!puzzle && !finished },
     { key: "n", label: "New game", action: start, enabled: !puzzle || finished },
   ];
   useGameShortcuts(shortcuts);
@@ -139,14 +237,15 @@ export const PhotoConnections = ({ photos }: { photos: PhotoGamePhoto[] }) => {
     return (
       <GameIntro game="connections">
         <p>
-          Make {size} groups of {size} photographs. Each group must share a subject.
+          Make {settings.size} groups of {settings.size} photographs. Each group must share a
+          subject.
         </p>
         <div className={styles.actions} role="group" aria-label="Board size">
           {([4, 5, 6] as const).map((value) => (
             <Button
               key={value}
-              active={size === value}
-              aria-pressed={size === value}
+              active={settings.size === value}
+              aria-pressed={settings.size === value}
               onClick={() => {
                 setSettings((previous) => ({ ...previous, size: value }));
                 setMessage("");
@@ -160,8 +259,8 @@ export const PhotoConnections = ({ photos }: { photos: PhotoGamePhoto[] }) => {
           {([null, 4, 6, 8] as const).map((value) => (
             <Button
               key={value ?? "unlimited"}
-              active={lives === value}
-              aria-pressed={lives === value}
+              active={settings.lives === value}
+              aria-pressed={settings.lives === value}
               onClick={() => setSettings((previous) => ({ ...previous, lives: value }))}
             >
               {value === null ? "Unlimited" : `${value} lives`}
@@ -170,23 +269,23 @@ export const PhotoConnections = ({ photos }: { photos: PhotoGamePhoto[] }) => {
         </div>
         <div className={styles.actions} role="group" aria-label="Connection difficulty">
           <Button
-            active={detail === "broad"}
-            aria-pressed={detail === "broad"}
+            active={settings.detail === "broad"}
+            aria-pressed={settings.detail === "broad"}
             onClick={() => setSettings((previous) => ({ ...previous, detail: "broad" }))}
           >
             Broad subjects
           </Button>
           <Button
-            active={detail === "specific"}
-            aria-pressed={detail === "specific"}
+            active={settings.detail === "specific"}
+            aria-pressed={settings.detail === "specific"}
             onClick={() => setSettings((previous) => ({ ...previous, detail: "specific" }))}
           >
             Specific subjects
           </Button>
           <Button
-            active={hints}
-            aria-pressed={hints}
-            aria-label={`One-away hints ${hints ? "on" : "off"}`}
+            active={settings.hints}
+            aria-pressed={settings.hints}
+            aria-label={`One-away hints ${settings.hints ? "on" : "off"}`}
             onClick={() => setSettings((previous) => ({ ...previous, hints: !previous.hints }))}
           >
             One-away hints
@@ -194,10 +293,29 @@ export const PhotoConnections = ({ photos }: { photos: PhotoGamePhoto[] }) => {
         </div>
         <Caption>Specific subjects use finer connections, such as lanterns or bicycles.</Caption>
         {message ? <p role="alert">{message}</p> : null}
-        <Button variant="primary" onClick={start}>
-          Start connecting
-          <KeyHint aria-hidden="true">N</KeyHint>
-        </Button>
+        <div className={styles.actions}>
+          <Button variant="primary" onClick={start}>
+            Start connecting
+            <KeyHint aria-hidden="true">N</KeyHint>
+          </Button>
+          {stats && !todaysResult ? (
+            <>
+              <Button onClick={startDaily}>Daily #{today.number}</Button>
+              <Caption>4×4 · 4 lives</Caption>
+            </>
+          ) : null}
+        </div>
+        {todaysResult ? (
+          <div className={styles.actions}>
+            <Caption>
+              Daily #{today.number} · {todaysResult.summary}
+            </Caption>
+            <ShareResult
+              text={dailyShareText("connections", today.day, todaysResult.summary, shareOrigin)}
+            />
+          </div>
+        ) : null}
+        <GameStatsLine stats={stats} best={null} />
       </GameIntro>
     );
   const visibleGroups = finished
@@ -267,6 +385,12 @@ export const PhotoConnections = ({ photos }: { photos: PhotoGamePhoto[] }) => {
               {found.length === size ? "All connected" : "The connections"}
             </Heading>
           ) : null}
+          {finished && daily && stats?.dailies[daily] ? (
+            <ShareResult
+              text={dailyShareText("connections", daily, stats.dailies[daily].summary, shareOrigin)}
+            />
+          ) : null}
+          {finished ? <ResultNextSteps photos={puzzle.tiles} /> : null}
           {visibleGroups.map((group) => (
             <section
               key={group.id}
@@ -343,7 +467,7 @@ export const PhotoConnections = ({ photos }: { photos: PhotoGamePhoto[] }) => {
             </section>
           ) : null}
           <div className={styles.actions}>
-            <Button variant="quiet" onClick={() => setGaveUp(true)}>
+            <Button variant="quiet" onClick={giveUp}>
               Give up
               <KeyHint aria-hidden="true">G</KeyHint>
             </Button>
@@ -358,6 +482,8 @@ export const PhotoConnections = ({ photos }: { photos: PhotoGamePhoto[] }) => {
           <Button
             onClick={() => {
               setPuzzle(null);
+              setDaily(null);
+              setDailyUrl(false);
               setMessage("");
             }}
           >

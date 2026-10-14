@@ -146,7 +146,8 @@ test("Photo Relay supports giving up and completing a new chain on mobile", asyn
   });
   await page.getByRole("button", { name: "Give up" }).click();
   const result = page.getByRole("region", { name: "Relay result" });
-  await expect(result.getByRole("link")).toHaveCount(7);
+  // The chain is the first list; next-step links follow it.
+  await expect(result.getByRole("list").first().getByRole("link")).toHaveCount(7);
   await page.getByRole("button", { name: "Play again" }).click();
   await page.getByRole("button", { name: /Photograph 1$/ }).focus();
   for (let i = 1; i <= 5; i++) {

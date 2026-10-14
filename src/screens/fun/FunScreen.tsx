@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { GlobalNav } from "../../components/GlobalNav";
 import { AppLink } from "../../components/platform";
 import { Heading, Icon } from "../../components/ui";
@@ -5,39 +6,63 @@ import { Seo } from "../../components/Seo";
 import { formatPageTitle } from "../../lib/seo";
 import { GameIllustration } from "../../components/fun/GameIllustration";
 import { FUN_GAMES } from "../../components/fun/games";
+import { readGameStats } from "../../components/fun/useGameStats";
+import { localDayKey } from "../../util/gameDaily";
 import styles from "./FunScreen.module.css";
 
-const FunScreen = () => (
-  <main id="main-content" className={styles.page}>
-    <Seo
-      title={formatPageTitle("Fun!")}
-      description="Play with the photo archive: geography, visual connections, drawing and a photo oracle."
-      pathname="/fun"
-      jsonLd={[]}
-    />
-    <GlobalNav currentPage="fun" hasPadding={false} />
-    <Heading level={1} as="h1">
-      Fun!
-    </Heading>
-    <div className={styles.games}>
-      {FUN_GAMES.map((game) => (
-        <AppLink key={game.id} href={game.href} className={styles.game}>
-          <div className={styles.gameArtwork}>
-            <GameIllustration src={game.illustration} />
-          </div>
-          <div className={styles.gameBody}>
-            <Heading level={1} as="h2">
-              {game.title}
-            </Heading>
-            <p>{game.description}</p>
-            <span className={styles.play}>
-              Play <Icon kind="compass" />
-            </span>
-          </div>
-        </AppLink>
-      ))}
-    </div>
-  </main>
-);
+/** Games finished today; read from this browser's storage after mount. */
+const usePlayedToday = (): ReadonlySet<string> => {
+  const [played, setPlayed] = useState<ReadonlySet<string>>(() => new Set());
+  useEffect(() => {
+    const today = localDayKey();
+    setPlayed(
+      new Set(
+        FUN_GAMES.filter((game) => readGameStats(game.id).lastDay === today).map((game) => game.id),
+      ),
+    );
+  }, []);
+  return played;
+};
+
+const FunScreen = () => {
+  const playedToday = usePlayedToday();
+  return (
+    <main id="main-content" className={styles.page}>
+      <Seo
+        title={formatPageTitle("Fun!")}
+        description="Play with the photo archive: geography, visual connections, drawing and a photo oracle."
+        pathname="/fun"
+        jsonLd={[]}
+      />
+      <GlobalNav currentPage="fun" hasPadding={false} />
+      <Heading level={1} as="h1">
+        Fun!
+      </Heading>
+      <div className={styles.games}>
+        {FUN_GAMES.map((game) => (
+          <AppLink key={game.id} href={game.href} className={styles.game}>
+            <div className={styles.gameArtwork}>
+              <GameIllustration src={game.illustration} />
+            </div>
+            <div className={styles.gameBody}>
+              <Heading level={1} as="h2">
+                {game.title}
+              </Heading>
+              <p>{game.description}</p>
+              <span className={styles.footer}>
+                <span className={styles.play}>
+                  Play <Icon kind="compass" />
+                </span>
+                {playedToday.has(game.id) ? (
+                  <span className={styles.playedToday}>Played today</span>
+                ) : null}
+              </span>
+            </div>
+          </AppLink>
+        ))}
+      </div>
+    </main>
+  );
+};
 
 export default FunScreen;

@@ -6,6 +6,8 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { fetchGuessRegions } from "../search/api";
 import { GuessLobby } from "./GuessLobby";
 import { gameSettingsStorageKey } from "../fun/useGameSettings";
+import { EMPTY_GAME_STATS, recordGameResult } from "../../util/gameStats";
+import { dailyNumber, localDayKey } from "../../util/gameDaily";
 
 jest.mock("../search/api", () => ({
   fetchGuessRegions: jest.fn(),
@@ -251,5 +253,49 @@ describe("GuessLobby", () => {
         "France",
       ),
     );
+  });
+
+  it("shows the player's record once a game has been finished", async () => {
+    const stats = recordGameResult(EMPTY_GAME_STATS, { won: false, score: 12_000 }, localDayKey());
+    render(
+      <GuessLobby
+        database={database}
+        defaults={{ rounds: 5, timeLimit: null }}
+        onStart={jest.fn()}
+        stats={stats}
+      />,
+    );
+    await screen.findByText("20 photos available");
+    expect(screen.getByText("Played 1 · best 12,000")).toBeInTheDocument();
+  });
+
+  it("offers today's result to share instead of replaying a finished daily", async () => {
+    const today = localDayKey();
+    const stats = recordGameResult(
+      EMPTY_GAME_STATS,
+      { won: false, score: 18_420, daily: { day: today, summary: "18,420 / 25,000 points" } },
+      today,
+    );
+    const writeText = jest.fn().mockResolvedValue(undefined);
+    Object.assign(navigator, { clipboard: { writeText } });
+    const onStart = jest.fn();
+    render(
+      <GuessLobby
+        database={database}
+        defaults={{ rounds: 5, timeLimit: null }}
+        onStart={onStart}
+        stats={stats}
+      />,
+    );
+    await screen.findByText("20 photos available");
+    expect(screen.queryByRole("button", { name: "Daily challenge" })).toBeNull();
+    expect(screen.getByText(/18,420 \/ 25,000 points/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Share result" }));
+    await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
+    const text: string = writeText.mock.calls[0][0];
+    expect(text).toContain(`Guess Where #${dailyNumber(today)}`);
+    expect(text).toContain("18,420 / 25,000 points");
+    expect(text).toMatch(/\/fun\/guess\?daily$/);
+    expect(onStart).not.toHaveBeenCalled();
   });
 });

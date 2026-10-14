@@ -1,6 +1,6 @@
 /** @jest-environment jsdom */
 import { act, render, screen } from "@testing-library/react";
-import { PhotoGameScreen } from "./PhotoGameScreen";
+import { HindsightScreen, PhotoGameScreen } from "./PhotoGameScreen";
 import { GameIntro } from "../../components/fun/GameIllustration";
 import { fetchPhotoGameArchive } from "../../components/search/api";
 
@@ -80,4 +80,26 @@ it("keeps the real lobby mounted and disabled while data loads, then enables the
   );
   expect(screen.getByRole("button", { name: "Start connecting" })).toBe(start);
   expect(start).toBeEnabled();
+});
+
+it("loads Hindsight from the core archive alone and opens its lobby", async () => {
+  jest.mocked(fetchPhotoGameArchive).mockResolvedValue(
+    Array.from({ length: 6 }, (_, i) => ({
+      path: `../albums/a/${i}.jpg`,
+      href: `/album/a#${i}.jpg`,
+      caption: "A photo",
+      tags: "",
+      vector: [],
+      takenAt: `${2010 + i}-01-01T00:00:00`,
+    })),
+  );
+  render(<HindsightScreen />);
+  await act(async () => {});
+  expect(fetchPhotoGameArchive).toHaveBeenCalledWith(
+    expect.not.objectContaining({ embeddingsDatabase: expect.anything() }),
+  );
+  expect(fetchPhotoGameArchive).toHaveBeenCalledWith(
+    expect.objectContaining({ game: "hindsight" }),
+  );
+  expect(screen.getByRole("button", { name: /Start Hindsight/ })).toBeEnabled();
 });

@@ -15,9 +15,15 @@ import { GameIntro } from "./GameIllustration";
 import { useGameReadiness } from "./GameReadiness";
 import styles from "./PhotoGames.module.css";
 import { useGameShortcuts } from "./useGameShortcuts";
+import { useGameStats } from "./useGameStats";
+import { GameStatsLine } from "./GameRecord";
+import { ResultNextSteps } from "./ResultNextSteps";
+
+const outOf100 = (value: number) => `${value}/100`;
 
 export const BlindFrame = ({ photos }: { photos: PhotoGamePhoto[] }) => {
   const { loading } = useGameReadiness();
+  const { stats, record } = useGameStats("blind-frame");
   const [target, setTarget] = useState<PhotoGamePhoto | null>(null);
   const [inlinePad, setInlinePad] = useState(false);
   useEffect(() => {
@@ -58,10 +64,24 @@ export const BlindFrame = ({ photos }: { photos: PhotoGamePhoto[] }) => {
   useEffect(() => {
     if (result || gaveUp) resultRef.current?.focus();
   }, [result, gaveUp]);
+  // Each submitted sketch is one game, recorded when its reveal arrives. The
+  // ref keeps a re-render or a re-run effect from recording it twice. A win is
+  // a drawing whose closest match in the archive is the original itself.
+  const recordedQuery = useRef<typeof imageQuery>(null);
+  useEffect(() => {
+    if (!result || !target || gaveUp || !imageQuery || recordedQuery.current === imageQuery) return;
+    recordedQuery.current = imageQuery;
+    record({
+      won: result.nearest.path === target.path,
+      ...(result.score === null ? {} : { score: result.score }),
+    });
+  }, [result, target, gaveUp, imageQuery, record]);
   const comparing = Boolean(imageQuery && !imageQuery.vector);
   // Abandon any comparison still running, or its late result would replace the reveal.
   const giveUp = () => {
+    if (gaveUp) return;
     clearImageQuery();
+    record({ won: false });
     setGaveUp(true);
   };
   const eligible = photos.filter((photo) => photo.caption.length >= 20 && photo.vector.length > 0);
@@ -107,6 +127,7 @@ export const BlindFrame = ({ photos }: { photos: PhotoGamePhoto[] }) => {
           Draw a hidden photograph from its description. Then meet the original—and your drawing’s
           closest match.
         </p>
+        <GameStatsLine stats={stats} formatBest={outOf100} />
         <Button variant="primary" onClick={start}>
           Start Blind Frame
           <KeyHint aria-hidden="true">N</KeyHint>
@@ -177,6 +198,7 @@ export const BlindFrame = ({ photos }: { photos: PhotoGamePhoto[] }) => {
             <Caption>These match the original, not your drawing.</Caption>
             <PhotoChain photos={nearestGamePhotos(target, photos, 4)} numbered={false} />
           </section>
+          <ResultNextSteps photos={[target, ...nearestGamePhotos(target, photos, 4)]} />
           <div className={styles.actions}>
             <Button variant="primary" onClick={start}>
               Play again

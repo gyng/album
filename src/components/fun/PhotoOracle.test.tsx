@@ -2,6 +2,7 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { PhotoOracle } from "./PhotoOracle";
 import type { PhotoGamePhoto } from "../../util/photoGames";
+import { readGameStats } from "./useGameStats";
 
 beforeEach(() => localStorage.clear());
 
@@ -203,4 +204,36 @@ it("announces each question in one persistent status region and keeps the answer
   expect(screen.getByRole("status")).toBe(status);
   expect(status.textContent).not.toBe(first);
   expect(screen.getByRole("button", { name: "Not sure" })).toHaveFocus();
+});
+
+it("records each finished round once, in either mode, and shows the record in the lobby", () => {
+  const first = render(<PhotoOracle photos={photos} />);
+  fireEvent.click(screen.getByRole("button", { name: "Meet the oracle" }));
+  fireEvent.click(screen.getByRole("button", { name: /Photograph 1$/ }));
+  fireEvent.click(screen.getByRole("button", { name: "I have my photograph" }));
+  fireEvent.click(screen.getByRole("button", { name: "Give up" }));
+  expect(readGameStats("oracle")).toMatchObject({ played: 1 });
+  fireEvent.click(screen.getByRole("button", { name: "Change mode" }));
+  fireEvent.click(screen.getByRole("button", { name: "Find me a photograph" }));
+  fireEvent.click(screen.getByRole("button", { name: "Show a match now" }));
+  expect(readGameStats("oracle")).toMatchObject({ played: 2 });
+  first.unmount();
+  render(<PhotoOracle photos={photos} />);
+  expect(screen.getByText("Played 2")).toBeInTheDocument();
+});
+
+it("offers a search for photographs like the one revealed", () => {
+  render(<PhotoOracle photos={photos} />);
+  fireEvent.click(screen.getByRole("button", { name: "Meet the oracle" }));
+  fireEvent.click(screen.getByRole("button", { name: /Photograph 2$/ }));
+  fireEvent.click(screen.getByRole("button", { name: "I have my photograph" }));
+  fireEvent.click(screen.getByRole("button", { name: "Give up" }));
+  const result = screen.getByRole("region", { name: "Oracle result" });
+  const shown = within(result).getByRole("img").getAttribute("src")!;
+  const href = within(result)
+    .getByRole("link", { name: "Similar photographs" })
+    .getAttribute("href")!;
+  const similar = new URL(href, "https://example.org").searchParams.get("similar")!;
+  expect(similar.startsWith("../albums/test-simple/")).toBe(true);
+  expect(shown).toContain(similar.split("/").at(-1));
 });

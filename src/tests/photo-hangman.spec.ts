@@ -78,7 +78,7 @@ for (const width of [320, 1280]) {
     await answer.click();
     const result = page.getByRole("region", { name: "Photo Hangman result" });
     await expect(result).toBeFocused();
-    await expect(result.getByRole("link")).toHaveCount(8);
+    await expect(result.getByRole("link").filter({ has: page.getByRole("img") })).toHaveCount(8);
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
       width,
     );
@@ -104,7 +104,7 @@ test("each wrong subject reveals a photo, previous clues remain available, and s
   }
   const result = page.getByRole("region", { name: "Photo Hangman result" });
   await expect(result).toBeFocused();
-  await expect(result.getByRole("link")).toHaveCount(8);
+  await expect(result.getByRole("link").filter({ has: page.getByRole("img") })).toHaveCount(8);
   await page.getByRole("button", { name: "View clue 1" }).click();
   await expect(
     page.getByRole("figure", { name: "Current photographic clue" }).getByRole("img"),

@@ -1,0 +1,197 @@
+.daily {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+}
+
+.workspace,
+.board,
+.tray {
+  min-inline-size: 0;
+  display: grid;
+  align-content: start;
+  gap: var(--space-3);
+}
+
+.slots {
+  grid-template-columns: repeat(var(--hindsight-size, 5), minmax(0, 1fr));
+}
+
+.slots li {
+  position: relative;
+  align-content: start;
+  aspect-ratio: auto;
+  min-block-size: 5rem;
+  transition:
+    border-color 150ms ease,
+    background 150ms ease,
+    opacity 150ms ease;
+}
+
+.slots li[data-drop-active="true"] {
+  background: var(--c-surface);
+  border-color: var(--c-border-hover);
+}
+
+.slots li[data-drop-hover="true"] {
+  background: var(--c-selected);
+  border: var(--line-strong) solid var(--c-accent);
+  box-shadow: inset 0 0 0 var(--line-strong) var(--c-bg);
+}
+
+.choice[data-dragging="true"],
+.slots li[data-dragging="true"] {
+  opacity: 0.4;
+  outline: var(--line-strong) dashed var(--c-accent);
+  outline-offset: var(--size-2);
+}
+
+.choices {
+  grid-template-columns: repeat(auto-fill, minmax(var(--size-120), 1fr));
+  gap: var(--space-2);
+}
+
+.choice {
+  cursor: grab;
+  padding: var(--space-1);
+}
+
+.choice,
+.slots button {
+  scroll-margin-block-start: calc(var(--hindsight-dock-height, 0px) + var(--space-3));
+}
+
+.choice span {
+  font-size: var(--fs-s);
+}
+
+.reference {
+  display: none;
+}
+
+.reveal {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(var(--size-180), 1fr));
+  gap: var(--space-3);
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.reveal li {
+  display: grid;
+  align-content: start;
+  gap: var(--space-1);
+  min-inline-size: 0;
+  padding: var(--space-2);
+  border: var(--line-hairline) solid var(--c-border);
+  border-radius: var(--radius-panel);
+  background: var(--c-surface);
+}
+
+.reveal li[data-correct="true"] {
+  border-color: var(--c-accent);
+}
+
+.when {
+  font-size: var(--fs-s);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (min-width: 961px) and (pointer: fine) {
+  .slotActions button {
+    min-inline-size: var(--control-height-compact, 2rem);
+    min-block-size: var(--control-height-compact, 2rem);
+    padding: 0;
+  }
+}
+
+@media (max-width: 960px) {
+  .reference {
+    display: grid;
+    gap: var(--space-2);
+    align-self: start;
+    padding: var(--space-2);
+    border: var(--line-hairline) solid var(--c-border);
+    border-radius: var(--radius-panel);
+    background: var(--c-bg);
+  }
+
+  .miniOrder {
+    display: grid;
+    grid-template-columns: repeat(var(--hindsight-size, 5), minmax(0, 1fr));
+    gap: var(--space-1);
+    padding: 0;
+    margin: 0;
+    list-style: none;
+  }
+
+  .miniOrder li {
+    min-inline-size: 0;
+  }
+
+  .miniOrder img,
+  .empty {
+    inline-size: 100%;
+    aspect-ratio: 1;
+    block-size: auto;
+  }
+
+  .empty {
+    display: grid;
+    place-items: center;
+    border: var(--line-hairline) dashed var(--c-border);
+    border-radius: var(--radius-preview);
+    color: var(--c-bg-contrast-light);
+    font-size: var(--fs-s);
+  }
+
+  .referenceActions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+  }
+}
+
+@media (min-width: 961px) {
+  .workspace {
+    grid-template-columns: minmax(0, 3fr) minmax(16rem, 2fr);
+    gap: var(--space-4);
+    align-items: start;
+  }
+
+  .tray {
+    max-block-size: max(16rem, calc(100dvh - 24rem));
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+    padding: var(--space-1);
+    border: var(--line-hairline) solid var(--c-border);
+    border-radius: var(--radius-panel);
+    background: var(--c-surface);
+  }
+}
+
+@media (max-width: 720px) {
+  .slots {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--space-2);
+  }
+
+  .choices {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .reveal {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-2);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .slots li {
+    transition: none;
+  }
+}

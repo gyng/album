@@ -108,3 +108,16 @@
   grid-column: 1;
   grid-row: 2;
 }
+
+/* A finished daily's Share action takes the Daily button's cell and width;
+   the share status sits beside it when there is one. */
+.dailyShare {
+  grid-column: 1;
+  grid-row: 1;
+  display: grid;
+}
+
+.dailyShare > span {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+}

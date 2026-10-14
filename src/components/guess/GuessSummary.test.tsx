@@ -37,13 +37,14 @@ const result = (score: number, overrides: Partial<RoundResult> = {}): RoundResul
 const renderSummary = (
   results: RoundResult[],
   settings: GameSettings = { rounds: 5, timeLimit: null },
+  seed = "challenge-seed",
 ) => {
   const onPlayAgain = jest.fn();
   const onChangeSettings = jest.fn();
   render(
     <GuessSummary
       results={results}
-      seed="challenge-seed"
+      seed={seed}
       settings={settings}
       onPlayAgain={onPlayAgain}
       onChangeSettings={onChangeSettings}
@@ -137,14 +138,26 @@ describe("GuessSummary", () => {
     );
   });
 
-  it("copies the canonical daily challenge URL", async () => {
-    renderSummary([result(1_000)], { rounds: 5, timeLimit: null, daily: true });
+  it("shares a finished daily as a spoiler-free result", async () => {
+    renderSummary([result(1_000)], { rounds: 5, timeLimit: null, daily: true }, "daily-2026-10-16");
 
     expect(screen.getByText("Daily challenge")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Copy challenge link" }));
+    expect(screen.queryByRole("button", { name: "Copy challenge link" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Share result" }));
 
-    expect(writeText).toHaveBeenCalledWith("http://localhost/fun/guess?daily");
-    expect(await screen.findByRole("button", { name: "Copied!" })).toBeInTheDocument();
+    await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
+    expect(writeText.mock.calls[0][0]).toMatch(
+      /^Guess Where #3\n1,000 \/ 5,000 points\n\S*\/fun\/guess\?daily$/,
+    );
+  });
+
+  it("challenges a friend with the same named photographs", async () => {
+    const photos = ["../albums/test-simple/a b.jpg", "../albums/test-simple/c.jpg"];
+    renderSummary([result(1_000), result(2_000)], { rounds: 2, timeLimit: null, photos }, "");
+    fireEvent.click(screen.getByRole("button", { name: "Copy challenge link" }));
+    const url = new URL(writeText.mock.calls[0][0]);
+    expect(url.pathname).toBe("/fun/guess");
+    expect(url.searchParams.getAll("photos")).toEqual(photos);
   });
 
   it("includes default choices explicitly so recipients' saved preferences cannot change the challenge", async () => {

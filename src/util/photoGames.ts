@@ -5,6 +5,8 @@ export type PhotoGamePhoto = {
   tags: string;
   vector: number[] | Float32Array;
   location?: { lat: number; lng: number; date: string; label: string };
+  /** Camera-local wall clock (naive ISO), for games about when a photograph was taken. */
+  takenAt?: string;
 };
 
 export const photoGameCaption = (value: string): string =>

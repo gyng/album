@@ -398,3 +398,77 @@ trail. Clear answer badges distinguish Yes, No and Not sure. Back removes the
 latest answer and restores its question; results retain the trail. Entry motion
 is subtle and disabled for reduced-motion preferences. Keyboard hints remain
 beside the active question controls.
+
+## Hindsight
+
+At `/fun/hindsight`, put four, five or six photographs (five by default) in
+the order they were taken. Tap a photograph to place it in the next free slot,
+drag it into place, or use the keyboard; placed photographs have move-earlier,
+move-later and remove buttons. Keyboard placement moves focus to the next
+photograph in the tray and then to Check order; moves keep focus on the moved
+photograph, and undo or remove returns it to the tray photograph. The reveal
+takes focus.
+
+Order is the camera's wall clock (`exifWallClockTimestamp` over
+`metadata.iso8601`), the same clock the reveal shows through
+`formatExifWallClockDateTime`. No zone is applied. Photographs without a
+parseable time are never dealt, and no two dealt photographs are within ten
+minutes of each other, so ties and bursts cannot make an order ambiguous.
+
+- **Across the years** deals from the whole archive, every pair at least 90 days
+  apart. That is far wider than any difference between zones, so wall-clock order
+  is also real order.
+- **One trip** deals from one album (a photograph's directory), first to last
+  within two weeks, each pair at least ten minutes apart. Within a trip that
+  crosses zones the camera's clock is still the clock the reveal shows.
+
+A hand dealt already in order is rotated before play. The score is the share of
+all pairs the right way round (Kendall-tau style): n(n−1)/2 pairs, so one
+photograph out of place costs only the pairs it breaks, where exact positions
+would punish one early slip along the whole row. The reveal also counts
+photographs in exactly the right place, shows each date with the gap from the
+previous photograph, and links every photograph to its album. A perfect order
+is a win; the best score is recorded.
+
+The daily (`?daily`) is five photographs across the years, dealt from
+`dailyPhotoOrder` with `dailyPuzzle("hindsight").random()`, so every device
+with the same archive gets the same board on the same local day. It never reads
+or saves the player's settings; Play again after a daily is a practice game
+with the player's own settings. A finished daily is recorded once, with a
+spoiler-free share text ("5 photographs · 80% in order"); replaying it the same
+day is not recorded again. The lobby shows today's result and the personal record.
+
+## Dailies, stats and next steps
+
+Connect the Shots, Cross Exposure, Sight Lines, Photo Hangman, Hindsight and
+Guess Where each offer one daily board, numbered from 14 October 2026 (#1) and
+reached from the lobby or `?daily`. A daily follows the reader's local calendar
+day and is dealt from the archive sorted by path with a seed of the game and
+day (`util/gameDaily.ts`, `GameRecord.dailyPuzzle`/`dailyPhotoOrder`), so every
+device with the same archive gets the same board; the archive itself arrives in
+random order. Daily settings are fixed and never saved: Connect the Shots 4×4,
+broad, hints, 4 lives; Cross Exposure 4×4, hidden, no starting photographs;
+Sight Lines 6×6, 4 per line; Hangman its usual rules (never seeded by the
+previous answer); Hindsight 5 photographs across the years; Guess Where five
+untimed rounds with its existing `daily-YYYY-MM-DD` seed. A finished daily is
+kept: the lobby shows its result and Share instead of offering it again, and a
+replay counts as practice. Share text is spoiler-free — title, number and a
+summary such as "4×4 · 1 mistake" — with a link back to the daily.
+
+Every game records each finished game once, from the handler that ends it, in
+`localStorage` (`fun-stats:<game>`, `util/gameStats.ts`): games played, wins,
+a best score where one compares across games, and a streak of consecutive days
+played. Best scores: Guess Where total points; Relay its visual-flow
+percentile; Blind Frame its 0–100 resemblance; Double Take correct answers;
+Hangman misses to spare; Hindsight the percentage of pairs in order. Connect
+the Shots, Cross Exposure, Sight Lines and Oracle record no best, since their
+measures depend on board size or have no winner. The Fun hub marks games played
+today. Links never write saved settings.
+
+Results end with next steps: "Similar photographs" searches around the first
+result photograph, and "Guess where these were taken" deals the located ones
+(at least two, at most ten) to Guess Where through repeated `photos=` paths.
+Every game loads coordinates for this; outside Guess Where, Double Take and
+Hindsight, place and time stay out of the puzzles themselves — players cannot
+reason about when or where an arbitrary photograph was taken. Sight Lines uses
+coordinates only to avoid lines whose photographs share one outing.

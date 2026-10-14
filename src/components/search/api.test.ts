@@ -1545,6 +1545,32 @@ describe("guess-game queries", () => {
     expect(first).toHaveLength(1);
   });
 
+  it("fetches named photos in the order named, skipping unknown paths", async () => {
+    const rows: Record<string, string[]> = {
+      "../albums/a/one.jpg": ["../albums/a/one.jpg", "exif-one", "JP\nJapan"],
+      "../albums/a/two.jpg": ["../albums/a/two.jpg", "exif-two", ""],
+    };
+    const exec = jest.fn(({ bind, callback }: ExecArgs) => {
+      for (const path of bind as string[]) if (rows[path]) callback(rows[path]);
+    });
+    await expect(
+      fetchGuessPhotos({
+        database: { exec } as any,
+        count: 10,
+        paths: ["../albums/a/two.jpg", "../albums/missing/x.jpg", "../albums/a/one.jpg"],
+      }),
+    ).resolves.toEqual([
+      { path: "../albums/a/two.jpg", exif: "exif-two", geocode: "" },
+      { path: "../albums/a/one.jpg", exif: "exif-one", geocode: "JP\nJapan" },
+    ]);
+    expect(exec).toHaveBeenCalledTimes(1);
+    exec.mockClear();
+    await expect(
+      fetchGuessPhotos({ database: { exec } as any, count: 10, paths: [] }),
+    ).resolves.toEqual([]);
+    expect(exec).not.toHaveBeenCalled();
+  });
+
   it("returns no seeded photos when there are no candidates", async () => {
     const database = { exec: () => {} };
     await expect(

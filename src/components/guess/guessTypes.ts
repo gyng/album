@@ -12,4 +12,6 @@ export type GameSettings = {
   timeLimit: number | null;
   region?: string;
   daily?: boolean;
+  /** Archive paths dealt in this order, one per round, instead of a random draw. */
+  photos?: string[];
 };

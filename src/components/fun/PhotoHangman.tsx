@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
+import { useUrlSearchParams } from "../platform";
 import { Button, Caption, LoadingIndicator, KeyHint } from "../ui";
 import { GameIntro } from "./GameIllustration";
 import { GameDock } from "./GameDock";
@@ -15,13 +16,43 @@ import {
   type PhotoHangmanPuzzle,
 } from "../../util/photoHangman";
 import type { PhotoGamePhoto } from "../../util/photoGames";
+import { ResultNextSteps } from "./ResultNextSteps";
 import styles from "./PhotoHangman.module.css";
 import { useGameShortcuts } from "./useGameShortcuts";
+import { useGameStats } from "./useGameStats";
+import {
+  dailyPhotoOrder,
+  dailyPuzzle,
+  dailyShareText,
+  GameStatsLine,
+  ShareResult,
+  useShareOrigin,
+} from "./GameRecord";
+import { dailyNumber, localDayKey } from "../../util/gameDaily";
 
 const subjectLabel = (subject: string) => subject[0]! + subject.slice(1).toLowerCase();
 
+/**
+ * Today's puzzle under the usual rules. It never avoids the previous answer, as an ordinary
+ * round does: that would make the daily depend on what this player happened to play before.
+ */
+export const buildDailyPhotoHangman = (photos: PhotoGamePhoto[], day: string = localDayKey()) =>
+  buildPhotoHangman(dailyPhotoOrder(photos), dailyPuzzle("photo-hangman", day).random());
+
+const missCount = (misses: number) => `${misses} ${misses === 1 ? "miss" : "misses"}`;
+
+/** Spoiler-free: whether it was solved and at what cost, never the subject. */
+const dailySummary = (won: boolean, misses: number) =>
+  `${won ? "Solved" : "Not solved"} · ${missCount(misses)}`;
+
 export const PhotoHangman = ({ photos }: { photos: PhotoGamePhoto[] }) => {
   const [puzzle, setPuzzle] = useState<PhotoHangmanPuzzle | null>(null);
+  // The day of the daily being played; null for an ordinary round.
+  const [daily, setDaily] = useState<string | null>(null);
+  const { ready: urlReady, hasSearchParam } = useUrlSearchParams();
+  const { stats, record } = useGameStats("photo-hangman");
+  const shareOrigin = useShareOrigin();
+  const dailyDescriptionId = useId();
   const [guesses, setGuesses] = useState<string[]>([]);
   const [query, setQuery] = useState("");
   const [viewed, setViewed] = useState<{ misses: number; index: number } | null>(null);
@@ -45,13 +76,13 @@ export const PhotoHangman = ({ photos }: { photos: PhotoGamePhoto[] }) => {
     const frame = requestAnimationFrame(() => resultRef.current?.focus());
     return () => cancelAnimationFrame(frame);
   }, [ended]);
-  const start = () => {
-    const next = buildPhotoHangman(photos, Math.random, puzzle?.answer);
+  const begin = (next: PhotoHangmanPuzzle | null, day: string | null) => {
     if (!next) {
       setError("This archive needs at least eight photographs of each of two subjects.");
       return;
     }
     setPuzzle(next);
+    setDaily(day);
     setGuesses([]);
     setQuery("");
     setViewed(null);
@@ -62,6 +93,35 @@ export const PhotoHangman = ({ photos }: { photos: PhotoGamePhoto[] }) => {
     setRefocusAfter(null);
     setGaveUp(false);
     setError("");
+  };
+  const start = () => begin(buildPhotoHangman(photos, Math.random, puzzle?.answer), null);
+  const startDaily = () => {
+    const day = localDayKey();
+    begin(buildDailyPhotoHangman(photos, day), day);
+  };
+  const today = localDayKey();
+  const todaysDaily = stats?.dailies[today];
+  // A linked daily starts once the archive and the player's record are both known.
+  const linkedDaily = useRef(false);
+  const startLinkedDaily = useRef(startDaily);
+  startLinkedDaily.current = startDaily;
+  useEffect(() => {
+    if (linkedDaily.current || !urlReady || !stats || !photos.length) return;
+    linkedDaily.current = true;
+    if (hasSearchParam("daily") && !stats.dailies[localDayKey()]) startLinkedDaily.current();
+  }, [urlReady, hasSearchParam, stats, photos.length]);
+  // Score: misses to spare on a solved round, so higher is better; an unsolved round has none.
+  const finish = (won: boolean, finalMisses: number) =>
+    record({
+      won,
+      ...(won ? { score: HANGMAN_MISSES - finalMisses } : {}),
+      ...(daily ? { daily: { day: daily, summary: dailySummary(won, finalMisses) } } : {}),
+    });
+  const giveUp = () => {
+    if (!puzzle || ended) return;
+    searchRef.current?.blur();
+    finish(false, misses);
+    setGaveUp(true);
   };
   const revealed = puzzle ? Math.min(misses + HANGMAN_INITIAL_CLUES, puzzle.photos.length) : 0;
   const clueIndex = viewed?.misses === misses ? viewed.index : revealed - 1;
@@ -101,7 +161,7 @@ export const PhotoHangman = ({ photos }: { photos: PhotoGamePhoto[] }) => {
     {
       key: "G",
       label: "Give up",
-      action: () => setGaveUp(true),
+      action: giveUp,
       enabled: Boolean(puzzle && !ended),
     },
   ];
@@ -114,10 +174,33 @@ export const PhotoHangman = ({ photos }: { photos: PhotoGamePhoto[] }) => {
           guess reveals another. Six misses end the round.
         </p>
         {error ? <p role="alert">{error}</p> : null}
-        <Button variant="primary" onClick={start}>
-          Start guessing
-          <KeyHint aria-hidden="true">N</KeyHint>
-        </Button>
+        <div className={styles.lobbyActions}>
+          <Button variant="primary" onClick={start}>
+            Start guessing
+            <KeyHint aria-hidden="true">N</KeyHint>
+          </Button>
+          {todaysDaily ? null : (
+            <>
+              <Button onClick={startDaily} aria-describedby={dailyDescriptionId}>
+                Daily #{dailyNumber(today)}
+              </Button>
+              <Caption id={dailyDescriptionId} as="span">
+                The same photographs for everyone today
+              </Caption>
+            </>
+          )}
+        </div>
+        {todaysDaily ? (
+          <div className={styles.lobbyActions}>
+            <p className={styles.dailyResult}>
+              Daily #{dailyNumber(today)} · {todaysDaily.summary}
+            </p>
+            <ShareResult
+              text={dailyShareText("photo-hangman", today, todaysDaily.summary, shareOrigin)}
+            />
+          </div>
+        ) : null}
+        <GameStatsLine stats={stats} formatBest={(score) => missCount(HANGMAN_MISSES - score)} />
       </GameIntro>
     );
   const answer =
@@ -284,8 +367,12 @@ export const PhotoHangman = ({ photos }: { photos: PhotoGamePhoto[] }) => {
                       if (!ready) return;
                       searchRef.current?.blur();
                       setRefocusAfter(subject);
-                      setGuesses((previous) => addHangmanSubjectGuess(puzzle, previous, subject));
+                      const next = addHangmanSubjectGuess(puzzle, guesses, subject);
+                      setGuesses(next);
                       setQuery("");
+                      const outcome = hangmanSubjectStatus(puzzle, next);
+                      if (next !== guesses && outcome !== "playing")
+                        finish(outcome === "won", wrongHangmanSubjects(puzzle, next).length);
                     }}
                   >
                     {subjectLabel(subject)}
@@ -294,12 +381,7 @@ export const PhotoHangman = ({ photos }: { photos: PhotoGamePhoto[] }) => {
                 ))}
               </div>
               {!choices.length ? <p>No matching subjects.</p> : null}
-              <Button
-                onClick={() => {
-                  searchRef.current?.blur();
-                  setGaveUp(true);
-                }}
-              >
+              <Button onClick={giveUp}>
                 Give up
                 <KeyHint aria-hidden="true">G</KeyHint>
               </Button>
@@ -317,7 +399,18 @@ export const PhotoHangman = ({ photos }: { photos: PhotoGamePhoto[] }) => {
                   ? `Solved using ${revealed} ${revealed === 1 ? "photograph" : "photographs"}.`
                   : `${guesses.length} ${guesses.length === 1 ? "guess" : "guesses"} · ${misses} ${misses === 1 ? "miss" : "misses"}.`}
               </p>
+              {daily ? (
+                <ShareResult
+                  text={dailyShareText(
+                    "photo-hangman",
+                    daily,
+                    dailySummary(status === "won", misses),
+                    shareOrigin,
+                  )}
+                />
+              ) : null}
               <PhotoChain photos={puzzle.photos} numbered={false} />
+              <ResultNextSteps photos={puzzle.photos} />
               <Button onClick={start}>
                 Play again<KeyHint aria-hidden="true">N</KeyHint>
               </Button>

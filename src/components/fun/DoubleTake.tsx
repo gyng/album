@@ -14,6 +14,11 @@ import { GameProgress, GameScore } from "./GameFeedback";
 import { GamePhoto } from "./GamePhoto";
 import { useGameShortcuts } from "./useGameShortcuts";
 import { useGameSettings } from "./useGameSettings";
+import { useGameStats } from "./useGameStats";
+import { GameStatsLine } from "./GameRecord";
+import { ResultNextSteps } from "./ResultNextSteps";
+
+const correctAnswers = (value: number) => `${value} correct`;
 import styles from "./DoubleTake.module.css";
 
 type Phase =
@@ -66,6 +71,7 @@ export const DoubleTake = ({ photos }: { photos: PhotoGamePhoto[] }) => {
   const [round, setRound] = useState(0);
   const [phase, setPhase] = useState<Phase>("lobby");
   const [settings, setSettings] = useGameSettings("doubleTake");
+  const { stats, record } = useGameStats("double-take");
   const { slower } = settings;
   const [attempt, setAttempt] = useState(0);
   const [replayed, setReplayed] = useState(false);
@@ -190,8 +196,12 @@ export const DoubleTake = ({ photos }: { photos: PhotoGamePhoto[] }) => {
   };
 
   const next = () => {
-    if (round + 1 === deck.length) setPhase("summary");
-    else {
+    if (phase !== "reveal") return;
+    if (round + 1 === deck.length) {
+      // Scored by correct answers; a perfect game is a win.
+      record({ won: correctCount === deck.length, score: correctCount });
+      setPhase("summary");
+    } else {
       setRound(round + 1);
       setAnswer(null);
       setReplayed(false);
@@ -251,6 +261,7 @@ export const DoubleTake = ({ photos }: { photos: PhotoGamePhoto[] }) => {
           </Button>
         </div>
         {message ? <p role="alert">{message}</p> : null}
+        <GameStatsLine stats={stats} formatBest={correctAnswers} />
         <Button variant="primary" onClick={start}>
           Start Double Take
           <KeyHint aria-hidden="true">N</KeyHint>
@@ -274,6 +285,7 @@ export const DoubleTake = ({ photos }: { photos: PhotoGamePhoto[] }) => {
         <p>
           {correctCount} of {deck.length} correct · {score} points
         </p>
+        <ResultNextSteps photos={deck.flatMap((item) => item.photos)} />
         <Button variant="primary" onClick={start}>
           Play again
           <KeyHint aria-hidden="true">N</KeyHint>

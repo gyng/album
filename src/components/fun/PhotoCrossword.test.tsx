@@ -1,8 +1,13 @@
 /** @jest-environment jsdom */
+import { StrictMode } from "react";
 import { fireEvent, render, screen, within } from "@testing-library/react";
-import { PhotoCrossword } from "./PhotoCrossword";
+import { dailyCrosswordPuzzle, PhotoCrossword } from "./PhotoCrossword";
+import { dailyPuzzle } from "./GameRecord";
+import { gameStatsStorageKey, readGameStats } from "./useGameStats";
+import { gameSettingsStorageKey } from "./useGameSettings";
 import { buildPhotoCrossword, type PhotoCrosswordPuzzle } from "../../util/photoCrossword";
-import type { PhotoGamePhoto, OracleQuestion } from "../../util/photoGames";
+import { shuffleGamePhotos, type PhotoGamePhoto, type OracleQuestion } from "../../util/photoGames";
+import { seededRandom } from "../../util/seededRandom";
 jest.mock("./GameIllustration", () => ({
   GameIntro: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
@@ -372,4 +377,120 @@ it("ignores the new-puzzle shortcut while a board is in progress", () => {
   fireEvent.click(first());
   fireEvent.keyDown(window, { key: "n" });
   expect(within(first()).getByRole("img")).toHaveAttribute("alt", "round scarlet");
+});
+
+describe("daily", () => {
+  const today = dailyPuzzle("cross-exposure");
+  const dailyName = `Daily #${today.number}`;
+  afterEach(() => window.history.replaceState(null, "", "/"));
+
+  it("deals the same board on every device, whatever order the archive arrives in", () => {
+    jest
+      .mocked(buildPhotoCrossword)
+      .mockImplementation(jest.requireActual("../../util/photoCrossword").buildPhotoCrossword);
+    const archive: PhotoGamePhoto[] = Array.from({ length: 6 }, (_, r) =>
+      Array.from({ length: 6 }, (_, c) => ({
+        path: `../albums/test-simple/${r}-${c}.jpg`,
+        href: `/album/test-simple#${r}-${c}.jpg`,
+        caption: "A photograph",
+        tags: `row_${"abcdef"[r]},column_${"abcdef"[c]}`,
+        vector: [],
+      })),
+    ).flat();
+    const boardOf = (photos: PhotoGamePhoto[]) => {
+      const board = dailyCrosswordPuzzle(photos, today.day)!;
+      return {
+        size: board.size,
+        rows: board.rows.map((question) => question.id),
+        columns: board.columns.map((question) => question.id),
+        solution: board.solution.map((photo) => photo.path),
+        tiles: board.tiles.map((photo) => photo.path),
+      };
+    };
+    const first = boardOf(shuffleGamePhotos(archive, seededRandom("device one")));
+    expect(first.size).toBe(4);
+    expect(boardOf(shuffleGamePhotos(archive, seededRandom("device two")))).toEqual(first);
+  });
+
+  it("plays the fixed daily board without replacing saved settings", () => {
+    const saved = { mode: "visible", prefill: 2, size: 5 };
+    localStorage.setItem(gameSettingsStorageKey("cross"), JSON.stringify(saved));
+    render(<PhotoCrossword photos={photos} />);
+    fireEvent.click(screen.getByRole("button", { name: dailyName }));
+    expect(jest.mocked(buildPhotoCrossword)).toHaveBeenLastCalledWith(
+      expect.any(Array),
+      4,
+      expect.any(Function),
+    );
+    expect(screen.queryAllByRole("button", { name: /fixed starting photograph/ })).toHaveLength(0);
+    expect(screen.getByRole("button", { name: "Hint" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Give up" }));
+    expect(JSON.parse(localStorage.getItem(gameSettingsStorageKey("cross"))!)).toEqual(saved);
+    expect(window.location.search).toBe("?daily=");
+  });
+
+  it("records each finished game exactly once", () => {
+    render(
+      <StrictMode>
+        <PhotoCrossword photos={photos} />
+      </StrictMode>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Visible clues" }));
+    fireEvent.click(screen.getByRole("button", { name: "Start crossing" }));
+    fireEvent.click(screen.getByRole("button", { name: "Give up" }));
+    expect(readGameStats("cross-exposure")).toMatchObject({ played: 1, won: 0, dailies: {} });
+    fireEvent.click(screen.getByRole("button", { name: "Play again" }));
+    for (let i = 0; i < 9; i++) {
+      fireEvent.click(screen.getByRole("button", { name: "Select photograph 1" }));
+      fireEvent.click(
+        screen.getByRole("button", {
+          name: new RegExp(`^Row ${Math.floor(i / 3) + 1}: [a-z]+; column ${"ABC"[i % 3]}:`),
+        }),
+      );
+    }
+    fireEvent.click(screen.getByRole("button", { name: "Check grid" }));
+    expect(screen.getByRole("heading", { name: "Every clue crossed" })).toBeTruthy();
+    expect(readGameStats("cross-exposure")).toMatchObject({ played: 2, won: 1 });
+    fireEvent.click(screen.getByRole("button", { name: "Change grid size" }));
+    expect(screen.getByText(/Played 2 · won 1/)).toBeTruthy();
+  });
+
+  it("shares a finished daily and shows its result instead of offering it again", () => {
+    render(<PhotoCrossword photos={photos} />);
+    fireEvent.click(screen.getByRole("button", { name: dailyName }));
+    fireEvent.click(screen.getByRole("button", { name: "Hint" }));
+    fireEvent.click(screen.getByRole("button", { name: "Give up" }));
+    const result = screen.getByRole("region", { name: "Cross Exposure result" });
+    expect(within(result).getByRole("button", { name: "Share result" })).toBeTruthy();
+    expect(readGameStats("cross-exposure").dailies[today.day]).toEqual({
+      won: false,
+      summary: "3×3 · Gave up after 1 hint",
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Change grid size" }));
+    expect(screen.queryByRole("button", { name: dailyName })).toBeNull();
+    expect(screen.getByText(`${dailyName} · 3×3 · Gave up after 1 hint`)).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Share result" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Start crossing" })).toBeEnabled();
+  });
+
+  it("opens today's board from the URL, and its result once it is finished", () => {
+    window.history.replaceState(null, "", "/fun/cross-exposure?daily");
+    const first = render(<PhotoCrossword photos={photos} />);
+    expect(screen.getByRole("region", { name: "Crossword board" })).toBeTruthy();
+    first.unmount();
+    localStorage.setItem(
+      gameStatsStorageKey("cross-exposure"),
+      JSON.stringify({
+        played: 1,
+        won: 1,
+        streak: 1,
+        bestStreak: 1,
+        lastDay: today.day,
+        dailies: { [today.day]: { won: true, summary: "4×4 · Solved with no hints" } },
+      }),
+    );
+    render(<PhotoCrossword photos={photos} />);
+    expect(screen.queryByRole("region", { name: "Crossword board" })).toBeNull();
+    expect(screen.getByText(`${dailyName} · 4×4 · Solved with no hints`)).toBeTruthy();
+  });
 });

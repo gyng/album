@@ -7,6 +7,7 @@ import {
   MAX_SCORE,
   ZERO_DISTANCE,
   MAX_TIME_BONUS,
+  guessGameTotals,
 } from "./guessScoring";
 import { seededShuffle } from "../search/api";
 
@@ -152,5 +153,16 @@ describe("seededShuffle", () => {
     const c = seededShuffle(items, "daily-2026-04-09");
     expect(a).toEqual(b);
     expect(a).not.toEqual(c);
+  });
+});
+
+describe("guessGameTotals", () => {
+  it("totals a game against its untimed or timed maximum", () => {
+    expect(guessGameTotals([1_100, 900], null)).toEqual({
+      total: 2_000,
+      max: 10_000,
+      summary: "2,000 / 10,000 points",
+    });
+    expect(guessGameTotals([6_000], 30)).toMatchObject({ max: 6_000 });
   });
 });

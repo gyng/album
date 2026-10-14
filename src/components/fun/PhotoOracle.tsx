@@ -18,6 +18,9 @@ import styles from "./PhotoGames.module.css";
 import oracleStyles from "./PhotoOracle.module.css";
 import { useGameReadiness } from "./GameReadiness";
 import { useGameShortcuts } from "./useGameShortcuts";
+import { useGameStats } from "./useGameStats";
+import { GameStatsLine } from "./GameRecord";
+import { ResultNextSteps } from "./ResultNextSteps";
 
 type OracleAnswer = { id: string; question: string; answer: "yes" | "no" | "unsure" };
 
@@ -58,6 +61,7 @@ const AnswerTrail = ({ answers }: { answers: OracleAnswer[] }) => {
 
 export const PhotoOracle = ({ photos }: { photos: PhotoGamePhoto[] }) => {
   const { loading } = useGameReadiness();
+  const { stats, record } = useGameStats("oracle");
   const [settings, setSettings] = useGameSettings("oracle");
   const { mode } = settings;
   const [cohort, setCohort] = useState<PhotoGamePhoto[]>([]);
@@ -139,10 +143,17 @@ export const PhotoOracle = ({ photos }: { photos: PhotoGamePhoto[] }) => {
     setAnswers(previous.answers);
     setHistory(history.slice(0, -1));
   };
+  // Neither mode has a player win or a score, so a finished round only counts
+  // towards games played and the streak.
+  const finishRound = (photo: PhotoGamePhoto | null) => {
+    if (stage === "finished") return;
+    if (photo) setConfirmed(photo);
+    record({ won: false });
+    setStage("finished");
+  };
   const keep = () => {
     if (!top) return;
-    setConfirmed(top.photo);
-    setStage("finished");
+    finishRound(top.photo);
   };
   const another = () => {
     if (!top || candidates.length <= 1) return;
@@ -199,6 +210,7 @@ export const PhotoOracle = ({ photos }: { photos: PhotoGamePhoto[] }) => {
             ? "Answer a few questions. Find a photograph that suits your mood."
             : "Choose a photograph. Can the oracle read your mind?"}
         </p>
+        <GameStatsLine stats={stats} wins={false} best={null} />
         <div className={styles.actions}>
           <Button
             variant={mode === "mind" ? "primary" : "surface"}
@@ -341,10 +353,7 @@ export const PhotoOracle = ({ photos }: { photos: PhotoGamePhoto[] }) => {
             <Button
               variant="quiet"
               disabled={mode === "discover" && !top}
-              onClick={() => {
-                if (mode === "discover" && top) setConfirmed(top.photo);
-                setStage("finished");
-              }}
+              onClick={() => finishRound(mode === "discover" && top ? top.photo : null)}
             >
               {mode === "mind" ? "Give up" : "Show a match now"}
             </Button>
@@ -375,6 +384,7 @@ export const PhotoOracle = ({ photos }: { photos: PhotoGamePhoto[] }) => {
             {answers.length} {answers.length === 1 ? "question" : "questions"} answered
           </Caption>
           <AnswerTrail answers={answers} />
+          <ResultNextSteps photos={[(confirmed ?? secret)!]} />
           <Button variant="primary" onClick={() => start()}>
             Play again
             <KeyHint aria-hidden="true">N</KeyHint>

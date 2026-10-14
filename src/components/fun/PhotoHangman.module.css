@@ -137,3 +137,13 @@
 .singleClue {
   min-inline-size: 0;
 }
+.lobbyActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.dailyResult {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}

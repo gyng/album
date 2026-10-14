@@ -3,7 +3,9 @@
  */
 
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { StrictMode } from "react";
 import { fetchGuessPhotos } from "../search/api";
+import { readGameStats } from "../fun/useGameStats";
 import { extractGPSFromExifString } from "../../util/extractExifFromDb";
 import { GuessGame } from "./GuessGame";
 import type { GameSettings, GuessPhoto } from "./guessTypes";
@@ -97,6 +99,7 @@ jest.mock("./GuessRound", () => ({
         data-total={totalRounds}
         data-score={cumulativeScore}
         data-guess={JSON.stringify(guess)}
+        data-path={photo.path}
       >
         {mapSlot}
         <button type="button" onClick={onReveal}>
@@ -160,6 +163,7 @@ const validRows = [
 describe("GuessGame", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    localStorage.clear();
     mockStartSettings = { rounds: 2, timeLimit: 30, region: "Japan" };
     fetchGuessPhotosMock.mockResolvedValue(validRows);
     extractGPSMock.mockImplementation((exif) => {
@@ -349,5 +353,62 @@ describe("GuessGame", () => {
     unmount();
     rejectPhotos(new Error("late failure"));
     await waitFor(() => expect(screen.queryByRole("alert")).not.toBeInTheDocument());
+  });
+
+  it("deals named photographs in their order, then a fresh game on Play again", async () => {
+    fetchGuessPhotosMock.mockResolvedValueOnce([validRows[6]!, validRows[0]!]);
+    const onSeedGenerated = jest.fn();
+    const paths = ["../albums/second/two.jpg", "../albums/first/one.jpg"];
+    render(
+      <GuessGame
+        database={database}
+        initialSettings={{ rounds: 2, timeLimit: null, photos: paths }}
+        onSeedGenerated={onSeedGenerated}
+      />,
+    );
+    expect(await screen.findByTestId("round")).toHaveAttribute("data-path", paths[0]);
+    expect(fetchGuessPhotosMock).toHaveBeenCalledTimes(1);
+    expect(fetchGuessPhotosMock).toHaveBeenCalledWith({ database, count: 10, paths });
+    // The named set is the link itself; there is no seed to write back.
+    expect(onSeedGenerated).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Complete mocked round" }));
+    expect(screen.getByTestId("round")).toHaveAttribute("data-path", paths[1]);
+    fireEvent.click(screen.getByRole("button", { name: "Complete mocked round" }));
+    fireEvent.click(screen.getByRole("button", { name: "Play again" }));
+    await waitFor(() => expect(fetchGuessPhotosMock).toHaveBeenCalledTimes(2));
+    expect(fetchGuessPhotosMock.mock.calls[1]![0]).not.toHaveProperty("paths");
+    await screen.findByTestId("round");
+    expect(onSeedGenerated).toHaveBeenLastCalledWith("i", { rounds: 2, timeLimit: null });
+  });
+
+  it("records a finished game once, with its total as the score", async () => {
+    render(
+      <StrictMode>
+        <GuessGame database={database} initialSettings={{ rounds: 2, timeLimit: 30 }} />
+      </StrictMode>,
+    );
+    await screen.findByTestId("round");
+    fireEvent.click(screen.getByRole("button", { name: "Complete mocked round" }));
+    expect(readGameStats("guess").played).toBe(0);
+    fireEvent.click(screen.getByRole("button", { name: "Complete mocked round" }));
+    await screen.findByTestId("summary");
+    expect(readGameStats("guess")).toMatchObject({ played: 1, won: 0, best: 2_200 });
+    expect(readGameStats("guess").dailies).toEqual({});
+  });
+
+  it("records a finished daily against its own day with a spoiler-free summary", async () => {
+    jest.useFakeTimers().setSystemTime(new Date(2026, 9, 16, 12, 0));
+    render(
+      <GuessGame
+        database={database}
+        initialSettings={{ rounds: 1, timeLimit: null, daily: true }}
+      />,
+    );
+    await screen.findByTestId("round");
+    fireEvent.click(screen.getByRole("button", { name: "Complete mocked round" }));
+    expect(readGameStats("guess").dailies).toEqual({
+      "2026-10-16": { won: false, score: 1_100, summary: "1,100 / 5,000 points" },
+    });
   });
 });

@@ -9,18 +9,69 @@ import {
   type PhotoCrosswordPuzzle,
 } from "../../util/photoCrossword";
 import { shuffleGamePhotos, type PhotoGamePhoto } from "../../util/photoGames";
+import { useUrlSearchParams } from "../platform";
 import { Button, Caption, Heading, KeyHint } from "../ui";
 import { GameIntro } from "./GameIllustration";
 import { GamePhoto } from "./GamePhoto";
+import { useGameReadiness } from "./GameReadiness";
+import {
+  dailyPhotoOrder,
+  dailyPuzzle,
+  dailyShareText,
+  GameStatsLine,
+  ShareResult,
+  useShareOrigin,
+} from "./GameRecord";
 import { useGameShortcuts, type GameShortcut } from "./useGameShortcuts";
-import { useGameSettings } from "./useGameSettings";
+import { useGameSettings, type GameSettingsRegistry } from "./useGameSettings";
+import { useGameStats } from "./useGameStats";
+import { ResultNextSteps } from "./ResultNextSteps";
 import styles from "./PhotoCrossword.module.css";
 
 const columnLetter = (index: number) => String.fromCharCode(65 + index);
 
+type RoundSettings = GameSettingsRegistry["cross"];
+
+/** Everyone's daily board is the same: a 4×4 grid of hidden connections, every square empty. */
+const DAILY_SETTINGS: RoundSettings = { mode: "hidden", prefill: 0, size: 4 };
+
+/** Today's board, identical on every device whatever order the archive arrived in. */
+export const dailyCrosswordPuzzle = (photos: PhotoGamePhoto[], day?: string) =>
+  buildPhotoCrossword(
+    dailyPhotoOrder(photos),
+    DAILY_SETTINGS.size,
+    dailyPuzzle("cross-exposure", day).random(),
+  );
+
+const hintCount = (count: number) => `${count} ${count === 1 ? "hint" : "hints"}`;
+
+// Spoiler-free: how the round went, never which photographs or clues.
+const dailySummary = (outcome: "solved" | "revealed", size: number, hints: number) =>
+  `${size}×${size} · ${
+    outcome === "solved"
+      ? `Solved with ${hints ? hintCount(hints) : "no hints"}`
+      : hints
+        ? `Gave up after ${hintCount(hints)}`
+        : "Gave up"
+  }`;
+
 export const PhotoCrossword = ({ photos }: { photos: PhotoGamePhoto[] }) => {
   const [settings, setSettings] = useGameSettings("cross");
-  const { mode, prefill, size } = settings;
+  // The board in play keeps the settings it was dealt with; a daily's are fixed and never saved.
+  const [round, setRound] = useState<RoundSettings>(settings);
+  const [daily, setDaily] = useState<string | null>(null);
+  const { stats, record } = useGameStats("cross-exposure");
+  const shareOrigin = useShareOrigin();
+  const { loading } = useGameReadiness();
+  const {
+    ready: urlReady,
+    searchParams,
+    hasSearchParam,
+    replaceSearchParams,
+  } = useUrlSearchParams();
+  const today = dailyPuzzle("cross-exposure");
+  const todaysResult = stats?.dailies[today.day];
+  const dailyRequested = useRef(false);
   const [revealedClues, setRevealedClues] = useState<CrosswordClueCoordinate[]>([]);
   const [lastHint, setLastHint] = useState<string | null>(null);
   const [puzzle, setPuzzle] = useState<PhotoCrosswordPuzzle | null>(null);
@@ -88,8 +139,18 @@ export const PhotoCrossword = ({ photos }: { photos: PhotoGamePhoto[] }) => {
   useEffect(() => {
     if (finished) resultRef.current?.focus();
   }, [finished]);
-  const start = () => {
-    const next = buildPhotoCrossword(photos, size);
+  const setDailyUrl = (on: boolean) => {
+    if (hasSearchParam("daily") === on) return;
+    const params = new URLSearchParams(searchParams);
+    if (on) params.set("daily", "");
+    else params.delete("daily");
+    replaceSearchParams(params);
+  };
+  const deal = (
+    next: PhotoCrosswordPuzzle | null,
+    roundSettings: RoundSettings,
+    day: string | null,
+  ) => {
     if (!next) {
       setMessage(
         "There are not enough photographs for this grid. Try a smaller grid or another puzzle.",
@@ -99,13 +160,16 @@ export const PhotoCrossword = ({ photos }: { photos: PhotoGamePhoto[] }) => {
     dragPath.current = null;
     setDragged(null);
     setDropTarget(null);
+    setRound(roundSettings);
+    setDaily(day);
+    setDailyUrl(day !== null);
     setPuzzle(next);
     setTiles(next.tiles);
     setRevealedClues([]);
     setLastHint(null);
-    const seeds = new Set(crosswordSeedIndices(size, prefill));
+    const seeds = new Set(crosswordSeedIndices(next.size, roundSettings.prefill));
     setCells(
-      Array.from({ length: size ** 2 }, (_, index) =>
+      Array.from({ length: next.size ** 2 }, (_, index) =>
         seeds.has(index) ? next.solution[index]! : null,
       ),
     );
@@ -113,6 +177,29 @@ export const PhotoCrossword = ({ photos }: { photos: PhotoGamePhoto[] }) => {
     setChecked(null);
     setFinished(null);
     setMessage("");
+  };
+  const start = () => deal(buildPhotoCrossword(photos, settings.size), settings, null);
+  const startDaily = () => {
+    if (todaysResult) return;
+    deal(dailyCrosswordPuzzle(photos, today.day), DAILY_SETTINGS, today.day);
+  };
+  // `?daily` opens today's board, or its result once it has been played.
+  useEffect(() => {
+    if (dailyRequested.current || !urlReady || loading || !stats || !photos.length) return;
+    dailyRequested.current = true;
+    if (hasSearchParam("daily") && !stats.dailies[today.day]) startDaily();
+  });
+  const { mode, prefill } = round;
+  const size = puzzle?.size ?? settings.size;
+  // Recorded where the round ends, so a re-render can never count it twice.
+  const finish = (outcome: "solved" | "revealed") => {
+    setFinished(outcome);
+    record({
+      won: outcome === "solved",
+      ...(daily
+        ? { daily: { day: daily, summary: dailySummary(outcome, size, revealedClues.length) } }
+        : {}),
+    });
   };
   const seedIndices = new Set(crosswordSeedIndices(size, prefill));
   const isFixed = (index: number) => seedIndices.has(index);
@@ -177,7 +264,7 @@ export const PhotoCrossword = ({ photos }: { photos: PhotoGamePhoto[] }) => {
         setPuzzle(resolved);
         setChecked(cells.map(() => true));
         setMessage("Every row and column shares a connection.");
-        setFinished("solved");
+        finish("solved");
       } else {
         setChecked(null);
         setMessage(
@@ -192,14 +279,14 @@ export const PhotoCrossword = ({ photos }: { photos: PhotoGamePhoto[] }) => {
     setChecked(result);
     const count = result.filter(Boolean).length;
     setMessage(`${count} of ${size ** 2} photographs fit both clues.`);
-    if (result.every(Boolean)) setFinished("solved");
+    if (result.every(Boolean)) finish("solved");
   };
   const giveUp = () => {
     if (!puzzle || finished) return;
     setCells(puzzle.solution);
     setChecked(null);
     setSelected(null);
-    setFinished("revealed");
+    finish("revealed");
     setMessage("");
     endDrag();
   };
@@ -254,14 +341,14 @@ export const PhotoCrossword = ({ photos }: { photos: PhotoGamePhoto[] }) => {
     return (
       <GameIntro game="cross-exposure">
         <p>
-          {mode === "hidden"
+          {settings.mode === "hidden"
             ? "Find a shared subject for each row and column. Each photograph must fit both."
             : "Match each photograph to its row and column clues. Use each photograph once. More than one arrangement can work."}
         </p>
         <div className={styles.actions} role="group" aria-label="Clue mode">
           <Button
-            active={mode === "hidden"}
-            aria-pressed={mode === "hidden"}
+            active={settings.mode === "hidden"}
+            aria-pressed={settings.mode === "hidden"}
             onClick={() => {
               setSettings((previous) => ({ ...previous, mode: "hidden" }));
             }}
@@ -269,8 +356,8 @@ export const PhotoCrossword = ({ photos }: { photos: PhotoGamePhoto[] }) => {
             Hidden connections
           </Button>
           <Button
-            active={mode === "visible"}
-            aria-pressed={mode === "visible"}
+            active={settings.mode === "visible"}
+            aria-pressed={settings.mode === "visible"}
             onClick={() => {
               setSettings((previous) => ({ ...previous, mode: "visible" }));
             }}
@@ -282,8 +369,8 @@ export const PhotoCrossword = ({ photos }: { photos: PhotoGamePhoto[] }) => {
           {([3, 4, 5] as const).map((value) => (
             <Button
               key={value}
-              active={size === value}
-              aria-pressed={size === value}
+              active={settings.size === value}
+              aria-pressed={settings.size === value}
               onClick={() => {
                 setSettings((previous) => ({ ...previous, size: value }));
                 setMessage("");
@@ -298,8 +385,8 @@ export const PhotoCrossword = ({ photos }: { photos: PhotoGamePhoto[] }) => {
             <Button
               key={choice}
               aria-label={`${choice} starting photographs`}
-              active={prefill === choice}
-              aria-pressed={prefill === choice}
+              active={settings.prefill === choice}
+              aria-pressed={settings.prefill === choice}
               onClick={() => setSettings((previous) => ({ ...previous, prefill: choice }))}
             >
               {choice}
@@ -307,15 +394,34 @@ export const PhotoCrossword = ({ photos }: { photos: PhotoGamePhoto[] }) => {
           ))}
         </div>
         <Caption>
-          {prefill === 0
+          {settings.prefill === 0
             ? "All squares start empty."
-            : `${prefill} fixed ${prefill === 1 ? "photograph" : "photographs"}.`}
+            : `${settings.prefill} fixed ${settings.prefill === 1 ? "photograph" : "photographs"}.`}
         </Caption>
         {message ? <p role="alert">{message}</p> : null}
-        <Button variant="primary" onClick={start}>
-          Start crossing
-          <KeyHint aria-hidden="true">N</KeyHint>
-        </Button>
+        <div className={styles.actions}>
+          <Button variant="primary" onClick={start}>
+            Start crossing
+            <KeyHint aria-hidden="true">N</KeyHint>
+          </Button>
+          {stats && !todaysResult ? (
+            <>
+              <Button onClick={startDaily}>Daily #{today.number}</Button>
+              <Caption>4×4 · Hidden connections</Caption>
+            </>
+          ) : null}
+        </div>
+        {todaysResult ? (
+          <div className={styles.actions}>
+            <Caption>
+              Daily #{today.number} · {todaysResult.summary}
+            </Caption>
+            <ShareResult
+              text={dailyShareText("cross-exposure", today.day, todaysResult.summary, shareOrigin)}
+            />
+          </div>
+        ) : null}
+        <GameStatsLine stats={stats} best={null} />
       </GameIntro>
     );
   return (
@@ -337,6 +443,17 @@ export const PhotoCrossword = ({ photos }: { photos: PhotoGamePhoto[] }) => {
               ? "Every photograph fits both clues."
               : "Other arrangements can be valid too."}
           </Caption>
+          {daily && stats?.dailies[daily] ? (
+            <ShareResult
+              text={dailyShareText(
+                "cross-exposure",
+                daily,
+                stats.dailies[daily].summary,
+                shareOrigin,
+              )}
+            />
+          ) : null}
+          <ResultNextSteps photos={puzzle.solution} />
         </div>
       ) : null}
       <div
@@ -637,6 +754,8 @@ export const PhotoCrossword = ({ photos }: { photos: PhotoGamePhoto[] }) => {
                 onClick={() => {
                   setPuzzle(null);
                   setFinished(null);
+                  setDaily(null);
+                  setDailyUrl(false);
                   setMessage("");
                 }}
               >

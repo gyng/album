@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { AppLink, useUrlSearchParams } from "../../components/platform";
 import { useDatabase } from "../../components/database/useDatabase";
 import { ProgressBar } from "../../components/ProgressBar";
@@ -6,6 +6,9 @@ import { GlobalNav } from "../../components/GlobalNav";
 import { GuessGame } from "../../components/guess/GuessGame";
 import type { GameSettings } from "../../components/guess/guessTypes";
 import { useGameSettings } from "../../components/fun/useGameSettings";
+import { readGameStats } from "../../components/fun/useGameStats";
+import { guessPhotosFromParams } from "../../components/guess/guessPhotoLinks";
+import { localDayKey } from "../../util/gameDaily";
 import { Seo } from "../../components/Seo";
 import { Button, Heading, buttonStyles } from "../../components/ui";
 import styles from "./GuessScreen.module.css";
@@ -29,6 +32,13 @@ const GuessScreen = () => {
   const seedFromUrl = getSearchParam("seed") ?? undefined;
   const regionFromUrl = getSearchParam("region") ?? undefined;
   const isDaily = hasSearchParam("daily");
+  const photosFromUrl = guessPhotosFromParams(searchParams);
+  // Stats live in this browser's storage, so they are read after mount: null
+  // until then, and the page waits rather than starting a daily it then drops.
+  const [dailyFinished, setDailyFinished] = useState<boolean | null>(null);
+  useEffect(() => {
+    setDailyFinished(Boolean(readGameStats("guess").dailies[localDayKey()]));
+  }, []);
   const [preferences, , preferencesReady] = useGameSettings("guess");
   const roundsFromUrl = getSearchParam("rounds");
   const timerFromUrl = getSearchParam("timer");
@@ -43,18 +53,25 @@ const GuessScreen = () => {
       : {}),
   };
 
-  // When a seed or daily flag is in the URL, skip the lobby.
+  // When a seed, daily flag or named photographs are in the URL, skip the
+  // lobby — except for a daily already finished today, whose result and share
+  // action are in the lobby.
   const initialSettings: GameSettings | undefined = isDaily
-    ? { rounds: 5, timeLimit: null, daily: true }
-    : seedFromUrl
-      ? settingsForSeed
-      : undefined;
+    ? dailyFinished
+      ? undefined
+      : { rounds: 5, timeLimit: null, daily: true }
+    : photosFromUrl.length
+      ? { rounds: photosFromUrl.length, timeLimit: null, photos: photosFromUrl }
+      : seedFromUrl
+        ? settingsForSeed
+        : undefined;
 
   // Through the platform port rather than the History API, so the renderer's
   // router keeps its own record of the URL it is showing.
   const handleSeedGenerated = useCallback(
     (seed: string, settings: GameSettings) => {
       const params = new URLSearchParams(searchParams);
+      params.delete("photos");
       if (settings.daily) {
         params.set("daily", "");
         for (const field of ["seed", "rounds", "timer", "region"]) params.delete(field);
@@ -105,7 +122,7 @@ const GuessScreen = () => {
               All games
             </AppLink>
           </div>
-        ) : !database || !urlReady || !preferencesReady ? (
+        ) : !database || !urlReady || !preferencesReady || dailyFinished === null ? (
           <div className={styles.loading}>
             <Heading level={1} as="h1" className={styles.title}>
               Guess Where
@@ -118,7 +135,7 @@ const GuessScreen = () => {
             database={database}
             onActiveChange={setActive}
             {...(initialSettings ? { initialSettings } : {})}
-            {...(seedFromUrl && !isDaily ? { seed: seedFromUrl } : {})}
+            {...(seedFromUrl && !isDaily && !photosFromUrl.length ? { seed: seedFromUrl } : {})}
             onSeedGenerated={handleSeedGenerated}
           />
         )}

@@ -1,10 +1,21 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
+import { useUrlSearchParams } from "../platform";
 import { Button, Caption, KeyHint } from "../ui";
 import { GameIntro } from "./GameIllustration";
 import { GameDock } from "./GameDock";
 import { GamePhoto, PhotoChain } from "./GamePhoto";
 import { useGameSettings } from "./useGameSettings";
 import { useGameShortcuts } from "./useGameShortcuts";
+import { useGameStats } from "./useGameStats";
+import {
+  dailyPhotoOrder,
+  dailyPuzzle,
+  dailyShareText,
+  GameStatsLine,
+  ShareResult,
+  useShareOrigin,
+} from "./GameRecord";
+import { dailyNumber, localDayKey } from "../../util/gameDaily";
 import {
   buildPhotoWordSearch,
   PHOTO_SEARCH_SIZES,
@@ -14,11 +25,37 @@ import {
   type PhotoWordSearch,
 } from "../../util/photoWordSearch";
 import type { PhotoGamePhoto } from "../../util/photoGames";
+import { ResultNextSteps } from "./ResultNextSteps";
 import styles from "./SightLines.module.css";
+
+/** Everyone's daily board has the same shape, whatever their own saved settings. */
+export const SIGHT_LINES_DAILY = { size: 6, lineLength: 4 } as const;
+
+/** Today's board, independent of the archive's arrival order and of `Math.random`. */
+export const buildDailySightLines = (photos: PhotoGamePhoto[], day: string = localDayKey()) =>
+  buildPhotoWordSearch(
+    dailyPhotoOrder(photos),
+    SIGHT_LINES_DAILY.size,
+    dailyPuzzle("sight-lines", day).random(),
+    SIGHT_LINES_DAILY.lineLength,
+  );
+
+/** Spoiler-free: the shape of the board and how it went, never its subjects. */
+const dailySummary = (puzzle: PhotoWordSearch, found: number, hints: number) =>
+  `${puzzle.size}×${puzzle.size} · ${found}/${puzzle.targets.length} lines · ${
+    hints ? `${hints} ${hints === 1 ? "hint" : "hints"}` : "no hints"
+  }`;
 
 export const SightLines = ({ photos }: { photos: PhotoGamePhoto[] }) => {
   const [settings, setSettings] = useGameSettings("sightLines");
+  const { ready: urlReady, hasSearchParam } = useUrlSearchParams();
+  const { stats, record } = useGameStats("sight-lines");
+  const shareOrigin = useShareOrigin();
+  const dailyDescriptionId = useId();
   const [puzzle, setPuzzle] = useState<PhotoWordSearch | null>(null);
+  // The day of the daily being played; null for an ordinary game.
+  const [daily, setDaily] = useState<string | null>(null);
+  const [hinted, setHinted] = useState<string[]>([]);
   const [found, setFound] = useState<Array<{ id: string; cells: number[] }>>([]);
   const [selected, setSelected] = useState<number[]>([]);
   const [anchor, setAnchor] = useState<number | null>(null);
@@ -36,13 +73,10 @@ export const SightLines = ({ photos }: { photos: PhotoGamePhoto[] }) => {
     const frame = requestAnimationFrame(() => resultRef.current?.focus());
     return () => cancelAnimationFrame(frame);
   }, [finished]);
-  const start = () => {
-    const next = buildPhotoWordSearch(photos, settings.size, Math.random, settings.lineLength);
-    if (!next) {
-      setMessage("There are not enough photographs for this grid. Try a smaller grid.");
-      return;
-    }
+  const begin = (next: PhotoWordSearch, day: string | null) => {
     setPuzzle(next);
+    setDaily(day);
+    setHinted([]);
     setFound([]);
     setSelected([]);
     setAnchor(null);
@@ -52,6 +86,42 @@ export const SightLines = ({ photos }: { photos: PhotoGamePhoto[] }) => {
     drag.current = null;
     setFocusCell(0);
   };
+  const start = () => {
+    const next = buildPhotoWordSearch(photos, settings.size, Math.random, settings.lineLength);
+    if (!next) {
+      setMessage("There are not enough photographs for this grid. Try a smaller grid.");
+      return;
+    }
+    begin(next, null);
+  };
+  const startDaily = () => {
+    const day = localDayKey();
+    const next = buildDailySightLines(photos, day);
+    if (!next) {
+      setMessage("There are not enough photographs for today’s board.");
+      return;
+    }
+    begin(next, day);
+  };
+  const today = localDayKey();
+  const todaysDaily = stats?.dailies[today];
+  // A linked daily starts once the archive and the player's record are both known.
+  const linkedDaily = useRef(false);
+  const startLinkedDaily = useRef(startDaily);
+  startLinkedDaily.current = startDaily;
+  useEffect(() => {
+    if (linkedDaily.current || !urlReady || !stats || !photos.length) return;
+    linkedDaily.current = true;
+    if (hasSearchParam("daily") && !stats.dailies[localDayKey()]) startLinkedDaily.current();
+  }, [urlReady, hasSearchParam, stats, photos.length]);
+  // No score: boards of different sizes would not compare. A win is every line, unaided by Give up.
+  const finish = (board: PhotoWordSearch, foundCount: number) =>
+    record({
+      won: foundCount === board.targets.length,
+      ...(daily
+        ? { daily: { day: daily, summary: dailySummary(board, foundCount, hinted.length) } }
+        : {}),
+    });
   const check = (cells: number[]) => {
     if (!puzzle) return;
     const target = matchPhotoSearchLine(
@@ -65,6 +135,7 @@ export const SightLines = ({ photos }: { photos: PhotoGamePhoto[] }) => {
       const next = [...found, { id: target.id, cells }];
       setFound(next);
       setHint(null);
+      if (next.length === puzzle.targets.length) finish(puzzle, next.length);
       setMessage(
         next.length === puzzle.targets.length
           ? "Every sight line found!"
@@ -94,11 +165,14 @@ export const SightLines = ({ photos }: { photos: PhotoGamePhoto[] }) => {
     const target = puzzle.targets.find((item) => !found.some((match) => match.id === item.id));
     if (!target) return;
     setHint(target.cells[0]!);
+    if (!hinted.includes(target.id)) setHinted([...hinted, target.id]);
     setSelected([]);
     setAnchor(null);
     setMessage(`${target.label}: the line starts at the marked photograph.`);
   };
   const giveUp = () => {
+    if (!puzzle || finished) return;
+    finish(puzzle, found.length);
     setGaveUp(true);
     setSelected([]);
     setAnchor(null);
@@ -158,10 +232,34 @@ export const SightLines = ({ photos }: { photos: PhotoGamePhoto[] }) => {
           ))}
         </div>
         {message ? <p role="alert">{message}</p> : null}
-        <Button variant="primary" onClick={start}>
-          Start searching
-          <KeyHint aria-hidden="true">N</KeyHint>
-        </Button>
+        <div className={styles.actions}>
+          <Button variant="primary" onClick={start}>
+            Start searching
+            <KeyHint aria-hidden="true">N</KeyHint>
+          </Button>
+          {todaysDaily ? null : (
+            <>
+              <Button onClick={startDaily} aria-describedby={dailyDescriptionId}>
+                Daily #{dailyNumber(today)}
+              </Button>
+              <Caption id={dailyDescriptionId} as="span">
+                {SIGHT_LINES_DAILY.size}×{SIGHT_LINES_DAILY.size} · {SIGHT_LINES_DAILY.lineLength}{" "}
+                per line · the same board for everyone today
+              </Caption>
+            </>
+          )}
+        </div>
+        {todaysDaily ? (
+          <div className={styles.actions}>
+            <p className={styles.dailyResult}>
+              Daily #{dailyNumber(today)} · {todaysDaily.summary}
+            </p>
+            <ShareResult
+              text={dailyShareText("sight-lines", today, todaysDaily.summary, shareOrigin)}
+            />
+          </div>
+        ) : null}
+        <GameStatsLine stats={stats} best={null} />
       </GameIntro>
     );
   const shownLines = puzzle.targets.flatMap((target, index) => {
@@ -384,6 +482,16 @@ export const SightLines = ({ photos }: { photos: PhotoGamePhoto[] }) => {
               ? `${found.length} of ${puzzle.targets.length} sight lines found.`
               : `All ${puzzle.targets.length} connections found.`}
           </p>
+          {daily ? (
+            <ShareResult
+              text={dailyShareText(
+                "sight-lines",
+                daily,
+                dailySummary(puzzle, found.length, hinted.length),
+                shareOrigin,
+              )}
+            />
+          ) : null}
           {puzzle.targets.map((target, index) => (
             <div key={target.id}>
               <h2>
@@ -397,6 +505,7 @@ export const SightLines = ({ photos }: { photos: PhotoGamePhoto[] }) => {
               />
             </div>
           ))}
+          <ResultNextSteps photos={puzzle.tiles} />
         </section>
       ) : null}
     </div>

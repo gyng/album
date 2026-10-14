@@ -71,7 +71,8 @@ export const GlobalNav: React.FC<Props> = ({
     currentPage === "double-take" ||
     currentPage === "cross-exposure" ||
     currentPage === "sight-lines" ||
-    currentPage === "photo-hangman";
+    currentPage === "photo-hangman" ||
+    currentPage === "hindsight";
   return (
     <div className={styles.stack}>
       <Nav

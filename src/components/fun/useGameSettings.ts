@@ -1,4 +1,5 @@
 import type { PhotoSearchSize, PhotoSearchLineLength } from "../../util/photoWordSearch";
+import type { HindsightSize, HindsightSpread } from "../../util/hindsight";
 import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 
 export type GameSettingsRegistry = {
@@ -13,6 +14,7 @@ export type GameSettingsRegistry = {
   doubleTake: { slower: boolean };
   oracle: { mode: "mind" | "discover" };
   guess: { region: string; timeLimit: null | 15 | 30; rounds: 3 | 5 | 10 };
+  hindsight: { size: HindsightSize; spread: HindsightSpread };
 };
 
 type Game = keyof GameSettingsRegistry;
@@ -24,6 +26,7 @@ const defaults: GameSettingsRegistry = {
   doubleTake: { slower: false },
   oracle: { mode: "discover" },
   guess: { region: "", timeLimit: null, rounds: 5 },
+  hindsight: { size: 5, spread: "years" },
 };
 
 const oneOf =
@@ -57,6 +60,7 @@ const validators: {
     timeLimit: oneOf(null, 15, 30),
     rounds: oneOf(3, 5, 10),
   },
+  hindsight: { size: oneOf(4, 5, 6), spread: oneOf("years", "trip") },
 };
 
 export const gameSettingsStorageKey = (game: Game): string => `snapshots-fun-settings-v1:${game}`;

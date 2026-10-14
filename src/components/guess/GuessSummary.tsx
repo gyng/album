@@ -3,10 +3,19 @@ import { AppLink as Link } from "../platform";
 import { Button, Caption, Heading } from "../ui";
 import { RoundResult } from "./GuessRound";
 import { GameSettings } from "./guessTypes";
-import { MAX_SCORE, MAX_TIME_BONUS, formatDistance, scoreTierColour } from "./guessScoring";
+import {
+  MAX_SCORE,
+  MAX_TIME_BONUS,
+  formatDistance,
+  guessGameTotals,
+  scoreTierColour,
+} from "./guessScoring";
 import { useAnimatedCounter } from "./useAnimatedCounter";
 import styles from "./GuessSummary.module.css";
 import { encodePublicAssetPath } from "../../util/encodePublicAssetPath";
+import { ShareResult, dailyShareText, useShareOrigin } from "../fun/GameRecord";
+import { guessDailySeedDay } from "./guessDaily";
+import { guessWherePath } from "./guessPhotoLinks";
 
 type GuessSummaryProps = {
   results: RoundResult[];
@@ -46,6 +55,7 @@ const getGeocodeLabel = (geocode: string): string | null => {
 
 const buildShareUrl = (seed: string, settings: GameSettings): string => {
   if (settings.daily) return "/fun/guess?daily";
+  if (settings.photos) return guessWherePath(settings.photos);
   const params = new URLSearchParams();
   params.set("seed", seed);
   params.set("rounds", String(settings.rounds));
@@ -72,6 +82,8 @@ export const GuessSummary: React.FC<GuessSummaryProps> = ({
   const totalTierColour = scoreTierColour(results.length > 0 ? totalScore / results.length : 0);
 
   const shareUrl = buildShareUrl(seed, settings);
+  const siteOrigin = useShareOrigin();
+  const dailyDay = settings.daily ? guessDailySeedDay(seed) : null;
 
   const handleCopyLink = useCallback(() => {
     const fullUrl = `${window.location.origin}${shareUrl}`;
@@ -171,9 +183,23 @@ export const GuessSummary: React.FC<GuessSummaryProps> = ({
         <Button className={styles.playAgain} onClick={onPlayAgain}>
           Play again
         </Button>
-        <Button className={styles.shareButton} onClick={handleCopyLink}>
-          {copied ? "Copied!" : "Copy challenge link"}
-        </Button>
+        {dailyDay ? (
+          <ShareResult
+            text={dailyShareText(
+              "guess",
+              dailyDay,
+              guessGameTotals(
+                results.map((result) => result.score),
+                settings.timeLimit,
+              ).summary,
+              siteOrigin,
+            )}
+          />
+        ) : (
+          <Button className={styles.shareButton} onClick={handleCopyLink}>
+            {copied ? "Copied!" : "Copy challenge link"}
+          </Button>
+        )}
       </div>
 
       <div className={styles.footer}>

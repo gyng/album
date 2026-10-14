@@ -2,6 +2,9 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { PhotoRelay } from "./PhotoRelay";
 import type { PhotoGamePhoto } from "../../util/photoGames";
+import { readGameStats } from "./useGameStats";
+
+beforeEach(() => localStorage.clear());
 
 const photos: PhotoGamePhoto[] = Array.from({ length: 12 }, (_, i) => ({
   path: `../albums/test-simple/${i}.jpg`,
@@ -19,7 +22,7 @@ it("reveals the entire suggested chain on giving up and resets for another round
   fireEvent.click(screen.getByRole("button", { name: "Start relay" }));
   fireEvent.click(screen.getByRole("button", { name: "Give up" }));
   const result = screen.getByRole("region", { name: "Relay result" });
-  expect(within(result).getAllByRole("link")).toHaveLength(7);
+  expect(within(within(result).getAllByRole("list")[0]!).getAllByRole("link")).toHaveLength(7);
   fireEvent.click(screen.getByRole("button", { name: "Play again" }));
   expect(screen.queryByRole("region", { name: "Relay result" })).toBeNull();
   expect(screen.getByRole("status")).toHaveTextContent("0 of 5");
@@ -199,4 +202,34 @@ it("keeps focused photographs clear of the sticky reference on small screens", (
     match.mockRestore();
     rect.mockRestore();
   }
+});
+
+it("records each finished relay once and shows the record in the lobby", () => {
+  const first = render(<PhotoRelay photos={photos} />);
+  fireEvent.click(screen.getByRole("button", { name: "Start relay" }));
+  for (let i = 1; i <= 5; i++) fireEvent.click(trayChoice(i));
+  fireEvent.click(screen.getByRole("button", { name: "Finish relay" }));
+  const flow = Number(/Visual flow: (\d+)/.exec(screen.getByText(/Visual flow/).textContent!)![1]);
+  expect(readGameStats("relay")).toMatchObject({ played: 1, won: 1, best: flow });
+  fireEvent.click(screen.getByRole("button", { name: "Play again" }));
+  fireEvent.click(screen.getByRole("button", { name: "Give up" }));
+  expect(readGameStats("relay")).toMatchObject({ played: 2, won: 1, best: flow });
+  first.unmount();
+  render(<PhotoRelay photos={photos} />);
+  expect(screen.getByText(`Played 2 · best ${flow}/100`)).toBeInTheDocument();
+});
+
+it("offers a search for photographs like the relay's start", () => {
+  render(<PhotoRelay photos={photos} />);
+  fireEvent.click(screen.getByRole("button", { name: "Start relay" }));
+  fireEvent.click(screen.getByRole("button", { name: "Give up" }));
+  const steps = screen.getByRole("navigation", { name: "Next steps" });
+  const start = within(screen.getByRole("region", { name: "Relay result" }))
+    .getAllByRole("img")[0]!
+    .getAttribute("src")!;
+  const href = within(steps)
+    .getByRole("link", { name: "Similar photographs" })
+    .getAttribute("href")!;
+  const similar = new URL(href, "https://example.org").searchParams.get("similar")!;
+  expect(start).toContain(similar.split("/").at(-1));
 });

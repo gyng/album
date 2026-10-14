@@ -65,6 +65,15 @@ export const FUN_GAMES = [
     illustration: "/fun/double-take.avif",
     description: "Two fleeting photographs. Same look. Same place?",
   },
+  {
+    id: "hindsight",
+    href: "/fun/hindsight",
+    title: "Hindsight",
+    // PLACEHOLDER: the retired Photo Relay cartoon (07549cc), reused until
+    // Hindsight has artwork of its own. See docs/fun-illustrations.md.
+    illustration: "/fun/hindsight.avif",
+    description: "Put the photographs in the order they were taken.",
+  },
 ] as const;
 
 export type PhotoGameKind =
@@ -75,5 +84,6 @@ export type PhotoGameKind =
   | "double-take"
   | "cross-exposure"
   | "sight-lines"
-  | "photo-hangman";
+  | "photo-hangman"
+  | "hindsight";
 export type FunPage = "fun" | "guess" | PhotoGameKind;

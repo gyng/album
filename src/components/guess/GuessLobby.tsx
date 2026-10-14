@@ -7,6 +7,9 @@ import { type GameShortcut, useGameShortcuts } from "../fun/useGameShortcuts";
 import { GameIllustration } from "../fun/GameIllustration";
 import { useGameSettings, type GameSettingsRegistry } from "../fun/useGameSettings";
 import { useUrlSearchParams } from "../platform";
+import { GameStatsLine, ShareResult, dailyShareText, useShareOrigin } from "../fun/GameRecord";
+import { dailyNumber, localDayKey } from "../../util/gameDaily";
+import type { GameStats } from "../../util/gameStats";
 import styles from "./GuessLobby.module.css";
 
 type GuessLobbyProps = {
@@ -15,6 +18,8 @@ type GuessLobbyProps = {
   onStart: (settings: GameSettings) => void;
   /** Shown as an inline error above the start buttons (e.g. after a failed load). */
   error?: string | null;
+  /** The player's record; null until read after mount. */
+  stats?: GameStats | null;
 };
 
 type TimerValue = "off" | "30" | "15";
@@ -39,8 +44,17 @@ const limitToTimerValue = (limit: number | null): TimerValue => {
   return "off";
 };
 
-export const GuessLobby: React.FC<GuessLobbyProps> = ({ database, defaults, onStart, error }) => {
+export const GuessLobby: React.FC<GuessLobbyProps> = ({
+  database,
+  defaults,
+  onStart,
+  error,
+  stats = null,
+}) => {
   const dailyDescriptionId = useId();
+  const siteOrigin = useShareOrigin();
+  const today = localDayKey();
+  const todaysDaily = stats?.dailies[today];
   const [regions, setRegions] = useState<GuessRegionOption[]>([]);
   const [totalPhotos, setTotalPhotos] = useState(0);
   const [regionsLoaded, setRegionsLoaded] = useState(false);
@@ -136,6 +150,7 @@ export const GuessLobby: React.FC<GuessLobbyProps> = ({ database, defaults, onSt
           Guess Where
         </Heading>
         <Caption as="p">Guess where each photo was taken on the map</Caption>
+        <GameStatsLine stats={stats} wins={false} />
       </div>
 
       <div className={styles.options}>
@@ -198,18 +213,35 @@ export const GuessLobby: React.FC<GuessLobbyProps> = ({ database, defaults, onSt
       ) : null}
 
       <div className={styles.buttonRow}>
-        <div className={styles.dailyAction}>
-          <Button
-            className={styles.dailyButton}
-            aria-describedby={dailyDescriptionId}
-            onClick={handleDaily}
-          >
-            Daily challenge
-          </Button>
-          <Caption id={dailyDescriptionId} as="span" size="sm" className={styles.dailyDescription}>
-            Five rounds · same photos for everyone today
-          </Caption>
-        </div>
+        {todaysDaily ? (
+          // Today's daily is done: its result is shared, not replayed.
+          <div className={styles.dailyAction}>
+            <div className={styles.dailyShare}>
+              <ShareResult text={dailyShareText("guess", today, todaysDaily.summary, siteOrigin)} />
+            </div>
+            <Caption as="span" size="sm" className={styles.dailyDescription}>
+              Daily #{dailyNumber(today)} · {todaysDaily.summary}
+            </Caption>
+          </div>
+        ) : (
+          <div className={styles.dailyAction}>
+            <Button
+              className={styles.dailyButton}
+              aria-describedby={dailyDescriptionId}
+              onClick={handleDaily}
+            >
+              Daily challenge
+            </Button>
+            <Caption
+              id={dailyDescriptionId}
+              as="span"
+              size="sm"
+              className={styles.dailyDescription}
+            >
+              Five rounds · same photos for everyone today
+            </Caption>
+          </div>
+        )}
         <Button variant="primary" className={styles.playButton} onClick={handleStart}>
           Play
           <KeyHint>Enter</KeyHint>

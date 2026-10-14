@@ -50,3 +50,14 @@ export const scoreTierColour = (score: number): string => {
   if (ratio >= 0.35) return "var(--c-warning)";
   return "var(--c-accent)";
 };
+
+/** A game's total against its maximum, with the spoiler-free line a daily shares. */
+export const guessGameTotals = (scores: readonly number[], timeLimit: number | null) => {
+  const total = scores.reduce((sum, score) => sum + score, 0);
+  const max = scores.length * (MAX_SCORE + (timeLimit ? MAX_TIME_BONUS : 0));
+  return {
+    total,
+    max,
+    summary: `${total.toLocaleString("en-GB")} / ${max.toLocaleString("en-GB")} points`,
+  };
+};

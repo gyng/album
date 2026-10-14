@@ -8,6 +8,10 @@ import { GuessLobby } from "./GuessLobby";
 import { GameSettings, GuessPhoto } from "./guessTypes";
 import styles from "./GuessGame.module.css";
 import { GuessMapDeferred } from "./GuessMapDeferred";
+import { guessDailySeed, guessDailySeedDay } from "./guessDaily";
+import { guessGameTotals } from "./guessScoring";
+import { useGameStats } from "../fun/useGameStats";
+import { GUESS_PHOTO_LIMIT } from "./guessPhotoLinks";
 
 type GuessGameProps = {
   database: Database;
@@ -18,14 +22,6 @@ type GuessGameProps = {
 };
 
 const generateSeed = (): string => Math.random().toString(36).slice(2, 8);
-
-const getDailySeed = (): string => {
-  const now = new Date();
-  const yyyy = now.getFullYear();
-  const mm = String(now.getMonth() + 1).padStart(2, "0");
-  const dd = String(now.getDate()).padStart(2, "0");
-  return `daily-${yyyy}-${mm}-${dd}`;
-};
 
 const DEFAULT_SETTINGS: GameSettings = {
   rounds: 5,
@@ -112,9 +108,10 @@ const reducer = (state: State, action: Action): State => {
       };
     }
     case "play_again": {
-      // Replaying today's daily would deal the same photographs again, so a
-      // replay is an ordinary practice game with the daily's five untimed rounds.
-      const { daily: _daily, ...settings } = state.settings;
+      // Replaying today's daily or a set of named photographs would deal the
+      // same photographs again, so a replay is an ordinary practice game with
+      // the same number of rounds.
+      const { daily: _daily, photos: _photos, ...settings } = state.settings;
       return {
         ...state,
         settings,
@@ -156,6 +153,21 @@ export const GuessGame: React.FC<GuessGameProps> = ({
     onActiveChange?.(state.phase !== "lobby");
   }, [state.phase, onActiveChange]);
 
+  const { stats, record } = useGameStats("guess");
+  // Each dealt game has its own load key, so a summary is recorded once
+  // however often it renders (or StrictMode re-runs its effects).
+  const recordedLoad = useRef(0);
+  useEffect(() => {
+    if (state.phase !== "summary" || recordedLoad.current === state.loadKey) return;
+    recordedLoad.current = state.loadKey;
+    const { total, summary } = guessGameTotals(
+      state.results.map((result) => result.score),
+      state.settings.timeLimit,
+    );
+    const day = state.settings.daily ? guessDailySeedDay(state.activeSeed) : null;
+    record({ won: false, score: total, ...(day ? { daily: { day, summary } } : {}) });
+  }, [state.phase, state.loadKey, state.results, state.settings, state.activeSeed, record]);
+
   // Guess state lifted here so the map (rendered persistently) and round can share it
   const [guess, setGuess] = useState<{ lat: number; lng: number } | null>(null);
   const [revealed, setRevealed] = useState(false);
@@ -176,21 +188,28 @@ export const GuessGame: React.FC<GuessGameProps> = ({
       // A shared seed deals only the first game (load 1); Play again and a new
       // start from the lobby deal fresh photographs.
       const sharedSeed = state.loadKey === 1 ? seedProp : undefined;
-      const seed = sharedSeed || (state.settings.daily ? getDailySeed() : generateSeed());
+      const named = state.settings.photos;
+      const seed = named
+        ? ""
+        : sharedSeed || (state.settings.daily ? guessDailySeed() : generateSeed());
       try {
-        const rows = await fetchGuessPhotos({
-          database,
-          count: state.settings.rounds + 5,
-          ...(state.settings.region ? { region: state.settings.region } : {}),
-          seed,
-        });
+        const rows = named
+          ? await fetchGuessPhotos({ database, count: GUESS_PHOTO_LIMIT, paths: named })
+          : await fetchGuessPhotos({
+              database,
+              count: state.settings.rounds + 5,
+              ...(state.settings.region ? { region: state.settings.region } : {}),
+              seed,
+            });
         if (cancelled) return;
         const parsed = parsePhotos(rows).slice(0, state.settings.rounds);
 
         if (parsed.length === 0) {
           dispatch({
             type: "error",
-            message: "No GPS-tagged photos found. Try a different region.",
+            message: named
+              ? "None of these photographs has a recorded location."
+              : "No GPS-tagged photos found. Try a different region.",
           });
           return;
         }
@@ -198,7 +217,8 @@ export const GuessGame: React.FC<GuessGameProps> = ({
         dispatch({ type: "loaded", photos: parsed, seed });
         setGuess(null);
         setRevealed(false);
-        onSeedGeneratedRef.current?.(seed, state.settings);
+        // Named photographs are their own link; there is no seed to share.
+        if (!named) onSeedGeneratedRef.current?.(seed, state.settings);
       } catch {
         if (cancelled) return;
         dispatch({
@@ -245,6 +265,7 @@ export const GuessGame: React.FC<GuessGameProps> = ({
     return (
       <GuessLobby
         database={database}
+        stats={stats}
         defaults={state.settings}
         onStart={handleStart}
         error={state.error}

@@ -162,3 +162,7 @@
   min-inline-size: calc(var(--search-size) * (var(--tap-target) + var(--space-1)));
   touch-action: auto;
 }
+.dailyResult {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}

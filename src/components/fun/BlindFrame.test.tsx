@@ -1,8 +1,10 @@
 /** @jest-environment jsdom */
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { StrictMode } from "react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { BlindFrame } from "./BlindFrame";
 import { encodeSearchImage } from "../search/imageEmbeddings";
 import type { PhotoGamePhoto } from "../../util/photoGames";
+import { readGameStats } from "./useGameStats";
 
 jest.mock("../search/imageEmbeddings", () => ({ encodeSearchImage: jest.fn() }));
 jest.mock("../search/SearchDrawPad", () => ({
@@ -37,6 +39,7 @@ const photos: PhotoGamePhoto[] = [
 const revokePreview = jest.fn();
 beforeEach(() => {
   jest.clearAllMocks();
+  localStorage.clear();
   URL.createObjectURL = jest.fn(() => "blob:sketch");
   URL.revokeObjectURL = revokePreview;
 });
@@ -170,4 +173,32 @@ it("keeps a busy comparison status after the image model reports ready", () => {
   expect(status).toHaveAttribute("aria-busy", "true");
   expect(status).toHaveTextContent("Comparing your drawing");
   expect(status).not.toHaveTextContent("model ready");
+});
+
+it("records each reveal once, winning when the drawing's closest match is the original", async () => {
+  const view = render(
+    <StrictMode>
+      <BlindFrame photos={photos} />
+    </StrictMode>,
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Start Blind Frame" }));
+  const target = photos.find((photo) => screen.queryByText(photo.caption))!;
+  jest.mocked(encodeSearchImage).mockResolvedValue([...target.vector]);
+  fireEvent.click(screen.getByRole("button", { name: "Draw this scene" }));
+  await act(async () => {
+    fireEvent.click(screen.getByRole("button", { name: "Submit sketch" }));
+  });
+  expect(readGameStats("blind-frame")).toMatchObject({ played: 1, won: 1, best: 100 });
+  const result = screen.getByRole("region", { name: "Blind Frame result" });
+  const href = within(result)
+    .getByRole("link", { name: "Similar photographs" })
+    .getAttribute("href")!;
+  expect(new URL(href, "https://example.org").searchParams.get("similar")).toBe(target.path);
+
+  fireEvent.click(screen.getByRole("button", { name: "Play again" }));
+  fireEvent.click(screen.getByRole("button", { name: "Give up" }));
+  expect(readGameStats("blind-frame")).toMatchObject({ played: 2, won: 1, best: 100 });
+  view.unmount();
+  render(<BlindFrame photos={photos} />);
+  expect(screen.getByText("Played 2 · won 1 · best 100/100")).toBeInTheDocument();
 });

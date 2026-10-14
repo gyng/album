@@ -74,3 +74,36 @@ it("loads crossword photographs from the core archive without embeddings", async
     await fetchPhotoGameArchive({ database: createDatabase([]) as never, game: "cross-exposure" }),
   ).toHaveLength(1);
 });
+
+it("joins camera-local wall clocks to hindsight photographs without embeddings", async () => {
+  const base = createDatabase([]);
+  const database = {
+    exec: (args: Parameters<typeof base.exec>[0]) => {
+      if (args.sql.startsWith("SELECT path, lat_deg"))
+        args.callback(["../albums/test-simple/a.jpg", null, null, "2024-03-22T16:55:00"]);
+      else base.exec(args);
+    },
+  };
+  const photos = await fetchPhotoGameArchive({ database: database as never, game: "hindsight" });
+  expect(photos).toEqual([
+    expect.objectContaining({
+      href: "/album/test-simple#a.jpg",
+      takenAt: "2024-03-22T16:55:00",
+      vector: [],
+    }),
+  ]);
+});
+
+it("gives every game the coordinates that let a result offer Guess Where", async () => {
+  const base = createDatabase([]);
+  const database = {
+    exec: (args: Parameters<typeof base.exec>[0]) => {
+      if (args.sql.startsWith("SELECT path, lat_deg"))
+        args.callback(["../albums/test-simple/a.jpg", 35, 139, "2024-03-22T16:55:00"]);
+      else base.exec(args);
+    },
+  };
+  const [photo] = await fetchPhotoGameArchive({ database: database as never, game: "connections" });
+  expect(photo).toMatchObject({ location: { lat: 35, lng: 139 } });
+  expect(photo).not.toHaveProperty("takenAt");
+});

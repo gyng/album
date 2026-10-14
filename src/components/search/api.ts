@@ -1,4 +1,5 @@
 import { METADATA_FACETS, weatherFacetValue } from "../../util/metadataFacets";
+import { hashSeed, mulberry32 } from "../../util/seededRandom";
 import { weatherCondition } from "../../util/weather";
 import { Database } from "@sqlite.org/sqlite-wasm";
 import { SearchResultRow } from "./searchTypes";
@@ -1155,7 +1156,8 @@ export const fetchPhotoGameArchive = async (opts: {
     | "double-take"
     | "cross-exposure"
     | "sight-lines"
-    | "photo-hangman";
+    | "photo-hangman"
+    | "hindsight";
 }): Promise<PhotoGamePhoto[]> => {
   const { database, game } = opts;
   const vectorDatabase = opts.embeddingsDatabase ?? database;
@@ -1190,24 +1192,26 @@ export const fetchPhotoGameArchive = async (opts: {
     game === "connections" ||
     game === "cross-exposure" ||
     game === "sight-lines" ||
-    game === "photo-hangman"
+    game === "photo-hangman" ||
+    game === "hindsight"
       ? await fetchRandomResults({ database, pageSize: 10000 })
       : await fetchResultsByPaths(
           database,
           embeddings.map((row) => row.path),
         );
+  // One pass over the metadata for every game. Coordinates let a result offer
+  // "Guess where these were taken" and Sight Lines vary a line's outings;
+  // camera-local wall clocks are kept as stored, never parsed or shifted.
   const locations = new Map<string, NonNullable<PhotoGamePhoto["location"]>>();
-  if (game === "double-take") {
-    const result = await exec(
-      database,
-      "SELECT path, lat_deg, lng_deg, iso8601 FROM metadata WHERE lat_deg IS NOT NULL AND lng_deg IS NOT NULL",
-      [],
-    );
-    for (const [path, lat, lng, date] of result.data as unknown as Array<
-      [string, number, number, string]
-    >)
-      if (typeof lat === "number" && typeof lng === "number" && typeof date === "string")
-        locations.set(path, { lat, lng, date, label: "" });
+  const takenAt = new Map<string, string>();
+  const metadata = await exec(database, "SELECT path, lat_deg, lng_deg, iso8601 FROM metadata", []);
+  for (const [path, lat, lng, date] of metadata.data as unknown as Array<
+    [string, unknown, unknown, unknown]
+  >) {
+    if (typeof date !== "string" || !date) continue;
+    takenAt.set(path, date);
+    if (typeof lat === "number" && typeof lng === "number")
+      locations.set(path, { lat, lng, date, label: "" });
   }
   const vectors = new Map(embeddings.map((row) => [row.path, row.embedding]));
   return rows
@@ -1226,6 +1230,7 @@ export const fetchPhotoGameArchive = async (opts: {
             },
           }
         : {}),
+      ...(game === "hindsight" && takenAt.has(row.path) ? { takenAt: takenAt.get(row.path)! } : {}),
     }));
 };
 
@@ -1994,14 +1999,40 @@ export const fetchGuessRegions = async (opts: {
   }
 };
 
+/** Rows for the given paths, in that order; unknown paths are skipped. */
+const fetchGuessRowsByPaths = async (
+  database: Database,
+  paths: readonly string[],
+): Promise<RandomPhotoRow[]> => {
+  if (paths.length === 0) return [];
+  const result = await exec(
+    database,
+    `SELECT path, exif, geocode FROM images WHERE path IN (${paths.map(() => "?").join(",")})`,
+    [...paths],
+  );
+  const rowMap = new Map(
+    (result.data as unknown as string[][]).map((row) => [
+      row[0] ?? "",
+      { path: row[0] ?? "", exif: row[1] ?? "", geocode: row[2] ?? "" },
+    ]),
+  );
+  return paths.flatMap((p) => {
+    const row = rowMap.get(p);
+    return row ? [row] : [];
+  });
+};
+
 export const fetchGuessPhotos = async (opts: {
   database: Database;
   count: number;
   filter?: string;
   region?: string;
   seed?: string;
+  /** Deal exactly these photographs, in this order, instead of drawing. */
+  paths?: readonly string[];
 }): Promise<RandomPhotoRow[]> => {
-  const { database, count, filter = "%", region, seed } = opts;
+  const { database, count, filter = "%", region, seed, paths } = opts;
+  if (paths) return fetchGuessRowsByPaths(database, paths.slice(0, count));
 
   const baseWhere = `path LIKE ? AND exif LIKE '%GPSLatitude%'`;
   const regionClause = region
@@ -2038,50 +2069,11 @@ export const fetchGuessPhotos = async (opts: {
     const allPaths = (allResult.data as unknown as string[][])
       .map((r) => r[0])
       .filter((p): p is string => p !== undefined);
-    const selected = seededShuffle(allPaths, seed).slice(0, count);
-
-    if (selected.length === 0) return [];
-
-    const placeholders = selected.map(() => "?").join(",");
-    const result = await exec(
-      database,
-      `SELECT path, exif, geocode FROM images WHERE path IN (${placeholders})`,
-      selected,
-    );
-    const rowMap = new Map(
-      (result.data as unknown as string[][]).map((row) => [
-        row[0] ?? "",
-        { path: row[0] ?? "", exif: row[1] ?? "", geocode: row[2] ?? "" },
-      ]),
-    );
-    return selected.flatMap((p) => {
-      const row = rowMap.get(p);
-      return row ? [row] : [];
-    });
+    return fetchGuessRowsByPaths(database, seededShuffle(allPaths, seed).slice(0, count));
   } catch (err) {
     console.error(`Failed to fetch guess photos`, err);
     throw err;
   }
-};
-
-/** Simple seeded PRNG (mulberry32). */
-const mulberry32 = (seed: number) => {
-  return () => {
-    seed |= 0;
-    seed = (seed + 0x6d2b79f5) | 0;
-    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-};
-
-/** Hash a string to a 32-bit integer for use as a PRNG seed. */
-const hashSeed = (str: string): number => {
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    hash = (Math.imul(31, hash) + str.charCodeAt(i)) | 0;
-  }
-  return hash;
 };
 
 /** Fisher-Yates shuffle with a seeded PRNG. Returns a new array. */

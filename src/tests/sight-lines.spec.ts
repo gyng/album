@@ -153,7 +153,7 @@ for (const { width, size } of [
     const result = page.getByRole("region", { name: "Sight Lines result" });
     await expect(result).toBeFocused();
     await expect(page).toHaveURL(/\/fun\/sight-lines(?:\?|$)/);
-    await expect(result.getByRole("link")).toHaveCount(12);
+    await expect(result.getByRole("link").filter({ has: page.getByRole("img") })).toHaveCount(12);
   });
 }
 
@@ -293,5 +293,5 @@ test("Sight Lines preserves a 10×10 five-photo-line game and keeps mobile targe
   await page.getByRole("button", { name: "Give up", exact: true }).click();
   const result = page.getByRole("region", { name: "Sight Lines result" });
   await expect(result).toBeFocused();
-  await expect(result.getByRole("link")).toHaveCount(30);
+  await expect(result.getByRole("link").filter({ has: page.getByRole("img") })).toHaveCount(30);
 });

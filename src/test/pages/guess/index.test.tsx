@@ -9,6 +9,8 @@ import { useDatabase } from "../../../components/database/useDatabase";
 import GuessPage from "../../../screens/guess/GuessScreen";
 import { gameSettingsStorageKey } from "../../../components/fun/useGameSettings";
 import type { GameSettings } from "../../../components/guess/guessTypes";
+import { gameStatsStorageKey } from "../../../components/fun/useGameStats";
+import { localDayKey } from "../../../util/gameDaily";
 
 jest.mock("next/router", () => ({
   useRouter: jest.fn(),
@@ -311,5 +313,44 @@ describe("GuessPage", () => {
       theme: "darkroom",
       daily: "",
     });
+  });
+
+  it("deals named photographs as an untimed game without a seed", () => {
+    const photos = ["../albums/test-simple/a b.jpg", "../albums/test-simple/c.jpg"];
+    setQuery({ photos: [...photos, "not-a-path"] });
+    render(<GuessPage />);
+    expect(screen.getByTestId("guess-game")).toHaveAttribute(
+      "data-settings",
+      JSON.stringify({ rounds: 2, timeLimit: null, photos }),
+    );
+    expect(screen.getByTestId("guess-game")).not.toHaveAttribute("data-seed");
+  });
+
+  it("drops the named photographs from the URL once a fresh game is dealt", () => {
+    setQuery({}, true, "/fun/guess?photos=..%2Falbums%2Fa%2Fb.jpg&photos=..%2Falbums%2Fa%2Fc.jpg");
+    render(<GuessPage />);
+    mockLoadedSeed = "fresh";
+    mockLoadedSettings = { rounds: 2, timeLimit: null };
+    fireEvent.click(screen.getByRole("button", { name: "Generate seed" }));
+    const params = new URLSearchParams(window.location.search);
+    expect(params.has("photos")).toBe(false);
+    expect(params.get("seed")).toBe("fresh");
+  });
+
+  it("opens the lobby, not a replay, when today's daily is already finished", () => {
+    localStorage.setItem(
+      gameStatsStorageKey("guess"),
+      JSON.stringify({
+        played: 1,
+        won: 0,
+        streak: 1,
+        bestStreak: 1,
+        lastDay: localDayKey(),
+        dailies: { [localDayKey()]: { won: false, summary: "1,000 / 25,000 points" } },
+      }),
+    );
+    setQuery({ daily: "" });
+    render(<GuessPage />);
+    expect(screen.getByTestId("guess-game")).not.toHaveAttribute("data-settings");
   });
 });

@@ -1,8 +1,14 @@
 /** @jest-environment jsdom */
+import { StrictMode } from "react";
 import { fireEvent, render, screen, within } from "@testing-library/react";
-import { PhotoConnections } from "./PhotoConnections";
-import type { PhotoGamePhoto } from "../../util/photoGames";
+import { dailyConnectionsPuzzle, PhotoConnections } from "./PhotoConnections";
+import { dailyPuzzle } from "./GameRecord";
+import { gameStatsStorageKey, readGameStats } from "./useGameStats";
+import { gameSettingsStorageKey } from "./useGameSettings";
+import { shuffleGamePhotos, type PhotoGamePhoto } from "../../util/photoGames";
+import { seededRandom } from "../../util/seededRandom";
 beforeEach(() => localStorage.clear());
+afterEach(() => window.history.replaceState(null, "", "/"));
 
 const photos: PhotoGamePhoto[] = ["A cat", "A lake", "A red flower", "A train"].flatMap(
   (caption, group) =>
@@ -213,4 +219,115 @@ it("keeps focused tiles clear of the sticky dock on small screens", () => {
     match.mockRestore();
     rect.mockRestore();
   }
+});
+
+describe("daily", () => {
+  const today = dailyPuzzle("connections");
+  const dailyName = `Daily #${today.number}`;
+  const archive: PhotoGamePhoto[] = [
+    "A cat",
+    "A lake",
+    "A train",
+    "A mountain",
+    "A staircase",
+    "A bridge",
+  ].flatMap((caption, group) =>
+    Array.from({ length: 6 }, (_, i) => ({
+      path: `${group}-${i}.jpg`,
+      href: "/album/test-simple",
+      caption,
+      tags: "",
+      vector: [],
+    })),
+  );
+  const boardOf = (photos: PhotoGamePhoto[]) => {
+    const puzzle = dailyConnectionsPuzzle(photos, today.day)!;
+    return {
+      groups: puzzle.groups.map((group) => [group.id, group.photos.map((photo) => photo.path)]),
+      tiles: puzzle.tiles.map((photo) => photo.path),
+    };
+  };
+
+  it("deals the same board on every device, whatever order the archive arrives in", () => {
+    const first = boardOf(shuffleGamePhotos(archive, seededRandom("device one")));
+    const second = boardOf(shuffleGamePhotos(archive, seededRandom("device two")));
+    expect(first.groups).toHaveLength(4);
+    expect(second).toEqual(first);
+  });
+
+  it("plays the fixed daily board without replacing saved settings", () => {
+    const saved = { size: 6, detail: "specific", hints: false, lives: 8 };
+    localStorage.setItem(gameSettingsStorageKey("connections"), JSON.stringify(saved));
+    render(<PhotoConnections photos={archive} />);
+    fireEvent.click(screen.getByRole("button", { name: dailyName }));
+    expect(
+      within(screen.getByRole("group", { name: "Photographs" })).getAllByRole("button"),
+    ).toHaveLength(16);
+    expect(screen.getByText("4 mistakes remaining")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Give up" }));
+    expect(JSON.parse(localStorage.getItem(gameSettingsStorageKey("connections"))!)).toEqual(saved);
+    expect(window.location.search).toBe("?daily=");
+  });
+
+  it("records each finished game exactly once", () => {
+    render(
+      <StrictMode>
+        <PhotoConnections photos={photos} />
+      </StrictMode>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Start connecting" }));
+    choose("A cat", 4);
+    fireEvent.click(screen.getByRole("button", { name: "Check connection" }));
+    fireEvent.click(screen.getByRole("button", { name: "Give up" }));
+    expect(readGameStats("connections")).toMatchObject({ played: 1, won: 0, dailies: {} });
+    fireEvent.click(screen.getByRole("button", { name: "Play again" }));
+    for (const name of ["A cat", "A lake", "A red flower", "A train"]) {
+      choose(name, 4);
+      fireEvent.click(screen.getByRole("button", { name: "Check connection" }));
+    }
+    expect(screen.getByRole("heading", { name: "All connected" })).toBeTruthy();
+    expect(readGameStats("connections")).toMatchObject({ played: 2, won: 1 });
+    fireEvent.click(screen.getByRole("button", { name: "Change board size" }));
+    expect(screen.getByText(/Played 2 · won 1/)).toBeTruthy();
+  });
+
+  it("shares a finished daily and shows its result instead of offering it again", () => {
+    render(<PhotoConnections photos={archive} />);
+    fireEvent.click(screen.getByRole("button", { name: dailyName }));
+    fireEvent.click(screen.getByRole("button", { name: "Give up" }));
+    const result = screen.getByRole("region", { name: "Connections result" });
+    expect(within(result).getByRole("button", { name: "Share result" })).toBeTruthy();
+    expect(readGameStats("connections").dailies[today.day]).toEqual({
+      won: false,
+      summary: "Gave up · 0 of 4 connections",
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Change board size" }));
+    expect(screen.queryByRole("button", { name: dailyName })).toBeNull();
+    expect(screen.getByText(`${dailyName} · Gave up · 0 of 4 connections`)).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Share result" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Start connecting" })).toBeEnabled();
+  });
+
+  it("opens today's board from the URL, and its result once it is finished", () => {
+    window.history.replaceState(null, "", "/fun/connections?daily");
+    const first = render(<PhotoConnections photos={archive} />);
+    expect(
+      within(screen.getByRole("group", { name: "Photographs" })).getAllByRole("button"),
+    ).toHaveLength(16);
+    first.unmount();
+    localStorage.setItem(
+      gameStatsStorageKey("connections"),
+      JSON.stringify({
+        played: 1,
+        won: 1,
+        streak: 1,
+        bestStreak: 1,
+        lastDay: today.day,
+        dailies: { [today.day]: { won: true, summary: "4×4 · No mistakes" } },
+      }),
+    );
+    render(<PhotoConnections photos={archive} />);
+    expect(screen.queryByRole("group", { name: "Photographs" })).toBeNull();
+    expect(screen.getByText(`${dailyName} · 4×4 · No mistakes`)).toBeTruthy();
+  });
 });

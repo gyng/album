@@ -14,6 +14,16 @@ AVIF, quality 85, effort 6. Cards and starts share the existing asset URL.
 
 > Use case: illustration-story. Asset type: decorative photo-game card illustration. Create an original witty animal-only editorial cartoon. Match the loose lively pen-and-ink, expressive deadpan animal faces and restrained cross-hatching of reference 2 (mole and pigeon); reference 1 is the existing Photo Relay concept, whose composition must become much taller and more compact. Subject: two perplexed dachshunds, sitting close together at the bottom left and right, hold the two ends of a looping string of five photographic prints. Between and above them a pompous pigeon has hopelessly tangled itself in the string, wings spread, one loop around its belly and another over its head. The prints hang in a gentle zigzag between all three animals, showing a doorway, arch, bridge, hill and mountain, clearly connecting the two endpoints. The dogs exchange dry sceptical looks while the pigeon pretends everything is under control. Compose the three animals into a compact triangular vignette, using both height and width, NOT a thin horizontal clothesline or long panorama. The subject fills about 75 percent of a landscape 3:2 canvas height, all subjects visible with generous transparent margins. Strong silhouettes and clear visual humour at small card size. Pure black ink marks on genuinely transparent background, including uninked interiors, no white fills or paper backdrop. Animal paws/wings only. No humans, human body parts, captions, speech bubbles, text, lettering, numbers, signatures, artist attribution, logos, borders or watermark. Application recolours the ink with an inverted luminance mask.
 
+## Placeholder — `hindsight.avif`
+
+**Hindsight has no artwork of its own yet.** `hindsight.avif` is the retired
+Photo Relay cartoon from 07549cc (two dachshunds holding either end of a line
+of prints), reused because a line of photographs reads as a sequence and it
+already belongs to the animal set. It was retired from Relay only for its long
+horizontal composition. Replace it with a generated Hindsight cartoon in this
+style, encoded like the others, then remove the placeholder comment in
+`components/fun/games.ts`.
+
 ## Current direction — animal editorial cartoons
 
 Updated 13 October 2026 with the built-in imagegen tool, one generation per

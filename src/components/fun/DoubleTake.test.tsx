@@ -1,8 +1,9 @@
 /** @jest-environment jsdom */
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { DoubleTake } from "./DoubleTake";
 import { buildDoubleTakeDeck, prepareDoubleTakePairs } from "../../util/doubleTake";
 import type { PhotoGamePhoto } from "../../util/photoGames";
+import { readGameStats } from "./useGameStats";
 
 jest.mock("../../util/doubleTake", () => ({
   ...jest.requireActual("../../util/doubleTake"),
@@ -283,4 +284,25 @@ it("offers keyboard picks only after watching and advances a revealed pair", asy
   expect(screen.getByRole("region", { name: "Double Take results" })).toHaveTextContent(
     "2 of 2 correct",
   );
+});
+
+it("records a finished game once, scored by correct answers, and leads on from its photographs", async () => {
+  start();
+  await watch();
+  fireEvent.click(screen.getByRole("button", { name: "Same place" }));
+  fireEvent.click(screen.getByRole("button", { name: "Next pair" }));
+  expect(readGameStats("double-take").played).toBe(0);
+  await watch(900);
+  fireEvent.click(screen.getByRole("button", { name: "Same place" }));
+  fireEvent.click(screen.getByRole("button", { name: "See results" }));
+  expect(readGameStats("double-take")).toMatchObject({ played: 1, won: 0, best: 1 });
+
+  const results = screen.getByRole("region", { name: "Double Take results" });
+  const guess = within(results).getByRole("link", { name: "Guess where these were taken" });
+  expect(
+    new URL(guess.getAttribute("href")!, "https://example.org").searchParams.getAll("photos"),
+  ).toEqual(photos.map((photo) => photo.path));
+
+  fireEvent.click(screen.getByRole("button", { name: "Change viewing time" }));
+  expect(screen.getByText("Played 1 · won 0 · best 1 correct")).toBeInTheDocument();
 });

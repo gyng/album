@@ -1,6 +1,10 @@
 /** @jest-environment jsdom */
-import { fireEvent, render, screen, within, waitFor } from "@testing-library/react";
-import { PhotoHangman } from "./PhotoHangman";
+import { act, fireEvent, render, screen, within, waitFor } from "@testing-library/react";
+import { buildDailyPhotoHangman, PhotoHangman } from "./PhotoHangman";
+import { readGameStats } from "./useGameStats";
+import { dailyNumber, localDayKey } from "../../util/gameDaily";
+import { seededRandom } from "../../util/seededRandom";
+import { shuffleGamePhotos } from "../../util/photoGames";
 import { buildPhotoHangman } from "../../util/photoHangman";
 jest.mock("../../util/photoHangman", () => {
   const actual = jest.requireActual("../../util/photoHangman");
@@ -28,6 +32,8 @@ const photos: PhotoGamePhoto[] = [
 const { buildPhotoHangman: buildActual } =
   jest.requireActual<typeof import("../../util/photoHangman")>("../../util/photoHangman");
 beforeEach(() => {
+  localStorage.clear();
+  window.history.replaceState(null, "", "/");
   jest.spyOn(Math, "random").mockReturnValue(0.37);
   jest.mocked(buildPhotoHangman).mockImplementation(buildActual);
 });
@@ -55,7 +61,11 @@ it("offers subject tags, filters without guessing, and reveals linked clues afte
   );
   const result = screen.getByRole("region", { name: "Photo Hangman result" });
   await waitFor(() => expect(result).toHaveFocus());
-  expect(within(result).getAllByRole("link")).toHaveLength(8);
+  expect(
+    within(result)
+      .getAllByRole("link")
+      .filter((link) => link.querySelector("img")),
+  ).toHaveLength(8);
   expect(within(result).getByText(new RegExp(puzzle.answer, "i"))).toBeTruthy();
 });
 it("each wrong tag reveals a new clue, used choices stay disabled, and six misses end the round", async () => {
@@ -75,7 +85,11 @@ it("each wrong tag reveals a new clue, used choices stay disabled, and six misse
   }
   const result = screen.getByRole("region", { name: "Photo Hangman result" });
   await waitFor(() => expect(result).toHaveFocus());
-  expect(within(result).getAllByRole("link")).toHaveLength(8);
+  expect(
+    within(result)
+      .getAllByRole("link")
+      .filter((link) => link.querySelector("img")),
+  ).toHaveLength(8);
   fireEvent.click(screen.getByRole("button", { name: "Play again" }));
   expect(screen.queryByRole("region", { name: "Photo Hangman result" })).toBeNull();
   expect(screen.getByText("6 misses left")).toBeTruthy();
@@ -148,4 +162,91 @@ it("loads the next round's clues afresh even when one was showing on the result 
   fireEvent.click(screen.getByRole("button", { name: "Play again" }));
   // A reused element with an unchanged source never fires another load event.
   expect(screen.getByRole("img", { name: "Photographic clue 2" })).not.toBe(shown);
+});
+
+const loadClues = () => {
+  for (const image of screen.queryAllByRole("img", { name: /^Photographic clue/ }))
+    fireEvent.load(image);
+};
+
+describe("daily puzzle", () => {
+  const today = localDayKey();
+  const label = `Daily #${dailyNumber(today)}`;
+  const shape = (puzzle: ReturnType<typeof buildDailyPhotoHangman>) => ({
+    answer: puzzle!.answer,
+    photos: puzzle!.photos.map((photo) => photo.path),
+  });
+
+  it("deals the same subject and clues however the archive arrives", () => {
+    const first = buildDailyPhotoHangman(photos, "2026-10-20");
+    jest.spyOn(Math, "random").mockReturnValue(0.91);
+    const second = buildDailyPhotoHangman(
+      shuffleGamePhotos(photos, seededRandom("another order")),
+      "2026-10-20",
+    );
+    expect(first).not.toBeNull();
+    expect(shape(second)).toEqual(shape(first));
+    const days = ["2026-10-21", "2026-10-22", "2026-10-23", "2026-10-24"];
+    expect(
+      days.some((day) => shape(buildDailyPhotoHangman(photos, day)).answer !== first!.answer),
+    ).toBe(true);
+  });
+
+  it("shares a spoiler-free result, records it once and shows it in the lobby afterwards", async () => {
+    const writeText = jest.fn().mockResolvedValue(undefined);
+    Object.assign(navigator, { clipboard: { writeText } });
+    const puzzle = buildDailyPhotoHangman(photos, today)!;
+    const { unmount } = render(<PhotoHangman photos={[...photos].reverse()} />);
+    fireEvent.click(screen.getByRole("button", { name: label }));
+    loadClues();
+    const wrong = puzzle.subjects.find((subject) => !puzzle.acceptedAnswers.includes(subject))!;
+    fireEvent.click(screen.getByRole("button", { name: `Guess ${wrong.toLowerCase()}` }));
+    loadClues();
+    fireEvent.click(screen.getByRole("button", { name: `Guess ${puzzle.answer.toLowerCase()}` }));
+    const result = screen.getByRole("region", { name: "Photo Hangman result" });
+    await act(async () => {
+      fireEvent.click(within(result).getByRole("button", { name: "Share result" }));
+    });
+    const text = writeText.mock.calls[0]![0] as string;
+    expect(text).toContain(`Photo Hangman #${dailyNumber(today)}`);
+    expect(text).toContain("Solved · 1 miss");
+    for (const subject of [puzzle.answer, ...puzzle.acceptedAnswers])
+      expect(text).not.toMatch(new RegExp(subject, "i"));
+    expect(readGameStats("photo-hangman")).toMatchObject({ played: 1, won: 1, best: 5 });
+    unmount();
+
+    render(<PhotoHangman photos={photos} />);
+    expect(screen.queryByRole("button", { name: label })).toBeNull();
+    expect(screen.getByText(/Solved · 1 miss/)).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Share result" })).toBeTruthy();
+    expect(screen.getByText("Played 1 · won 1 · best 1 miss")).toBeTruthy();
+  });
+
+  it("opens straight into the daily from ?daily, and shows the result once it is finished", () => {
+    window.history.replaceState(null, "", "/fun/photo-hangman?daily");
+    const puzzle = buildDailyPhotoHangman(photos, today)!;
+    const { unmount, rerender } = render(<PhotoHangman photos={[]} />);
+    expect(screen.queryByRole("group", { name: "Subject choices" })).toBeNull();
+    rerender(<PhotoHangman photos={photos} />);
+    loadClues();
+    fireEvent.click(screen.getByRole("button", { name: "Give up" }));
+    expect(
+      within(screen.getByRole("region", { name: "Photo Hangman result" })).getByText(
+        new RegExp(puzzle.answer, "i"),
+      ),
+    ).toBeTruthy();
+    unmount();
+    render(<PhotoHangman photos={photos} />);
+    expect(screen.queryByRole("group", { name: "Subject choices" })).toBeNull();
+    expect(screen.getByText(/Not solved · 0 misses/)).toBeTruthy();
+    expect(readGameStats("photo-hangman")).toMatchObject({ played: 1, won: 0 });
+  });
+});
+
+it("records an ordinary game once, with no daily", () => {
+  start();
+  fireEvent.click(screen.getByRole("button", { name: "Give up" }));
+  fireEvent.keyDown(window, { key: "g" });
+  expect(readGameStats("photo-hangman")).toMatchObject({ played: 1, won: 0, dailies: {} });
+  expect(readGameStats("photo-hangman").best).toBeUndefined();
 });
