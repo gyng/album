@@ -414,6 +414,24 @@ export const nearestNeighbours = (
     }
   }
 
+  // Each pair once: a row's similarity to another is the other's to it, and
+  // computing both halves was half of this function's time. The sum runs in the
+  // same order either way, so the stored value is bit-for-bit what each row
+  // would have computed for itself.
+  const similarities = new Float64Array(total * total);
+  for (let row = 0; row < total; row += 1) {
+    const rowStart = row * dimensions;
+    for (let other = row + 1; other < total; other += 1) {
+      const otherStart = other * dimensions;
+      let similarity = 0;
+      for (let index = 0; index < dimensions; index += 1) {
+        similarity += (unit[rowStart + index] as number) * (unit[otherStart + index] as number);
+      }
+      similarities[row * total + other] = similarity;
+      similarities[other * total + row] = similarity;
+    }
+  }
+
   const wanted = Math.min(count, total - 1);
   const neighbours: number[][] = [];
 
@@ -424,11 +442,7 @@ export const nearestNeighbours = (
     for (let other = 0; other < total; other += 1) {
       if (other === row) continue;
 
-      let similarity = 0;
-      for (let index = 0; index < dimensions; index += 1) {
-        similarity +=
-          (unit[row * dimensions + index] as number) * (unit[other * dimensions + index] as number);
-      }
+      const similarity = similarities[row * total + other] as number;
 
       if (best.length < wanted) {
         best.push({ index: other, similarity });

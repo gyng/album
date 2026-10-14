@@ -619,9 +619,24 @@ export const computeVisualSamenessStats = async (
         return vector ? [{ path: row.path, vector }] : [];
       });
 
-      const vectors = parsedRows.map((row) => row.vector);
-      if (!computeVisualSamenessFromVectors(vectors)) {
+      // The same gate computeVisualSamenessFromVectors applies, without its own
+      // pass over every pair: the pass below is the one whose answers are used,
+      // and running both doubled the critical path of the /explore build.
+      if (parsedRows.length < MIN_EMBEDDING_SAMPLE) {
         return null;
+      }
+
+      // Every pair's similarity, each computed once and read from both rows: the
+      // pass over every pair is the expensive part of the /explore build.
+      const total = parsedRows.length;
+      const similarities = new Float64Array(total * total);
+      for (let left = 0; left < total; left += 1) {
+        const leftVector = parsedRows[left]!.vector;
+        for (let right = left + 1; right < total; right += 1) {
+          const score = dotProduct(leftVector, parsedRows[right]!.vector);
+          similarities[left * total + right] = score;
+          similarities[right * total + left] = score;
+        }
       }
 
       const nearest = parsedRows.map((source, sourceIndex) => {
@@ -641,7 +656,7 @@ export const computeVisualSamenessStats = async (
 
           // invariant: targetIndex < parsedRows.length, so the row is defined
           const target = parsedRows[targetIndex]!;
-          const score = dotProduct(source.vector, target.vector);
+          const score = similarities[sourceIndex * total + targetIndex] as number;
           if (score >= IDENTICAL_SIMILARITY_THRESHOLD) {
             continue;
           }

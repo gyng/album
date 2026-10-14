@@ -5,6 +5,8 @@ const path = require("node:path");
 const sharp = require("sharp");
 const { formatAspectRatio } = require("../util/formatAspectRatio.ts");
 
+const HEADER_READERS = 16;
+
 async function prepareSearchFraming(databasePath) {
   if (!existsSync(databasePath)) return 0;
   const db = new DatabaseSync(databasePath);
@@ -22,12 +24,27 @@ async function prepareSearchFraming(databasePath) {
     const update = db.prepare(
       "INSERT INTO metadata (path, aspect_ratio, orientation) VALUES (?, ?, ?) ON CONFLICT(path) DO UPDATE SET aspect_ratio=excluded.aspect_ratio, orientation=excluded.orientation",
     );
+    // Headers are read several at a time: one by one they were most of this
+    // step's time on every build. Writes still happen in row order below.
+    const metadataByRow = Array.from({ length: rows.length });
+    let next = 0;
+    const readHeaders = async () => {
+      while (next < rows.length) {
+        const index = next++;
+        const source = path.resolve(__dirname, "..", rows[index].path);
+        if (!existsSync(source)) continue;
+        metadataByRow[index] = await sharp(source)
+          .metadata()
+          .catch((error) => ({ error }));
+      }
+    };
+    await Promise.all(Array.from({ length: HEADER_READERS }, readHeaders));
     let count = 0;
-    for (const row of rows) {
-      const source = path.resolve(__dirname, "..", row.path);
-      if (!existsSync(source)) continue;
+    for (const [index, row] of rows.entries()) {
+      const metadata = metadataByRow[index];
+      if (!metadata) continue;
       try {
-        const metadata = await sharp(source).metadata();
+        if (metadata.error) throw metadata.error;
         let { width, height } = metadata;
         if (!width || !height) continue;
         if (metadata.orientation >= 5) [width, height] = [height, width];
