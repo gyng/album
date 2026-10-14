@@ -104,6 +104,7 @@ it("retains the presented position when navigation interrupts an unfinished anim
   };
   const view = render(<Region />);
   target = 200;
+  history.replaceState(null, "", "/motion-middle");
   view.rerender(<Region />);
   translation = -50;
   history.replaceState(null, "", "/motion-next");
@@ -144,4 +145,64 @@ it.each([
   expect(JSON.parse(sessionStorage.getItem("gallery-nav-position:left")!).y).toBe(expectedY);
   rect.mockRestore();
   Object.defineProperty(window, "scrollY", { configurable: true, value: oldScroll });
+});
+
+describe("positions that are not a navigation", () => {
+  let target: number;
+  let animate: jest.Mock;
+  let match: jest.SpyInstance;
+  let rect: jest.SpyInstance;
+  const innerWidth = window.innerWidth;
+  const Region = () => {
+    const ref = useRef<HTMLDivElement>(null);
+    useNavPositionMotion(ref, "trailing");
+    return <div ref={ref} />;
+  };
+  beforeEach(() => {
+    sessionStorage.clear();
+    target = 100;
+    animate = jest.fn(() => ({ cancel: () => {} }) as unknown as Animation);
+    Object.defineProperty(HTMLElement.prototype, "animate", { configurable: true, value: animate });
+    match = jest.spyOn(window, "matchMedia").mockReturnValue({ matches: false } as MediaQueryList);
+    rect = jest.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(() => ({
+      x: target,
+      y: 24,
+      width: 100,
+      height: 44,
+      top: 24,
+      bottom: 68,
+      left: target,
+      right: target + 100,
+      toJSON: () => ({}),
+    }));
+  });
+  afterEach(() => {
+    rect.mockRestore();
+    match.mockRestore();
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: innerWidth });
+  });
+
+  it("does not glide when the layout moves the nav without a navigation", () => {
+    history.replaceState(null, "", "/explore");
+    const view = render(<Region />);
+    animate.mockClear();
+    // A resize from desktop to phone width re-renders the same route.
+    target = 900;
+    view.rerender(<Region />);
+    expect(animate).not.toHaveBeenCalled();
+    view.unmount();
+  });
+
+  it("does not launch the nav from a position measured at another viewport width", () => {
+    history.replaceState(null, "", "/explore/timeline");
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 1280 });
+    target = 1100;
+    render(<Region />).unmount();
+    animate.mockClear();
+    history.replaceState(null, "", "/explore");
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 390 });
+    target = 250;
+    render(<Region />).unmount();
+    expect(animate).not.toHaveBeenCalled();
+  });
 });

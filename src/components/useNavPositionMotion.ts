@@ -1,6 +1,6 @@
 import { useCallback, useLayoutEffect, useRef, type RefObject } from "react";
 
-type Position = { x: number; y: number; path: string; at: number };
+type Position = { x: number; y: number; path: string; at: number; viewport: number };
 const STORAGE_KEY = "gallery-nav-position";
 type Region = "left" | "right" | "trailing";
 const lastPositions = new Map<Region, Position>();
@@ -37,6 +37,7 @@ export const useNavPositionMotion = (
         y: rect.y + (sticky ? 0 : window.scrollY) - (visual ? 0 : (matrix?.m42 ?? 0)),
         path: window.location.pathname,
         at: Date.now(),
+        viewport: window.innerWidth,
       };
     },
     [ref, edge],
@@ -55,16 +56,19 @@ export const useNavPositionMotion = (
       } catch {
         /* Storage is optional. */
       }
-      if (
-        from &&
-        (!Number.isFinite(from.x) ||
-          !Number.isFinite(from.y) ||
-          !Number.isFinite(from.at) ||
-          from.path === target.path ||
-          target.at - from.at > 10000)
-      )
-        from = null;
+      if (from && (!Number.isFinite(from.at) || target.at - from.at > 10000)) from = null;
     }
+    // Only a navigation moves the nav. A resize, a rotated phone or late content
+    // also re-renders it somewhere new, and gliding there from a desktop-width
+    // position slid it in from beyond the edge of a phone.
+    if (
+      from &&
+      (!Number.isFinite(from.x) ||
+        !Number.isFinite(from.y) ||
+        from.path === target.path ||
+        from.viewport !== target.viewport)
+    )
+      from = null;
     previous.current = target;
     if (!from || !node.animate || window.matchMedia("(prefers-reduced-motion: reduce)").matches)
       return;
