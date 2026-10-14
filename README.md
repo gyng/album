@@ -71,7 +71,7 @@ There is a CLI at the repo root — `./album --help` lists everything:
 | Command | |
 |---|---|
 | `./album init` | name, URL, albums directory, social links → `src/site.config.json` |
-| `./album doctor` | check this machine can build; `--indexing` adds the Python toolchain |
+| `./album doctor` | check this machine can build; `--indexing` adds the Python toolchain, `--fix` removes Windows `Zone.Identifier` sidecars from the albums |
 | `./album dev` | development server |
 | `./album generate` | production build (alias: `build`); `--profile` for build profiling |
 | `./album index [mode]` | `full`, `embeddings`, `retag`, `status`, `validate`, `prune`, `publish` |

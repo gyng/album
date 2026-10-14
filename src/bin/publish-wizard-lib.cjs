@@ -210,7 +210,8 @@ const buildAttentionAlbums = (report) => {
         album.newPhotos.length > 0 ||
         album.removedPhotos.length > 0 ||
         album.warnings.length > 0 ||
-        album.blockers.length > 0,
+        album.blockers.length > 0 ||
+        (album.notes?.length ?? 0) > 0,
     )
     .sort((left, right) => {
       const leftScore =
@@ -986,12 +987,16 @@ const createAlbumReport = async ({ albumDir, albumName, dbState }) => {
 
   const warnings = [];
   const blockers = [];
+  // Informational: the build ignores sidecars, so they never affect a publish.
+  const notes = [];
 
   if (manifest.exists && manifest.valid === false) {
     blockers.push(`album.json is invalid for ${albumName}`);
   }
   if (zoneSidecars.length > 0) {
-    warnings.push(`${zoneSidecars.length} Zone.Identifier sidecar files found`);
+    notes.push(
+      `${zoneSidecars.length} Zone.Identifier sidecar file(s), ignored by the build; remove with album doctor --fix`,
+    );
   }
   if (photos.length === 0 && videos.length === 0) {
     warnings.push("album has no media files");
@@ -1012,6 +1017,7 @@ const createAlbumReport = async ({ albumDir, albumName, dbState }) => {
     removedPhotos,
     warnings,
     blockers,
+    notes,
   };
 };
 
@@ -1397,6 +1403,9 @@ const printPreflightReport = (report) => {
     }
     if (album.warnings.length > 0) {
       printIndentedList(album.warnings, "    ! ");
+    }
+    if (album.notes?.length > 0) {
+      printIndentedList(album.notes, "    · ");
     }
     if (album.blockers.length > 0) {
       printIndentedList(album.blockers, "    x ");

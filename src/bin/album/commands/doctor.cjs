@@ -11,6 +11,11 @@ module.exports = {
       default: false,
       description: "Also check the Python indexing toolchain",
     },
+    fix: {
+      type: "boolean",
+      default: false,
+      description: "Remove Windows Zone.Identifier sidecars from the albums",
+    },
   },
   positional: null,
   // Deliberately fast: presence checks only, no EXIF walk over the photo
@@ -32,6 +37,19 @@ module.exports = {
       for (const line of formatProbeRows(indexRows)) {
         log(line);
       }
+    }
+
+    // Name-only walk, no EXIF: cheap enough to keep doctor fast.
+    const sidecars = services.findZoneSidecars(context.albumsDir);
+    if (sidecars.length > 0 && args.fix) {
+      const { removed, failed } = services.removeZoneSidecars(sidecars);
+      log(`\nRemoved ${removed.length} Zone.Identifier sidecar file(s):`);
+      for (const file of removed) log(`  ${file}`);
+      for (const { file, message } of failed) log(`  could not remove ${file}: ${message}`);
+    } else if (sidecars.length > 0) {
+      log(
+        `\n${sidecars.length} Zone.Identifier sidecar file(s) in the albums; the build ignores them. Remove with: album doctor --fix`,
+      );
     }
 
     if (hasBlockers([...rows, ...indexRows])) {

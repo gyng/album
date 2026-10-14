@@ -4,11 +4,13 @@ const doctor = require("./doctor.cjs");
 
 const context = { albumsDir: "/repo/albums" };
 
-const makeHarness = ({ site = [], indexing = [] } = {}) => ({
+const makeHarness = ({ site = [], indexing = [], sidecars = [] } = {}) => ({
   services: {
     env: {},
     buildSiteProbes: jest.fn(() => site),
     buildIndexProbes: jest.fn(() => indexing),
+    findZoneSidecars: jest.fn(() => sidecars),
+    removeZoneSidecars: jest.fn((paths) => ({ removed: paths, failed: [] })),
   },
   log: jest.fn(),
   setExitCode: jest.fn(),
@@ -16,7 +18,7 @@ const makeHarness = ({ site = [], indexing = [] } = {}) => ({
 
 const run = async (args, harness) =>
   doctor.run({
-    args: { indexing: false, ...args },
+    args: { indexing: false, fix: false, ...args },
     context,
     services: harness.services,
     log: harness.log,
@@ -63,5 +65,32 @@ describe("album doctor", () => {
     await run({ indexing: true }, harness);
 
     expect(harness.setExitCode).toHaveBeenCalledWith(1);
+  });
+
+  it("reports Zone.Identifier sidecars without removing them", async () => {
+    const harness = makeHarness({ site: ok, sidecars: ["/repo/albums/a/p.jpg:Zone.Identifier"] });
+    await run({}, harness);
+
+    expect(harness.services.findZoneSidecars).toHaveBeenCalledWith("/repo/albums");
+    expect(harness.services.removeZoneSidecars).not.toHaveBeenCalled();
+    expect(harness.log.mock.calls.flat().join("\n")).toContain("album doctor --fix");
+    expect(harness.setExitCode).not.toHaveBeenCalled();
+  });
+
+  it("removes sidecars with --fix", async () => {
+    const sidecar = "/repo/albums/a/p.jpg:Zone.Identifier";
+    const harness = makeHarness({ site: ok, sidecars: [sidecar] });
+    await run({ fix: true }, harness);
+
+    expect(harness.services.removeZoneSidecars).toHaveBeenCalledWith([sidecar]);
+    expect(harness.log.mock.calls.flat().join("\n")).toContain(sidecar);
+  });
+
+  it("says nothing about sidecars when there are none", async () => {
+    const harness = makeHarness({ site: ok });
+    await run({ fix: true }, harness);
+
+    expect(harness.services.removeZoneSidecars).not.toHaveBeenCalled();
+    expect(harness.log.mock.calls.flat().join("\n")).not.toContain("Zone.Identifier");
   });
 });

@@ -507,7 +507,8 @@ describe("publish wizard boundary adapters", () => {
       photos: ["new.jpg"],
       videos: ["clip.mp4"],
       removedPhotos: ["../albums/trip/removed.jpg"],
-      warnings: [expect.stringContaining("Zone.Identifier")],
+      warnings: [],
+      notes: [expect.stringContaining("album doctor --fix")],
     });
 
     const report = await createPreflightReport({

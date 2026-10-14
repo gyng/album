@@ -30,6 +30,7 @@ const { defaultTargets } = require("./targets/registry.cjs");
 const { readVersion } = require("./pkg.cjs");
 const { commandExists, fileExists, readJsonFile } = require("./probeAdapters.cjs");
 const { buildIndexProbes, buildSiteProbes } = require("./probes.cjs");
+const { findZoneSidecars, removeZoneSidecars } = require("./zoneSidecars.cjs");
 
 const countAlbums = (albumsDir) =>
   fs.readdirSync(albumsDir, { withFileTypes: true }).filter((entry) => entry.isDirectory()).length;
@@ -51,6 +52,8 @@ const buildDefaultServices = () => ({
   parseWizardArgs: wizardLib.parseArgs,
   buildWizardContext: wizardLib.buildWizardContext,
   wizardServices,
+  findZoneSidecars,
+  removeZoneSidecars,
   buildIndexProbes: ({ context, env }) =>
     buildIndexProbes({ context, env, commandExists, fileExists, homedir: os.homedir() }),
   buildSiteProbes: ({ context }) =>
