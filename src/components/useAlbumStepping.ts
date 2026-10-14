@@ -11,8 +11,8 @@ const IN_FLIGHT_MS = 700;
 /**
  * Which stop to go to, given each stop's distance from where a scroll would
  * leave it (negative: above). Next is the first still below; previous the last
- * already above, so pressing it partway through a photograph goes back to its
- * start. Null when there is nowhere further to go.
+ * already above, so pressing it with a photograph off centre centres it first.
+ * Null when there is nowhere further to go.
  */
 export const pickStep = (offsets: readonly number[], direction: 1 | -1): number | null => {
   if (direction === 1) {
@@ -22,6 +22,23 @@ export const pickStep = (offsets: readonly number[], direction: 1 | -1): number 
   for (let index = offsets.length - 1; index >= 0; index--) if (offsets[index]! < -1) return index;
   return null;
 };
+
+/**
+ * How far a photograph's centre sits from the middle of the visible area —
+ * the viewport below `inset`, the sticky chrome that covers its top. Zero when
+ * the photograph is centred; negative above.
+ */
+export const centreOffset = (
+  rect: { top: number; height: number },
+  inset: number,
+  viewportHeight: number,
+): number => rect.top + rect.height / 2 - (inset + (viewportHeight - inset) / 2);
+
+// What to centre: a block's photograph or clip itself, not the block around it,
+// whose details band on a phone sits above the picture. The album's end is
+// centred whole.
+const subjectOf = (stop: HTMLElement): HTMLElement =>
+  (stop.localName === "nav" ? null : stop.querySelector<HTMLElement>("img, video")) ?? stop;
 
 const typing = (target: EventTarget | null) =>
   target instanceof HTMLElement &&
@@ -35,7 +52,7 @@ const arrowsClaimed = (target: EventTarget | null) =>
   target !== document.documentElement &&
   !target.matches("a, button, summary");
 
-/** J/→ and K/← scroll an album a photograph at a time. */
+/** J/→ and K/← scroll an album a photograph at a time, centring each one. */
 export const useAlbumStepping = () => {
   const last = useRef<{ index: number; at: number } | null>(null);
   useEffect(() => {
@@ -48,21 +65,22 @@ export const useAlbumStepping = () => {
       const stops = [...document.querySelectorAll<HTMLElement>(`[${ALBUM_STEP_ATTRIBUTE}]`)];
       if (!stops.length) return;
       const recent = last.current && performance.now() - last.current.at < IN_FLIGHT_MS;
+      // Centred in the whole window. The phone's sticky album nav slides away
+      // as the page scrolls down, so it is no fixed inset; and a centred
+      // photograph clears it anyway.
+      const offsetOf = (stop: HTMLElement) =>
+        centreOffset(subjectOf(stop).getBoundingClientRect(), 0, window.innerHeight);
       const index = recent
         ? Math.min(stops.length - 1, Math.max(0, last.current!.index + direction))
-        : pickStep(
-            stops.map(
-              (stop) =>
-                stop.getBoundingClientRect().top -
-                (Number.parseFloat(getComputedStyle(stop).scrollMarginBlockStart) || 0),
-            ),
-            direction,
-          );
+        : pickStep(stops.map(offsetOf), direction);
       if (index === null || (recent && index === last.current!.index)) return;
       event.preventDefault();
       last.current = { index, at: performance.now() };
       const reduced = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-      stops[index]!.scrollIntoView({ behavior: reduced ? "auto" : "smooth", block: "start" });
+      window.scrollTo({
+        top: window.scrollY + offsetOf(stops[index]!),
+        behavior: reduced ? "auto" : "smooth",
+      });
     };
     window.addEventListener("keydown", step);
     return () => window.removeEventListener("keydown", step);

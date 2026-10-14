@@ -1,6 +1,6 @@
 /** @jest-environment jsdom */
 import { fireEvent, render } from "@testing-library/react";
-import { ALBUM_STEP_ATTRIBUTE, pickStep, useAlbumStepping } from "./useAlbumStepping";
+import { ALBUM_STEP_ATTRIBUTE, centreOffset, pickStep, useAlbumStepping } from "./useAlbumStepping";
 
 describe("pickStep", () => {
   it("steps to the first stop below and the last one above", () => {
@@ -19,6 +19,14 @@ describe("pickStep", () => {
   it("has nowhere to go past either end", () => {
     expect(pickStep([0, 900], -1)).toBeNull();
     expect(pickStep([-900, 0], 1)).toBeNull();
+  });
+});
+
+describe("centreOffset", () => {
+  it("measures a photograph's centre from the middle of the area below any sticky chrome", () => {
+    // 900px viewport, 100px of sticky nav: the visible middle is 500.
+    expect(centreOffset({ top: 300, height: 400 }, 100, 900)).toBe(0);
+    expect(centreOffset({ top: 1300, height: 400 }, 100, 900)).toBe(1000);
   });
 });
 
@@ -41,23 +49,22 @@ describe("useAlbumStepping", () => {
     scrolled = [];
     now = 0;
     jest.spyOn(performance, "now").mockImplementation(() => now);
-    // The reader is at the top of the second photograph.
+    Object.defineProperty(window, "innerHeight", { configurable: true, value: 800 });
+    // The second photograph is centred; the others sit a screen above and below.
     jest.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (
       this: HTMLElement,
     ) {
-      const top = (Number(this.dataset.index) - 1) * 1000;
-      return { top } as DOMRect;
+      const index = Number(this.dataset.index);
+      return { top: (index - 1) * 1000 + 100, height: 600 } as DOMRect;
     });
-    Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
-      configurable: true,
-      value(this: HTMLElement) {
-        scrolled.push(Number(this.dataset.index));
-      },
-    });
+    jest.spyOn(window, "scrollTo").mockImplementation(((options: ScrollToOptions) => {
+      // Back to the stop whose centre the scroll lands on.
+      scrolled.push(options.top! / 1000 + 1);
+    }) as typeof window.scrollTo);
   });
   afterEach(() => jest.restoreAllMocks());
 
-  it("moves a photograph at a time with J, K and the arrows", () => {
+  it("centres a photograph at a time with J, K and the arrows", () => {
     render(<Album />);
     fireEvent.keyDown(window, { key: "j" });
     now = 1000;
