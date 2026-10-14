@@ -219,6 +219,17 @@
   border-radius: var(--radius-preview);
   max-inline-size: 28rem;
 }
+.scoreLine {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-3);
+  margin: 0;
+}
+.scoreBand {
+  font-size: var(--fs-m);
+  font-weight: 600;
+}
 .scoreTrack {
   block-size: 0.35rem;
   background: var(--c-bg-contrast-light);

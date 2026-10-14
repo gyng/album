@@ -49,17 +49,28 @@ export const warmerTemperature = (rank: number, total: number): Temperature => {
   return BANDS.find(([limit]) => share < limit)?.[1] ?? { id: "freezing", label: "Freezing" };
 };
 
-const MAX_BLUR_PX = 28;
+export type WarmerLevel = "normal" | "hard";
 
-/**
- * How blurred the hidden photograph still is, from the best guess so far.
- * Colours and shapes read from the start; detail arrives only near the top.
- */
-export const warmerBlur = (bestRank: number | null, total: number): number => {
-  if (bestRank === null) return MAX_BLUR_PX;
-  if (bestRank <= 1) return 0;
-  const share = Math.min(1, (bestRank - 1) / Math.max(1, total - 1) / 0.5);
-  return Math.round(MAX_BLUR_PX * Math.sqrt(share) * 10) / 10;
+// Blocks across the hidden photograph after each guess. Sharpening by the number of
+// guesses rather than the best rank keeps one lucky word from giving the picture
+// away, after which the game was describing what could already be seen.
+const PIXELS: Record<WarmerLevel, number[]> = {
+  normal: [6, 8, 10, 13, 16, 20, 25, 32, 40, 50, 64],
+  hard: [3, 4, 5, 6, 7, 8, 10, 12],
+};
+
+export const warmerPixels = (guesses: number, level: WarmerLevel): number => {
+  const steps = PIXELS[level];
+  return steps[Math.min(guesses, steps.length - 1)]!;
+};
+
+const WORD_LIMIT: Record<WarmerLevel, number> = { normal: 2, hard: 1 };
+
+/** Why a Warmer guess is too long, or null. A guess is a word or two, not a caption. */
+export const warmerGuessProblem = (text: string, level: WarmerLevel): string | null => {
+  const words = text.match(/[\p{L}\p{N}]+(?:['’-][\p{L}\p{N}]+)*/gu) ?? [];
+  if (words.length <= WORD_LIMIT[level]) return null;
+  return level === "hard" ? "One word per guess." : "Two words at most per guess.";
 };
 
 export const normaliseGuess = (text: string): string =>

@@ -7,11 +7,14 @@ import { shuffleGamePhotos, type PhotoGamePhoto } from "../../util/photoGames";
 import {
   normaliseGuess,
   scoreTextAgainstArchive,
-  warmerBlur,
+  warmerGuessProblem,
+  warmerPixels,
   warmerTemperature,
   type Temperature,
+  type WarmerLevel,
 } from "../../util/semanticGames";
 import { GamePhoto } from "./GamePhoto";
+import { PixelatedPhoto } from "./PixelatedPhoto";
 import { GameIntro } from "./GameIllustration";
 import { useGameReadiness } from "./GameReadiness";
 import {
@@ -23,6 +26,7 @@ import {
   useShareOrigin,
 } from "./GameRecord";
 import { readGameStats, useGameStats } from "./useGameStats";
+import { useGameSettings } from "./useGameSettings";
 import { useGameShortcuts } from "./useGameShortcuts";
 import { useTextEncoder } from "./useTextEncoder";
 import { ResultNextSteps } from "./ResultNextSteps";
@@ -31,6 +35,18 @@ import warmerStyles from "./Warmer.module.css";
 
 type Guess = { text: string; rank: number; total: number; temperature: Temperature };
 type Daily = { day: string; number: number };
+
+/** Everyone plays the same daily, whatever their own level. */
+const DAILY_LEVEL: WarmerLevel = "normal";
+
+const LEVELS = [
+  { value: "normal", label: "Normal", detail: "Two words a guess." },
+  {
+    value: "hard",
+    label: "Hard",
+    detail: "One word a guess, the picture stays in blocks of colour, and no ranks.",
+  },
+] as const;
 
 const MAX_GUESS_LENGTH = 60;
 const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? "" : "es"}`;
@@ -42,6 +58,7 @@ const rankText = (guess: Pick<Guess, "rank" | "total">) =>
 export const Warmer = ({ photos }: { photos: PhotoGamePhoto[] }) => {
   const { loading } = useGameReadiness();
   const { stats, record } = useGameStats("warmer");
+  const [settings, setSettings] = useGameSettings("warmer");
   const shareOrigin = useShareOrigin();
   const {
     ready: urlReady,
@@ -52,6 +69,7 @@ export const Warmer = ({ photos }: { photos: PhotoGamePhoto[] }) => {
   const encoder = useTextEncoder();
   const [target, setTarget] = useState<PhotoGamePhoto | null>(null);
   const [daily, setDaily] = useState<Daily | null>(null);
+  const [level, setLevel] = useState<WarmerLevel>(DAILY_LEVEL);
   const [guesses, setGuesses] = useState<Guess[]>([]);
   const [draft, setDraft] = useState("");
   const [message, setMessage] = useState("");
@@ -73,8 +91,9 @@ export const Warmer = ({ photos }: { photos: PhotoGamePhoto[] }) => {
     else params.delete("daily");
     replaceSearchParams(params);
   };
-  const deal = (next: PhotoGamePhoto | null, nextDaily: Daily | null) => {
+  const deal = (next: PhotoGamePhoto | null, nextDaily: Daily | null, nextLevel: WarmerLevel) => {
     encoder.cancel();
+    setLevel(nextLevel);
     previousTarget.current = next?.path ?? null;
     setTarget(next);
     setDaily(next ? nextDaily : null);
@@ -90,6 +109,7 @@ export const Warmer = ({ photos }: { photos: PhotoGamePhoto[] }) => {
         eligible[0] ??
         null,
       null,
+      settings.level,
     );
   };
   const startDaily = () => {
@@ -98,7 +118,7 @@ export const Warmer = ({ photos }: { photos: PhotoGamePhoto[] }) => {
     const order = dailyPhotoOrder(eligible);
     const next = order[Math.floor(today.random()() * order.length)] ?? null;
     setDailyParam(!!next);
-    deal(next, { day: today.day, number: today.number });
+    deal(next, { day: today.day, number: today.number }, DAILY_LEVEL);
   };
 
   // A `?daily` link opens straight onto today's photograph, once the archive is ready.
@@ -128,6 +148,11 @@ export const Warmer = ({ photos }: { photos: PhotoGamePhoto[] }) => {
     if (!target || encoder.busy || outcome) return;
     const text = normaliseGuess(draft);
     if (!text) return;
+    const tooLong = warmerGuessProblem(text, level);
+    if (tooLong) {
+      setMessage(tooLong);
+      return;
+    }
     if (guesses.some((previous) => previous.text === text)) {
       setMessage(`You already tried “${text}”.`);
       return;
@@ -175,9 +200,22 @@ export const Warmer = ({ photos }: { photos: PhotoGamePhoto[] }) => {
     return (
       <GameIntro game="warmer">
         <p>
-          Find a hidden photograph by describing it. Every guess is ranked against the whole
-          archive, and the closer it gets, the sharper the photograph.
+          Find a hidden photograph in a word or two. Every guess is ranked against the whole
+          archive, and each one sharpens the picture a little.
         </p>
+        <div className={styles.actions} role="group" aria-label="Difficulty">
+          {LEVELS.map(({ value, label }) => (
+            <Button
+              key={value}
+              active={settings.level === value}
+              aria-pressed={settings.level === value}
+              onClick={() => setSettings((previous) => ({ ...previous, level: value }))}
+            >
+              {label}
+            </Button>
+          ))}
+        </div>
+        <Caption>{LEVELS.find((item) => item.value === settings.level)!.detail}</Caption>
         <Caption>The first guess downloads a 155 MB language model.</Caption>
         <Button variant="primary" onClick={start}>
           Start Warmer
@@ -197,7 +235,6 @@ export const Warmer = ({ photos }: { photos: PhotoGamePhoto[] }) => {
   }
 
   const ranked = [...guesses].sort((a, b) => a.rank - b.rank);
-  const best = ranked[0] ?? null;
   const latest = guesses.at(-1) ?? null;
 
   if (outcome) {
@@ -254,17 +291,17 @@ export const Warmer = ({ photos }: { photos: PhotoGamePhoto[] }) => {
     );
   }
 
-  const blur = warmerBlur(best?.rank ?? null, best?.total ?? photos.length);
+  const showRanks = level !== "hard";
   return (
     <div className={styles.game}>
       {daily ? <Caption>Daily #{daily.number}</Caption> : null}
       <div className={warmerStyles.layout}>
         <div className={warmerStyles.hidden}>
-          <img
+          <PixelatedPhoto
             src={getResizedAlbumImageSrc(target.path)}
-            alt="The hidden photograph, blurred"
-            className={styles.photo}
-            style={{ filter: `blur(${blur}px)` }}
+            blocks={warmerPixels(guesses.length, level)}
+            label="The hidden photograph, pixelated"
+            className={warmerStyles.pixels}
           />
         </div>
         <div className={warmerStyles.play}>
@@ -305,7 +342,11 @@ export const Warmer = ({ photos }: { photos: PhotoGamePhoto[] }) => {
           {encoder.error ? <p role="alert">{encoder.error}</p> : null}
           {message ? <p role="alert">{message}</p> : null}
           <p role="status" className={warmerStyles.latest}>
-            {latest ? `“${latest.text}” · ${latest.temperature.label} · ${rankText(latest)}` : ""}
+            {latest
+              ? [`“${latest.text}”`, latest.temperature.label, showRanks ? rankText(latest) : ""]
+                  .filter(Boolean)
+                  .join(" · ")
+              : ""}
           </p>
           {ranked.length ? (
             <ol className={warmerStyles.guesses} aria-label="Your guesses, closest first">
@@ -317,7 +358,7 @@ export const Warmer = ({ photos }: { photos: PhotoGamePhoto[] }) => {
                 >
                   <span className={warmerStyles.word}>{item.text}</span>
                   <span>{item.temperature.label}</span>
-                  <span className={warmerStyles.rank}>{rankText(item)}</span>
+                  {showRanks ? <span className={warmerStyles.rank}>{rankText(item)}</span> : null}
                 </li>
               ))}
             </ol>

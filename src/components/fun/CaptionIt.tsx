@@ -187,22 +187,13 @@ export const CaptionIt = ({ photos }: { photos: PhotoGamePhoto[] }) => {
         role="region"
         aria-label="Caption It result"
       >
-        <Heading level={1}>{yours.found ? "Picked out" : "Your caption"}</Heading>
+        <Heading level={1}>{yours.found ? "Picked out" : "Not picked out"}</Heading>
         {daily ? <Caption>Daily #{daily.number}</Caption> : null}
-        <blockquote className={styles.prompt}>{attempt.caption}</blockquote>
-        <GameScore label="Fit" score={yours.score} />
-        <Caption>
-          Your caption ranked this photograph {rankPhrase(yours)}.
-          {index
-            ? ` The archive’s own caption ranked it ${rankPhrase(index)}${
-                index.rank > yours.rank ? " — yours did better" : ""
-              }.`
-            : ""}
-        </Caption>
-        <div className={styles.comparison}>
+        <div className={captionStyles.result} data-picked-out={yours.nearest.path === target.path}>
+          <GamePhoto photo={target} link />
           <figure className={styles.frame}>
-            <Caption as="figcaption">The photograph</Caption>
-            <GamePhoto photo={target} link />
+            <Caption as="figcaption">The archive’s caption</Caption>
+            <p className={captionStyles.indexCaption}>{target.caption}</p>
           </figure>
           {yours.nearest.path !== target.path ? (
             <figure className={styles.frame}>
@@ -210,10 +201,21 @@ export const CaptionIt = ({ photos }: { photos: PhotoGamePhoto[] }) => {
               <GamePhoto photo={yours.nearest} link />
             </figure>
           ) : null}
-          <figure className={styles.frame}>
-            <Caption as="figcaption">The archive’s caption</Caption>
-            <p className={captionStyles.indexCaption}>{target.caption}</p>
-          </figure>
+          <div className={captionStyles.yours}>
+            <GameScore label="Fit" score={yours.score} band />
+            <figure className={styles.frame}>
+              <Caption as="figcaption">Your caption</Caption>
+              <blockquote className={styles.prompt}>{attempt.caption}</blockquote>
+            </figure>
+            <Caption>
+              Your caption ranked this photograph {rankPhrase(yours)}.
+              {index
+                ? ` The archive’s own caption ranked it ${rankPhrase(index)}${
+                    index.rank > yours.rank ? " — yours did better" : ""
+                  }.`
+                : ""}
+            </Caption>
+          </div>
         </div>
         <ResultNextSteps photos={[target]} />
         <div className={styles.actions}>

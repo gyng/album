@@ -20,8 +20,8 @@ const photos: PhotoGamePhoto[] = Array.from({ length: SIZE }, (_, i) => ({
   vector: oneHot(i),
 }));
 
-const hidden = () => screen.getByRole("img", { name: "The hidden photograph, blurred" });
-const targetIndex = () => Number(/photo-(\d+)/.exec(hidden().getAttribute("src")!)![1]);
+const hidden = () => screen.getByRole("img", { name: "The hidden photograph, pixelated" });
+const targetIndex = () => Number(/photo-(\d+)/.exec(hidden().getAttribute("data-photo")!)![1]);
 /** "exact" points at the hidden photograph; anything else points away from it. */
 const answerWith = (target: number) =>
   jest.mocked(encodeSearchText).mockImplementation(async (text) => {
@@ -45,18 +45,21 @@ beforeEach(() => {
   window.history.replaceState(null, "", "/fun/warmer");
 });
 
-it("ranks each guess against the archive, sharpens nothing for a cold one and reveals the photograph when found", async () => {
+it("ranks each guess against the archive, sharpens the picture with every guess and reveals the photograph when found", async () => {
   render(<Warmer photos={photos} />);
   await act(async () => {});
   fireEvent.click(screen.getByRole("button", { name: /^Start Warmer/ }));
   answerWith(targetIndex());
 
+  const blocks = () => Number(hidden().getAttribute("width"));
+  const before = blocks();
   await guess("far away");
   const list = screen.getByRole("list", { name: "Your guesses, closest first" });
   expect(within(list).getByText("far away")).toBeInTheDocument();
   expect(within(list).getByText("Freezing")).toBeInTheDocument();
   expect(within(list).getByText(`#${SIZE} of ${SIZE}`)).toBeInTheDocument();
-  expect(hidden().style.filter).toBe("blur(28px)");
+  // Even a freezing guess sharpens the picture: it follows the count, not the luck.
+  expect(blocks()).toBeGreaterThan(before);
 
   await guess("exact");
   const result = screen.getByRole("region", { name: "Warmer result" });
@@ -96,11 +99,50 @@ it("deals the same daily photograph from any archive order and keeps its result"
   const today = dailyPuzzle("warmer");
   const order = dailyPhotoOrder(photos);
   const expected = order[Math.floor(today.random()() * order.length)]!;
-  expect(hidden().getAttribute("src")).toContain(expected.path.split("/").at(-1)!);
+  expect(hidden().getAttribute("data-photo")).toContain(expected.path.split("/").at(-1)!);
   answerWith(targetIndex());
   await guess("exact");
   expect(readGameStats("warmer").dailies[localDayKey()]).toMatchObject({
     won: true,
     summary: "Found in 1 guess",
   });
+});
+
+it("refuses a guess longer than the level allows before loading the model", async () => {
+  render(<Warmer photos={photos} />);
+  await act(async () => {});
+  fireEvent.click(screen.getByRole("button", { name: /^Start Warmer/ }));
+  await guess("red bicycle by the canal");
+  expect(screen.getByRole("alert")).toHaveTextContent("Two words at most per guess.");
+  expect(encodeSearchText).not.toHaveBeenCalled();
+});
+
+it("plays hard with one word a guess and no ranks, and remembers the level", async () => {
+  const view = render(<Warmer photos={photos} />);
+  await act(async () => {});
+  fireEvent.click(screen.getByRole("button", { name: "Hard" }));
+  fireEvent.click(screen.getByRole("button", { name: /^Start Warmer/ }));
+  answerWith(targetIndex());
+  await guess("red bicycle");
+  expect(screen.getByRole("alert")).toHaveTextContent("One word per guess.");
+  await guess("far");
+  const list = screen.getByRole("list", { name: "Your guesses, closest first" });
+  expect(within(list).getByText("Freezing")).toBeInTheDocument();
+  expect(within(list).queryByText(`#${SIZE} of ${SIZE}`)).toBeNull();
+  view.unmount();
+
+  render(<Warmer photos={photos} />);
+  await act(async () => {});
+  expect(screen.getByRole("button", { name: "Hard" })).toHaveAttribute("aria-pressed", "true");
+});
+
+it("plays the daily on normal whatever the player's level", async () => {
+  localStorage.setItem("snapshots-fun-settings-v1:warmer", JSON.stringify({ level: "hard" }));
+  window.history.replaceState(null, "", "/fun/warmer?daily");
+  render(<Warmer photos={photos} />);
+  await act(async () => {});
+  answerWith(targetIndex());
+  await guess("far away");
+  expect(screen.queryByRole("alert")).toBeNull();
+  expect(screen.getByText(`#${SIZE} of ${SIZE}`)).toBeInTheDocument();
 });

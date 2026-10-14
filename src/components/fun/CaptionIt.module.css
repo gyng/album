@@ -56,3 +56,43 @@
   margin: 0;
   line-height: var(--lh-body);
 }
+
+/* Two rows on a wide screen: the photograph beside its own caption, then the one
+   the player's caption fits best beside their score and words. */
+.result {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: start;
+  gap: var(--space-5);
+}
+
+.yours {
+  display: grid;
+  align-content: start;
+  gap: var(--space-4);
+  min-inline-size: 0;
+}
+
+/* Picked out: no other photograph to show, so the score joins the caption
+   beside the one photograph. */
+.result[data-picked-out="true"] {
+  grid-template-rows: auto 1fr;
+}
+
+.result[data-picked-out="true"] > :first-child {
+  grid-row: span 2;
+}
+
+@media (max-width: 720px) {
+  .result {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .result[data-picked-out="true"] {
+    grid-template-rows: none;
+  }
+
+  .result[data-picked-out="true"] > :first-child {
+    grid-row: auto;
+  }
+}

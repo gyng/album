@@ -452,17 +452,33 @@ different things for different photographs — a busy street matches every word
 a little — and a rank does not. A target in the top three counts as found,
 because bursts of one scene tie for first.
 
-- **Warmer.** A hidden photograph, blurred. Each guess is ranked, and the
-  temperature is a share of the archive (burning under 1%, hot 5%, warm 15%,
-  tepid 35%, cool 60%, else freezing), so it means the same in any collection.
-  The best guess so far sets the blur. Repeated guesses are refused before
-  encoding. Won when found; no best score.
+- **Warmer.** A hidden photograph, pixelated (`PixelatedPhoto` draws it into
+  a canvas a few blocks wide and scales it up unsmoothed). Each guess is
+  ranked, and the temperature is a share of the archive (burning under 1%, hot
+  5%, warm 15%, tepid 35%, cool 60%, else freezing), so it means the same in
+  any collection. The picture sharpens with the number of guesses, not the best
+  rank: when one lucky guess cleared the blur, the rest of the game was
+  describing a photograph that could already be seen, and it was too easy.
+  Normal allows two words a guess; Hard one word, a picture that stays at 12
+  blocks across at most, and temperatures without ranks. The level is a saved
+  lobby setting (`useGameSettings("warmer")`). Over-long and repeated guesses
+  are refused before encoding. Won when found; no best score.
 - **Caption It.** A visible photograph and a caption of at most 120
   characters. Its fit is `rankDrawing`'s 0–100 score, and the archive's own
   caption is scored the same way as the bar to beat. Captions of one word, or
   that repeat a word three times, are refused before encoding — rank scoring
   already resists keyword stuffing, and this keeps the obvious attempt from
-  costing a model download. Rewriting the same photograph is practice.
+  costing a model download. Rewriting the same photograph is practice. On a
+  wide screen the result is two rows: the photograph beside the archive's
+  caption, then the photograph the player's caption fits best beside their
+  score and words; when the caption picked its photograph out, the score
+  joins the first row.
+
+Scores that measure a fit rather than a tally — Caption It's fit, Blind
+Frame's resemblance and Relay's visual flow — carry a word beside the number
+(`util/fitBand.ts`: Perfect from 95, Close enough 80, Getting there 60, Loose
+35, A stretch 15, else Way off). Double Take's accuracy and Hindsight's order
+are counts of right answers and keep the bare number.
 
 Both start with placeholder illustrations (see `docs/fun-illustrations.md`).
 
@@ -477,8 +493,8 @@ device with the same archive gets the same board; the archive itself arrives in
 random order. Daily settings are fixed and never saved: Connect the Shots 4×4,
 broad, hints, 4 lives; Cross Exposure 4×4, hidden, no starting photographs;
 Sight Lines 6×6, 4 per line; Hangman its usual rules (never seeded by the
-previous answer); Hindsight 5 photographs across the years; Warmer and
-Caption It one photograph each; Guess Where five
+previous answer); Hindsight 5 photographs across the years; Warmer one photograph on
+Normal; Caption It one photograph; Guess Where five
 untimed rounds with its existing `daily-YYYY-MM-DD` seed. A finished daily is
 kept: the lobby shows its result and Share instead of offering it again, and a
 replay counts as practice. Share text is spoiler-free — title, number and a

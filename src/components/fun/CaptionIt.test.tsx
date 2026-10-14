@@ -52,6 +52,7 @@ it("scores a caption by how well it picks the photograph out of the archive, aga
   const result = screen.getByRole("region", { name: "Caption It result" });
   expect(result).toHaveFocus();
   expect(within(result).getByText("Fit: 100 / 100")).toBeInTheDocument();
+  expect(within(result).getByText("Perfect")).toBeInTheDocument();
   expect(result).toHaveTextContent(
     "Your caption ranked this photograph first of all. The archive’s own caption ranked it 2 of 20 — yours did better.",
   );

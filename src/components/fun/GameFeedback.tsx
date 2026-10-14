@@ -1,14 +1,25 @@
+import { fitBand } from "../../util/fitBand";
 import styles from "./PhotoGames.module.css";
 
-export const GameScore = ({ score, label }: { score: number | null; label: string }) => (
+type ScoreProps = {
+  score: number | null;
+  label: string;
+  /** Names the score beside it ("Close enough"): for fits and resemblances, not tallies. */
+  band?: boolean;
+};
+
+export const GameScore = ({ score, label, band = false }: ScoreProps) => (
   <div className={styles.scoreCard}>
     {score === null ? (
       <p>These matches are too alike to score.</p>
     ) : (
       <>
-        <p className={styles.score}>
-          {label ? `${label}: ` : ""}
-          {score} / 100
+        <p className={styles.scoreLine}>
+          <span className={styles.score}>
+            {label ? `${label}: ` : ""}
+            {score} / 100
+          </span>
+          {band ? <span className={styles.scoreBand}>{fitBand(score)}</span> : null}
         </p>
         <div className={styles.scoreTrack} aria-hidden="true">
           <span style={{ width: `${score}%` }} />

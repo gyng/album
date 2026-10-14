@@ -3,7 +3,8 @@ import {
   captionProblem,
   normaliseGuess,
   scoreTextAgainstArchive,
-  warmerBlur,
+  warmerGuessProblem,
+  warmerPixels,
   warmerTemperature,
 } from "./semanticGames";
 import type { PhotoGamePhoto } from "./photoGames";
@@ -59,14 +60,30 @@ describe("warmerTemperature", () => {
   });
 });
 
-describe("warmerBlur", () => {
-  it("starts fully blurred and clears as the best guess closes in", () => {
-    const start = warmerBlur(null, 1000);
-    const warm = warmerBlur(150, 1000);
-    const hot = warmerBlur(20, 1000);
-    expect(start).toBeGreaterThan(warm);
-    expect(warm).toBeGreaterThan(hot);
-    expect(warmerBlur(1, 1000)).toBe(0);
+describe("warmerPixels", () => {
+  it("sharpens with every guess, not with a lucky one", () => {
+    const normal = [0, 1, 2, 5, 20].map((count) => warmerPixels(count, "normal"));
+    expect(normal).toEqual([...normal].sort((a, b) => a - b));
+    expect(new Set(normal).size).toBe(normal.length);
+  });
+
+  it("keeps a hard picture to blocks of colour", () => {
+    expect(warmerPixels(0, "hard")).toBeLessThan(warmerPixels(0, "normal"));
+    expect(warmerPixels(100, "hard")).toBeLessThanOrEqual(12);
+  });
+});
+
+describe("warmerGuessProblem", () => {
+  it("allows two words a guess on normal and one on hard", () => {
+    expect(warmerGuessProblem("red bicycle", "normal")).toBeNull();
+    expect(warmerGuessProblem("red bicycle canal", "normal")).not.toBeNull();
+    expect(warmerGuessProblem("bicycle", "hard")).toBeNull();
+    expect(warmerGuessProblem("red bicycle", "hard")).not.toBeNull();
+  });
+
+  it("counts a hyphenated or apostrophised word once", () => {
+    expect(warmerGuessProblem("tram-stop", "hard")).toBeNull();
+    expect(warmerGuessProblem("o'clock", "hard")).toBeNull();
   });
 });
 

@@ -392,7 +392,9 @@ export const PhotoRelay = ({ photos }: { photos: PhotoGamePhoto[] }) => {
           aria-label="Relay result"
         >
           <Heading level={1}>{gaveUp ? "The suggested route" : "Your relay"}</Heading>
-          {!gaveUp ? <GameScore label="Visual flow" score={scoreRelay(puzzle, order)} /> : null}
+          {!gaveUp ? (
+            <GameScore label="Visual flow" band score={scoreRelay(puzzle, order)} />
+          ) : null}
           <Caption>
             {gaveUp
               ? "This route has the closest overall visual matches between neighbours."

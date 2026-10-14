@@ -150,7 +150,7 @@ export const BlindFrame = ({ photos }: { photos: PhotoGamePhoto[] }) => {
           <Heading level={1}>The reveal</Heading>
           {result && !gaveUp ? (
             <>
-              <GameScore label="Resemblance to the original" score={result.score} />
+              <GameScore label="Resemblance to the original" band score={result.score} />
               <Caption>
                 Your drawing ranked the original {result.rank.toLocaleString("en-GB")} of{" "}
                 {result.total.toLocaleString("en-GB")} photographs. A score of 100 means it matched

@@ -23,14 +23,14 @@
   border-radius: var(--radius-preview);
 }
 
-.hidden img {
-  transition: filter var(--t-slow) var(--ease-out);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .hidden img {
-    transition: none;
-  }
+/* Blocks, not a smudge: the canvas holds a few dozen pixels and is scaled up crisply. */
+.pixels {
+  display: block;
+  inline-size: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: contain;
+  background: var(--c-surface);
+  image-rendering: pixelated;
 }
 
 .play,

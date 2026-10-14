@@ -246,7 +246,7 @@ export const DoubleTake = ({ photos }: { photos: PhotoGamePhoto[] }) => {
   if (phase === "lobby")
     return (
       <GameIntro game="double-take">
-        <p>Two photographs. A similar look. Were they taken in the same place?</p>
+        <p>Were two photographs taken in the same place?</p>
         <Caption>
           Same place means within 75 metres, on different days. Different places are at least 5 km
           apart.
