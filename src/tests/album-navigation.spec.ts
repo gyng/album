@@ -1,6 +1,29 @@
 import { test, expect } from "@playwright/test";
 import { gotoHydrated } from "./hydrated";
 
+test("mobile navigation hides shortly after passing its own height and survives address-bar resizing", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 700 });
+  await gotoHydrated(page, "/album/test-simple");
+  const nav = page.getByRole("navigation").first();
+  const height = await nav.evaluate(
+    (element) => element.closest("[data-nav-viewport-motion]")!.getBoundingClientRect().height,
+  );
+  await page.mouse.wheel(0, height + 32);
+  await expect(nav).not.toBeInViewport();
+  await page.setViewportSize({ width: 390, height: 650 });
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve) => {
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+      }),
+  );
+  await expect(nav).not.toBeInViewport();
+  await page.mouse.wheel(0, -48);
+  await expect(nav).toBeInViewport({ ratio: 1 });
+});
+
 test("finishing the initial image load does not undo deliberate scrolling", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.setViewportSize({ width: 390, height: 700 });

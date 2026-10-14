@@ -37,6 +37,7 @@ export const AlbumNavigation = ({
     let state = initialScrollReveal(window.scrollY);
     let frame: number | null = null;
     let hasInteracted = false;
+    let viewportWidth = window.innerWidth;
     const mobile = window.matchMedia("(max-width: 720px)");
     setVisible(true);
     const position = () =>
@@ -53,6 +54,13 @@ export const AlbumNavigation = ({
       // The initial pageshow can arrive after the reader starts scrolling while
       // images load. Only a history restoration should discard that intent.
       if (event.persisted) reset();
+    };
+    const resize = () => {
+      // Mobile address bars change viewport height during a scroll. Preserve
+      // the gesture; only a width change needs a fresh navigation layout.
+      if (window.innerWidth === viewportWidth) return;
+      viewportWidth = window.innerWidth;
+      reset();
     };
     const update = () => {
       frame = null;
@@ -74,7 +82,7 @@ export const AlbumNavigation = ({
       const inUse =
         node.contains(document.activeElement) ||
         Boolean(node.querySelector('[aria-expanded="true"], details[open]'));
-      state = advanceScrollReveal(state, y, height.current + 80, inUse);
+      state = advanceScrollReveal(state, y, height.current, inUse);
       setVisible(state.visible);
     };
     const scroll = () => {
@@ -97,7 +105,7 @@ export const AlbumNavigation = ({
     node.addEventListener("focusin", focus);
     window.addEventListener("scroll", scroll, { passive: true });
     window.addEventListener("pageshow", restore);
-    window.addEventListener("resize", reset);
+    window.addEventListener("resize", resize);
     window.addEventListener("wheel", interact, { passive: true });
     window.addEventListener("touchstart", interact, { passive: true });
     window.addEventListener("keydown", key);
@@ -107,7 +115,7 @@ export const AlbumNavigation = ({
       node.removeEventListener("focusin", focus);
       window.removeEventListener("scroll", scroll);
       window.removeEventListener("pageshow", restore);
-      window.removeEventListener("resize", reset);
+      window.removeEventListener("resize", resize);
       window.removeEventListener("wheel", interact);
       window.removeEventListener("touchstart", interact);
       window.removeEventListener("keydown", key);
