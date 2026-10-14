@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Refresh GPS coordinates + geocode in the live search DB after the geotag
-# companion tool writes GPS into originals — WITHOUT re-running the GPU models.
+# Refresh GPS coordinates + geocode in the live search DB after GPS is written
+# into originals (for example with exiftool) — WITHOUT re-running the GPU models.
 # Embeddings are unaffected, so search-embeddings.sqlite is left untouched.
 #
 # Usage:

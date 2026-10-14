@@ -24,21 +24,6 @@ jobs:
       - run: npm ci
       - run: npm run prepare:build-manifest
       - run: npm run test:ci
-  test-geotag:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./tools/geotag
-    steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-node@v6
-        with:
-          node-version: "26"
-          cache: "npm"
-          cache-dependency-path: tools/geotag/package-lock.json
-      - run: npm ci
-      - run: npm test
-      - run: npm run typecheck
   test-index:
     runs-on: ubuntu-latest
     timeout-minutes: 30

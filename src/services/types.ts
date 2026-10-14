@@ -5,8 +5,7 @@ export interface Exif {
   ModifyDate?: string;
   DateTimeOriginal?: string;
   OffsetTime?: string;
-  // Present in the exifr output for newer cameras (X-T5 and later); used by the
-  // geotag tool to reconcile camera-local time with a UTC GPS track.
+  // Present in the exifr output for newer cameras (X-T5 and later).
   OffsetTimeOriginal?: string;
   OffsetTimeDigitized?: string;
   Orientation?: string;
@@ -16,8 +15,8 @@ export interface Exif {
   GPSLongitude?: [number, number, number];
   GPSAltitude?: number;
   GPSAltitudeRef?: number;
-  // UTC date/time of the GPS fix (on already-geotagged photos) — lets the geotag
-  // tool self-calibrate the camera's offset. exifr yields "YYYY:MM:DD" + [h,m,s].
+  // UTC date/time of the GPS fix on geotagged photos. exifr yields
+  // "YYYY:MM:DD" + [h,m,s].
   GPSDateStamp?: string;
   GPSTimeStamp?: [number, number, number];
   ExposureTime?: number;

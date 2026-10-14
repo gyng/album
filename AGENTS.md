@@ -316,7 +316,6 @@ Runs on PRs to `main`, pushes to `main` and `release/*`, and manual dispatch.
 
 **Jobs:**
 - `test` — `npm ci` + `npm run test:ci` from `src/` (Node 24, ubuntu-latest)
-- `test-geotag` — geotag Vitest suite + typecheck from `tools/geotag/`
 - `test-index` — model-free Python index suite
 - `playwright` — full Chromium suite plus Firefox/WebKit smoke tests with artifact upload (`playwright-report/`, 30-day retention)
 
