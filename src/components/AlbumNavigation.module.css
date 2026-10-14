@@ -41,7 +41,8 @@
   }
 
   .album :global(main),
-  .album :global(main [id]) {
+  .album :global(main [id]),
+  .album :global(main [data-album-step]) {
     scroll-margin-block-start: calc(var(--album-nav-height) + var(--space-3));
   }
 }

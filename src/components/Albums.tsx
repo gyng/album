@@ -18,10 +18,17 @@ import styles from "./Album.module.css";
  */
 const HOVER_INTENT_MS = 200;
 
-export const Albums: React.FC<HomePageData> = (props) => {
-  const firstCoveredAlbumIndex = props.albums.findIndex((album) =>
-    album.blocks.some((block) => block.kind === "photo"),
-  );
+type Props = HomePageData & {
+  /** A line above an album's title, such as "Next album". */
+  kicker?: (album: HomePageData["albums"][number]) => string;
+  /** Load the first cover at once: true where the list opens the page. */
+  eager?: boolean;
+};
+
+export const Albums: React.FC<Props> = ({ kicker, eager = true, ...props }) => {
+  const firstCoveredAlbumIndex = eager
+    ? props.albums.findIndex((album) => album.blocks.some((block) => block.kind === "photo"))
+    : -1;
   const intentRef = React.useRef<number | undefined>(undefined);
   React.useEffect(
     () => () => {
@@ -92,6 +99,11 @@ export const Albums: React.FC<HomePageData> = (props) => {
             </Link>
 
             <div className={styles.name}>
+              {kicker ? (
+                <Caption as="span" size="sm" className={styles.kicker}>
+                  {kicker(album)}
+                </Caption>
+              ) : null}
               <Heading level={2} as="h2">
                 <span>
                   <Link href={`/album/${album._build.slug}`} tabIndex={-1}>

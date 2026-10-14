@@ -18,6 +18,11 @@
   display: grid;
 }
 
+/* Where J and K leave a photograph: just clear of the window's top edge. */
+.block[data-album-step] {
+  scroll-margin-block-start: var(--space-5);
+}
+
 /* Profiling a 163-photo album showed that deferring off-screen rendering cut
    median load time by 49%, initial main-thread work by 37%, and continuous
    scroll work by 43%. `auto` preserves find-in-page and fragment navigation,

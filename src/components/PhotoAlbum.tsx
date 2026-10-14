@@ -4,6 +4,7 @@ import styles from "./PhotoAlbum.module.css";
 import { TextBlockEl } from "./TextBlock";
 import { LocalVideoBlockEl, YoutubeBlockEl } from "./VideoBlock";
 import { pickPosterVariant } from "../util/videoPoster";
+import { ALBUM_STEP_ATTRIBUTE, useAlbumStepping } from "./useAlbumStepping";
 
 // Album pages present a clip at roughly full column width; the poster is
 // replaced by the first decoded frame as soon as playback starts.
@@ -54,6 +55,7 @@ export const Block: React.FC<{
 export const PhotoAlbum: React.FC<{
   album: Content;
 }> = (props) => {
+  useAlbumStepping();
   return (
     <div className={styles.page}>
       <div className={styles.album}>
@@ -64,6 +66,7 @@ export const PhotoAlbum: React.FC<{
               className={[styles.block, b.kind === "photo" ? styles.photoBlock : ""]
                 .filter(Boolean)
                 .join(" ")}
+              {...(b.kind === "text" ? {} : { [ALBUM_STEP_ATTRIBUTE]: "" })}
             >
               <Block b={b} i={i} />
             </div>

@@ -11,6 +11,7 @@ import { AlbumNavigation } from "../../components/AlbumNavigation";
 import { GlobalNav } from "../../components/GlobalNav";
 import { PhotoAlbum } from "../../components/PhotoAlbum";
 import { AlbumTripsView } from "../../components/AlbumTripsView";
+import { AlbumNeighbours } from "../../components/AlbumNeighbours";
 import { Footer, buttonStyles } from "../../components/ui";
 import commonStyles from "../../styles/common.module.css";
 import type { AlbumPageData } from "../../util/pageDataTypes";
@@ -170,6 +171,7 @@ const AlbumScreen = ({ album }: AlbumScreenProps) => {
       >
         <main id="main-content">
           {view === "trips" ? <AlbumTripsView album={album} /> : <PhotoAlbum album={album} />}
+          <AlbumNeighbours slug={albumName} />
         </main>
         <Footer />
       </AlbumNavigation>
