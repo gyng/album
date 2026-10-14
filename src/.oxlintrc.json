@@ -13,7 +13,11 @@
   "rules": {
     "nextjs/no-img-element": "off",
     "nextjs/no-sync-scripts": "off",
-    "jsx-a11y/prefer-tag-over-role": "off"
+    "jsx-a11y/prefer-tag-over-role": "off",
+    "react/set-state-in-effect": "warn",
+    "react/refs": "warn",
+    "react/preserve-manual-memoization": "warn",
+    "react/purity": "warn"
   },
   "ignorePatterns": [
     ".next/**",
