@@ -42,8 +42,23 @@ export const PHOTO_SUBJECTS: ReadonlyArray<{ answer: string; pattern: RegExp }> 
   ["LIGHTHOUSE", "lighthouses?"],
 ].map(([answer, words]) => ({ answer: answer!, pattern: new RegExp(`\\b(?:${words})\\b`, "i") }));
 
+// Each subject's derived patterns, compiled once rather than on every photograph.
+const compiled = new WeakMap<RegExp, { mentions: RegExp; tag: RegExp }>();
+const compile = (pattern: RegExp) => {
+  let entry = compiled.get(pattern);
+  if (!entry) {
+    entry = {
+      mentions: new RegExp(pattern.source, "gi"),
+      tag: new RegExp(`^(?:${pattern.source})$`, "i"),
+    };
+    compiled.set(pattern, entry);
+  }
+  return entry;
+};
+
 const captionMentions = (caption: string, pattern: RegExp): number[] =>
-  [...caption.matchAll(new RegExp(pattern.source, "gi"))].flatMap((mention) => {
+  // matchAll clones its regular expression, so the shared one keeps no state.
+  [...caption.matchAll(compile(pattern).mentions)].flatMap((mention) => {
     const prefix = caption.slice(Math.max(0, mention.index! - 60), mention.index);
     const suffix = caption.slice(mention.index! + mention[0].length);
     if (/^trains?$/i.test(mention[0]) && /^\s+(?:stations?|tracks?|platforms?)\b/i.test(suffix))
@@ -55,11 +70,13 @@ const captionMentions = (caption: string, pattern: RegExp): number[] =>
   });
 
 export const photoSubjectClarity = (photo: PhotoGamePhoto, pattern: RegExp): number | null => {
-  const mentions = captionMentions(photo.caption, pattern);
+  // Most captions never name the subject; one test settles those without collecting matches.
+  const named = pattern.test(photo.caption);
+  const mentions = named ? captionMentions(photo.caption, pattern) : [];
   if (!mentions.length) {
     // An explicit negation outranks a generic tag left by the indexer.
-    if (pattern.test(photo.caption)) return null;
-    const tagPattern = new RegExp(`^(?:${pattern.source})$`, "i");
+    if (named) return null;
+    const tagPattern = compile(pattern).tag;
     return photo.tags.split(",").some((tag) => tagPattern.test(tag.trim())) ? 0 : null;
   }
   return Math.max(
