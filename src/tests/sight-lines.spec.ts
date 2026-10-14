@@ -266,6 +266,8 @@ test("releasing a drag outside the board does not select photographs when the po
 test("Sight Lines preserves a 10×10 five-photo-line game and keeps mobile targets usable", async ({
   page,
 }) => {
+  // Rendering and resolving a 100-tile board takes 12–20s under parallel workers.
+  test.slow();
   await page.setViewportSize({ width: 320, height: 844 });
   await gotoHydrated(page, "/fun/sight-lines");
   await page.getByRole("button", { name: "10×10", exact: true }).click();

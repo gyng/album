@@ -14,6 +14,8 @@ const siteOrigin = resolveSiteOrigin();
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  // `next dev` otherwise writes its own src/AGENTS.md beside the repository's.
+  agentRules: false,
   distDir,
   // Turbopack can otherwise leave these client-side lookups as runtime
   // `process.env` access. Declare them here so each build embeds the selected
