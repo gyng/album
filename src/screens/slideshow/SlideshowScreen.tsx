@@ -708,8 +708,6 @@ export const Slideshow: React.FC<{
   const [touchGestureHint, setTouchGestureHint] = React.useState<
     "next" | "previous" | "controls" | "reload" | "remix" | null
   >(null);
-  const [touchPullProgress, setTouchPullProgress] = React.useState(0);
-  const [touchSwipeProgress, setTouchSwipeProgress] = React.useState(0);
   const [touchPointerActive, setTouchPointerActive] = React.useState(false);
   const [touchArmed, setTouchArmed] = React.useState(false);
   // A hold-to-pause is in progress (finger still down): drives the paused pill.
@@ -734,14 +732,54 @@ export const Slideshow: React.FC<{
   // so a slow tap got no answer and a quick one got an answer that had already
   // finished.
   const [pressedLayerKey, setPressedLayerKey] = React.useState<string | null>(null);
-  // The chevron handle leads the pull; the toolbar/edge peek only enters in the last 35%
-  // so the two indicators don't compete. Below 0.65 only the chevron is visible.
-  const touchToolbarShowPreviewProgress =
-    !controlsVisible && (touchGestureHint === "controls" || touchGestureHint === "reload")
-      ? remapSlideshowPeek(touchPullProgress)
-      : 0;
-  const touchToolbarHidePreviewProgress =
-    controlsVisible && touchGestureHint === "remix" ? remapSlideshowPeek(touchPullProgress) : 0;
+  // What changes with every finger movement — the photograph's offset, how far
+  // the neighbour has come up, the pull and swipe progress — is written straight
+  // to the DOM. In state, each move re-rendered the whole slideshow: about 26ms
+  // a move on an iPad-class CPU against a 16ms frame, so the photograph lagged
+  // the finger. React keeps the discrete parts: the hint, the arming, which
+  // neighbour is uncovered and the settle.
+  const stageRef = React.useRef<HTMLDivElement>(null);
+  const touchAffordancesRef = React.useRef<HTMLDivElement>(null);
+  const liveDragRef = React.useRef({
+    x: 0,
+    peekProgress: 0,
+    pull: 0,
+    swipe: 0,
+    hint: null as typeof touchGestureHint,
+    // What the drag state last rendered: null for no drag, else the neighbour
+    // it uncovers. State is set only when this changes — even an updater that
+    // returns the same value costs a render just after an update.
+    shape: null as string | null,
+  });
+  const controlsVisibleRef = React.useRef(controlsVisible);
+  useSafeLayoutEffect(() => {
+    controlsVisibleRef.current = controlsVisible;
+  }, [controlsVisible]);
+  const writeLiveDrag = useCallback(() => {
+    const { peekProgress, pull, swipe, hint } = liveDragRef.current;
+    const visible = controlsVisibleRef.current;
+    const stage = stageRef.current;
+    // The chevron handle leads the pull; the toolbar/edge peek only enters in
+    // the last 35% so the two indicators don't compete. Below 0.65 only the
+    // chevron is visible.
+    stage?.style.setProperty(
+      "--touch-toolbar-show-preview-progress",
+      String(!visible && (hint === "controls" || hint === "reload") ? remapSlideshowPeek(pull) : 0),
+    );
+    stage?.style.setProperty(
+      "--touch-toolbar-hide-preview-progress",
+      String(visible && hint === "remix" ? remapSlideshowPeek(pull) : 0),
+    );
+    touchAffordancesRef.current?.style.setProperty("--touch-pull-progress", String(pull));
+    touchAffordancesRef.current?.style.setProperty("--touch-swipe-progress", String(swipe));
+    // Only the neighbour being uncovered comes up; the other stays put.
+    stage?.querySelectorAll<HTMLElement>("[data-drag-buffer]").forEach((element) => {
+      element.style.setProperty(
+        "--drag-peek-progress",
+        element.dataset.dragPeek === "true" ? String(peekProgress) : "0",
+      );
+    });
+  }, []);
   // Loaded for Similar mode and also whenever remixes are on, so vector
   // strategies (similar / juxtapose) can fire on the first roll. Loading
   // lazily after the first vector roll meant the first ~37% of remixes
@@ -777,6 +815,8 @@ export const Slideshow: React.FC<{
     // True once the gesture has crossed the commit threshold on its primary axis,
     // so we can fire the haptic exactly once per gesture.
     hapticFired?: boolean;
+    /** Whether the release would commit, as last rendered. */
+    armed?: boolean;
     // Hold-to-pause: the pending timer, whether it fired, and whether it was
     // this gesture (rather than the toolbar) that paused the cadence — release
     // must only resume what the hold itself paused.
@@ -2149,8 +2189,8 @@ export const Slideshow: React.FC<{
       // new gesture so a fresh tap always lands.
       suppressImageClickRef.current = false;
       setTouchGestureHint(null);
-      setTouchPullProgress(0);
-      setTouchSwipeProgress(0);
+      liveDragRef.current = { x: 0, peekProgress: 0, pull: 0, swipe: 0, hint: null, shape: null };
+      writeLiveDrag();
       setTouchArmed(false);
       // A fresh gesture takes over any leftover settle animation.
       setLayerDrag(null);
@@ -2186,7 +2226,14 @@ export const Slideshow: React.FC<{
         }
       }
     },
-    [controlsVisible, isSessionWakeLockActive, props.disabled, requestSessionWakeLock, setPaused],
+    [
+      controlsVisible,
+      isSessionWakeLockActive,
+      props.disabled,
+      requestSessionWakeLock,
+      setPaused,
+      writeLiveDrag,
+    ],
   );
 
   const clearImagePointerGesture = useCallback(
@@ -2221,20 +2268,23 @@ export const Slideshow: React.FC<{
       // for touch/pen so suppression still works there.
       suppressImageClickRef.current = false;
       setTouchGestureHint(null);
-      setTouchPullProgress(0);
-      setTouchSwipeProgress(0);
+      // The offset and the neighbour's progress stay put: the settle animates
+      // away from where the finger left them.
+      const live = liveDragRef.current;
+      liveDragRef.current = { ...live, pull: 0, swipe: 0, hint: null, shape: null };
+      writeLiveDrag();
       setTouchPointerActive(false);
       setTouchArmed(false);
       // Cancellation has no pointerup to settle the displaced photograph.
       // The normal release handler can replace this spring-back with an exit.
       const key = layersRef.current[layersRef.current.length - 1]?.key;
       setLayerDrag((current) =>
-        current && current.x !== 0 && key !== undefined
+        current && live.x !== 0 && key !== undefined
           ? { ...current, key, x: 0, settling: true }
           : null,
       );
     },
-    [setPaused],
+    [setPaused, writeLiveDrag],
   );
 
   const handleImagePointerMove = useCallback(
@@ -2288,9 +2338,14 @@ export const Slideshow: React.FC<{
         gesture.committedVerticalDirection = result.committedVertical;
       }
 
-      setTouchGestureHint(result.hint);
-      setTouchPullProgress(result.pullProgress);
-      setTouchSwipeProgress(result.swipeProgress);
+      // Set only on a change: React renders once more for a repeated value just
+      // after an update, which on the moves following each change was a full
+      // re-render for nothing.
+      const live = liveDragRef.current;
+      if (live.hint !== result.hint) setTouchGestureHint(result.hint);
+      live.hint = result.hint;
+      live.pull = result.pullProgress;
+      live.swipe = result.swipeProgress;
 
       // Follow horizontal motion before the hint commits an axis. This must
       // not lock navigation: a small diagonal start can still become a pull.
@@ -2316,32 +2371,39 @@ export const Slideshow: React.FC<{
         1,
         Math.abs(dragOffset) / Math.max(1, window.innerWidth * 0.6),
       );
-      setLayerDrag((current) =>
-        dragOffset === 0
-          ? (gesture.committedHorizontalDirection || (deltaX === 0 && deltaY === 0)) && current
-            ? {
-                x: 0,
-                settling: false,
-                ...(current.peek ? { peek: { ...current.peek, progress: 0 } } : {}),
-              }
-            : null
-          : {
-              x: dragOffset,
-              settling: false,
-              ...(previewSrc
-                ? {
-                    peek: {
-                      src: previewSrc,
-                      progress: previewProgress,
-                      direction: -Math.sign(dragOffset),
-                    },
-                  }
-                : {}),
-            },
-      );
+      live.x = dragOffset;
+      live.peekProgress = dragOffset === 0 ? 0 : previewProgress;
+      const peek =
+        dragOffset !== 0 && previewSrc
+          ? { src: previewSrc, direction: -Math.sign(dragOffset) }
+          : undefined;
+      // State changes only when the drag starts or ends, or the neighbour it
+      // uncovers changes; the offset itself is written below.
+      const keepAtRest =
+        gesture.committedHorizontalDirection !== undefined || (deltaX === 0 && deltaY === 0);
+      const shape =
+        dragOffset !== 0
+          ? `${peek?.src ?? ""} ${peek?.direction ?? 0}`
+          : keepAtRest
+            ? live.shape
+            : null;
+      if (shape !== live.shape) {
+        live.shape = shape;
+        setLayerDrag(shape === null ? null : { x: 0, settling: false, ...(peek ? { peek } : {}) });
+      }
+      const top = topLayerElementRef.current;
+      if (top) {
+        const keep =
+          gesture.dragStarted === true &&
+          (gesture.committedHorizontalDirection !== undefined || (deltaX === 0 && deltaY === 0));
+        top.style.transform =
+          dragOffset !== 0 ? `translateX(${dragOffset}px)` : keep ? "translateX(0px)" : "";
+      }
+      writeLiveDrag();
 
+      if (result.armed !== (gesture.armed === true)) setTouchArmed(result.armed);
+      gesture.armed = result.armed;
       if (result.armed) {
-        setTouchArmed(true);
         // Fire the commit haptic exactly once per gesture.
         if (!gesture.hapticFired) {
           gesture.hapticFired = true;
@@ -2349,11 +2411,9 @@ export const Slideshow: React.FC<{
             navigator.vibrate(8);
           }
         }
-      } else {
-        setTouchArmed(false);
       }
     },
-    [bufferedPhotoSrc, previousPhotoSrc],
+    [bufferedPhotoSrc, previousPhotoSrc, writeLiveDrag],
   );
 
   const handleImagePointerUp = useCallback(
@@ -2755,6 +2815,11 @@ export const Slideshow: React.FC<{
   // instead of fabricating a successful decode after the deadline.
   const layersRef = React.useRef(layers);
   layersRef.current = layers;
+  // A render that uncovers a different neighbour adds its data-drag-peek after
+  // the move that caused it; bring the live values onto it.
+  useSafeLayoutEffect(() => {
+    if (layerDrag && !layerDrag.settling) writeLiveDrag();
+  }, [layerDrag, writeLiveDrag]);
   // A dragged layer can be removed by its opacity fade before its transform
   // transition reports completion; drop the stale offset so a later layer
   // with a recycled position cannot inherit it.
@@ -2887,15 +2952,10 @@ export const Slideshow: React.FC<{
         data-dragging={String(layerDrag !== null && !layerDrag.settling)}
         data-touch-armed={String(touchArmed)}
         data-touch-hold={String(touchHoldActive)}
+        ref={stageRef}
         onPointerDownCapture={extendControlsHideDeadline}
         onPointerMoveCapture={extendControlsHideDeadline}
         onTouchStartCapture={handleAnyTouchStartCapture}
-        style={
-          {
-            "--touch-toolbar-show-preview-progress": String(touchToolbarShowPreviewProgress),
-            "--touch-toolbar-hide-preview-progress": String(touchToolbarHidePreviewProgress),
-          } as React.CSSProperties
-        }
       >
         {isFullscreenActive ? (
           <button
@@ -2949,12 +3009,7 @@ export const Slideshow: React.FC<{
             data-touch-armed={String(touchArmed)}
             data-touch-hold={String(touchHoldActive)}
             aria-hidden="true"
-            style={
-              {
-                "--touch-pull-progress": String(touchPullProgress),
-                "--touch-swipe-progress": String(touchSwipeProgress),
-              } as React.CSSProperties
-            }
+            ref={touchAffordancesRef}
           >
             {/* Top affordance removed — the toolbar slides down over the
                 same area when the user pulls, so the hint is redundant. */}
@@ -3201,7 +3256,10 @@ export const Slideshow: React.FC<{
           const dragsThisLayer =
             layerDrag !== null &&
             (layerDrag.settling ? layerDrag.key === layer.key && layerDrag.x === 0 : isTop);
-          const dragX = dragsThisLayer ? layerDrag.x : layer.exitX;
+          // While the finger is down the gesture writes the offset itself; React
+          // takes over again for the settle.
+          const liveDrag = dragsThisLayer && !layerDrag.settling;
+          const dragX = liveDrag ? undefined : dragsThisLayer ? layerDrag.x : layer.exitX;
           const settlingClass = (dragsThisLayer ? layerDrag.settling : layer.exitX !== undefined)
             ? styles.layerSettling
             : "";

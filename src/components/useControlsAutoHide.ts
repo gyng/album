@@ -29,7 +29,17 @@ export type UseControlsAutoHide = {
 // the desktop show/hide + post-Hide suppression.
 export const useControlsAutoHide = (): UseControlsAutoHide => {
   const [controlsVisible, setControlsVisible] = React.useState(true);
-  const [controlsHideProgress, setControlsHideProgress] = React.useState(1);
+  const [controlsHideProgress, setControlsHideProgressState] = React.useState(1);
+  // Every touch move extends the deadline and re-sets the progress to 1. React
+  // renders once more for a repeated value just after an update, so during a
+  // drag the moves after each hint or arming change re-rendered the whole
+  // slideshow for nothing; an unchanged value is skipped here instead.
+  const controlsHideProgressRef = React.useRef(1);
+  const setControlsHideProgress = useCallback((progress: number) => {
+    if (controlsHideProgressRef.current === progress) return;
+    controlsHideProgressRef.current = progress;
+    setControlsHideProgressState(progress);
+  }, []);
   const [isCoarsePointer, setIsCoarsePointer] = React.useState(false);
   const [isPointerOverToolbar, setIsPointerOverToolbar] = React.useState(false);
   const controlsHideDeadlineRef = React.useRef<number | null>(null);
@@ -41,7 +51,7 @@ export const useControlsAutoHide = (): UseControlsAutoHide => {
     }
     controlsHideDeadlineRef.current = Date.now() + TOUCH_CONTROLS_AUTO_HIDE_MS;
     setControlsHideProgress(1);
-  }, [controlsVisible, isCoarsePointer]);
+  }, [controlsVisible, isCoarsePointer, setControlsHideProgress]);
 
   useEffect(() => {
     const coarsePointerQuery = window.matchMedia("(hover: none), (pointer: coarse)");
@@ -150,7 +160,7 @@ export const useControlsAutoHide = (): UseControlsAutoHide => {
       window.removeEventListener("focus", checkOnResume);
       document.removeEventListener("visibilitychange", checkOnResume);
     };
-  }, [controlsVisible, isCoarsePointer, isPointerOverToolbar]);
+  }, [controlsVisible, isCoarsePointer, isPointerOverToolbar, setControlsHideProgress]);
 
   const showControlsForDesktop = useCallback(() => {
     if (isCoarsePointer) {

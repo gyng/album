@@ -8,6 +8,7 @@
 // cover the call-site wiring — timers, cadence pause plumbing, and the
 // layer-keyed drag/ack state — that pure-helper tests cannot see.
 
+import { Profiler } from "react";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { HOLD_TO_PAUSE_MS } from "../../util/slideshowGesture";
 
@@ -388,6 +389,30 @@ describe("SlideshowScreen touch gestures (screen-level)", () => {
     await flush();
     expect(peek()).toBe(uncovered);
     expect(peek()).toHaveAttribute("data-settling", "true");
+  });
+
+  // Every finger movement used to re-render the whole slideshow through five
+  // state updates — 26ms a move on an iPad-class CPU against a 16ms frame — so
+  // the photograph lagged the finger. Movement now goes straight to the DOM;
+  // React only hears about the discrete changes (the hint, the arming).
+  it("follows the finger without re-rendering the slideshow on every move", async () => {
+    let commits = 0;
+    render(
+      <Profiler id="slideshow" onRender={() => (commits += 1)}>
+        <SlideshowScreen />
+      </Profiler>,
+    );
+    await flush();
+
+    const image = slideImage();
+    pointer(image, "pointerdown", touchAt(300, 300));
+    pointer(image, "pointermove", touchAt(290, 300));
+    commits = 0;
+    for (let x = 280; x >= 180; x -= 10) pointer(image, "pointermove", touchAt(x, 300));
+
+    expect(image.style.transform).toBe("translateX(-120px)");
+    // Only the discrete changes render: the drag starting, the hint, arming.
+    expect(commits).toBeLessThanOrEqual(3);
   });
 
   it("springs back when the browser cancels a swipe", async () => {

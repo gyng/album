@@ -20,17 +20,10 @@ describe("slideshow neighbour buffers", () => {
       const { container, rerender } = render(<SlideshowDragPreview {...props} peek={undefined} />);
       await waitFor(() => expect(decoded).toEqual(["/next.avif", "/previous.avif"]));
       const images = Array.from(container.querySelectorAll("img"));
-      for (const progress of [0.2, 0, 0.1]) {
-        rerender(
-          <SlideshowDragPreview {...props} peek={{ src: "/next.avif", direction: 1, progress }} />,
-        );
+      for (let move = 0; move < 3; move += 1) {
+        rerender(<SlideshowDragPreview {...props} peek={{ src: "/next.avif", direction: 1 }} />);
       }
-      rerender(
-        <SlideshowDragPreview
-          {...props}
-          peek={{ src: "/previous.avif", direction: -1, progress: 0.2 }}
-        />,
-      );
+      rerender(<SlideshowDragPreview {...props} peek={{ src: "/previous.avif", direction: -1 }} />);
       expect(Array.from(container.querySelectorAll("img"))).toEqual(images);
       expect(decoded).toHaveLength(2);
     } finally {
@@ -41,7 +34,7 @@ describe("slideshow neighbour buffers", () => {
 
   it("preserves the outgoing preview until settling ends when the queue advances", () => {
     const props = { previousSrc: null, cover: false };
-    const peek = { src: "/next.avif", direction: 1, progress: 0.3 };
+    const peek = { src: "/next.avif", direction: 1 };
     const { container, rerender } = render(
       <SlideshowDragPreview {...props} nextSrc="/next.avif" peek={peek} settling={false} />,
     );

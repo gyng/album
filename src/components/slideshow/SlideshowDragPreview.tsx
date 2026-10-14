@@ -1,7 +1,8 @@
 import { useEffect, useRef, type CSSProperties } from "react";
 import styles from "./SlideshowShared.module.css";
 
-export type DragPeek = { src: string; progress: number; direction: number };
+/** Which neighbour a drag uncovers. How far it has come up is written by the gesture. */
+export type DragPeek = { src: string; direction: number };
 
 /** One reusable, decoded image per neighbour, not a new image on every drag. */
 function Preview({
@@ -43,7 +44,6 @@ function Preview({
       data-settling={String(active && settling)}
       style={
         {
-          "--drag-peek-progress": active ? peek.progress : 0,
           "--drag-peek-direction": direction,
         } as CSSProperties
       }
