@@ -86,3 +86,72 @@ it("reports a model that fails to load and lets the player retry", async () => {
   expect(screen.getByRole("button", { name: "Score caption" })).toBeEnabled();
   expect(readGameStats("caption-it").played).toBe(0);
 });
+
+const playWith = async (settings: object, archive: PhotoGamePhoto[] = photos) => {
+  localStorage.setItem("snapshots-fun-settings-v1:caption", JSON.stringify(settings));
+  render(<CaptionIt photos={archive} />);
+  await act(async () => {});
+  fireEvent.click(screen.getByRole("button", { name: /^Start Caption It/ }));
+};
+const indexOf = (image: HTMLElement) => Number(/photo-(\d+)/.exec(image.getAttribute("src")!)![1]);
+
+it("refuses a caption over the word budget before loading the model", async () => {
+  await playWith({ words: 5 });
+  expect(screen.getByText("0 / 5 words")).toBeInTheDocument();
+  write("A small red boat on a river");
+  await submit();
+  expect(screen.getByRole("alert")).toHaveTextContent("Use 5 words at most.");
+  expect(encodeSearchText).not.toHaveBeenCalled();
+});
+
+it("bans the photograph's rarest tag words, in either number", async () => {
+  const tagged = photos.map((photo, i) => ({
+    ...photo,
+    tags: i === 0 ? "harbour, crane, boat" : "boat",
+  }));
+  await playWith({ banned: true }, [tagged[0]!]);
+  expect(screen.getByText("crane")).toBeInTheDocument();
+  write("Two cranes over the water");
+  await submit();
+  expect(screen.getByRole("alert")).toHaveTextContent("“cranes” is one of the banned words.");
+  expect(encodeSearchText).not.toHaveBeenCalled();
+});
+
+it("tells a photograph apart from its lookalikes", async () => {
+  // Five photographs, each 0.82 alike with every other: alike, never a burst.
+  const lean = 25 * (Math.PI / 180);
+  const cluster: PhotoGamePhoto[] = Array.from({ length: 5 }, (_, i) => ({
+    ...photos[i]!,
+    vector: Array.from({ length: 8 }, (_, d) =>
+      d === 0 ? Math.cos(lean) : d === i + 1 ? Math.sin(lean) : 0,
+    ),
+  }));
+  await playWith({ mode: "lookalikes" }, cluster);
+  const lookalikes = within(screen.getByRole("list", { name: "Its lookalikes" })).getAllByRole(
+    "img",
+  );
+  expect(lookalikes).toHaveLength(3);
+  const target = cluster[indexOf(screen.getAllByRole("img")[0]!)]!;
+  jest.mocked(encodeSearchText).mockImplementation(async () => [...target.vector]);
+  write("Exactly this one and no other");
+  await submit();
+  const result = screen.getByRole("region", { name: "Caption It result" });
+  expect(within(result).getByRole("heading", { name: "Told apart" })).toBeInTheDocument();
+  expect(result).toHaveTextContent("Your caption told it apart from 3 of its 3 lookalikes.");
+  expect(readGameStats("caption-it")).toMatchObject({ played: 1, won: 1 });
+});
+
+it("scores one caption against a set of three", async () => {
+  await playWith({ mode: "set" });
+  const set = within(screen.getByRole("list", { name: "The set" }))
+    .getAllByRole("img")
+    .map(indexOf);
+  expect(set).toHaveLength(3);
+  const fitsAll = Array.from({ length: SIZE }, (_, i) => (set.includes(i) ? 1 : 0));
+  jest.mocked(encodeSearchText).mockImplementation(async () => fitsAll);
+  write("Three photographs of one afternoon");
+  await submit();
+  const result = screen.getByRole("region", { name: "Caption It result" });
+  expect(within(result).getByRole("heading", { name: "All three picked out" })).toBeInTheDocument();
+  expect(readGameStats("caption-it")).toMatchObject({ played: 1, won: 1 });
+});

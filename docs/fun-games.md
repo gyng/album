@@ -474,6 +474,28 @@ because bursts of one scene tie for first.
   score and words; when the caption picked its photograph out, the score
   joins the first row.
 
+Caption It's lobby has three modes and two constraints, saved with
+`useGameSettings("caption")`; the daily is always one photograph with neither
+constraint (`util/captionModes.ts` holds the rules):
+
+- **Word budget** — any length, 12, 8 or 5 words, counted as a reader counts
+  them, refused before encoding.
+- **Banned words** — three words the caption may not use, in either number:
+  the rarest words in the photograph's tags, since a word few photographs
+  carry is the one that picks these out. A set bans words its photographs
+  share first.
+- **Lookalikes** — the photograph is shown with the three most like it, by
+  image vector, between 0.75 and 0.93 alike and no two of them above 0.93 with
+  each other. On the archive's SigLIP v1 vectors a nearest neighbour is
+  typically 0.81 alike and frames of one burst sit above 0.93, so the
+  lookalikes confuse a loose caption without being impossible to tell apart.
+  Won when the caption fits the photograph better than all three; the
+  archive's own caption is measured the same way.
+- **A set of three** — three photographs from one album, no two above 0.85
+  alike, and one caption for all of them. Each counts as picked out within the
+  top 5% of the archive; won when all three are. A set records wins only,
+  since an average of three fits is not one fit.
+
 Scores that measure a fit rather than a tally — Caption It's fit, Blind
 Frame's resemblance and Relay's visual flow — carry a word beside the number
 (`util/fitBand.ts`: Perfect from 95, Close enough 80, Getting there 60, Loose

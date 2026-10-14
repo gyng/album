@@ -1,6 +1,7 @@
 import type { PhotoSearchSize, PhotoSearchLineLength } from "../../util/photoWordSearch";
 import type { HindsightSize, HindsightSpread } from "../../util/hindsight";
 import type { WarmerLevel } from "../../util/semanticGames";
+import type { CaptionBudget, CaptionMode } from "../../util/captionModes";
 import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 
 export type GameSettingsRegistry = {
@@ -17,6 +18,7 @@ export type GameSettingsRegistry = {
   guess: { region: string; timeLimit: null | 15 | 30; rounds: 3 | 5 | 10 };
   hindsight: { size: HindsightSize; spread: HindsightSpread };
   warmer: { level: WarmerLevel };
+  caption: { mode: CaptionMode; words: CaptionBudget; banned: boolean };
 };
 
 type Game = keyof GameSettingsRegistry;
@@ -30,6 +32,7 @@ const defaults: GameSettingsRegistry = {
   guess: { region: "", timeLimit: null, rounds: 5 },
   hindsight: { size: 5, spread: "years" },
   warmer: { level: "normal" },
+  caption: { mode: "single", words: null, banned: false },
 };
 
 const oneOf =
@@ -65,6 +68,11 @@ const validators: {
   },
   hindsight: { size: oneOf(4, 5, 6), spread: oneOf("years", "trip") },
   warmer: { level: oneOf("normal", "hard") },
+  caption: {
+    mode: oneOf("single", "lookalikes", "set"),
+    words: oneOf(null, 12, 8, 5),
+    banned: boolean,
+  },
 };
 
 export const gameSettingsStorageKey = (game: Game): string => `snapshots-fun-settings-v1:${game}`;
