@@ -182,14 +182,29 @@ describe("positions that are not a navigation", () => {
     Object.defineProperty(window, "innerWidth", { configurable: true, value: innerWidth });
   });
 
-  it("does not glide when the layout moves the nav without a navigation", () => {
+  it("does not glide when a resize moves the nav", () => {
     history.replaceState(null, "", "/explore");
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 1280 });
     const view = render(<Region />);
     animate.mockClear();
-    // A resize from desktop to phone width re-renders the same route.
+    // Desktop to phone width re-renders the same route somewhere new.
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 390 });
     target = 900;
     view.rerender(<Region />);
     expect(animate).not.toHaveBeenCalled();
+    view.unmount();
+  });
+
+  it("glides when the page itself moves the nav at the same width", () => {
+    // Guess Where starting a round switches to its map chrome without a navigation.
+    history.replaceState(null, "", "/fun/guess");
+    const view = render(<Region />);
+    animate.mockClear();
+    target = 160;
+    view.rerender(<Region />);
+    expect(animate.mock.calls.map((call) => call[0])).toEqual([
+      [{ transform: "translate(-60px, 0px)" }, { transform: "translate(0, 0)" }],
+    ]);
     view.unmount();
   });
 

@@ -47,6 +47,7 @@ export const useNavPositionMotion = (
     const target = measure();
     if (!node || !target) return;
     let from = previous.current;
+    const carried = !from;
     if (!from) {
       from = lastPositions.get(region) ?? null;
       try {
@@ -58,15 +59,17 @@ export const useNavPositionMotion = (
       }
       if (from && (!Number.isFinite(from.at) || target.at - from.at > 10000)) from = null;
     }
-    // Only a navigation moves the nav. A resize, a rotated phone or late content
-    // also re-renders it somewhere new, and gliding there from a desktop-width
-    // position slid it in from beyond the edge of a phone.
+    // A resize or a rotated phone also re-renders the nav somewhere new, and
+    // gliding there from a desktop-width position slid it in from beyond the edge
+    // of a phone; a position from another width is never a starting point. Within
+    // one page a move is the page's own (Guess Where starting a round swaps in its
+    // map chrome); one carried from storage only counts after a navigation.
     if (
       from &&
       (!Number.isFinite(from.x) ||
         !Number.isFinite(from.y) ||
-        from.path === target.path ||
-        from.viewport !== target.viewport)
+        from.viewport !== target.viewport ||
+        (carried && from.path === target.path))
     )
       from = null;
     previous.current = target;
