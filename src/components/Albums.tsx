@@ -1,7 +1,7 @@
 import React from "react";
 import { AppLink as Link } from "./platform";
 import type { PhotoBlock } from "../services/types";
-import type { HomePageData } from "../util/pageDataTypes";
+import type { AlbumPreview, HomePageData } from "../util/pageDataTypes";
 import { Picture } from "./Photo";
 import { Caption, Heading } from "./ui";
 import { parseExifLocalDateTime } from "../util/exifTime";
@@ -18,17 +18,26 @@ import styles from "./Album.module.css";
  */
 const HOVER_INTENT_MS = 200;
 
-type Props = HomePageData & {
-  /** A line above an album's title, such as "Next album". */
-  kicker?: (album: HomePageData["albums"][number]) => string;
-  /** Load the first cover at once: true where the list opens the page. */
-  eager?: boolean;
+/** "2024–2026 · 52 snaps": an album's years, in its own order, and its size. */
+export const albumSummary = (album: AlbumPreview): string => {
+  const timeRange = album._build.timeRange
+    ?.filter(Boolean)
+    .map((ts) => parseExifLocalDateTime(ts)?.year ?? 0) ?? [0, 0];
+  if (album.formatting.sort === "newest-first") timeRange.reverse();
+  const years =
+    timeRange[0] && timeRange[1] && timeRange[0] !== timeRange[1]
+      ? timeRange.join("–")
+      : timeRange[0] || null;
+  const photoCount =
+    album.photoCount ?? album.blocks.filter((block) => block.kind === "photo").length;
+  const countLabel = `${photoCount.toLocaleString("en-GB")} ${photoCount === 1 ? "snap" : "snaps"}`;
+  return years ? `${years} · ${countLabel}` : countLabel;
 };
 
-export const Albums: React.FC<Props> = ({ kicker, eager = true, ...props }) => {
-  const firstCoveredAlbumIndex = eager
-    ? props.albums.findIndex((album) => album.blocks.some((block) => block.kind === "photo"))
-    : -1;
+export const Albums: React.FC<HomePageData> = (props) => {
+  const firstCoveredAlbumIndex = props.albums.findIndex((album) =>
+    album.blocks.some((block) => block.kind === "photo"),
+  );
   const intentRef = React.useRef<number | undefined>(undefined);
   React.useEffect(
     () => () => {
@@ -53,18 +62,6 @@ export const Albums: React.FC<Props> = ({ kicker, eager = true, ...props }) => {
         const prefetchFirstPhoto = firstPhoto
           ? () => prefetchImageSrcSet((firstPhoto as PhotoBlock)._build.srcset, "auto, 100vw")
           : undefined;
-
-        const timeRange = album._build.timeRange
-          ?.filter(Boolean)
-          .map((ts) => parseExifLocalDateTime(ts)?.year ?? 0) ?? [0, 0];
-        if (album.formatting.sort === "newest-first") timeRange.reverse();
-        const years =
-          timeRange[0] && timeRange[1] && timeRange[0] !== timeRange[1]
-            ? timeRange.join("–")
-            : timeRange[0] || null;
-        const photoCount =
-          album.photoCount ?? album.blocks.filter((block) => block.kind === "photo").length;
-        const countLabel = `${photoCount.toLocaleString("en-GB")} ${photoCount === 1 ? "snap" : "snaps"}`;
 
         return (
           <li key={album._build.slug} className={styles.item}>
@@ -99,11 +96,6 @@ export const Albums: React.FC<Props> = ({ kicker, eager = true, ...props }) => {
             </Link>
 
             <div className={styles.name}>
-              {kicker ? (
-                <Caption as="span" size="sm" className={styles.kicker}>
-                  {kicker(album)}
-                </Caption>
-              ) : null}
               <Heading level={2} as="h2">
                 <span>
                   <Link href={`/album/${album._build.slug}`} tabIndex={-1}>
@@ -113,8 +105,7 @@ export const Albums: React.FC<Props> = ({ kicker, eager = true, ...props }) => {
               </Heading>
 
               <Caption as="span" size="sm" className={styles.date}>
-                {years ? `${years} · ` : ""}
-                {countLabel}
+                {albumSummary(album)}
               </Caption>
             </div>
           </li>

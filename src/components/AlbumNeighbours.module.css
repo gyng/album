@@ -1,11 +1,60 @@
 .neighbours {
   max-inline-size: var(--content-width-wide);
   margin-inline: auto;
-  padding: var(--space-9) var(--page-gutter) var(--space-6);
+  padding: var(--space-6) var(--page-gutter);
   border-block-start: var(--line-hairline) solid var(--c-border);
 }
 
 /* J and K stop here after the last photograph. */
 .neighbours[data-album-step] {
   scroll-margin-block-start: var(--space-5);
+}
+
+/* Previous on the left, next on the right — also when there is only a next. */
+.list {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.neighbour[data-side="next"] {
+  margin-inline-start: auto;
+  text-align: end;
+}
+
+.neighbour[data-side="next"] .link {
+  justify-items: end;
+}
+
+.link {
+  display: grid;
+  gap: var(--space-2);
+  inline-size: var(--thumb-size);
+  color: inherit;
+  text-decoration: none;
+  font-size: var(--fs-s);
+}
+
+.link:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--size-2);
+}
+
+.text {
+  display: grid;
+  gap: var(--space-1);
+  min-inline-size: 0;
+}
+
+.title {
+  overflow-wrap: anywhere;
+  font-weight: 600;
+  font-size: var(--fs-sm);
+}
+
+.link:hover .title {
+  color: var(--c-accent);
 }

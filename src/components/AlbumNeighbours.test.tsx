@@ -23,11 +23,11 @@ it("ends an album with the albums either side of it", async () => {
   render(<AlbumNeighbours slug="middle" />);
   const nav = await screen.findByRole("navigation", { name: "More albums" });
   expect(within(nav).getByText("Previous album")).toBeInTheDocument();
-  expect(within(nav).getByRole("link", { name: "Title of newest" })).toHaveAttribute(
+  expect(within(nav).getByRole("link", { name: /Previous album Title of newest/ })).toHaveAttribute(
     "href",
     "/album/newest",
   );
-  expect(within(nav).getByRole("link", { name: "Title of oldest" })).toHaveAttribute(
+  expect(within(nav).getByRole("link", { name: /Next album Title of oldest/ })).toHaveAttribute(
     "href",
     "/album/oldest",
   );
