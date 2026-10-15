@@ -264,3 +264,74 @@ export const wanderKey = (entry: Pick<WanderEntry, "src">): string | null =>
 
 export const findWanderEntry = (entries: readonly WanderEntry[], key: string | null): number =>
   key ? entries.findIndex((entry) => wanderKey(entry) === key) : -1;
+
+/** A reproducible route: every move is an exit shown with that walk's explored set. */
+export const wanderRoute = (
+  entries: readonly WanderEntry[],
+  start: number,
+  target: (entry: WanderEntry) => boolean,
+  explored: ReadonlySet<number> = new Set(),
+): WanderExit[] | null => {
+  if (!entries[start]) return null;
+  if (target(entries[start]!)) return [];
+  const queue: { current: number; path: WanderExit[] }[] = [{ current: start, path: [] }];
+  const reached = new Set([start]);
+  for (let head = 0; head < queue.length; head += 1) {
+    const { current, path } = queue[head]!;
+    const visited = new Set([...explored, start, ...path.map((step) => step.index)]);
+    for (const exit of wanderExits(entries, current, visited)) {
+      const next = [...path, exit];
+      if (target(entries[exit.index]!)) return next;
+      if (!reached.has(exit.index)) {
+        reached.add(exit.index);
+        queue.push({ current: exit.index, path: next });
+      }
+    }
+  }
+  // Different arrivals can hide different exits. A complete fresh walk still
+  // reaches every remaining photograph, even if merging search branches missed it.
+  const visited = new Set([...explored, start]);
+  const path: WanderExit[] = [];
+  let current = start;
+  while (visited.size <= entries.length) {
+    const exit = wanderExits(entries, current, visited)[0];
+    if (!exit) return null;
+    path.push(exit);
+    if (target(entries[exit.index]!)) return path;
+    visited.add(exit.index);
+    current = exit.index;
+  }
+  return null;
+};
+
+/** Keep a visual connection while steering towards or away from a named subject. */
+export const wanderKeyword = (
+  entries: readonly WanderEntry[],
+  current: number,
+  visited: ReadonlySet<number>,
+  keyword: string,
+  more = true,
+): number | null => {
+  const term = keyword.trim().toLowerCase().replaceAll("_", " ");
+  const here = entries[current];
+  if (!term || !here) return null;
+  const neighbours = [...(here.near ?? []), ...(here.around ?? [])];
+  const matches = (index: number) =>
+    index !== current &&
+    !visited.has(index) &&
+    subjectText(entries[index]!).toLowerCase().includes(term) === more;
+  const nearby = neighbours.find((index) => entries[index] && matches(index));
+  if (nearby !== undefined) return nearby;
+  const own = new Set(here.tags ?? []);
+  let best: number | null = null;
+  let score = -1;
+  entries.forEach((entry, index) => {
+    if (!matches(index)) return;
+    const shared = (entry.tags ?? []).filter((tag) => own.has(tag)).length;
+    if (shared > score) {
+      best = index;
+      score = shared;
+    }
+  });
+  return best;
+};

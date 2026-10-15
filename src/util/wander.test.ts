@@ -4,6 +4,8 @@ import {
   wanderExits,
   wanderJump,
   wanderHunt,
+  wanderRoute,
+  wanderKeyword,
   wanderQuest,
   type WanderEntry,
 } from "./wander";
@@ -147,4 +149,37 @@ it("builds a hunt with distinct, solvable targets and avoids a goal already met 
   expect(wanderHunt(source, 1, () => 0, avoid).every((goal) => !meetsQuest(avoid, goal))).toBe(
     true,
   );
+});
+
+it("finds a solution using the actual available exits and respects explored photos", () => {
+  const entries = [
+    entry("/album/a#0", ["street"], "", [1]),
+    entry("/album/a#1", ["street"], "", [2]),
+    entry("/album/a#2", ["cat"], ""),
+  ];
+  const visited = new Set([0]);
+  const route = wanderRoute(entries, 0, (photo) => photo === entries[2], visited)!;
+  let current = 0;
+  for (const step of route) {
+    expect(wanderExits(entries, current, visited)).toContainEqual(step);
+    visited.add(step.index);
+    current = step.index;
+  }
+  expect(current).toBe(2);
+  expect(wanderRoute(entries, 0, () => false)).toBeNull();
+});
+
+it("steers towards or away from a keyword, preferring related unvisited photos", () => {
+  const entries = [
+    entry("/album/a#0", ["city", "cat"], "", [1, 2]),
+    entry("/album/a#1", ["cat", "window"], ""),
+    entry("/album/a#2", ["forest"], ""),
+    entry("/album/a#3", ["cat"], ""),
+  ];
+  expect(wanderKeyword(entries, 0, new Set([0]), "cat")).toBe(1);
+  expect(wanderKeyword(entries, 0, new Set([0, 1]), "cat")).toBe(3);
+  expect(wanderKeyword(entries, 0, new Set([0]), "cat", false)).toBe(2);
+  expect(wanderKeyword(entries, 0, new Set([0]), "window")).toBe(1);
+  expect(wanderKeyword(entries, 0, new Set([0]), "unicorn")).toBeNull();
+  expect(wanderKeyword(entries, 0, new Set([0]), " ")).toBeNull();
 });

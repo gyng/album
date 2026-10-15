@@ -43,6 +43,12 @@ test("Wander surrounds the current photograph and respects reduced motion", asyn
   const current = page.getByRole("img", { name: "Scene 1", exact: true });
   await expect(current).toBeVisible();
   expect(await current.evaluate((el) => getComputedStyle(el).animationName)).toBe("none");
+  await page.getByRole("button", { name: "Less subject1", exact: true }).click();
+  await expect(page.getByRole("img", { name: "Scene 2", exact: true })).toBeVisible();
+  await page.getByRole("textbox", { name: "Wander keyword" }).fill("subject6");
+  await page.getByRole("button", { name: "Follow keyword", exact: true }).click();
+  await expect(page.getByRole("img", { name: "Scene 6", exact: true })).toBeVisible();
+
   await page.setViewportSize({ width: 390, height: 844 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
 });
@@ -127,6 +133,13 @@ test("Explore opens the Fun quest and Wander offers photo hunts and difficulty",
   await page.getByRole("link", { name: "Give me a quest", exact: true }).click();
   await expect(page).toHaveURL(/\/fun\/wander\?/);
   await expect(page.getByRole("list", { name: "Quest targets" })).toContainText("cat + stairs");
+  const currentPhoto = page.getByRole("img", { name: "Quest scene 0", exact: true });
+  await expect(currentPhoto.locator("xpath=ancestor::a")).toHaveCount(0);
+  await currentPhoto.click();
+  await expect(page).toHaveURL(/\/fun\/wander\?/);
+  await page.getByRole("button", { name: "Hint", exact: true }).click();
+  await expect(page.getByRole("status")).toContainText("closest");
+
   await page
     .getByRole("list", { name: "Ways on" })
     .getByRole("button", { name: "closest", exact: true })
@@ -137,6 +150,11 @@ test("Explore opens the Fun quest and Wander offers photo hunts and difficulty",
   await page.getByRole("radio", { name: "Hard", exact: true }).click();
   await page.getByRole("button", { name: "Start hunt", exact: true }).click();
   await expect(page.getByRole("list", { name: "Quest targets" }).getByRole("img")).toHaveCount(5);
+  await page.getByRole("button", { name: "Give up", exact: true }).click();
+  await expect(page.getByRole("region", { name: "Solution", exact: true })).toBeVisible();
+  await expect(page.getByRole("list", { name: "Solution route" }).first()).toContainText(
+    "Start here",
+  );
   await page.setViewportSize({ width: 390, height: 844 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
   await gotoHydrated(page, "/fun");

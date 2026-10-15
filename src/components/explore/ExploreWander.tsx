@@ -1,6 +1,6 @@
 import React from "react";
 import { AppLink, useUrlSearchParams } from "../platform";
-import { Button, Caption, LoadingIndicator, buttonStyles } from "../ui";
+import { Button, Caption, Input, LoadingIndicator, buttonStyles } from "../ui";
 import { fetchEmbeddingSpaceOnce, type EmbeddingSpaceEntry } from "../../util/embeddingSpaceData";
 import {
   findWanderEntry,
@@ -8,6 +8,7 @@ import {
   wanderJump,
   wanderScenes,
   wanderKey,
+  wanderKeyword,
 } from "../../util/wander";
 import styles from "./ExploreWander.module.css";
 
@@ -30,15 +31,18 @@ export const ExploreWander: React.FC<{
   onTrailChange?: (sources: string[]) => void;
   initialIndex?: number;
   questLink?: boolean;
+  photoLinks?: boolean;
   onVisit?: (entry: EmbeddingSpaceEntry, steps: number) => void;
-}> = ({ onTrailChange, initialIndex, questLink = true, onVisit }) => {
+}> = ({ onTrailChange, initialIndex, questLink = true, photoLinks = true, onVisit }) => {
   const { ready, searchParams, getSearchParam, replaceSearchParams } = useUrlSearchParams();
   const [entries, setEntries] = React.useState<EmbeddingSpaceEntry[] | null>(null);
   const [failed, setFailed] = React.useState(false);
   const [trail, setTrail] = React.useState<number[]>([]);
   const [explored, setExplored] = React.useState<Set<number>>(() => new Set());
   const [steps, setSteps] = React.useState(0);
-  const currentRef = React.useRef<HTMLAnchorElement>(null);
+  const [keyword, setKeyword] = React.useState("");
+  const [keywordMessage, setKeywordMessage] = React.useState("");
+  const currentRef = React.useRef<HTMLDivElement>(null);
   const moved = React.useRef(false);
   const [motion, setMotion] = React.useState({ x: 0, y: 12 });
 
@@ -97,6 +101,7 @@ export const ExploreWander: React.FC<{
 
   const go = (next: number[], direction = { x: 0, y: 12 }) => {
     if (next.at(-1) !== current) setSteps((previous) => previous + 1);
+    setKeywordMessage("");
     setMotion(direction);
     moved.current = true;
     setTrail(next);
@@ -119,13 +124,42 @@ export const ExploreWander: React.FC<{
   if (!entries || !here || current === null)
     return <LoadingIndicator label="Loading photographs…" />;
 
+  const steer = (term: string, more = true) => {
+    const next = wanderKeyword(entries, current, visited, term, more);
+    if (next === null) {
+      setKeywordMessage(
+        `No unexplored photographs ${more ? "with" : "without"} “${readable(term.trim())}”.`,
+      );
+      return;
+    }
+    go([...trail, next], { x: more ? 20 : -20, y: 0 });
+  };
+  const subjects = [...new Set(here.tags ?? [])].slice(0, 3);
+  const linkedKeywords = [...new Set(exits.flatMap((exit) => entries[exit.index]!.tags ?? []))]
+    .filter((tag) => !here.tags?.includes(tag))
+    .slice(0, 6);
   const shown = trail.slice(-TRAIL_SHOWN);
   const hiddenSteps = trail.length - shown.length;
   return (
     <div className={styles.wander}>
       <div className={styles.journey}>
-        <div className={styles.here}>
-          <AppLink href={here.href} className={styles.current} ref={currentRef}>
+        <div className={styles.here} ref={currentRef} tabIndex={-1}>
+          {photoLinks ? (
+            <AppLink href={here.href} className={styles.current}>
+              <img
+                key={here.src}
+                src={here.src}
+                alt={here.label}
+                className={styles.photo}
+                style={
+                  {
+                    "--wander-x": `${motion.x}px`,
+                    "--wander-y": `${motion.y}px`,
+                  } as React.CSSProperties
+                }
+              />
+            </AppLink>
+          ) : (
             <img
               key={here.src}
               src={here.src}
@@ -138,7 +172,7 @@ export const ExploreWander: React.FC<{
                 } as React.CSSProperties
               }
             />
-          </AppLink>
+          )}
           <Caption>{labelOf(here)}</Caption>
         </div>
         <ul className={styles.exits} aria-label="Ways on">
@@ -197,6 +231,63 @@ export const ExploreWander: React.FC<{
               Start again
             </Button>
           ) : null}
+        </div>
+        <div className={styles.sceneJumps}>
+          <Caption>Follow a subject</Caption>
+          {subjects.length ? (
+            <div className={styles.subjects} role="group" aria-label="Steer by subject">
+              {subjects.map((subject) => (
+                <div className={styles.actions} key={subject}>
+                  <Button
+                    disabled={wanderKeyword(entries, current, visited, subject) === null}
+                    onClick={() => steer(subject)}
+                  >
+                    More {readable(subject)}
+                  </Button>
+                  <Button
+                    disabled={wanderKeyword(entries, current, visited, subject, false) === null}
+                    onClick={() => steer(subject, false)}
+                  >
+                    Less {readable(subject)}
+                  </Button>
+                </div>
+              ))}
+            </div>
+          ) : null}
+          <form
+            className={styles.keywordForm}
+            onSubmit={(event) => {
+              event.preventDefault();
+              steer(keyword);
+            }}
+          >
+            <Input
+              aria-label="Wander keyword"
+              placeholder="Keyword"
+              value={keyword}
+              onChange={(event) => setKeyword(event.target.value)}
+            />
+            <Button type="submit" disabled={!keyword.trim()}>
+              Follow keyword
+            </Button>
+          </form>
+          {linkedKeywords.length ? (
+            <div className={styles.actions} role="group" aria-label="Linked keywords">
+              {linkedKeywords.map((tag) => (
+                <Button
+                  key={tag}
+                  variant="quiet"
+                  onClick={() => {
+                    setKeyword(readable(tag));
+                    steer(tag);
+                  }}
+                >
+                  {readable(tag)}
+                </Button>
+              ))}
+            </div>
+          ) : null}
+          {keywordMessage ? <p role="status">{keywordMessage}</p> : null}
         </div>
         {scenes.length ? (
           <div className={styles.sceneJumps}>

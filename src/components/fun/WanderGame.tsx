@@ -5,10 +5,13 @@ import {
   meetsQuest,
   wanderHunt,
   wanderKey,
+  wanderRoute,
+  type WanderEntry,
+  type WanderExit,
   type WanderQuest,
 } from "../../util/wander";
 import { ExploreWander } from "../explore/ExploreWander";
-import { AppLink, useUrlSearchParams } from "../platform";
+import { useUrlSearchParams } from "../platform";
 import { Button, Caption, Heading, SegmentedToggle } from "../ui";
 import { GameIntro } from "./GameIllustration";
 import { GameReadinessProvider } from "./GameReadiness";
@@ -20,11 +23,18 @@ import styles from "./WanderGame.module.css";
 
 type Mode = GameSettingsRegistry["wander"]["mode"];
 type Goal = WanderQuest & { photo?: EmbeddingSpaceEntry };
-const matches = (entry: EmbeddingSpaceEntry, goal: Goal) =>
+const matches = (entry: WanderEntry, goal: Goal) =>
   goal.photo ? entry.src === goal.photo.src : meetsQuest(entry, goal);
 type Round = { id: number; mode: Mode; goals: Goal[]; initialIndex: number };
 type Find = { goal: Goal; photo: EmbeddingSpaceEntry };
-type Result = { mode: Mode; won: boolean; steps: number; photos: EmbeddingSpaceEntry[] };
+type Solution = { goal: Goal; from: EmbeddingSpaceEntry; route: WanderExit[] };
+type Result = {
+  mode: Mode;
+  won: boolean;
+  steps: number;
+  photos: EmbeddingSpaceEntry[];
+  solutions?: Solution[];
+};
 const goalKey = (goal: Goal) => goal.photo?.src ?? goal.tags.join("\u0000");
 const readable = (tag: string) => tag.replaceAll("_", " ");
 
@@ -44,6 +54,8 @@ export const WanderGame = ({ linkedMode }: { linkedMode?: Mode }) => {
   const [found, setFound] = useState<Find[]>([]);
   const [steps, setSteps] = useState(0);
   const [message, setMessage] = useState("");
+  const [hint, setHint] = useState("");
+  const explored = useRef(new Set<number>());
   const foundRef = useRef<Find[]>([]);
   const lastVisit = useRef<{ photo: EmbeddingSpaceEntry; steps: number } | null>(null);
   const completed = useRef(false),
@@ -122,6 +134,8 @@ export const WanderGame = ({ linkedMode }: { linkedMode?: Mode }) => {
     sequence.current += 1;
     completed.current = false;
     foundRef.current = [];
+    explored.current = new Set([initialIndex]);
+    setHint("");
     lastVisit.current = null;
     setFound([]);
     setSteps(0);
@@ -145,6 +159,8 @@ export const WanderGame = ({ linkedMode }: { linkedMode?: Mode }) => {
   const onVisit = useCallback(
     (photo: EmbeddingSpaceEntry, moves: number) => {
       lastVisit.current = { photo, steps: moves };
+      if (entries) explored.current.add(entries.findIndex((entry) => entry.src === photo.src));
+      setHint("");
       setSteps(moves);
       if (!round || completed.current || round.mode === "roam") return;
       const newGoals = round.goals.filter(
@@ -168,8 +184,25 @@ export const WanderGame = ({ linkedMode }: { linkedMode?: Mode }) => {
         });
       }
     },
-    [round, record],
+    [round, record, entries],
   );
+  const showHint = () => {
+    if (!round || !entries || !lastVisit.current) return;
+    const current = entries.findIndex((entry) => entry.src === lastVisit.current!.photo.src);
+    const routes = round.goals
+      .filter((goal) => !foundRef.current.some((item) => goalKey(item.goal) === goalKey(goal)))
+      .map((goal) =>
+        wanderRoute(entries, current, (entry) => matches(entry, goal), explored.current),
+      )
+      .filter((route): route is WanderExit[] => !!route?.length)
+      .sort((a, b) => a.length - b.length);
+    const route = routes[0];
+    setHint(
+      route
+        ? `Try “${readable(route[0]!.label)}” · ${route.length} ${route.length === 1 ? "step" : "steps"} to a find.`
+        : "Retrace your walk to look for another route.",
+    );
+  };
   const finish = () => {
     if (!round || !entries || completed.current || !lastVisit.current) return;
     completed.current = true;
@@ -183,7 +216,16 @@ export const WanderGame = ({ linkedMode }: { linkedMode?: Mode }) => {
               entries.find((entry) => matches(entry, goal));
             return photo ? [photo] : [];
           });
-    setResult({ mode: round.mode, won: false, steps: lastVisit.current.steps, photos });
+    const solutions: Solution[] = [];
+    const current = entries.findIndex((entry) => entry.src === lastVisit.current!.photo.src);
+    const visited = new Set(explored.current);
+    for (const goal of round.goals) {
+      if (foundRef.current.some((item) => goalKey(item.goal) === goalKey(goal))) continue;
+      const route = wanderRoute(entries, current, (entry) => matches(entry, goal), visited);
+      if (!route) continue;
+      solutions.push({ goal, from: entries[current]!, route });
+    }
+    setResult({ mode: round.mode, won: false, steps: lastVisit.current.steps, photos, solutions });
   };
   if (result)
     return (
@@ -212,9 +254,7 @@ export const WanderGame = ({ linkedMode }: { linkedMode?: Mode }) => {
         <div className={styles.finds}>
           {result.photos.map((photo, index) => (
             <figure key={photo.src}>
-              <AppLink href={photo.href}>
-                <img src={photo.src} alt={photo.label} />
-              </AppLink>
+              <img src={photo.src} alt={photo.label} />
               {round?.goals[index] ? (
                 <figcaption>
                   {round.goals[index]!.photo?.label ??
@@ -224,6 +264,36 @@ export const WanderGame = ({ linkedMode }: { linkedMode?: Mode }) => {
             </figure>
           ))}
         </div>
+        {result.solutions?.length ? (
+          <section className={styles.game} aria-label="Solution">
+            <Heading level={2}>A route to each remaining find</Heading>
+            {result.solutions.map((solution) => (
+              <div key={goalKey(solution.goal)}>
+                <Heading level={3}>
+                  {solution.goal.photo?.label ?? solution.goal.tags.map(readable).join(" + ")}
+                </Heading>
+                <ol className={styles.route} aria-label="Solution route">
+                  <li>
+                    <span>Start here</span>
+                    <img src={solution.from.src} alt={solution.from.label} loading="lazy" />
+                  </li>
+                  {solution.route.map((step, index) => (
+                    <li key={`${index}-${step.index}`}>
+                      <span>
+                        {index + 1}. {readable(step.label)}
+                      </span>
+                      <img
+                        src={entries![step.index]!.src}
+                        alt={entries![step.index]!.label}
+                        loading="lazy"
+                      />
+                    </li>
+                  ))}
+                </ol>
+              </div>
+            ))}
+          </section>
+        ) : null}
         <ResultNextSteps
           photos={result.photos.flatMap((photo) => {
             const path = wanderKey(photo);
@@ -260,10 +330,12 @@ export const WanderGame = ({ linkedMode }: { linkedMode?: Mode }) => {
           <Caption>
             {steps} {steps === 1 ? "step" : "steps"}
           </Caption>
+          {round.mode !== "roam" ? <Button onClick={showHint}>Hint</Button> : null}
           <Button variant="quiet" onClick={finish}>
             {round.mode === "roam" ? "End walk" : "Give up"}
           </Button>
         </div>
+        {hint ? <p role="status">{hint}</p> : null}
         {round.goals.length ? (
           <ul className={styles.targets} aria-label="Quest targets">
             {round.goals.map((goal) => {
@@ -290,6 +362,7 @@ export const WanderGame = ({ linkedMode }: { linkedMode?: Mode }) => {
           key={round.id}
           initialIndex={round.initialIndex}
           questLink={false}
+          photoLinks={false}
           onVisit={onVisit}
         />
       </div>

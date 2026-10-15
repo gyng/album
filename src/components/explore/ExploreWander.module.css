@@ -193,3 +193,17 @@
   display: grid;
   gap: var(--space-2);
 }
+
+.subjects {
+  display: grid;
+  gap: var(--space-2);
+}
+.keywordForm {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.keywordForm input {
+  flex: 1 1 10rem;
+  min-inline-size: 0;
+}

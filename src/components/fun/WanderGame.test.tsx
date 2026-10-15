@@ -114,9 +114,9 @@ it("reveals a valid target when giving up", async () => {
   await act(async () => {});
   fireEvent.click(screen.getByRole("button", { name: "Give up" }));
   expect(
-    within(screen.getByRole("region", { name: "Wander result" })).getByRole("img", {
+    within(screen.getByRole("region", { name: "Wander result" })).getAllByRole("img", {
       name: "cat-stairs",
-    }),
+    })[0],
   ).toBeInTheDocument();
   expect(readGameStats("wander")).toMatchObject({ played: 1, won: 0 });
 });
@@ -146,4 +146,24 @@ it("uses difficulty to change the photo hunt size and remembers the choice", asy
   expect(JSON.parse(localStorage.getItem("snapshots-fun-settings-v1:wander")!)).toMatchObject({
     difficulty: "hard",
   });
+});
+
+it("keeps the current photo inside the game and offers a next-step hint", async () => {
+  await load();
+  fireEvent.click(screen.getByRole("button", { name: "Start quest" }));
+  await act(async () => {});
+  const photo = screen.getByRole("img", { name: "start" });
+  expect(photo.closest("a")).toBeNull();
+  fireEvent.click(photo);
+  expect(screen.getByRole("list", { name: "Quest targets" })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Hint" }));
+  expect(screen.getByRole("status")).toHaveTextContent("closest");
+});
+it("shows a navigable solution route after giving up", async () => {
+  await load();
+  fireEvent.click(screen.getByRole("button", { name: "Start quest" }));
+  await act(async () => {});
+  fireEvent.click(screen.getByRole("button", { name: "Give up" }));
+  expect(screen.getByRole("list", { name: "Solution route" })).toHaveTextContent("closest");
+  expect(screen.getByRole("list", { name: "Solution route" }).querySelector("a")).toBeNull();
 });

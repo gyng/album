@@ -132,3 +132,23 @@ it("links Give me a quest to the Fun game, carrying the current photograph", asy
   expect(url.searchParams.get("play")).toBe("1");
   expect(url.searchParams.get("wander")).toBe("../albums/walk/start.jpg");
 });
+
+it("steers by more or less of a subject and by a linked keyword", async () => {
+  await load();
+  fireEvent.click(screen.getByRole("button", { name: "More street" }));
+  expect(here()).toHaveAttribute("href", "/album/walk#next.jpg");
+  fireEvent.change(screen.getByRole("textbox", { name: "Wander keyword" }), {
+    target: { value: "canal" },
+  });
+  fireEvent.submit(screen.getByRole("textbox", { name: "Wander keyword" }).closest("form")!);
+  expect(here()).toHaveAttribute("href", "/album/walk#canal.jpg");
+});
+it("keeps the walk in place when no photo matches a keyword", async () => {
+  await load();
+  fireEvent.change(screen.getByRole("textbox", { name: "Wander keyword" }), {
+    target: { value: "unicorn" },
+  });
+  fireEvent.submit(screen.getByRole("textbox", { name: "Wander keyword" }).closest("form")!);
+  expect(here()).toHaveAttribute("href", "/album/walk#start.jpg");
+  expect(screen.getByRole("status")).toHaveTextContent("No unexplored photographs");
+});
