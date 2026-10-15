@@ -1,6 +1,7 @@
 import React from "react";
 import styles from "./Search.module.css";
 import { SearchResultTile } from "./SearchResultTile";
+import { resultTextOpacities } from "./resultTextEmphasis";
 import { SearchResultRow } from "./searchTypes";
 import { RGB } from "../../util/colorDistance";
 
@@ -50,6 +51,7 @@ export const SearchResultsGrid: React.FC<Props> = ({
   onSearchByColor,
   onFetchNextPage,
 }) => {
+  const textOpacities = resultTextOpacities(results ?? []);
   const showResults =
     isSimilarMode ||
     isColorMode ||
@@ -128,7 +130,7 @@ export const SearchResultsGrid: React.FC<Props> = ({
         </li>
       ) : null}
 
-      {results?.map((r) => {
+      {results?.map((r, index) => {
         const isVisitedInSimilarTrail = isSimilarMode && similarClickstreamPaths.has(r.path);
         return (
           <li
@@ -146,6 +148,7 @@ export const SearchResultsGrid: React.FC<Props> = ({
           >
             <SearchResultTile
               result={r}
+              textOpacity={textOpacities[index] ?? 1}
               persistColorAction={isColorCategoryActive}
               onFindSimilar={(path, similarity) => {
                 onFindSimilar(path, similarity);

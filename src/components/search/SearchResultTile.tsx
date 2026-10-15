@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import { Icon } from "../ui/Icon";
 import { AppLink as Link } from "../platform";
 import { Thumb, OverlayButton } from "../ui";
@@ -23,11 +24,18 @@ const stripHtml = (value?: string): string => {
 
 export const SearchResultTile = (props: {
   result: SearchResultRow;
+  textOpacity?: number;
   onFindSimilar?: (path: string, similarity?: number) => void;
   onSearchByColor?: (color: RGB) => void;
   persistColorAction?: boolean;
 }) => {
-  const { result, onFindSimilar, onSearchByColor, persistColorAction = false } = props;
+  const {
+    result,
+    onFindSimilar,
+    onSearchByColor,
+    persistColorAction = false,
+    textOpacity = 1,
+  } = props;
 
   let colour = "var(--c-border-on-dark)";
   const palette = result.colors ? parseColorPalette(result.colors) : [];
@@ -86,7 +94,7 @@ export const SearchResultTile = (props: {
       : "Video";
 
   return (
-    <div className={styles.card}>
+    <div className={styles.card} style={{ "--result-text-opacity": textOpacity } as CSSProperties}>
       {isVideo ? (
         <div
           className={`${styles.overlayBadge} ${styles.videoBadge}`}
@@ -100,8 +108,10 @@ export const SearchResultTile = (props: {
         </div>
       ) : null}
       {similarityLabel ? (
-        <div className={`${styles.overlayBadge} ${styles.similarityBadge}`} title={scoreTitle}>
-          {similarityLabel}
+        <div className={`${styles.overlayBadge} ${styles.similarityBadge}`}>
+          <span className={styles.scoreText} title={scoreTitle}>
+            {similarityLabel}
+          </span>
         </div>
       ) : null}
       {onFindSimilar || (matchingColorStyle && onSearchByColor) ? (

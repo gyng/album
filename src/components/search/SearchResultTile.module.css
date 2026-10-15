@@ -116,3 +116,23 @@
   border-radius: var(--radius-pill);
   border: solid var(--size-2) var(--c-border-on-dark);
 }
+
+.details,
+.scoreText {
+  opacity: var(--result-text-opacity, 1);
+  transition: opacity var(--t-fast) var(--ease-out);
+}
+
+.card:hover .details,
+.card:hover .scoreText,
+.card:focus-within .details,
+.card:focus-within .scoreText {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .details,
+  .scoreText {
+    transition: none;
+  }
+}
