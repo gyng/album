@@ -46,3 +46,49 @@ test("Wander surrounds the current photograph and respects reduced motion", asyn
   await page.setViewportSize({ width: 390, height: 844 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
 });
+
+test("Wander escapes a closed city loop and offers fresh scene shortcuts after Back", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const tags = [
+    ["street", "building"],
+    ["street", "car"],
+    ["street", "building"],
+    ["forest", "mountain"],
+    ["sea", "beach"],
+  ];
+  const points = tags.map((tags, i) => ({
+    src: `/data/albums/test-simple/.resized_images/escape${i}.jpg%40800.avif`,
+    href: `/album/test-simple#escape${i}.jpg`,
+    label: `Escape scene ${i}`,
+    tags,
+    near: i < 3 ? [0, 1, 2].filter((index) => index !== i) : [0],
+    around: [],
+    x: i,
+    y: 0,
+    z: 0,
+  }));
+  await page.route("**/data/embedding-space.json", (route) =>
+    route.fulfill({ json: { points, clusters: [], axisScale: { x: 1, y: 1, z: 1 }, atlas: null } }),
+  );
+  await page.route("**/escape*.avif", (route) =>
+    route.fulfill({
+      contentType: "image/svg+xml",
+      body: '<svg xmlns="http://www.w3.org/2000/svg" width="600" height="400"><rect width="600" height="400" fill="silver"/></svg>',
+    }),
+  );
+  await gotoHydrated(page, "/explore?wander=../albums/test-simple/escape0.jpg");
+  await page.getByRole("button", { name: "Show Wander", exact: true }).click();
+  const ways = page.getByRole("list", { name: "Ways on" });
+  await expect(ways.getByRole("button", { name: "further afield", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Nature", exact: true }).click();
+  await expect(page.getByRole("img", { name: "Escape scene 3", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Back", exact: true }).click();
+  await expect(page.getByRole("img", { name: "Escape scene 0", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Nature", exact: true })).toHaveCount(0);
+  await page.getByRole("button", { name: "Take a leap", exact: true }).click();
+  await expect(page.getByRole("img", { name: "Escape scene 4", exact: true })).toBeVisible();
+  await expect(page).toHaveURL(/wander=.*escape4/);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+});

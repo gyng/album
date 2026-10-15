@@ -375,7 +375,7 @@ const ExploreScreen = ({
             id="wander"
             title="Wander"
             deferContent
-            deferredSummary="Walk from photograph to photograph, each step to one the model reads as alike."
+            deferredSummary="Follow visual connections, or jump to a different scene."
           >
             <section className={`${styles.section} ${styles.sectionWide}`}>
               <ExploreWander onTrailChange={setWanderTrail} />

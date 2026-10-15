@@ -1,4 +1,11 @@
-import { findWanderEntry, meetsQuest, wanderExits, wanderQuest, type WanderEntry } from "./wander";
+import {
+  findWanderEntry,
+  meetsQuest,
+  wanderExits,
+  wanderJump,
+  wanderQuest,
+  type WanderEntry,
+} from "./wander";
 
 const entry = (
   href: string,
@@ -39,15 +46,12 @@ describe("wanderExits", () => {
 
   it("keeps to unwalked photographs while there are any", () => {
     expect(wanderExits(entries, 0, new Set([1, 3]))[0]).toEqual({ index: 2, label: "closest" });
-    expect(wanderExits(entries, 0, new Set([1, 2, 3, 4, 5, 6]))[0]).toEqual({
-      index: 1,
-      label: "closest",
-    });
+    expect(wanderExits(entries, 0, new Set([1, 2, 3, 4, 5, 6]))).toEqual([]);
   });
 
   it("stops at the requested count and copes with a dead end", () => {
     expect(wanderExits(entries, 0, new Set(), 2)).toHaveLength(2);
-    expect(wanderExits(entries, 6)).toEqual([]);
+    expect(wanderExits([], 6)).toEqual([]);
   });
 });
 
@@ -78,4 +82,32 @@ it("finds a place on the walk by the search database's key", () => {
   expect(findWanderEntry(entries, "../albums/b/y 1.jpg")).toBe(1);
   expect(findWanderEntry(entries, "../albums/c/z.jpg")).toBe(-1);
   expect(findWanderEntry(entries, null)).toBe(-1);
+});
+
+describe("escaping a local loop", () => {
+  const photos = [
+    entry("/album/city#0", ["street", "building"], "", [1, 2]),
+    entry("/album/city#1", ["street", "car"], "", [0, 2]),
+    entry("/album/city#2", ["street", "building"], "", [0, 1]),
+    entry("/album/hills#0", ["mountain", "forest"], "", [4]),
+    entry("/album/coast#0", ["sea", "beach"], "", [3]),
+  ];
+  it("offers an unseen global exit beyond the local city neighbours", () => {
+    const exits = wanderExits(photos, 0, new Set([0]));
+    expect(exits.some((exit) => exit.index >= 3)).toBe(true);
+    expect(exits[0]).toEqual({ index: 1, label: "closest" });
+    const escaped = wanderExits(photos, 0, new Set([0, 1, 2]));
+    expect(escaped.length).toBeGreaterThan(0);
+    expect(escaped.every((exit) => exit.index >= 3)).toBe(true);
+  });
+  it("takes a leap outside the neighbourhood and never chooses an explored photograph", () => {
+    expect(wanderJump(photos, 0, new Set([0]), () => 0)).toBe(3);
+    expect(wanderJump(photos, 0, new Set([0, 3]), () => 0)).toBe(4);
+    expect(wanderJump(photos, 0, new Set([0, 1, 2, 3, 4]), () => 0)).toBeNull();
+  });
+  it("jumps to the requested scene rather than another city frame", () => {
+    expect(wanderJump(photos, 0, new Set([0]), () => 0, "nature")).toBe(3);
+    expect(wanderJump(photos, 0, new Set([0]), () => 0, "water")).toBe(4);
+    expect(wanderJump(photos, 0, new Set([0, 3]), () => 0, "nature")).toBeNull();
+  });
 });

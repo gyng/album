@@ -32,10 +32,10 @@ const points = [
   point("canal", ["street", "canal"], [0, 1]),
 ];
 
-const load = async (url = "/explore?wander=../albums/walk/start.jpg") => {
+const load = async (url = "/explore?wander=../albums/walk/start.jpg", source = points) => {
   window.history.replaceState(null, "", url);
   jest.mocked(fetchEmbeddingSpaceOnce).mockResolvedValue({
-    points,
+    points: source,
     clusters: [],
     axisScale: { x: 1, y: 1, z: 1 },
     atlas: null,
@@ -81,4 +81,44 @@ it("returns to any earlier step from the trail", async () => {
 it("does not write the URL for a random start", async () => {
   await load("/explore");
   expect(window.location.search).toBe("");
+});
+
+it("offers scene jumps and remembers explored photos after going back", async () => {
+  const source = [
+    ...points,
+    point("mountain", ["mountain", "forest"], [0]),
+    point("beach", ["sea", "beach"], [0]),
+  ];
+  await load(undefined, source);
+  fireEvent.click(screen.getByRole("button", { name: "Nature" }));
+  expect(here()).toHaveAttribute("href", "/album/walk#mountain.jpg");
+  fireEvent.click(screen.getByRole("button", { name: "Back" }));
+  expect(here()).toHaveAttribute("href", "/album/walk#start.jpg");
+  expect(screen.queryByRole("button", { name: "Nature" })).toBeNull();
+  expect(
+    within(screen.getByRole("list", { name: "Ways on" }))
+      .getAllByRole("button")
+      .every((button) => button.querySelector("img")?.getAttribute("src") !== source[3]!.src),
+  ).toBe(true);
+  fireEvent.click(screen.getByRole("button", { name: "Water" }));
+  expect(here()).toHaveAttribute("href", "/album/walk#beach.jpg");
+  expect(new URLSearchParams(window.location.search).get("wander")).toBe(
+    "../albums/walk/beach.jpg",
+  );
+});
+
+it("requires an explicit restart once every photograph has been explored", async () => {
+  await load();
+  fireEvent.click(screen.getByRole("button", { name: "closest" }));
+  fireEvent.click(screen.getByRole("button", { name: "closest" }));
+  expect(screen.getByRole("button", { name: "Take a leap" })).toBeDisabled();
+  expect(
+    within(screen.getByRole("list", { name: "Ways on" })).queryAllByRole("button"),
+  ).toHaveLength(0);
+  fireEvent.click(screen.getByRole("button", { name: "Start again" }));
+  expect(screen.getByRole("button", { name: "Back" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Take a leap" })).toBeEnabled();
+  expect(
+    within(screen.getByRole("list", { name: "Ways on" })).getAllByRole("button").length,
+  ).toBeGreaterThan(0);
 });

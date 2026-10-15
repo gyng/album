@@ -6,6 +6,8 @@ import {
   findWanderEntry,
   meetsQuest,
   wanderExits,
+  wanderJump,
+  wanderScenes,
   wanderKey,
   wanderQuest,
   type WanderQuest,
@@ -22,8 +24,8 @@ const labelOf = (entry: EmbeddingSpaceEntry) =>
   entry.tags?.length ? entry.tags.map(readable).join(", ") : entry.label;
 
 /**
- * A walk through the archive one photograph at a time, each step to one of its
- * neighbours in the full embedding space. No score: the cloud above is the map
+ * A walk through visual neighbours, with wider jumps into unexplored scenes.
+ * No score: the cloud above is the map
  * and this is the ground.
  */
 export const ExploreWander: React.FC<{
@@ -34,6 +36,7 @@ export const ExploreWander: React.FC<{
   const [entries, setEntries] = React.useState<EmbeddingSpaceEntry[] | null>(null);
   const [failed, setFailed] = React.useState(false);
   const [trail, setTrail] = React.useState<number[]>([]);
+  const [explored, setExplored] = React.useState<Set<number>>(() => new Set());
   const [quest, setQuest] = React.useState<WanderQuest | null>(null);
   const currentRef = React.useRef<HTMLAnchorElement>(null);
   const moved = React.useRef(false);
@@ -57,7 +60,9 @@ export const ExploreWander: React.FC<{
   React.useEffect(() => {
     if (!entries?.length || !ready || trail.length) return;
     const linked = findWanderEntry(entries, getSearchParam("wander"));
-    setTrail([linked >= 0 ? linked : randomIndex(entries.length)]);
+    const first = linked >= 0 ? linked : randomIndex(entries.length);
+    setTrail([first]);
+    setExplored(new Set([first]));
     // Only the first arrival chooses a start; later URL writes are our own.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [entries, ready]);
@@ -85,13 +90,20 @@ export const ExploreWander: React.FC<{
     setMotion(direction);
     moved.current = true;
     setTrail(next);
+    setExplored((previous) => new Set([...previous, ...next]));
     currentRef.current?.focus({ preventScroll: true });
   };
-  const visited = React.useMemo(() => new Set(trail), [trail]);
+  const visited = explored;
   const exits = React.useMemo(
     () => (entries && current !== null ? wanderExits(entries, current, visited) : []),
     [entries, current, visited],
   );
+  const scenes = React.useMemo(
+    () => (entries && current !== null ? wanderScenes(entries, current, visited) : []),
+    [entries, current, visited],
+  );
+  const hasUnexplored =
+    !!entries && entries.some((_, index) => index !== current && !visited.has(index));
   const questMet = meetsQuest(here, quest);
 
   if (failed) return <p>The walk could not be loaded.</p>;
@@ -153,10 +165,48 @@ export const ExploreWander: React.FC<{
           <Button disabled={trail.length < 2} onClick={() => go(trail.slice(0, -1))}>
             Back
           </Button>
-          <Button variant="quiet" onClick={() => go([randomIndex(entries.length)])}>
-            Somewhere else
+          <Button
+            variant="accent"
+            disabled={!hasUnexplored}
+            onClick={() => {
+              const next = wanderJump(entries, current, visited);
+              if (next !== null) go([...trail, next], { x: 0, y: 20 });
+            }}
+          >
+            Take a leap
           </Button>
+          {!hasUnexplored ? (
+            <Button
+              onClick={() => {
+                const next = entries.length > 1 ? (current + 1) % entries.length : current;
+                setExplored(new Set([next]));
+                moved.current = true;
+                setTrail([next]);
+              }}
+            >
+              Start again
+            </Button>
+          ) : null}
         </div>
+        {scenes.length ? (
+          <div className={styles.sceneJumps}>
+            <Caption>Change scene</Caption>
+            <div className={styles.actions} role="group" aria-label="Change scene">
+              {scenes.map((scene) => (
+                <Button
+                  key={scene.id}
+                  onClick={() => {
+                    const next = wanderJump(entries, current, visited, Math.random, scene.id);
+                    if (next !== null) go([...trail, next], { x: 0, y: 20 });
+                  }}
+                >
+                  {scene.label}
+                </Button>
+              ))}
+            </div>
+          </div>
+        ) : null}
+        {!hasUnexplored ? <Caption>You’ve explored every photograph in this walk.</Caption> : null}
         <div className={styles.quest}>
           {quest ? (
             <p role="status">

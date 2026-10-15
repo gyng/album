@@ -11,10 +11,110 @@ import { indexedPathFromSrc, type EmbeddingSpaceEntry } from "./embeddingSpaceDa
 
 export type WanderEntry = Pick<
   EmbeddingSpaceEntry,
-  "src" | "href" | "tags" | "swatch" | "near" | "around"
+  "src" | "href" | "tags" | "swatch" | "near" | "around" | "cluster"
 >;
 
 export type WanderExit = { index: number; label: string };
+
+const URBAN =
+  /\b(streets?|city|cityscape|urban|buildings?|architecture|apartments?|skyscrapers?|storefront|downtown|skyline)\b/i;
+export const WANDER_SCENES = [
+  {
+    id: "nature",
+    label: "Nature",
+    pattern:
+      /\b(forests?|mountains?|woods?|woodland|landscape|hills?|fields?|meadows?|snow|desert|wildlife)\b/i,
+  },
+  {
+    id: "water",
+    label: "Water",
+    pattern: /\b(water|ocean|sea|beach|coast|lakes?|rivers?|waterfalls?|canal)\b/i,
+  },
+  {
+    id: "animals",
+    label: "Animals",
+    pattern: /\b(animals?|cats?|dogs?|birds?|wildlife|deer|fox|penguin|insects?|fish)\b/i,
+  },
+  {
+    id: "people",
+    label: "People",
+    pattern: /\b(people|person|woman|women|man|men|child|children|portrait)\b/i,
+  },
+  {
+    id: "food",
+    label: "Food",
+    pattern: /\b(food|meal|dish|dessert|coffee|cake|noodles|sushi|fruit)\b/i,
+  },
+  { id: "night", label: "Night", pattern: /\b(night|stars?|moon|milky way|fireworks)\b/i },
+] as const;
+export type WanderScene = (typeof WANDER_SCENES)[number]["id"];
+const subjectText = (entry: WanderEntry) => (entry.tags ?? []).join(" ").replaceAll("_", " ");
+const matchesScene = (entry: WanderEntry, scene: WanderScene) => {
+  const text = subjectText(entry);
+  return (
+    WANDER_SCENES.find((item) => item.id === scene)!.pattern.test(text) &&
+    (!(scene === "nature" || scene === "water") || !URBAN.test(text))
+  );
+};
+
+/** Unexplored scene shortcuts, across the whole archive rather than only nearest neighbours. */
+export const wanderScenes = (
+  entries: readonly WanderEntry[],
+  current: number,
+  visited: ReadonlySet<number>,
+) =>
+  WANDER_SCENES.filter((scene) =>
+    entries.some(
+      (entry, index) => index !== current && !visited.has(index) && matchesScene(entry, scene.id),
+    ),
+  );
+
+/** A genuinely wider step, favouring different subjects and escaping urban photographs. */
+export const wanderJump = (
+  entries: readonly WanderEntry[],
+  current: number,
+  visited: ReadonlySet<number> = new Set(),
+  random: () => number = Math.random,
+  scene?: WanderScene,
+): number | null => {
+  const here = entries[current];
+  if (!here) return null;
+  let candidates = entries.flatMap((entry, index) =>
+    index !== current && !visited.has(index) && (!scene || matchesScene(entry, scene))
+      ? [index]
+      : [],
+  );
+  if (!candidates.length) return null;
+  const neighbours = new Set([...(here.near ?? []), ...(here.around ?? [])]);
+  const outside = candidates.filter((index) => !neighbours.has(index));
+  if (outside.length) candidates = outside;
+  if (!scene && URBAN.test(subjectText(here))) {
+    const outsideCity = candidates.filter((index) => !URBAN.test(subjectText(entries[index]!)));
+    if (outsideCity.length) candidates = outsideCity;
+  }
+  const own = new Set(here.tags ?? []);
+  let best = -Infinity;
+  let choices: number[] = [];
+  for (const index of candidates) {
+    const entry = entries[index]!;
+    const tags = new Set(entry.tags ?? []);
+    const shared = [...tags].filter((tag) => own.has(tag)).length;
+    const union = new Set([...own, ...tags]).size;
+    const novelty = own.size && tags.size ? 1 - shared / union : 0.5;
+    const differentAlbum = entry.href.split("#")[0] !== here.href.split("#")[0];
+    const differentCluster =
+      here.cluster !== undefined && entry.cluster !== undefined && here.cluster !== entry.cluster;
+    const score = novelty + Number(differentAlbum) * 0.1 + Number(differentCluster) * 0.1;
+    if (score > best) {
+      best = score;
+      choices = [index];
+    } else if (score === best) choices.push(index);
+  }
+  return (
+    choices[Math.min(choices.length - 1, Math.max(0, Math.floor(random() * choices.length)))] ??
+    null
+  );
+};
 
 const parseSwatch = (swatch: string | undefined) => {
   const match = swatch ? /rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)/i.exec(swatch) : null;
@@ -46,12 +146,7 @@ const colourLabels = (from: WanderEntry, to: WanderEntry): string[] => {
   return labels;
 };
 
-/**
- * Up to `count` ways out of a photograph, closest first. The nearest always
- * leads ("closest"); every other exit must bring something the others do not,
- * so six exits are six directions rather than six frames of one burst. Places
- * already walked are used only when nothing else is left.
- */
+/** Local, labelled steps plus an unexplored exit beyond the current neighbourhood. */
 export const wanderExits = (
   entries: readonly WanderEntry[],
   current: number,
@@ -59,27 +154,30 @@ export const wanderExits = (
   count = 6,
 ): WanderExit[] => {
   const here = entries[current];
-  if (!here) return [];
+  if (!here || count < 1) return [];
   const all = [...(here.near ?? []), ...(here.around ?? [])].filter(
     (index, position, list) =>
       index !== current && entries[index] !== undefined && list.indexOf(index) === position,
   );
-  const fresh = all.filter((index) => !visited.has(index));
-  const candidates = fresh.length ? fresh : all;
-  if (!candidates.length) return [];
+  const candidates = all.filter((index) => !visited.has(index));
+  const jump = wanderJump(entries, current, new Set([...visited, ...all]), () => 0);
+  const localLimit = count - Number(jump !== null);
+  const exits: WanderExit[] = [];
+  const used = new Set<string>();
   const own = new Set(here.tags ?? []);
-  const [first, ...rest] = candidates as [number, ...number[]];
-  const exits: WanderExit[] = [{ index: first, label: "closest" }];
-  const used = new Set(["closest"]);
-  for (const index of rest) {
-    if (exits.length >= count) break;
+  for (const index of candidates) {
+    if (exits.length >= localLimit) break;
     const entry = entries[index]!;
     const subjects = (entry.tags ?? []).filter((tag) => !own.has(tag));
-    const label = [...subjects, ...colourLabels(here, entry)].find((item) => !used.has(item));
+    const label =
+      exits.length === 0
+        ? "closest"
+        : [...subjects, ...colourLabels(here, entry)].find((item) => !used.has(item));
     if (!label) continue;
     used.add(label);
     exits.push({ index, label });
   }
+  if (jump !== null) exits.push({ index: jump, label: "further afield" });
   return exits;
 };
 
