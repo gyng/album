@@ -1149,6 +1149,8 @@ export const fetchPhotoGameArchive = async (opts: {
   database: Database;
   embeddingsDatabase?: Database | null;
   game:
+    | "photo-pairs"
+    | "photo-jigsaw"
     | "relay"
     | "blind-frame"
     | "oracle"
@@ -1167,7 +1169,7 @@ export const fetchPhotoGameArchive = async (opts: {
   // Drawings and words come from the browser's v1 encoders. Never compare
   // them to v2 image vectors, even when both spaces have the same dimensions.
   const browserEncoded = game === "blind-frame" || game === "warmer" || game === "caption-it";
-  if (game === "relay" || game === "double-take" || browserEncoded) {
+  if (game === "photo-pairs" || game === "relay" || game === "double-take" || browserEncoded) {
     try {
       embeddings = await fetchEmbeddingsByModel(
         vectorDatabase,
@@ -1191,6 +1193,7 @@ export const fetchPhotoGameArchive = async (opts: {
     });
   }
   const rows =
+    game === "photo-jigsaw" ||
     game === "oracle" ||
     game === "connections" ||
     game === "cross-exposure" ||

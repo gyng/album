@@ -32,20 +32,23 @@ export const CloudSpotlight = ({ onMatches }: { onMatches: (paths: string[] | nu
         <Button type="submit" disabled={!input.trim() || input.trim() === query}>
           Spotlight
         </Button>
-        {query ? (
-          <Button
-            variant="quiet"
-            onClick={() => {
-              setQuery("");
-              setInput("");
-              onMatches(null);
-            }}
-          >
-            Clear search
-          </Button>
-        ) : null}
+        <Button
+          variant="quiet"
+          className={styles.clear}
+          disabled={!query}
+          aria-hidden={!query}
+          onClick={() => {
+            setQuery("");
+            setInput("");
+            onMatches(null);
+          }}
+        >
+          Clear search
+        </Button>
       </form>
-      {query ? <RankScene key={query} query={query} onMatches={onMatches} /> : null}
+      <div className={styles.feedback}>
+        {query ? <RankScene key={query} query={query} onMatches={onMatches} /> : null}
+      </div>
     </div>
   );
 };

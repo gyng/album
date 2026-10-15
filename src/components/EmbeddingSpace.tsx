@@ -69,7 +69,7 @@ const DRIFT = 0.11;
  * cloud with a handful of photographs around you, far enough that the whole
  * thing is a speck of its own colours.
  */
-const MIN_DISTANCE = 0.85;
+const MIN_DISTANCE = 0.3;
 const MAX_DISTANCE = 16;
 const MAX_PITCH = Math.PI / 2.4;
 

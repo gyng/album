@@ -2,6 +2,22 @@
   min-inline-size: 0;
 }
 
+.clear:disabled {
+  visibility: hidden;
+}
+
+.feedback {
+  min-block-size: var(--tap-target);
+  display: grid;
+  align-items: center;
+  font-size: var(--fs-sm);
+  line-height: var(--lh-label);
+}
+
+.feedback p {
+  margin: 0;
+}
+
 .search form {
   display: flex;
   flex-wrap: wrap;

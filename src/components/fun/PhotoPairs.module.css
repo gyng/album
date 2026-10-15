@@ -1,0 +1,88 @@
+.game {
+  display: grid;
+  gap: var(--space-4);
+  max-inline-size: 60rem;
+}
+.game p {
+  margin: 0;
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+.board {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+.card {
+  position: relative;
+  display: grid;
+  place-items: center;
+  aspect-ratio: 4 / 3;
+  min-inline-size: 0;
+  overflow: hidden;
+  padding: 0;
+  border: var(--line-strong) solid var(--c-border);
+  border-radius: var(--radius-control);
+  background: var(--c-surface);
+  color: var(--c-font);
+  cursor: pointer;
+}
+.card[aria-pressed="true"] {
+  border-color: var(--c-accent);
+}
+.card:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--line-strong);
+}
+.face {
+  inline-size: 100%;
+  block-size: 100%;
+  object-fit: contain;
+  animation: reveal 180ms var(--ease-out);
+}
+
+@keyframes reveal {
+  from {
+    opacity: 0;
+    transform: rotateY(80deg);
+  }
+  to {
+    opacity: 1;
+    transform: rotateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .face {
+    animation: none;
+  }
+}
+.back {
+  font-size: var(--fs-l);
+  color: var(--c-accent);
+}
+.match {
+  position: absolute;
+  inset-inline: 0;
+  inset-block-end: 0;
+  padding: var(--space-1);
+  background: var(--c-bg);
+  font-size: var(--fs-s);
+}
+.results {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+@media (max-width: 480px) {
+  .board {
+    gap: var(--space-1);
+  }
+  .match {
+    font-size: var(--fs-xs);
+  }
+}

@@ -1,5 +1,39 @@
 # Fun
 
+## Photo Pairs and Photo Jigsaw — 16 October 2026
+
+Photo Pairs (`/fun/photo-pairs`) turns over two cards per turn. Each pair uses
+two different photographs. Lookalikes is the default: normalised image
+embeddings select mutual nearest neighbours, excluding competing photographs
+on the same board that are as similar as the intended partner. Same subject
+uses the concrete subject vocabulary shared with Hangman and Sight Lines;
+each pair gets a distinct subject and cross-pair subject overlap is rejected.
+If the archive cannot supply enough distinct pairs, the lobby offers fewer
+pairs or another mode rather than inventing a match.
+
+Boards have four, six or eight pairs. Classic leaves positions fixed; One
+glimpse shows the board for three seconds after all photographs have loaded;
+Moving cards shuffles only unmatched cards after each miss. Misses remain
+visible for 1.4 seconds after both photographs load. A third card cannot open
+until the miss settles. Hidden cards have no image/caption in the accessible
+tree. Matching and completion are keyboard-operable through ordinary buttons.
+Completion records efficiency (pairs divided by turns) once and links back to
+the photographs. Mode, pair count and twist are saved as lobby preferences.
+
+Photo Jigsaw (`/fun/photo-jigsaw`) is a photographic tile puzzle: 3×3, 4×4
+or 5×5. Swap exchanges two chosen pieces. Quarter turns also scrambles each
+piece's orientation, with a separate rotation control. Sliding tiles moves
+only a neighbour into the empty space; boards are dealt by legal moves from
+the solved state, preserving solvability. Preview shows the original without
+changing the board. The source photograph's aspect ratio is preserved, and
+play waits for the image to load. Completion requires every position and
+orientation and records one finished puzzle. Settings persist in the lobby.
+
+Both use the existing shared intro, archive loader, navigation and stats;
+they add no runtime API or index schema. Pairs prefers SigLIP 2 and falls back
+to SigLIP 1, while Jigsaw requires only the core database. Neither new game
+currently has a daily challenge.
+
 Guess Where uses the shared `GameIntro` setup layout: title above, artwork
 beside controls on desktop and above them on mobile, then Play, daily action
 and statistics. Its settings, keyboard shortcuts and challenge URLs retain
@@ -94,7 +128,7 @@ bonsai target 42 instead of 89, and a daffodil-portrait target 26 instead of 78.
 
 ## Illustrations
 
-The twelve game illustrations are animal editorial cartoons with transparent
+The fourteen game illustrations are animal editorial cartoons with transparent
 outer backgrounds, generated using the built-in imagegen tool. Final 960×640
 AVIFs preserve alpha in `src/public/fun/`. The shared `GameIllustration` component renders their inverted
 luminance through an SVG mask, removing pale paper interiors as well as the

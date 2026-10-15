@@ -330,6 +330,8 @@ const generateSitemap = (albumEntries) => {
       "/fun/cross-exposure",
       "/fun/sight-lines",
       "/fun/photo-hangman",
+      "/fun/photo-pairs",
+      "/fun/photo-jigsaw",
       "/fun/hindsight",
       "/fun/warmer",
       "/fun/caption-it",

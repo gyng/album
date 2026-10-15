@@ -1,14 +1,47 @@
 .wander {
   display: grid;
-  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
   gap: var(--space-5);
   align-items: start;
 }
-
-@media (max-width: 720px) {
-  .wander {
-    grid-template-columns: minmax(0, 1fr);
-  }
+.journey {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-3);
+  align-items: center;
+}
+.here {
+  grid-column: 2 / 4;
+  grid-row: 2 / 4;
+}
+.exits {
+  display: contents;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.exits > li:nth-child(1) {
+  grid-column: 2;
+  grid-row: 1;
+}
+.exits > li:nth-child(2) {
+  grid-column: 3;
+  grid-row: 1;
+}
+.exits > li:nth-child(3) {
+  grid-column: 4;
+  grid-row: 2 / 4;
+}
+.exits > li:nth-child(4) {
+  grid-column: 3;
+  grid-row: 4;
+}
+.exits > li:nth-child(5) {
+  grid-column: 2;
+  grid-row: 4;
+}
+.exits > li:nth-child(6) {
+  grid-column: 1;
+  grid-row: 2 / 4;
 }
 
 .here,
@@ -30,15 +63,7 @@
   object-fit: contain;
   border-radius: var(--radius-preview);
   background: var(--c-surface);
-}
-
-.exits {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--space-2);
-  margin: 0;
-  padding: 0;
-  list-style: none;
+  animation: arrive 280ms var(--ease-out);
 }
 
 .exit {
@@ -71,7 +96,7 @@
 .thumb {
   display: block;
   inline-size: 100%;
-  aspect-ratio: 1;
+  aspect-ratio: 4 / 3;
   object-fit: cover;
 }
 
@@ -135,4 +160,41 @@
   block-size: var(--compact-control-size);
   object-fit: cover;
   border-radius: var(--radius-preview);
+}
+
+@keyframes arrive {
+  from {
+    opacity: 0;
+    transform: translate(var(--wander-x, 0px), var(--wander-y, 12px)) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translate(0, 0) scale(1);
+  }
+}
+@media (max-width: 900px) {
+  .journey {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .here {
+    grid-column: auto;
+    grid-row: auto;
+  }
+  .exits {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--space-2);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .exits > li:nth-child(n) {
+    grid-column: auto;
+    grid-row: auto;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .photo {
+    animation: none;
+  }
 }

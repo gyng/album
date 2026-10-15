@@ -1,5 +1,13 @@
 # Fun improvements queue
 
+## New games — 16 October 2026
+
+- Photo Pairs: lookalikes or shared subjects; classic, one-glimpse and moving
+  card variants; four, six or eight pairs, saved settings and completion stats.
+- Photo Jigsaw: swap, quarter-turn and solvable sliding-tile variants; three
+  board sizes, preview, saved settings and completion stats.
+- Original recurring-cast illustrations for both; see `docs/fun-illustrations.md`.
+
 ## Semantic games and Wander — 14 October 2026
 
 - Warmer and Caption It: ranked against the archive with the in-browser text

@@ -1,5 +1,17 @@
 # Explore cloud
 
+16 October 2026: scene-search feedback and the clear action reserve their
+layout space, so loading and clearing do not move the canvas. Maximum cloud
+zoom increased from approximately ×4.5 to ×12.7 (camera distance floor 0.3).
+Wheel and keyboard controls share that limit; the wheel still returns to page
+scrolling at either boundary.
+
+Wander places its current photograph between six surrounding choices on
+desktop, returning to a photograph above a three-column choice grid at 900px
+and below. Each step translates and fades the incoming photograph from the
+chosen direction over 280ms; reduced motion disables that animation. Back,
+the trail, quests and shared photograph URLs retain their existing behaviour.
+
 The cloud groups topics in the full image embedding space. Its build-time
 projection, contact sheet and payload are described in `AGENTS.md`; visual rules
 live in [the design system](design-system.md#explore).

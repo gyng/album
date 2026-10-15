@@ -62,6 +62,8 @@ export const GlobalNav: React.FC<Props> = ({
   const exploreView =
     currentPage === "explore" || currentPage === "timeline" || currentPage === "trips";
   const funView =
+    currentPage === "photo-pairs" ||
+    currentPage === "photo-jigsaw" ||
     currentPage === "fun" ||
     currentPage === "guess" ||
     currentPage === "relay" ||

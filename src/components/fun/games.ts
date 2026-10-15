@@ -86,9 +86,25 @@ export const FUN_GAMES = [
     illustration: "/fun/caption-it.avif",
     description: "Caption a photograph so well it stands out from the whole archive.",
   },
+  {
+    id: "photo-pairs",
+    href: "/fun/photo-pairs",
+    title: "Photo Pairs",
+    illustration: "/fun/photo-pairs.avif",
+    description: "Remember the photographs. Find the pairs that belong together.",
+  },
+  {
+    id: "photo-jigsaw",
+    href: "/fun/photo-jigsaw",
+    title: "Photo Jigsaw",
+    illustration: "/fun/photo-jigsaw.avif",
+    description: "Piece an archive photograph back together, with a twist.",
+  },
 ] as const;
 
 export type PhotoGameKind =
+  | "photo-pairs"
+  | "photo-jigsaw"
   | "relay"
   | "blind-frame"
   | "oracle"

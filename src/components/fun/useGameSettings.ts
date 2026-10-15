@@ -5,6 +5,8 @@ import type { CaptionBudget, CaptionMode } from "../../util/captionModes";
 import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 
 export type GameSettingsRegistry = {
+  pairs: { mode: "visual" | "semantic"; pairs: 4 | 6 | 8; twist: "classic" | "glimpse" | "moving" };
+  jigsaw: { size: 3 | 4 | 5; mode: "swap" | "rotate" | "slide" };
   cross: { mode: "visible" | "hidden"; prefill: 0 | 1 | 2 | 3 | 4; size: 3 | 4 | 5 };
   connections: {
     size: 4 | 5 | 6;
@@ -24,6 +26,8 @@ export type GameSettingsRegistry = {
 type Game = keyof GameSettingsRegistry;
 
 const defaults: GameSettingsRegistry = {
+  pairs: { mode: "visual", pairs: 6, twist: "classic" },
+  jigsaw: { size: 3, mode: "swap" },
   cross: { mode: "hidden", prefill: 0, size: 3 },
   connections: { size: 4, detail: "broad", hints: true, lives: null },
   sightLines: { size: 5, lineLength: 3 },
@@ -46,6 +50,12 @@ const validators: {
     [K in keyof GameSettingsRegistry[G]]: (value: unknown) => value is GameSettingsRegistry[G][K];
   };
 } = {
+  pairs: {
+    mode: oneOf("visual", "semantic"),
+    pairs: oneOf(4, 6, 8),
+    twist: oneOf("classic", "glimpse", "moving"),
+  },
+  jigsaw: { size: oneOf(3, 4, 5), mode: oneOf("swap", "rotate", "slide") },
   cross: {
     mode: oneOf("visible", "hidden"),
     prefill: oneOf(0, 1, 2, 3, 4),

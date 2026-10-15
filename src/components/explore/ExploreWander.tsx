@@ -37,6 +37,7 @@ export const ExploreWander: React.FC<{
   const [quest, setQuest] = React.useState<WanderQuest | null>(null);
   const currentRef = React.useRef<HTMLAnchorElement>(null);
   const moved = React.useRef(false);
+  const [motion, setMotion] = React.useState({ x: 0, y: 12 });
 
   React.useEffect(() => {
     let cancelled = false;
@@ -80,7 +81,8 @@ export const ExploreWander: React.FC<{
     replaceSearchParams(params);
   }, [here, getSearchParam, searchParams, replaceSearchParams]);
 
-  const go = (next: number[]) => {
+  const go = (next: number[], direction = { x: 0, y: 12 }) => {
+    setMotion(direction);
     moved.current = true;
     setTrail(next);
     currentRef.current?.focus({ preventScroll: true });
@@ -100,22 +102,43 @@ export const ExploreWander: React.FC<{
   const hiddenSteps = trail.length - shown.length;
   return (
     <div className={styles.wander}>
-      <div className={styles.here}>
-        <AppLink href={here.href} className={styles.current} ref={currentRef}>
-          <img src={here.src} alt={here.label} className={styles.photo} />
-        </AppLink>
-        <Caption>{labelOf(here)}</Caption>
-      </div>
-      <div className={styles.side}>
+      <div className={styles.journey}>
+        <div className={styles.here}>
+          <AppLink href={here.href} className={styles.current} ref={currentRef}>
+            <img
+              key={here.src}
+              src={here.src}
+              alt={here.label}
+              className={styles.photo}
+              style={
+                {
+                  "--wander-x": `${motion.x}px`,
+                  "--wander-y": `${motion.y}px`,
+                } as React.CSSProperties
+              }
+            />
+          </AppLink>
+          <Caption>{labelOf(here)}</Caption>
+        </div>
         <ul className={styles.exits} aria-label="Ways on">
-          {exits.map((exit) => {
+          {exits.map((exit, position) => {
             const entry = entries[exit.index]!;
             return (
               <li key={exit.index}>
                 <button
                   type="button"
                   className={styles.exit}
-                  onClick={() => go([...trail, exit.index])}
+                  onClick={() => {
+                    const offsets = [
+                      { x: 0, y: -20 },
+                      { x: 20, y: -12 },
+                      { x: 24, y: 0 },
+                      { x: 16, y: 16 },
+                      { x: -16, y: 16 },
+                      { x: -24, y: 0 },
+                    ];
+                    go([...trail, exit.index], offsets[position]);
+                  }}
                 >
                   <img src={entry.src} alt="" className={styles.thumb} loading="lazy" />
                   <span className={styles.exitLabel}>{readable(exit.label)}</span>
@@ -124,6 +147,8 @@ export const ExploreWander: React.FC<{
             );
           })}
         </ul>
+      </div>
+      <div className={styles.side}>
         <div className={styles.actions}>
           <Button disabled={trail.length < 2} onClick={() => go(trail.slice(0, -1))}>
             Back

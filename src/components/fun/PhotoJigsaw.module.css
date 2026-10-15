@@ -1,0 +1,60 @@
+.game {
+  display: grid;
+  gap: var(--space-4);
+  max-inline-size: 60rem;
+}
+.game p {
+  margin: 0;
+}
+.actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.board {
+  position: relative;
+  display: grid;
+  inline-size: 100%;
+  overflow: hidden;
+  border: var(--line-hairline) solid var(--c-border);
+  border-radius: var(--radius-preview);
+  background: var(--c-surface);
+}
+.tile {
+  position: relative;
+  min-inline-size: 0;
+  min-block-size: 0;
+  padding: 0;
+  border: var(--line-hairline) solid var(--c-bg);
+  overflow: hidden;
+  background: var(--c-bg);
+  cursor: pointer;
+}
+.tile:disabled {
+  cursor: default;
+}
+.tile[aria-pressed="true"] {
+  z-index: var(--z-raised);
+  outline: var(--line-strong) solid var(--c-accent);
+  outline-offset: calc(-1 * var(--line-strong));
+}
+.tile:focus-visible {
+  z-index: var(--z-raised);
+  outline: var(--focus-ring);
+  outline-offset: calc(-1 * var(--space-1));
+}
+.crop {
+  position: absolute;
+  inset: 0;
+  display: block;
+  background-repeat: no-repeat;
+  pointer-events: none;
+}
+.preview {
+  position: absolute;
+  inset: 0;
+  inline-size: 100%;
+  block-size: 100%;
+  object-fit: contain;
+}

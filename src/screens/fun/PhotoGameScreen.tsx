@@ -6,6 +6,8 @@ import { AppLink } from "../../components/platform";
 import { useDatabase, useEmbeddingsDatabase } from "../../components/database/useDatabase";
 import { fetchPhotoGameArchive } from "../../components/search/api";
 import { FUN_GAMES, type PhotoGameKind } from "../../components/fun/games";
+import { PhotoPairs } from "../../components/fun/PhotoPairs";
+import { PhotoJigsaw } from "../../components/fun/PhotoJigsaw";
 import { PhotoRelay } from "../../components/fun/PhotoRelay";
 import { BlindFrame } from "../../components/fun/BlindFrame";
 import { PhotoConnections } from "../../components/fun/PhotoConnections";
@@ -27,6 +29,7 @@ const EMPTY_PHOTOS: PhotoGamePhoto[] = [];
 export const PhotoGameScreen = ({ game }: { game: PhotoGameKind }) => {
   const [database, progress, , databaseError, retryDatabase] = useDatabase();
   const needsVectors =
+    game === "photo-pairs" ||
     game === "relay" ||
     game === "blind-frame" ||
     game === "double-take" ||
@@ -114,6 +117,10 @@ export const PhotoGameScreen = ({ game }: { game: PhotoGameKind }) => {
                 All games
               </AppLink>
             </div>
+          ) : game === "photo-pairs" ? (
+            <PhotoPairs photos={availablePhotos} />
+          ) : game === "photo-jigsaw" ? (
+            <PhotoJigsaw photos={availablePhotos} />
           ) : game === "relay" ? (
             <PhotoRelay photos={availablePhotos} />
           ) : game === "blind-frame" ? (
@@ -162,3 +169,6 @@ export const HindsightScreen = () => <PhotoGameScreen game="hindsight" />;
 export const WarmerScreen = () => <PhotoGameScreen game="warmer" />;
 
 export const CaptionItScreen = () => <PhotoGameScreen game="caption-it" />;
+
+export const PhotoPairsScreen = () => <PhotoGameScreen game="photo-pairs" />;
+export const PhotoJigsawScreen = () => <PhotoGameScreen game="photo-jigsaw" />;

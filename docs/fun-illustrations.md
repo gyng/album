@@ -1,5 +1,59 @@
 # Fun illustrations
 
+## Clarity and negative space refinements — 16 October 2026
+
+- Relay replaces the unreadable tail launcher with a simple handover: pigeon
+  in oversized running shoes passes a photographic baton to penguin with a
+  stopwatch. Subjective review: absurdity 8, humour 8.
+- Oracle restores the earlier sly, half-lidded cat and simpler turban. Cape and
+  tablecloth are unfilled negative space with ink stars, moons and sparse fold
+  lines. Still one open fishbowl, no crystal ball, pedestal or cards.
+- Caption It is now owl alone. One continuous paper strip runs from the quill
+  into the shredder behind/beside the owl. Cat and portrait removed.
+  Subjective review: absurdity 8, humour 8.
+
+Built-in imagegen edits, 960×640 AVIF, quality 85, effort 6, alpha retained at
+the existing `src/public/fun/` URLs. Earlier prompts below are historical.
+
+### Latest correction prompts (verbatim)
+
+#### `photo-relay.avif`
+
+> Use case: illustration-story. Redo Photo Relay as an immediately readable comic handover, replacing the convoluted slingshot scene entirely. TWO live characters only: plump pigeon wearing small cross-body postal satchel and ABSURDLY OVERSIZED LACED RUNNING SHOES, and pear-shaped penguin official in small peaked cap. Side-on dynamic landscape 3:2 vignette. Pigeon on LEFT leans forward in a heroic sprint, one giant running shoe in air, useless wings: one stretches forward passing a SINGLE rectangular photographic print like a relay baton. Penguin on RIGHT reaches one flipper back to receive this same photo, other flipper holds a tiny stopwatch, face sceptical and impatient. Pigeon works absurdly hard running when it could simply fly; tiny wings and enormous shoes make the joke obvious. The handover photo shows a simple mountain and is clearly held between their wing/flipper tips. One shared photo, no strings, slingshots, nests, extra animals, finish lines, arrows or signs. Strong simple silhouette, whole feet and characters visible, generous clear transparent margins. Match referenced animal designs and loose lively BLACK PEN-AND-INK, expressive deadpan faces, sparse cross-hatching, no dense grey engraving. Genuinely TRANSPARENT background, no white backdrop, no opaque fills. No humans or human hands, text, numbers, speech bubbles, signatures or watermark. Aim absurdity 8+ and humour 8+, but prioritise clarity of handover.
+
+#### `photo-oracle.avif`
+
+> Use case: precise-object-edit. Input image 1 is current Photo Oracle EDIT TARGET; image 2 is original STYLE REFERENCE. Keep image 1's single centred ordinary OPEN-TOPPED fishbowl with actual deadpan fish, cat's paws either side of open rim, no crystal ball, no pedestal, no cards, no second bowl. Restore the quieter original cat drawing style from image 2: soft fluffy cheeks, narrow hungry half-lidded eyes, simple jewelled turban WITHOUT new giant plume, expressive original sly face; not large round anime eyes or dense dark fur. Crucial requested change: cape AND tablecloth must be NEGATIVE SPACE. Completely remove all large black filled fabric areas and dense tabletop hatching. Render fabric as genuinely TRANSPARENT UNINKED interiors, outlined by a few graceful black contours and sparse folds, with small BLACK ink stars and crescent moons drawn ON that negative space. NOT white stars cut from a solid black cloak. Tablecloth retains original elegant drape and tasselled edge, with small black moons/stars and plenty of open uninked space. Match original light economical loose pen-and-ink, sparse crosshatching, high clarity at card size. Preserve cat costume, table, centred fishbowl composition. Whole vignette in landscape 3:2 with generous transparent margins. Pure black ink only on genuine transparency, no white paper or white filled fabric, no background wash, no solid dark rectangles. No text, captions, lettering, signatures, logos or watermark.
+
+#### `caption-it.avif`
+
+> Use case: precise-object-edit. Redo this Caption It illustration as OWL ALONE. Remove CAT and cat PORTRAIT completely. Keep established owl with round tufted head, heavy-lidded pompous expression and black bow tie. Owl sits centre-left at a small simple writing desk, solemnly writing with feather quill onto a long continuous PAPER RIBBON. The same paper runs off the far desk edge, curves visibly behind the owl's back, and feeds DIRECTLY into the top slot of a small PAPER SHREDDER positioned BEHIND the owl on the right. Show the shredder fully, with thin strips emerging into its open basket. One uninterrupted paper path from under writing quill into shredder, immediately readable. Owl faces left/down towards writing and is apparently unaware its entire literary output is being destroyed just behind it. No other live animals, no photographs of cats, no framed portraits or extra props beyond quill inkpot desk chair and shredder. Clear side-on two-object silhouette, owl/desk front-left and shredder behind-right. Landscape 3:2 compact centred vignette, whole owl and shredder visible with generous clear margins. Preserve source loose lively black pen-and-ink, expressive face and sparse crosshatching. Background and uninked interiors genuinely TRANSPARENT, no white paper backdrop, no dense grey shadows, no large black filled surfaces. Paper has only a few abstract ink squiggles, NO readable text, letters, numbers, captions, speech bubbles, signatures, logos or watermark. Aim absurdity 8+ and humour 8+ through clear self-defeating scholarly effort.
+
+#### Caption It paper-path correction (verbatim)
+
+> Use case: precise-object-edit. Fix ONLY the PAPER PATH in this Caption It cartoon. Currently there are TWO DISCONNECTED paper ribbons, which is wrong. There must be ONE SINGLE CONTINUOUS paper ribbon from under the owl's writing quill into the shredder. DELETE the entire loose strip hanging down over the FRONT of the desk. From immediately beneath the quill nib, show the written paper lying on the tabletop, then running off the desk's RIGHT-HAND SIDE, then forming one smooth visible curve directly into the shredder slot at right. The connection must be visibly continuous along its full length, with no hidden gap, no second ribbon, no free cut-off end and no strip emerging from owl's back. Move shredder slightly closer to desk if needed to make the continuous diagonal paper path simple and clear. Keep owl alone, exact face bow tie and pose, small desk inkpot chair and shredder with visible strips in basket. Owl keeps writing obliviously. No cat or portrait. Preserve original black pen-and-ink style, sparse crosshatching, 3:2 composition, transparent background and margins. No new props or readable writing.
+
+
+## New game artwork — 16 October 2026
+
+Photo Pairs uses pigeon and owl: the owl cheats by looking through the glass
+table at the face-down cards. Photo Jigsaw uses fox and penguin: fox trims a
+piece with garden shears while the inspector holds the intact reference.
+Both keep one live animal of each species, the established cast, and the
+8+/8+ absurdity/humour target (subjective editorial review). Generated using
+built-in imagegen; saved at `src/public/fun/photo-pairs.avif` and
+`src/public/fun/photo-jigsaw.avif`, 960×640 transparent AVIF, quality 85, effort 6.
+
+### `photo-pairs.avif` prompt (verbatim)
+
+> Use case: illustration-story. Decorative photo matching game card. Original witty black pen-and-ink animal editorial cartoon, expressive deadpan faces, sparse crosshatching, compact landscape 3:2 vignette, generous transparent margins. Black ink on genuine transparent background, no white backdrop. Plump pigeon with small postal satchel proudly plays a memory matching game at a small GLASS-TOPPED table with eight face-down photo cards. Under the transparent tabletop, round tufted owl with small black bow tie crouches on its back looking upwards through the glass at ALL the secret photographic fronts, shamelessly cheating. Owl has self-satisfied scholarly look, pigeon above has unjustified confidence and cannot see the owl below. Show clear glass outline, transparent glass so viewer sees owl, photographic faces visible from underside at oblique angle. Two live animals only, one pigeon and one owl, no additional cast. Whole characters visible, strong above/below silhouette. Joke is scholarly cheating at concentration through a transparent table. No text, numbers, signatures, speech bubbles, logos or borders. Target at least 8/10 for absurdity and humour.
+
+### `photo-jigsaw.avif` prompt (verbatim)
+
+> Use case: illustration-story. Decorative photographic jigsaw game card. Original witty black pen-and-ink animal editorial cartoon, expressive deadpan faces, sparse crosshatching, compact landscape 3:2 vignette, generous transparent margins. Black ink on genuine transparent background, no white backdrop. Cunning fox with pointed ears dark forepaws huge white-tipped bushy tail confidently trims an obviously oversized photographic jigsaw piece with comically huge garden shears so it will fit a tiny remaining gap in a nearly assembled mountain photo puzzle. Offcuts fly onto floor. Fox smugly certain it solved the problem. Beside it, pear-shaped penguin inspector with tiny peaked official cap looks utterly horrified, holding up the intact reference photograph of the mountain. The fox is chopping off the mountain peak to fit. One fox and one penguin only. Clear huge shears, one photo puzzle with visibly wrong-size piece, minimal props, whole animals visible. Joke is destructive brute-force cheating. No humans or human hands, text, numbers, signatures, speech bubbles, logos or borders. Target at least 8/10 for absurdity and humour.
+
+
+
 ## Caption It: vanity as censorship — 16 October 2026
 
 Replaced the crowned-worm scene with the approved censoring-cat concept.
@@ -125,13 +179,13 @@ visual judgements at card size, not measured user ratings.
 | Cross Exposure | 8 | 9 | Fox treats chicken classification as a menu |
 | Sight Lines | 10 | 9 | Pigeon manufactures a peacock tail from self-portraits |
 | Photo Hangman | 8 | 9 | Pigeon supplies close-up clues of itself to the baffled owl |
-| Photo Relay | 9 | 9 | Pigeon rides the fox’s tail as owl aims a photographic delivery |
+| Photo Relay | 8 | 8 | Pigeon runs a photographic baton to penguin in enormous shoes |
 | Blind Frame | 9 | 9 | Owl flatters pigeon with a ridiculously muscular heroic portrait |
 | Photo Oracle | 9 | 8 | Costumed cat divines the future directly in an ordinary open fishbowl |
 | Double Take | 9 | 8 | Penguin compares a pigeon passport with its transparently disguised owner |
 | Hindsight | 8 | 9 | Solo fox hides the evidence while reordering photographs, sausage still in its mouth |
 | Warmer | 9 | 9 | Pigeon redirects its predator with a photograph of tastier prey |
-| Caption It | 8 | 9 | Cat shreds its own caption as fast as owl writes it |
+| Caption It | 8 | 8 | Owl’s writing feeds directly into its own shredder |
 
 ### First cast prompts (historical; see latest production prompts above)
 
@@ -253,7 +307,7 @@ start screens continue to share the existing URLs.
 ## Current direction — animal editorial cartoons
 
 Updated 13 October 2026 with the built-in imagegen tool, one generation per
-asset, with `transparent_background: true`. All twelve game illustrations use
+asset, with `transparent_background: true`. All fourteen game illustrations use
 animal mascots and visual humour: deadpan expressions, misplaced confidence
 and absurd situations. No humans or human body parts, including in the small
 photographs. Keep future artwork original, with no artist signatures or
