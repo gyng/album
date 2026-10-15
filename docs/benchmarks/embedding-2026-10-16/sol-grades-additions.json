@@ -1,0 +1,23 @@
+{
+  "judge": "gpt-6.1-sol",
+  "grades": {
+    "T12": {
+      "P1071": {
+        "grade": 1,
+        "reason": "A city street is visible at night, but rain and road reflections are not apparent."
+      }
+    },
+    "T16": {
+      "P0931": {
+        "grade": 3,
+        "reason": "Japanese writing is clearly visible on the shopfront sign."
+      }
+    },
+    "T21": {
+      "P0294": {
+        "grade": 0,
+        "reason": "Sky reflects on a vehicle beside water, without reflections on a rain-wet street."
+      }
+    }
+  }
+}

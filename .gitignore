@@ -28,3 +28,6 @@ lens-tagging.log
 
 # Local database backups written by src/bin/backup-publish-assets.cjs.
 /backups/
+
+# Downloaded models, isolated runtimes and raw embedding benchmark artefacts.
+/.cache/embedding-benchmark/

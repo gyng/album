@@ -1,0 +1,3185 @@
+{
+  "queries": [
+    {
+      "id": "T01",
+      "category": "subject",
+      "text": "a cat resting outdoors"
+    },
+    {
+      "id": "T02",
+      "category": "subject",
+      "text": "a small bird perched on a branch"
+    },
+    {
+      "id": "T03",
+      "category": "detail",
+      "text": "a tiny insect sitting on a leaf"
+    },
+    {
+      "id": "T06",
+      "category": "scene",
+      "text": "a snowy street at night"
+    },
+    {
+      "id": "T09",
+      "category": "composition",
+      "text": "mountains reflected in still water"
+    },
+    {
+      "id": "T11",
+      "category": "atmosphere",
+      "text": "a quiet forest with sunlight filtering through the trees"
+    },
+    {
+      "id": "T12",
+      "category": "atmosphere",
+      "text": "a rainy city street with reflections on the road"
+    },
+    {
+      "id": "T16",
+      "category": "detail",
+      "text": "Japanese writing on a shop sign"
+    },
+    {
+      "id": "T19",
+      "category": "multilingual",
+      "language": "ja",
+      "text": "夜の雪道",
+      "meaning": "a snowy road at night"
+    },
+    {
+      "id": "T21",
+      "category": "multilingual",
+      "language": "zh",
+      "text": "雨后街道上的倒影",
+      "meaning": "reflections on a street after rain"
+    },
+    {
+      "id": "T23",
+      "category": "multilingual",
+      "language": "fr",
+      "text": "un chat qui se repose dehors",
+      "meaning": "a cat resting outdoors"
+    },
+    {
+      "id": "T24",
+      "category": "multilingual",
+      "language": "es",
+      "text": "olas rompiendo contra una costa rocosa",
+      "meaning": "waves crashing against a rocky coast"
+    },
+    {
+      "id": "I01",
+      "category": "image",
+      "reference_index": 334,
+      "reference_path": "../albums/2502japan/DSCF0824.jpg",
+      "selection_query": "T01"
+    },
+    {
+      "id": "I03",
+      "category": "image",
+      "reference_index": 1024,
+      "reference_path": "../albums/melbourne/DSCF0106-2.jpg",
+      "selection_query": "T10"
+    },
+    {
+      "id": "I05",
+      "category": "image",
+      "reference_index": 754,
+      "reference_path": "../albums/hokkaido/DSCF6691.JPG",
+      "selection_query": "T15"
+    }
+  ],
+  "results": {
+    "T01": {
+      "siglip1-current-q4": [
+        {
+          "index": 144,
+          "path": "../albums/2411japan/DSCF8298.JPG",
+          "score": 0.11786982417106628
+        },
+        {
+          "index": 1237,
+          "path": "../albums/snapshots/DSCF3018.JPG",
+          "score": 0.11562000215053558
+        },
+        {
+          "index": 334,
+          "path": "../albums/2502japan/DSCF0824.jpg",
+          "score": 0.11346536874771118
+        }
+      ],
+      "siglip1-fp32": [
+        {
+          "index": 1237,
+          "path": "../albums/snapshots/DSCF3018.JPG",
+          "score": 0.11630181223154068
+        },
+        {
+          "index": 144,
+          "path": "../albums/2411japan/DSCF8298.JPG",
+          "score": 0.11282307654619217
+        },
+        {
+          "index": 334,
+          "path": "../albums/2502japan/DSCF0824.jpg",
+          "score": 0.11236104369163513
+        }
+      ],
+      "siglip2-fp32": [
+        {
+          "index": 334,
+          "path": "../albums/2502japan/DSCF0824.jpg",
+          "score": 0.14530342817306519
+        },
+        {
+          "index": 1207,
+          "path": "../albums/snapshots/DSCF2464.JPG",
+          "score": 0.14429569244384766
+        },
+        {
+          "index": 1237,
+          "path": "../albums/snapshots/DSCF3018.JPG",
+          "score": 0.14425842463970184
+        }
+      ],
+      "gemma-bf16": [
+        {
+          "index": 338,
+          "path": "../albums/2502japan/DSCF0939.jpg",
+          "score": 0.7755360007286072
+        },
+        {
+          "index": 334,
+          "path": "../albums/2502japan/DSCF0824.jpg",
+          "score": 0.767352283000946
+        },
+        {
+          "index": 321,
+          "path": "../albums/24okinawa-taipei/DSCF2731.JPG",
+          "score": 0.7606691122055054
+        }
+      ],
+      "gemma-onnx-q4": [
+        {
+          "index": 338,
+          "path": "../albums/2502japan/DSCF0939.jpg",
+          "score": 0.7776395082473755
+        },
+        {
+          "index": 334,
+          "path": "../albums/2502japan/DSCF0824.jpg",
+          "score": 0.7674532532691956
+        },
+        {
+          "index": 321,
+          "path": "../albums/24okinawa-taipei/DSCF2731.JPG",
+          "score": 0.7659962177276611
+        }
+      ],
+      "gemma-onnx-q8": [
+        {
+          "index": 338,
+          "path": "../albums/2502japan/DSCF0939.jpg",
+          "score": 0.7755327224731445
+        },
+        {
+          "index": 334,
+          "path": "../albums/2502japan/DSCF0824.jpg",
+          "score": 0.7670323848724365
+        },
+        {
+          "index": 321,
+          "path": "../albums/24okinawa-taipei/DSCF2731.JPG",
+          "score": 0.7602235078811646
+        }
+      ],
+      "gemma-unsloth-q4": [
+        {
+          "index": 338,
+          "path": "../albums/2502japan/DSCF0939.jpg",
+          "score": 0.7723957300186157
+        },
+        {
+          "index": 334,
+          "path": "../albums/2502japan/DSCF0824.jpg",
+          "score": 0.7645996809005737
+        },
+        {
+          "index": 321,
+          "path": "../albums/24okinawa-taipei/DSCF2731.JPG",
+          "score": 0.7600302696228027
+        }
+      ],
+      "gemma-unsloth-q8": [
+        {
+          "index": 338,
+          "path": "../albums/2502japan/DSCF0939.jpg",
+          "score": 0.77495276927948
+        },
+        {
+          "index": 334,
+          "path": "../albums/2502japan/DSCF0824.jpg",
+          "score": 0.7666041851043701
+        },
+        {
+          "index": 321,
+          "path": "../albums/24okinawa-taipei/DSCF2731.JPG",
+          "score": 0.7600661516189575
+        }
+      ],
+      "gemma-256d": [
+        {
+          "index": 338,
+          "path": "../albums/2502japan/DSCF0939.jpg",
+          "score": 0.8056507706642151
+        },
+        {
+          "index": 334,
+          "path": "../albums/2502japan/DSCF0824.jpg",
+          "score": 0.7993654012680054
+        },
+        {
+          "index": 321,
+          "path": "../albums/24okinawa-taipei/DSCF2731.JPG",
+          "score": 0.7982759475708008
+        }
+      ],
+      "gemma-int8-storage-q4": [
+        {
+          "index": 338,
+          "path": "../albums/2502japan/DSCF0939.jpg",
+          "score": 0.7777137160301208
+        },
+        {
+          "index": 334,
+          "path": "../albums/2502japan/DSCF0824.jpg",
+          "score": 0.7670697569847107
+        },
+        {
+          "index": 321,
+          "path": "../albums/24okinawa-taipei/DSCF2731.JPG",
+          "score": 0.766455888748169
+        }
+      ],
+      "gemma-caption-bf16": [
+        {
+          "index": 338,
+          "path": "../albums/2502japan/DSCF0939.jpg",
+          "score": 0.8199265599250793
+        },
+        {
+          "index": 1203,
+          "path": "../albums/snapshots/DSCF2437.JPG",
+          "score": 0.8188754320144653
+        },
+        {
+          "index": 334,
+          "path": "../albums/2502japan/DSCF0824.jpg",
+          "score": 0.8183900117874146
+        }
+      ],
+      "gemma-caption-onnx-q4": [
+        {
+          "index": 1203,
+          "path": "../albums/snapshots/DSCF2437.JPG",
+          "score": 0.8247824907302856
+        },
+        {
+          "index": 338,
+          "path": "../albums/2502japan/DSCF0939.jpg",
+          "score": 0.8230005502700806
+        },
+        {
+          "index": 321,
+          "path": "../albums/24okinawa-taipei/DSCF2731.JPG",
+          "score": 0.8209819197654724
+        }
+      ],
+      "gemma-caption-unsloth-q4": [
+        {
+          "index": 1203,
+          "path": "../albums/snapshots/DSCF2437.JPG",
+          "score": 0.8176957368850708
+        },
+        {
+          "index": 338,
+          "path": "../albums/2502japan/DSCF0939.jpg",
+          "score": 0.8173474073410034
+        },
+        {
+          "index": 334,
+          "path": "../albums/2502japan/DSCF0824.jpg",
+          "score": 0.8173206448554993
+        }
+      ],
+      "gemma-onnx-q4f16": [
+        {
+          "index": 338,
+          "path": "../albums/2502japan/DSCF0939.jpg",
+          "score": 0.7775325179100037
+        },
+        {
+          "index": 334,
+          "path": "../albums/2502japan/DSCF0824.jpg",
+          "score": 0.7674007415771484
+        },
+        {
+          "index": 321,
+          "path": "../albums/24okinawa-taipei/DSCF2731.JPG",
+          "score": 0.765966534614563
+        }
+      ]
+    },
+    "T02": {
+      "siglip1-current-q4": [
+        {
+          "index": 1107,
+          "path": "../albums/sg-parks/DSCF3125_2.jpg",
+          "score": 0.09689230471849442
+        },
+        {
+          "index": 162,
+          "path": "../albums/2411japan/DSCF8715_1.jpg",
+          "score": 0.08771099150180817
+        },
+        {
+          "index": 213,
+          "path": "../albums/24japan/PXL_20240223_011325877.jpg",
+          "score": 0.08355971425771713
+        }
+      ],
+      "siglip1-fp32": [
+        {
+          "index": 1107,
+          "path": "../albums/sg-parks/DSCF3125_2.jpg",
+          "score": 0.09682196378707886
+        },
+        {
+          "index": 1000,
+          "path": "../albums/kanto/PXL_20221113_032430297.jpg",
+          "score": 0.08662162721157074
+        },
+        {
+          "index": 1112,
+          "path": "../albums/sg-parks/DSCF4356-1.JPG",
+          "score": 0.08390109986066818
+        }
+      ],
+      "siglip2-fp32": [
+        {
+          "index": 1107,
+          "path": "../albums/sg-parks/DSCF3125_2.jpg",
+          "score": 0.13594329357147217
+        },
+        {
+          "index": 162,
+          "path": "../albums/2411japan/DSCF8715_1.jpg",
+          "score": 0.12463673949241638
+        },
+        {
+          "index": 1119,
+          "path": "../albums/sg-parks/DSCF4545.JPG",
+          "score": 0.11508706212043762
+        }
+      ],
+      "gemma-bf16": [
+        {
+          "index": 162,
+          "path": "../albums/2411japan/DSCF8715_1.jpg",
+          "score": 0.7574499845504761
+        },
+        {
+          "index": 1107,
+          "path": "../albums/sg-parks/DSCF3125_2.jpg",
+          "score": 0.7565332651138306
+        },
+        {
+          "index": 1106,
+          "path": "../albums/sg-parks/DSCF3102.JPG",
+          "score": 0.7142266631126404
+        }
+      ],
+      "gemma-onnx-q4": [
+        {
+          "index": 162,
+          "path": "../albums/2411japan/DSCF8715_1.jpg",
+          "score": 0.7548458576202393
+        },
+        {
+          "index": 1107,
+          "path": "../albums/sg-parks/DSCF3125_2.jpg",
+          "score": 0.7530817985534668
+        },
+        {
+          "index": 1106,
+          "path": "../albums/sg-parks/DSCF3102.JPG",
+          "score": 0.7101420164108276
+        }
+      ],
+      "gemma-onnx-q8": [
+        {
+          "index": 162,
+          "path": "../albums/2411japan/DSCF8715_1.jpg",
+          "score": 0.758001983165741
+        },
+        {
+          "index": 1107,
+          "path": "../albums/sg-parks/DSCF3125_2.jpg",
+          "score": 0.7573850154876709
+        },
+        {
+          "index": 1106,
+          "path": "../albums/sg-parks/DSCF3102.JPG",
+          "score": 0.7153139114379883
+        }
+      ],
+      "gemma-unsloth-q4": [
+        {
+          "index": 1107,
+          "path": "../albums/sg-parks/DSCF3125_2.jpg",
+          "score": 0.7555299997329712
+        },
+        {
+          "index": 162,
+          "path": "../albums/2411japan/DSCF8715_1.jpg",
+          "score": 0.7548327445983887
+        },
+        {
+          "index": 1106,
+          "path": "../albums/sg-parks/DSCF3102.JPG",
+          "score": 0.7135770320892334
+        }
+      ],
+      "gemma-unsloth-q8": [
+        {
+          "index": 162,
+          "path": "../albums/2411japan/DSCF8715_1.jpg",
+          "score": 0.757872462272644
+        },
+        {
+          "index": 1107,
+          "path": "../albums/sg-parks/DSCF3125_2.jpg",
+          "score": 0.7577530145645142
+        },
+        {
+          "index": 1106,
+          "path": "../albums/sg-parks/DSCF3102.JPG",
+          "score": 0.7147677540779114
+        }
+      ],
+      "gemma-256d": [
+        {
+          "index": 162,
+          "path": "../albums/2411japan/DSCF8715_1.jpg",
+          "score": 0.7874225378036499
+        },
+        {
+          "index": 1107,
+          "path": "../albums/sg-parks/DSCF3125_2.jpg",
+          "score": 0.7707788944244385
+        },
+        {
+          "index": 1106,
+          "path": "../albums/sg-parks/DSCF3102.JPG",
+          "score": 0.7395794987678528
+        }
+      ],
+      "gemma-int8-storage-q4": [
+        {
+          "index": 162,
+          "path": "../albums/2411japan/DSCF8715_1.jpg",
+          "score": 0.7541691064834595
+        },
+        {
+          "index": 1107,
+          "path": "../albums/sg-parks/DSCF3125_2.jpg",
+          "score": 0.752304196357727
+        },
+        {
+          "index": 1106,
+          "path": "../albums/sg-parks/DSCF3102.JPG",
+          "score": 0.7100776433944702
+        }
+      ],
+      "gemma-caption-bf16": [
+        {
+          "index": 1107,
+          "path": "../albums/sg-parks/DSCF3125_2.jpg",
+          "score": 0.7747112512588501
+        },
+        {
+          "index": 162,
+          "path": "../albums/2411japan/DSCF8715_1.jpg",
+          "score": 0.7673681974411011
+        },
+        {
+          "index": 213,
+          "path": "../albums/24japan/PXL_20240223_011325877.jpg",
+          "score": 0.7503498792648315
+        }
+      ],
+      "gemma-caption-onnx-q4": [
+        {
+          "index": 1107,
+          "path": "../albums/sg-parks/DSCF3125_2.jpg",
+          "score": 0.7703513503074646
+        },
+        {
+          "index": 162,
+          "path": "../albums/2411japan/DSCF8715_1.jpg",
+          "score": 0.762143611907959
+        },
+        {
+          "index": 1119,
+          "path": "../albums/sg-parks/DSCF4545.JPG",
+          "score": 0.7453120946884155
+        }
+      ],
+      "gemma-caption-unsloth-q4": [
+        {
+          "index": 1107,
+          "path": "../albums/sg-parks/DSCF3125_2.jpg",
+          "score": 0.7737845182418823
+        },
+        {
+          "index": 162,
+          "path": "../albums/2411japan/DSCF8715_1.jpg",
+          "score": 0.7656203508377075
+        },
+        {
+          "index": 1119,
+          "path": "../albums/sg-parks/DSCF4545.JPG",
+          "score": 0.7507835626602173
+        }
+      ],
+      "gemma-onnx-q4f16": [
+        {
+          "index": 162,
+          "path": "../albums/2411japan/DSCF8715_1.jpg",
+          "score": 0.7550226449966431
+        },
+        {
+          "index": 1107,
+          "path": "../albums/sg-parks/DSCF3125_2.jpg",
+          "score": 0.7532563209533691
+        },
+        {
+          "index": 1106,
+          "path": "../albums/sg-parks/DSCF3102.JPG",
+          "score": 0.7102106809616089
+        }
+      ]
+    },
+    "T03": {
+      "siglip1-current-q4": [
+        {
+          "index": 1088,
+          "path": "../albums/sg-parks/DSCF0423.JPG",
+          "score": 0.10836543142795563
+        },
+        {
+          "index": 1118,
+          "path": "../albums/sg-parks/DSCF4500.JPG",
+          "score": 0.10608093440532684
+        },
+        {
+          "index": 1103,
+          "path": "../albums/sg-parks/DSCF3028_1.jpg",
+          "score": 0.07618723064661026
+        }
+      ],
+      "siglip1-fp32": [
+        {
+          "index": 1088,
+          "path": "../albums/sg-parks/DSCF0423.JPG",
+          "score": 0.10939926654100418
+        },
+        {
+          "index": 1118,
+          "path": "../albums/sg-parks/DSCF4500.JPG",
+          "score": 0.10914014279842377
+        },
+        {
+          "index": 1103,
+          "path": "../albums/sg-parks/DSCF3028_1.jpg",
+          "score": 0.07969392836093903
+        }
+      ],
+      "siglip2-fp32": [
+        {
+          "index": 1118,
+          "path": "../albums/sg-parks/DSCF4500.JPG",
+          "score": 0.16462844610214233
+        },
+        {
+          "index": 1088,
+          "path": "../albums/sg-parks/DSCF0423.JPG",
+          "score": 0.13655582070350647
+        },
+        {
+          "index": 1091,
+          "path": "../albums/sg-parks/DSCF0502.JPG",
+          "score": 0.11082859337329865
+        }
+      ],
+      "gemma-bf16": [
+        {
+          "index": 1118,
+          "path": "../albums/sg-parks/DSCF4500.JPG",
+          "score": 0.7617241144180298
+        },
+        {
+          "index": 1088,
+          "path": "../albums/sg-parks/DSCF0423.JPG",
+          "score": 0.7445666790008545
+        },
+        {
+          "index": 1091,
+          "path": "../albums/sg-parks/DSCF0502.JPG",
+          "score": 0.7364501953125
+        }
+      ],
+      "gemma-onnx-q4": [
+        {
+          "index": 1118,
+          "path": "../albums/sg-parks/DSCF4500.JPG",
+          "score": 0.7607799172401428
+        },
+        {
+          "index": 1088,
+          "path": "../albums/sg-parks/DSCF0423.JPG",
+          "score": 0.7408658862113953
+        },
+        {
+          "index": 1091,
+          "path": "../albums/sg-parks/DSCF0502.JPG",
+          "score": 0.7326397895812988
+        }
+      ],
+      "gemma-onnx-q8": [
+        {
+          "index": 1118,
+          "path": "../albums/sg-parks/DSCF4500.JPG",
+          "score": 0.7620344758033752
+        },
+        {
+          "index": 1088,
+          "path": "../albums/sg-parks/DSCF0423.JPG",
+          "score": 0.7447530031204224
+        },
+        {
+          "index": 1091,
+          "path": "../albums/sg-parks/DSCF0502.JPG",
+          "score": 0.7363977432250977
+        }
+      ],
+      "gemma-unsloth-q4": [
+        {
+          "index": 1118,
+          "path": "../albums/sg-parks/DSCF4500.JPG",
+          "score": 0.7626458406448364
+        },
+        {
+          "index": 1088,
+          "path": "../albums/sg-parks/DSCF0423.JPG",
+          "score": 0.7468522787094116
+        },
+        {
+          "index": 1091,
+          "path": "../albums/sg-parks/DSCF0502.JPG",
+          "score": 0.73726487159729
+        }
+      ],
+      "gemma-unsloth-q8": [
+        {
+          "index": 1118,
+          "path": "../albums/sg-parks/DSCF4500.JPG",
+          "score": 0.7625443935394287
+        },
+        {
+          "index": 1088,
+          "path": "../albums/sg-parks/DSCF0423.JPG",
+          "score": 0.7450510263442993
+        },
+        {
+          "index": 1091,
+          "path": "../albums/sg-parks/DSCF0502.JPG",
+          "score": 0.737215518951416
+        }
+      ],
+      "gemma-256d": [
+        {
+          "index": 1088,
+          "path": "../albums/sg-parks/DSCF0423.JPG",
+          "score": 0.7782779932022095
+        },
+        {
+          "index": 1118,
+          "path": "../albums/sg-parks/DSCF4500.JPG",
+          "score": 0.7717736959457397
+        },
+        {
+          "index": 1091,
+          "path": "../albums/sg-parks/DSCF0502.JPG",
+          "score": 0.756606936454773
+        }
+      ],
+      "gemma-int8-storage-q4": [
+        {
+          "index": 1118,
+          "path": "../albums/sg-parks/DSCF4500.JPG",
+          "score": 0.7606934309005737
+        },
+        {
+          "index": 1088,
+          "path": "../albums/sg-parks/DSCF0423.JPG",
+          "score": 0.7407341599464417
+        },
+        {
+          "index": 1091,
+          "path": "../albums/sg-parks/DSCF0502.JPG",
+          "score": 0.7330734133720398
+        }
+      ],
+      "gemma-caption-bf16": [
+        {
+          "index": 1118,
+          "path": "../albums/sg-parks/DSCF4500.JPG",
+          "score": 0.8038302659988403
+        },
+        {
+          "index": 1091,
+          "path": "../albums/sg-parks/DSCF0502.JPG",
+          "score": 0.7763925194740295
+        },
+        {
+          "index": 1088,
+          "path": "../albums/sg-parks/DSCF0423.JPG",
+          "score": 0.7669012546539307
+        }
+      ],
+      "gemma-caption-onnx-q4": [
+        {
+          "index": 1118,
+          "path": "../albums/sg-parks/DSCF4500.JPG",
+          "score": 0.8040732145309448
+        },
+        {
+          "index": 1091,
+          "path": "../albums/sg-parks/DSCF0502.JPG",
+          "score": 0.7745789289474487
+        },
+        {
+          "index": 1088,
+          "path": "../albums/sg-parks/DSCF0423.JPG",
+          "score": 0.7649474143981934
+        }
+      ],
+      "gemma-caption-unsloth-q4": [
+        {
+          "index": 1118,
+          "path": "../albums/sg-parks/DSCF4500.JPG",
+          "score": 0.8048788905143738
+        },
+        {
+          "index": 1091,
+          "path": "../albums/sg-parks/DSCF0502.JPG",
+          "score": 0.7762776613235474
+        },
+        {
+          "index": 1088,
+          "path": "../albums/sg-parks/DSCF0423.JPG",
+          "score": 0.7677755951881409
+        }
+      ],
+      "gemma-onnx-q4f16": [
+        {
+          "index": 1118,
+          "path": "../albums/sg-parks/DSCF4500.JPG",
+          "score": 0.7608150243759155
+        },
+        {
+          "index": 1088,
+          "path": "../albums/sg-parks/DSCF0423.JPG",
+          "score": 0.7407296895980835
+        },
+        {
+          "index": 1091,
+          "path": "../albums/sg-parks/DSCF0502.JPG",
+          "score": 0.7324425578117371
+        }
+      ]
+    },
+    "T06": {
+      "siglip1-current-q4": [
+        {
+          "index": 689,
+          "path": "../albums/hokkaido/DSCF1455.JPG",
+          "score": 0.13733792304992676
+        },
+        {
+          "index": 687,
+          "path": "../albums/hokkaido/DSCF1442-2.jpg",
+          "score": 0.11967231333255768
+        },
+        {
+          "index": 688,
+          "path": "../albums/hokkaido/DSCF1449-2.jpg",
+          "score": 0.10718041658401489
+        }
+      ],
+      "siglip1-fp32": [
+        {
+          "index": 689,
+          "path": "../albums/hokkaido/DSCF1455.JPG",
+          "score": 0.13647417724132538
+        },
+        {
+          "index": 687,
+          "path": "../albums/hokkaido/DSCF1442-2.jpg",
+          "score": 0.1181158572435379
+        },
+        {
+          "index": 688,
+          "path": "../albums/hokkaido/DSCF1449-2.jpg",
+          "score": 0.10900197923183441
+        }
+      ],
+      "siglip2-fp32": [
+        {
+          "index": 689,
+          "path": "../albums/hokkaido/DSCF1455.JPG",
+          "score": 0.16827194392681122
+        },
+        {
+          "index": 687,
+          "path": "../albums/hokkaido/DSCF1442-2.jpg",
+          "score": 0.1628149449825287
+        },
+        {
+          "index": 731,
+          "path": "../albums/hokkaido/DSCF2248.JPG",
+          "score": 0.14720292389392853
+        }
+      ],
+      "gemma-bf16": [
+        {
+          "index": 689,
+          "path": "../albums/hokkaido/DSCF1455.JPG",
+          "score": 0.7503963112831116
+        },
+        {
+          "index": 687,
+          "path": "../albums/hokkaido/DSCF1442-2.jpg",
+          "score": 0.7470241785049438
+        },
+        {
+          "index": 731,
+          "path": "../albums/hokkaido/DSCF2248.JPG",
+          "score": 0.7223735451698303
+        }
+      ],
+      "gemma-onnx-q4": [
+        {
+          "index": 689,
+          "path": "../albums/hokkaido/DSCF1455.JPG",
+          "score": 0.748731255531311
+        },
+        {
+          "index": 687,
+          "path": "../albums/hokkaido/DSCF1442-2.jpg",
+          "score": 0.7440375089645386
+        },
+        {
+          "index": 731,
+          "path": "../albums/hokkaido/DSCF2248.JPG",
+          "score": 0.7198609113693237
+        }
+      ],
+      "gemma-onnx-q8": [
+        {
+          "index": 689,
+          "path": "../albums/hokkaido/DSCF1455.JPG",
+          "score": 0.750717282295227
+        },
+        {
+          "index": 687,
+          "path": "../albums/hokkaido/DSCF1442-2.jpg",
+          "score": 0.7472137212753296
+        },
+        {
+          "index": 731,
+          "path": "../albums/hokkaido/DSCF2248.JPG",
+          "score": 0.722554087638855
+        }
+      ],
+      "gemma-unsloth-q4": [
+        {
+          "index": 689,
+          "path": "../albums/hokkaido/DSCF1455.JPG",
+          "score": 0.750170111656189
+        },
+        {
+          "index": 687,
+          "path": "../albums/hokkaido/DSCF1442-2.jpg",
+          "score": 0.746371865272522
+        },
+        {
+          "index": 731,
+          "path": "../albums/hokkaido/DSCF2248.JPG",
+          "score": 0.7199326753616333
+        }
+      ],
+      "gemma-unsloth-q8": [
+        {
+          "index": 689,
+          "path": "../albums/hokkaido/DSCF1455.JPG",
+          "score": 0.750635027885437
+        },
+        {
+          "index": 687,
+          "path": "../albums/hokkaido/DSCF1442-2.jpg",
+          "score": 0.746919572353363
+        },
+        {
+          "index": 731,
+          "path": "../albums/hokkaido/DSCF2248.JPG",
+          "score": 0.7220075726509094
+        }
+      ],
+      "gemma-256d": [
+        {
+          "index": 689,
+          "path": "../albums/hokkaido/DSCF1455.JPG",
+          "score": 0.7868329286575317
+        },
+        {
+          "index": 687,
+          "path": "../albums/hokkaido/DSCF1442-2.jpg",
+          "score": 0.7786264419555664
+        },
+        {
+          "index": 731,
+          "path": "../albums/hokkaido/DSCF2248.JPG",
+          "score": 0.7628607153892517
+        }
+      ],
+      "gemma-int8-storage-q4": [
+        {
+          "index": 689,
+          "path": "../albums/hokkaido/DSCF1455.JPG",
+          "score": 0.74839186668396
+        },
+        {
+          "index": 687,
+          "path": "../albums/hokkaido/DSCF1442-2.jpg",
+          "score": 0.7444202899932861
+        },
+        {
+          "index": 731,
+          "path": "../albums/hokkaido/DSCF2248.JPG",
+          "score": 0.7196998596191406
+        }
+      ],
+      "gemma-caption-bf16": [
+        {
+          "index": 687,
+          "path": "../albums/hokkaido/DSCF1442-2.jpg",
+          "score": 0.8097354173660278
+        },
+        {
+          "index": 689,
+          "path": "../albums/hokkaido/DSCF1455.JPG",
+          "score": 0.8006388545036316
+        },
+        {
+          "index": 731,
+          "path": "../albums/hokkaido/DSCF2248.JPG",
+          "score": 0.7859288454055786
+        }
+      ],
+      "gemma-caption-onnx-q4": [
+        {
+          "index": 687,
+          "path": "../albums/hokkaido/DSCF1442-2.jpg",
+          "score": 0.8042754530906677
+        },
+        {
+          "index": 689,
+          "path": "../albums/hokkaido/DSCF1455.JPG",
+          "score": 0.797609269618988
+        },
+        {
+          "index": 731,
+          "path": "../albums/hokkaido/DSCF2248.JPG",
+          "score": 0.777694821357727
+        }
+      ],
+      "gemma-caption-unsloth-q4": [
+        {
+          "index": 687,
+          "path": "../albums/hokkaido/DSCF1442-2.jpg",
+          "score": 0.8051128387451172
+        },
+        {
+          "index": 689,
+          "path": "../albums/hokkaido/DSCF1455.JPG",
+          "score": 0.7959023714065552
+        },
+        {
+          "index": 731,
+          "path": "../albums/hokkaido/DSCF2248.JPG",
+          "score": 0.7803406119346619
+        }
+      ],
+      "gemma-onnx-q4f16": [
+        {
+          "index": 689,
+          "path": "../albums/hokkaido/DSCF1455.JPG",
+          "score": 0.7488515377044678
+        },
+        {
+          "index": 687,
+          "path": "../albums/hokkaido/DSCF1442-2.jpg",
+          "score": 0.7441893815994263
+        },
+        {
+          "index": 731,
+          "path": "../albums/hokkaido/DSCF2248.JPG",
+          "score": 0.7198960781097412
+        }
+      ]
+    },
+    "T09": {
+      "siglip1-current-q4": [
+        {
+          "index": 847,
+          "path": "../albums/kansai/DSCF2951-2.jpg",
+          "score": 0.10523081570863724
+        },
+        {
+          "index": 936,
+          "path": "../albums/kansai/IMG_20161125_135448.jpg",
+          "score": 0.09507670998573303
+        },
+        {
+          "index": 751,
+          "path": "../albums/hokkaido/DSCF6483-2.jpg",
+          "score": 0.09293779730796814
+        }
+      ],
+      "siglip1-fp32": [
+        {
+          "index": 847,
+          "path": "../albums/kansai/DSCF2951-2.jpg",
+          "score": 0.104383185505867
+        },
+        {
+          "index": 751,
+          "path": "../albums/hokkaido/DSCF6483-2.jpg",
+          "score": 0.09290722012519836
+        },
+        {
+          "index": 936,
+          "path": "../albums/kansai/IMG_20161125_135448.jpg",
+          "score": 0.0928003266453743
+        }
+      ],
+      "siglip2-fp32": [
+        {
+          "index": 607,
+          "path": "../albums/chuugoku/DSCF0520.jpg",
+          "score": 0.13386933505535126
+        },
+        {
+          "index": 751,
+          "path": "../albums/hokkaido/DSCF6483-2.jpg",
+          "score": 0.12381702661514282
+        },
+        {
+          "index": 748,
+          "path": "../albums/hokkaido/DSCF6345.JPG",
+          "score": 0.11094386875629425
+        }
+      ],
+      "gemma-bf16": [
+        {
+          "index": 847,
+          "path": "../albums/kansai/DSCF2951-2.jpg",
+          "score": 0.7430387735366821
+        },
+        {
+          "index": 751,
+          "path": "../albums/hokkaido/DSCF6483-2.jpg",
+          "score": 0.7319114208221436
+        },
+        {
+          "index": 607,
+          "path": "../albums/chuugoku/DSCF0520.jpg",
+          "score": 0.7188149690628052
+        }
+      ],
+      "gemma-onnx-q4": [
+        {
+          "index": 847,
+          "path": "../albums/kansai/DSCF2951-2.jpg",
+          "score": 0.7449339032173157
+        },
+        {
+          "index": 751,
+          "path": "../albums/hokkaido/DSCF6483-2.jpg",
+          "score": 0.7378377914428711
+        },
+        {
+          "index": 936,
+          "path": "../albums/kansai/IMG_20161125_135448.jpg",
+          "score": 0.7175800800323486
+        }
+      ],
+      "gemma-onnx-q8": [
+        {
+          "index": 847,
+          "path": "../albums/kansai/DSCF2951-2.jpg",
+          "score": 0.743708610534668
+        },
+        {
+          "index": 751,
+          "path": "../albums/hokkaido/DSCF6483-2.jpg",
+          "score": 0.7324029207229614
+        },
+        {
+          "index": 607,
+          "path": "../albums/chuugoku/DSCF0520.jpg",
+          "score": 0.7194427251815796
+        }
+      ],
+      "gemma-unsloth-q4": [
+        {
+          "index": 847,
+          "path": "../albums/kansai/DSCF2951-2.jpg",
+          "score": 0.7424238920211792
+        },
+        {
+          "index": 751,
+          "path": "../albums/hokkaido/DSCF6483-2.jpg",
+          "score": 0.7349157929420471
+        },
+        {
+          "index": 607,
+          "path": "../albums/chuugoku/DSCF0520.jpg",
+          "score": 0.7222139835357666
+        }
+      ],
+      "gemma-unsloth-q8": [
+        {
+          "index": 847,
+          "path": "../albums/kansai/DSCF2951-2.jpg",
+          "score": 0.7431650757789612
+        },
+        {
+          "index": 751,
+          "path": "../albums/hokkaido/DSCF6483-2.jpg",
+          "score": 0.7317155599594116
+        },
+        {
+          "index": 607,
+          "path": "../albums/chuugoku/DSCF0520.jpg",
+          "score": 0.7193581461906433
+        }
+      ],
+      "gemma-256d": [
+        {
+          "index": 847,
+          "path": "../albums/kansai/DSCF2951-2.jpg",
+          "score": 0.7614873647689819
+        },
+        {
+          "index": 607,
+          "path": "../albums/chuugoku/DSCF0520.jpg",
+          "score": 0.7514928579330444
+        },
+        {
+          "index": 751,
+          "path": "../albums/hokkaido/DSCF6483-2.jpg",
+          "score": 0.7500746250152588
+        }
+      ],
+      "gemma-int8-storage-q4": [
+        {
+          "index": 847,
+          "path": "../albums/kansai/DSCF2951-2.jpg",
+          "score": 0.7439051270484924
+        },
+        {
+          "index": 751,
+          "path": "../albums/hokkaido/DSCF6483-2.jpg",
+          "score": 0.737882137298584
+        },
+        {
+          "index": 936,
+          "path": "../albums/kansai/IMG_20161125_135448.jpg",
+          "score": 0.7180134057998657
+        }
+      ],
+      "gemma-caption-bf16": [
+        {
+          "index": 751,
+          "path": "../albums/hokkaido/DSCF6483-2.jpg",
+          "score": 0.7725194096565247
+        },
+        {
+          "index": 847,
+          "path": "../albums/kansai/DSCF2951-2.jpg",
+          "score": 0.7687074542045593
+        },
+        {
+          "index": 607,
+          "path": "../albums/chuugoku/DSCF0520.jpg",
+          "score": 0.7678969502449036
+        }
+      ],
+      "gemma-caption-onnx-q4": [
+        {
+          "index": 751,
+          "path": "../albums/hokkaido/DSCF6483-2.jpg",
+          "score": 0.7729973196983337
+        },
+        {
+          "index": 847,
+          "path": "../albums/kansai/DSCF2951-2.jpg",
+          "score": 0.7660984992980957
+        },
+        {
+          "index": 607,
+          "path": "../albums/chuugoku/DSCF0520.jpg",
+          "score": 0.7651188969612122
+        }
+      ],
+      "gemma-caption-unsloth-q4": [
+        {
+          "index": 751,
+          "path": "../albums/hokkaido/DSCF6483-2.jpg",
+          "score": 0.772879958152771
+        },
+        {
+          "index": 607,
+          "path": "../albums/chuugoku/DSCF0520.jpg",
+          "score": 0.7676049470901489
+        },
+        {
+          "index": 847,
+          "path": "../albums/kansai/DSCF2951-2.jpg",
+          "score": 0.7671411037445068
+        }
+      ],
+      "gemma-onnx-q4f16": [
+        {
+          "index": 847,
+          "path": "../albums/kansai/DSCF2951-2.jpg",
+          "score": 0.7450896501541138
+        },
+        {
+          "index": 751,
+          "path": "../albums/hokkaido/DSCF6483-2.jpg",
+          "score": 0.7378008961677551
+        },
+        {
+          "index": 936,
+          "path": "../albums/kansai/IMG_20161125_135448.jpg",
+          "score": 0.7176089286804199
+        }
+      ]
+    },
+    "T11": {
+      "siglip1-current-q4": [
+        {
+          "index": 763,
+          "path": "../albums/hokkaido/DSCF6941.JPG",
+          "score": 0.08157755434513092
+        },
+        {
+          "index": 956,
+          "path": "../albums/kanto/DSCF3470.JPG",
+          "score": 0.07492147386074066
+        },
+        {
+          "index": 1490,
+          "path": "../albums/westcoast/DSCF8526.JPG",
+          "score": 0.07288292795419693
+        }
+      ],
+      "siglip1-fp32": [
+        {
+          "index": 763,
+          "path": "../albums/hokkaido/DSCF6941.JPG",
+          "score": 0.08497968316078186
+        },
+        {
+          "index": 1490,
+          "path": "../albums/westcoast/DSCF8526.JPG",
+          "score": 0.07575739920139313
+        },
+        {
+          "index": 956,
+          "path": "../albums/kanto/DSCF3470.JPG",
+          "score": 0.07471965998411179
+        }
+      ],
+      "siglip2-fp32": [
+        {
+          "index": 763,
+          "path": "../albums/hokkaido/DSCF6941.JPG",
+          "score": 0.13051638007164001
+        },
+        {
+          "index": 1490,
+          "path": "../albums/westcoast/DSCF8526.JPG",
+          "score": 0.11319071799516678
+        },
+        {
+          "index": 813,
+          "path": "../albums/kansai/DSCF2304.jpg",
+          "score": 0.11154232919216156
+        }
+      ],
+      "gemma-bf16": [
+        {
+          "index": 982,
+          "path": "../albums/kanto/DSCF4047.JPG",
+          "score": 0.7110913991928101
+        },
+        {
+          "index": 763,
+          "path": "../albums/hokkaido/DSCF6941.JPG",
+          "score": 0.7066419720649719
+        },
+        {
+          "index": 883,
+          "path": "../albums/kansai/DSCF3667.jpg",
+          "score": 0.7064769268035889
+        }
+      ],
+      "gemma-onnx-q4": [
+        {
+          "index": 982,
+          "path": "../albums/kanto/DSCF4047.JPG",
+          "score": 0.7159863710403442
+        },
+        {
+          "index": 763,
+          "path": "../albums/hokkaido/DSCF6941.JPG",
+          "score": 0.7071365714073181
+        },
+        {
+          "index": 883,
+          "path": "../albums/kansai/DSCF3667.jpg",
+          "score": 0.707131028175354
+        }
+      ],
+      "gemma-onnx-q8": [
+        {
+          "index": 982,
+          "path": "../albums/kanto/DSCF4047.JPG",
+          "score": 0.7110114097595215
+        },
+        {
+          "index": 763,
+          "path": "../albums/hokkaido/DSCF6941.JPG",
+          "score": 0.7068836092948914
+        },
+        {
+          "index": 883,
+          "path": "../albums/kansai/DSCF3667.jpg",
+          "score": 0.7064170837402344
+        }
+      ],
+      "gemma-unsloth-q4": [
+        {
+          "index": 982,
+          "path": "../albums/kanto/DSCF4047.JPG",
+          "score": 0.7150087356567383
+        },
+        {
+          "index": 883,
+          "path": "../albums/kansai/DSCF3667.jpg",
+          "score": 0.7050237059593201
+        },
+        {
+          "index": 763,
+          "path": "../albums/hokkaido/DSCF6941.JPG",
+          "score": 0.7029137015342712
+        }
+      ],
+      "gemma-unsloth-q8": [
+        {
+          "index": 982,
+          "path": "../albums/kanto/DSCF4047.JPG",
+          "score": 0.7111011743545532
+        },
+        {
+          "index": 763,
+          "path": "../albums/hokkaido/DSCF6941.JPG",
+          "score": 0.707118034362793
+        },
+        {
+          "index": 883,
+          "path": "../albums/kansai/DSCF3667.jpg",
+          "score": 0.7064852714538574
+        }
+      ],
+      "gemma-256d": [
+        {
+          "index": 763,
+          "path": "../albums/hokkaido/DSCF6941.JPG",
+          "score": 0.7291920185089111
+        },
+        {
+          "index": 982,
+          "path": "../albums/kanto/DSCF4047.JPG",
+          "score": 0.7280077934265137
+        },
+        {
+          "index": 883,
+          "path": "../albums/kansai/DSCF3667.jpg",
+          "score": 0.7268574833869934
+        }
+      ],
+      "gemma-int8-storage-q4": [
+        {
+          "index": 982,
+          "path": "../albums/kanto/DSCF4047.JPG",
+          "score": 0.7166892290115356
+        },
+        {
+          "index": 883,
+          "path": "../albums/kansai/DSCF3667.jpg",
+          "score": 0.7069704532623291
+        },
+        {
+          "index": 763,
+          "path": "../albums/hokkaido/DSCF6941.JPG",
+          "score": 0.7065421342849731
+        }
+      ],
+      "gemma-caption-bf16": [
+        {
+          "index": 826,
+          "path": "../albums/kansai/DSCF2379-2.jpg",
+          "score": 0.765514612197876
+        },
+        {
+          "index": 883,
+          "path": "../albums/kansai/DSCF3667.jpg",
+          "score": 0.7533336281776428
+        },
+        {
+          "index": 1490,
+          "path": "../albums/westcoast/DSCF8526.JPG",
+          "score": 0.749793291091919
+        }
+      ],
+      "gemma-caption-onnx-q4": [
+        {
+          "index": 826,
+          "path": "../albums/kansai/DSCF2379-2.jpg",
+          "score": 0.7659530639648438
+        },
+        {
+          "index": 883,
+          "path": "../albums/kansai/DSCF3667.jpg",
+          "score": 0.7507590651512146
+        },
+        {
+          "index": 1490,
+          "path": "../albums/westcoast/DSCF8526.JPG",
+          "score": 0.7505634427070618
+        }
+      ],
+      "gemma-caption-unsloth-q4": [
+        {
+          "index": 826,
+          "path": "../albums/kansai/DSCF2379-2.jpg",
+          "score": 0.7637582421302795
+        },
+        {
+          "index": 883,
+          "path": "../albums/kansai/DSCF3667.jpg",
+          "score": 0.7513948678970337
+        },
+        {
+          "index": 982,
+          "path": "../albums/kanto/DSCF4047.JPG",
+          "score": 0.7499518394470215
+        }
+      ],
+      "gemma-onnx-q4f16": [
+        {
+          "index": 982,
+          "path": "../albums/kanto/DSCF4047.JPG",
+          "score": 0.7158632874488831
+        },
+        {
+          "index": 763,
+          "path": "../albums/hokkaido/DSCF6941.JPG",
+          "score": 0.7072135210037231
+        },
+        {
+          "index": 883,
+          "path": "../albums/kansai/DSCF3667.jpg",
+          "score": 0.7070348262786865
+        }
+      ]
+    },
+    "T12": {
+      "siglip1-current-q4": [
+        {
+          "index": 128,
+          "path": "../albums/2411japan/DSCF7828.JPG",
+          "score": 0.07658582925796509
+        },
+        {
+          "index": 860,
+          "path": "../albums/kansai/DSCF3212-2.jpg",
+          "score": 0.07197760790586472
+        },
+        {
+          "index": 774,
+          "path": "../albums/hyouka/DSCF2487-3.jpg",
+          "score": 0.06960398703813553
+        }
+      ],
+      "siglip1-fp32": [
+        {
+          "index": 128,
+          "path": "../albums/2411japan/DSCF7828.JPG",
+          "score": 0.07717438042163849
+        },
+        {
+          "index": 774,
+          "path": "../albums/hyouka/DSCF2487-3.jpg",
+          "score": 0.07317393273115158
+        },
+        {
+          "index": 860,
+          "path": "../albums/kansai/DSCF3212-2.jpg",
+          "score": 0.07088182866573334
+        }
+      ],
+      "siglip2-fp32": [
+        {
+          "index": 739,
+          "path": "../albums/hokkaido/DSCF5948-2_2.jpg",
+          "score": 0.11524289101362228
+        },
+        {
+          "index": 774,
+          "path": "../albums/hyouka/DSCF2487-3.jpg",
+          "score": 0.11105898022651672
+        },
+        {
+          "index": 860,
+          "path": "../albums/kansai/DSCF3212-2.jpg",
+          "score": 0.1102161779999733
+        }
+      ],
+      "gemma-bf16": [
+        {
+          "index": 739,
+          "path": "../albums/hokkaido/DSCF5948-2_2.jpg",
+          "score": 0.6885431408882141
+        },
+        {
+          "index": 296,
+          "path": "../albums/24okinawa-taipei/DSCF2220.JPG",
+          "score": 0.6825045347213745
+        },
+        {
+          "index": 1354,
+          "path": "../albums/snapshots/DSCF9045.JPG",
+          "score": 0.6772192120552063
+        }
+      ],
+      "gemma-onnx-q4": [
+        {
+          "index": 739,
+          "path": "../albums/hokkaido/DSCF5948-2_2.jpg",
+          "score": 0.6929690837860107
+        },
+        {
+          "index": 296,
+          "path": "../albums/24okinawa-taipei/DSCF2220.JPG",
+          "score": 0.6899725198745728
+        },
+        {
+          "index": 1354,
+          "path": "../albums/snapshots/DSCF9045.JPG",
+          "score": 0.6828855276107788
+        }
+      ],
+      "gemma-onnx-q8": [
+        {
+          "index": 739,
+          "path": "../albums/hokkaido/DSCF5948-2_2.jpg",
+          "score": 0.6894841194152832
+        },
+        {
+          "index": 296,
+          "path": "../albums/24okinawa-taipei/DSCF2220.JPG",
+          "score": 0.683008074760437
+        },
+        {
+          "index": 1354,
+          "path": "../albums/snapshots/DSCF9045.JPG",
+          "score": 0.6787136793136597
+        }
+      ],
+      "gemma-unsloth-q4": [
+        {
+          "index": 739,
+          "path": "../albums/hokkaido/DSCF5948-2_2.jpg",
+          "score": 0.6914200782775879
+        },
+        {
+          "index": 296,
+          "path": "../albums/24okinawa-taipei/DSCF2220.JPG",
+          "score": 0.6832249164581299
+        },
+        {
+          "index": 1354,
+          "path": "../albums/snapshots/DSCF9045.JPG",
+          "score": 0.6822748184204102
+        }
+      ],
+      "gemma-unsloth-q8": [
+        {
+          "index": 739,
+          "path": "../albums/hokkaido/DSCF5948-2_2.jpg",
+          "score": 0.6879722476005554
+        },
+        {
+          "index": 296,
+          "path": "../albums/24okinawa-taipei/DSCF2220.JPG",
+          "score": 0.6826179027557373
+        },
+        {
+          "index": 1354,
+          "path": "../albums/snapshots/DSCF9045.JPG",
+          "score": 0.6783735752105713
+        }
+      ],
+      "gemma-256d": [
+        {
+          "index": 739,
+          "path": "../albums/hokkaido/DSCF5948-2_2.jpg",
+          "score": 0.7288818359375
+        },
+        {
+          "index": 1354,
+          "path": "../albums/snapshots/DSCF9045.JPG",
+          "score": 0.7219139933586121
+        },
+        {
+          "index": 582,
+          "path": "../albums/2607hongkong/DSCF2322-14.jpg",
+          "score": 0.7035729885101318
+        }
+      ],
+      "gemma-int8-storage-q4": [
+        {
+          "index": 739,
+          "path": "../albums/hokkaido/DSCF5948-2_2.jpg",
+          "score": 0.692764401435852
+        },
+        {
+          "index": 296,
+          "path": "../albums/24okinawa-taipei/DSCF2220.JPG",
+          "score": 0.6898983120918274
+        },
+        {
+          "index": 1354,
+          "path": "../albums/snapshots/DSCF9045.JPG",
+          "score": 0.6829790472984314
+        }
+      ],
+      "gemma-caption-bf16": [
+        {
+          "index": 582,
+          "path": "../albums/2607hongkong/DSCF2322-14.jpg",
+          "score": 0.7266297340393066
+        },
+        {
+          "index": 1354,
+          "path": "../albums/snapshots/DSCF9045.JPG",
+          "score": 0.72234046459198
+        },
+        {
+          "index": 1070,
+          "path": "../albums/nagano/PXL_20230313_110000702.MP.jpg",
+          "score": 0.7217922210693359
+        }
+      ],
+      "gemma-caption-onnx-q4": [
+        {
+          "index": 582,
+          "path": "../albums/2607hongkong/DSCF2322-14.jpg",
+          "score": 0.729058027267456
+        },
+        {
+          "index": 1354,
+          "path": "../albums/snapshots/DSCF9045.JPG",
+          "score": 0.7273761630058289
+        },
+        {
+          "index": 1070,
+          "path": "../albums/nagano/PXL_20230313_110000702.MP.jpg",
+          "score": 0.7260376214981079
+        }
+      ],
+      "gemma-caption-unsloth-q4": [
+        {
+          "index": 1354,
+          "path": "../albums/snapshots/DSCF9045.JPG",
+          "score": 0.7289776802062988
+        },
+        {
+          "index": 582,
+          "path": "../albums/2607hongkong/DSCF2322-14.jpg",
+          "score": 0.7278026938438416
+        },
+        {
+          "index": 1070,
+          "path": "../albums/nagano/PXL_20230313_110000702.MP.jpg",
+          "score": 0.7264069318771362
+        }
+      ],
+      "gemma-onnx-q4f16": [
+        {
+          "index": 739,
+          "path": "../albums/hokkaido/DSCF5948-2_2.jpg",
+          "score": 0.6929452419281006
+        },
+        {
+          "index": 296,
+          "path": "../albums/24okinawa-taipei/DSCF2220.JPG",
+          "score": 0.6899058818817139
+        },
+        {
+          "index": 1354,
+          "path": "../albums/snapshots/DSCF9045.JPG",
+          "score": 0.6828758716583252
+        }
+      ]
+    },
+    "T16": {
+      "siglip1-current-q4": [
+        {
+          "index": 424,
+          "path": "../albums/2511japan/DSCF6501.JPG",
+          "score": 0.12407965213060379
+        },
+        {
+          "index": 350,
+          "path": "../albums/2502japan/DSCF1167.jpg",
+          "score": 0.12317861616611481
+        },
+        {
+          "index": 231,
+          "path": "../albums/24okinawa-taipei/DSCF1072.JPG",
+          "score": 0.11824426054954529
+        }
+      ],
+      "siglip1-fp32": [
+        {
+          "index": 424,
+          "path": "../albums/2511japan/DSCF6501.JPG",
+          "score": 0.13503925502300262
+        },
+        {
+          "index": 350,
+          "path": "../albums/2502japan/DSCF1167.jpg",
+          "score": 0.12479894608259201
+        },
+        {
+          "index": 231,
+          "path": "../albums/24okinawa-taipei/DSCF1072.JPG",
+          "score": 0.12342531979084015
+        }
+      ],
+      "siglip2-fp32": [
+        {
+          "index": 508,
+          "path": "../albums/2511japan/DSCF7992.JPG",
+          "score": 0.17576360702514648
+        },
+        {
+          "index": 444,
+          "path": "../albums/2511japan/DSCF7018.JPG",
+          "score": 0.1744910031557083
+        },
+        {
+          "index": 350,
+          "path": "../albums/2502japan/DSCF1167.jpg",
+          "score": 0.1718999296426773
+        }
+      ],
+      "gemma-bf16": [
+        {
+          "index": 350,
+          "path": "../albums/2502japan/DSCF1167.jpg",
+          "score": 0.7245279550552368
+        },
+        {
+          "index": 231,
+          "path": "../albums/24okinawa-taipei/DSCF1072.JPG",
+          "score": 0.721396803855896
+        },
+        {
+          "index": 287,
+          "path": "../albums/24okinawa-taipei/DSCF2025_2.jpg",
+          "score": 0.715194046497345
+        }
+      ],
+      "gemma-onnx-q4": [
+        {
+          "index": 231,
+          "path": "../albums/24okinawa-taipei/DSCF1072.JPG",
+          "score": 0.7234865427017212
+        },
+        {
+          "index": 350,
+          "path": "../albums/2502japan/DSCF1167.jpg",
+          "score": 0.7223683595657349
+        },
+        {
+          "index": 444,
+          "path": "../albums/2511japan/DSCF7018.JPG",
+          "score": 0.71566241979599
+        }
+      ],
+      "gemma-onnx-q8": [
+        {
+          "index": 350,
+          "path": "../albums/2502japan/DSCF1167.jpg",
+          "score": 0.7234815359115601
+        },
+        {
+          "index": 231,
+          "path": "../albums/24okinawa-taipei/DSCF1072.JPG",
+          "score": 0.7211343050003052
+        },
+        {
+          "index": 287,
+          "path": "../albums/24okinawa-taipei/DSCF2025_2.jpg",
+          "score": 0.7145669460296631
+        }
+      ],
+      "gemma-unsloth-q4": [
+        {
+          "index": 350,
+          "path": "../albums/2502japan/DSCF1167.jpg",
+          "score": 0.7242486476898193
+        },
+        {
+          "index": 231,
+          "path": "../albums/24okinawa-taipei/DSCF1072.JPG",
+          "score": 0.7201603055000305
+        },
+        {
+          "index": 287,
+          "path": "../albums/24okinawa-taipei/DSCF2025_2.jpg",
+          "score": 0.7160037159919739
+        }
+      ],
+      "gemma-unsloth-q8": [
+        {
+          "index": 350,
+          "path": "../albums/2502japan/DSCF1167.jpg",
+          "score": 0.7224527597427368
+        },
+        {
+          "index": 231,
+          "path": "../albums/24okinawa-taipei/DSCF1072.JPG",
+          "score": 0.7209060788154602
+        },
+        {
+          "index": 287,
+          "path": "../albums/24okinawa-taipei/DSCF2025_2.jpg",
+          "score": 0.7144433259963989
+        }
+      ],
+      "gemma-256d": [
+        {
+          "index": 350,
+          "path": "../albums/2502japan/DSCF1167.jpg",
+          "score": 0.7589779496192932
+        },
+        {
+          "index": 444,
+          "path": "../albums/2511japan/DSCF7018.JPG",
+          "score": 0.7526954412460327
+        },
+        {
+          "index": 231,
+          "path": "../albums/24okinawa-taipei/DSCF1072.JPG",
+          "score": 0.751603364944458
+        }
+      ],
+      "gemma-int8-storage-q4": [
+        {
+          "index": 231,
+          "path": "../albums/24okinawa-taipei/DSCF1072.JPG",
+          "score": 0.7234421968460083
+        },
+        {
+          "index": 350,
+          "path": "../albums/2502japan/DSCF1167.jpg",
+          "score": 0.7224831581115723
+        },
+        {
+          "index": 444,
+          "path": "../albums/2511japan/DSCF7018.JPG",
+          "score": 0.7153204083442688
+        }
+      ],
+      "gemma-caption-bf16": [
+        {
+          "index": 231,
+          "path": "../albums/24okinawa-taipei/DSCF1072.JPG",
+          "score": 0.7555530071258545
+        },
+        {
+          "index": 287,
+          "path": "../albums/24okinawa-taipei/DSCF2025_2.jpg",
+          "score": 0.7541369199752808
+        },
+        {
+          "index": 930,
+          "path": "../albums/kansai/IMG_20161120_155921.jpg",
+          "score": 0.7496702671051025
+        }
+      ],
+      "gemma-caption-onnx-q4": [
+        {
+          "index": 231,
+          "path": "../albums/24okinawa-taipei/DSCF1072.JPG",
+          "score": 0.7543870210647583
+        },
+        {
+          "index": 287,
+          "path": "../albums/24okinawa-taipei/DSCF2025_2.jpg",
+          "score": 0.7501083612442017
+        },
+        {
+          "index": 444,
+          "path": "../albums/2511japan/DSCF7018.JPG",
+          "score": 0.7466403245925903
+        }
+      ],
+      "gemma-caption-unsloth-q4": [
+        {
+          "index": 287,
+          "path": "../albums/24okinawa-taipei/DSCF2025_2.jpg",
+          "score": 0.7554404139518738
+        },
+        {
+          "index": 231,
+          "path": "../albums/24okinawa-taipei/DSCF1072.JPG",
+          "score": 0.7544528245925903
+        },
+        {
+          "index": 930,
+          "path": "../albums/kansai/IMG_20161120_155921.jpg",
+          "score": 0.751167893409729
+        }
+      ],
+      "gemma-onnx-q4f16": [
+        {
+          "index": 231,
+          "path": "../albums/24okinawa-taipei/DSCF1072.JPG",
+          "score": 0.7233351469039917
+        },
+        {
+          "index": 350,
+          "path": "../albums/2502japan/DSCF1167.jpg",
+          "score": 0.7222898006439209
+        },
+        {
+          "index": 444,
+          "path": "../albums/2511japan/DSCF7018.JPG",
+          "score": 0.7154927253723145
+        }
+      ]
+    },
+    "T19": {
+      "siglip1-current-q4": [
+        {
+          "index": 364,
+          "path": "../albums/2502japan/DSCF1804-2.jpg",
+          "score": 0.05882527679204941
+        },
+        {
+          "index": 1332,
+          "path": "../albums/snapshots/DSCF6019-2.jpg",
+          "score": 0.05302978307008743
+        },
+        {
+          "index": 501,
+          "path": "../albums/2511japan/DSCF7895.JPG",
+          "score": 0.05275604501366615
+        }
+      ],
+      "siglip1-fp32": [
+        {
+          "index": 714,
+          "path": "../albums/hokkaido/DSCF1940-2.jpg",
+          "score": 0.12011703103780746
+        },
+        {
+          "index": 174,
+          "path": "../albums/24japan/DSCF5880_1.jpg",
+          "score": 0.1108572781085968
+        },
+        {
+          "index": 737,
+          "path": "../albums/hokkaido/DSCF2334.JPG",
+          "score": 0.1088365912437439
+        }
+      ],
+      "siglip2-fp32": [
+        {
+          "index": 694,
+          "path": "../albums/hokkaido/DSCF1593-2.jpg",
+          "score": 0.1602686494588852
+        },
+        {
+          "index": 361,
+          "path": "../albums/2502japan/DSCF1695-2.jpg",
+          "score": 0.15436773002147675
+        },
+        {
+          "index": 359,
+          "path": "../albums/2502japan/DSCF1606.jpg",
+          "score": 0.1500495970249176
+        }
+      ],
+      "gemma-bf16": [
+        {
+          "index": 687,
+          "path": "../albums/hokkaido/DSCF1442-2.jpg",
+          "score": 0.7236405611038208
+        },
+        {
+          "index": 689,
+          "path": "../albums/hokkaido/DSCF1455.JPG",
+          "score": 0.7229747772216797
+        },
+        {
+          "index": 731,
+          "path": "../albums/hokkaido/DSCF2248.JPG",
+          "score": 0.7173224091529846
+        }
+      ],
+      "gemma-onnx-q4": [
+        {
+          "index": 689,
+          "path": "../albums/hokkaido/DSCF1455.JPG",
+          "score": 0.7189038395881653
+        },
+        {
+          "index": 731,
+          "path": "../albums/hokkaido/DSCF2248.JPG",
+          "score": 0.7186210751533508
+        },
+        {
+          "index": 687,
+          "path": "../albums/hokkaido/DSCF1442-2.jpg",
+          "score": 0.7180402278900146
+        }
+      ],
+      "gemma-onnx-q8": [
+        {
+          "index": 687,
+          "path": "../albums/hokkaido/DSCF1442-2.jpg",
+          "score": 0.7247303128242493
+        },
+        {
+          "index": 689,
+          "path": "../albums/hokkaido/DSCF1455.JPG",
+          "score": 0.7240957021713257
+        },
+        {
+          "index": 731,
+          "path": "../albums/hokkaido/DSCF2248.JPG",
+          "score": 0.7183041572570801
+        }
+      ],
+      "gemma-unsloth-q4": [
+        {
+          "index": 687,
+          "path": "../albums/hokkaido/DSCF1442-2.jpg",
+          "score": 0.7240344285964966
+        },
+        {
+          "index": 689,
+          "path": "../albums/hokkaido/DSCF1455.JPG",
+          "score": 0.7237445712089539
+        },
+        {
+          "index": 731,
+          "path": "../albums/hokkaido/DSCF2248.JPG",
+          "score": 0.7177995443344116
+        }
+      ],
+      "gemma-unsloth-q8": [
+        {
+          "index": 687,
+          "path": "../albums/hokkaido/DSCF1442-2.jpg",
+          "score": 0.7233988046646118
+        },
+        {
+          "index": 689,
+          "path": "../albums/hokkaido/DSCF1455.JPG",
+          "score": 0.7230661511421204
+        },
+        {
+          "index": 731,
+          "path": "../albums/hokkaido/DSCF2248.JPG",
+          "score": 0.7175707817077637
+        }
+      ],
+      "gemma-256d": [
+        {
+          "index": 689,
+          "path": "../albums/hokkaido/DSCF1455.JPG",
+          "score": 0.7616376876831055
+        },
+        {
+          "index": 687,
+          "path": "../albums/hokkaido/DSCF1442-2.jpg",
+          "score": 0.7571357488632202
+        },
+        {
+          "index": 731,
+          "path": "../albums/hokkaido/DSCF2248.JPG",
+          "score": 0.7562328577041626
+        }
+      ],
+      "gemma-int8-storage-q4": [
+        {
+          "index": 689,
+          "path": "../albums/hokkaido/DSCF1455.JPG",
+          "score": 0.7190186381340027
+        },
+        {
+          "index": 687,
+          "path": "../albums/hokkaido/DSCF1442-2.jpg",
+          "score": 0.7183629870414734
+        },
+        {
+          "index": 731,
+          "path": "../albums/hokkaido/DSCF2248.JPG",
+          "score": 0.7183517217636108
+        }
+      ],
+      "gemma-caption-bf16": [
+        {
+          "index": 731,
+          "path": "../albums/hokkaido/DSCF2248.JPG",
+          "score": 0.7527347803115845
+        },
+        {
+          "index": 687,
+          "path": "../albums/hokkaido/DSCF1442-2.jpg",
+          "score": 0.7507672905921936
+        },
+        {
+          "index": 689,
+          "path": "../albums/hokkaido/DSCF1455.JPG",
+          "score": 0.7439557909965515
+        }
+      ],
+      "gemma-caption-onnx-q4": [
+        {
+          "index": 731,
+          "path": "../albums/hokkaido/DSCF2248.JPG",
+          "score": 0.7512919306755066
+        },
+        {
+          "index": 687,
+          "path": "../albums/hokkaido/DSCF1442-2.jpg",
+          "score": 0.746117889881134
+        },
+        {
+          "index": 689,
+          "path": "../albums/hokkaido/DSCF1455.JPG",
+          "score": 0.7400175929069519
+        }
+      ],
+      "gemma-caption-unsloth-q4": [
+        {
+          "index": 731,
+          "path": "../albums/hokkaido/DSCF2248.JPG",
+          "score": 0.7492390275001526
+        },
+        {
+          "index": 687,
+          "path": "../albums/hokkaido/DSCF1442-2.jpg",
+          "score": 0.7481572031974792
+        },
+        {
+          "index": 689,
+          "path": "../albums/hokkaido/DSCF1455.JPG",
+          "score": 0.7417701482772827
+        }
+      ],
+      "gemma-onnx-q4f16": [
+        {
+          "index": 731,
+          "path": "../albums/hokkaido/DSCF2248.JPG",
+          "score": 0.7186229228973389
+        },
+        {
+          "index": 689,
+          "path": "../albums/hokkaido/DSCF1455.JPG",
+          "score": 0.7185173034667969
+        },
+        {
+          "index": 687,
+          "path": "../albums/hokkaido/DSCF1442-2.jpg",
+          "score": 0.7175420522689819
+        }
+      ]
+    },
+    "T21": {
+      "siglip1-current-q4": [
+        {
+          "index": 364,
+          "path": "../albums/2502japan/DSCF1804-2.jpg",
+          "score": 0.05882527679204941
+        },
+        {
+          "index": 1332,
+          "path": "../albums/snapshots/DSCF6019-2.jpg",
+          "score": 0.05302978307008743
+        },
+        {
+          "index": 501,
+          "path": "../albums/2511japan/DSCF7895.JPG",
+          "score": 0.05275604501366615
+        }
+      ],
+      "siglip1-fp32": [
+        {
+          "index": 769,
+          "path": "../albums/hyouka/DSCF2150-2.jpg",
+          "score": 0.1334473341703415
+        },
+        {
+          "index": 582,
+          "path": "../albums/2607hongkong/DSCF2322-14.jpg",
+          "score": 0.11581455171108246
+        },
+        {
+          "index": 774,
+          "path": "../albums/hyouka/DSCF2487-3.jpg",
+          "score": 0.11492951214313507
+        }
+      ],
+      "siglip2-fp32": [
+        {
+          "index": 841,
+          "path": "../albums/kansai/DSCF2584-2.jpg",
+          "score": 0.1259164661169052
+        },
+        {
+          "index": 768,
+          "path": "../albums/hyouka/DSCF2124-5.jpg",
+          "score": 0.12217511236667633
+        },
+        {
+          "index": 773,
+          "path": "../albums/hyouka/DSCF2473-3.jpg",
+          "score": 0.11901496350765228
+        }
+      ],
+      "gemma-bf16": [
+        {
+          "index": 1354,
+          "path": "../albums/snapshots/DSCF9045.JPG",
+          "score": 0.6845643520355225
+        },
+        {
+          "index": 296,
+          "path": "../albums/24okinawa-taipei/DSCF2220.JPG",
+          "score": 0.6807378530502319
+        },
+        {
+          "index": 803,
+          "path": "../albums/kansai/DSCF2174-3.jpg",
+          "score": 0.6773723363876343
+        }
+      ],
+      "gemma-onnx-q4": [
+        {
+          "index": 1354,
+          "path": "../albums/snapshots/DSCF9045.JPG",
+          "score": 0.6909109950065613
+        },
+        {
+          "index": 296,
+          "path": "../albums/24okinawa-taipei/DSCF2220.JPG",
+          "score": 0.6816216707229614
+        },
+        {
+          "index": 512,
+          "path": "../albums/2511japan/DSCF8059.JPG",
+          "score": 0.6816092729568481
+        }
+      ],
+      "gemma-onnx-q8": [
+        {
+          "index": 1354,
+          "path": "../albums/snapshots/DSCF9045.JPG",
+          "score": 0.6851142048835754
+        },
+        {
+          "index": 296,
+          "path": "../albums/24okinawa-taipei/DSCF2220.JPG",
+          "score": 0.6816356778144836
+        },
+        {
+          "index": 803,
+          "path": "../albums/kansai/DSCF2174-3.jpg",
+          "score": 0.677771270275116
+        }
+      ],
+      "gemma-unsloth-q4": [
+        {
+          "index": 296,
+          "path": "../albums/24okinawa-taipei/DSCF2220.JPG",
+          "score": 0.6862375140190125
+        },
+        {
+          "index": 1354,
+          "path": "../albums/snapshots/DSCF9045.JPG",
+          "score": 0.6857366561889648
+        },
+        {
+          "index": 803,
+          "path": "../albums/kansai/DSCF2174-3.jpg",
+          "score": 0.6837248206138611
+        }
+      ],
+      "gemma-unsloth-q8": [
+        {
+          "index": 1354,
+          "path": "../albums/snapshots/DSCF9045.JPG",
+          "score": 0.6840619444847107
+        },
+        {
+          "index": 296,
+          "path": "../albums/24okinawa-taipei/DSCF2220.JPG",
+          "score": 0.6813169717788696
+        },
+        {
+          "index": 803,
+          "path": "../albums/kansai/DSCF2174-3.jpg",
+          "score": 0.6770645380020142
+        }
+      ],
+      "gemma-256d": [
+        {
+          "index": 1354,
+          "path": "../albums/snapshots/DSCF9045.JPG",
+          "score": 0.7272872924804688
+        },
+        {
+          "index": 512,
+          "path": "../albums/2511japan/DSCF8059.JPG",
+          "score": 0.7148234248161316
+        },
+        {
+          "index": 803,
+          "path": "../albums/kansai/DSCF2174-3.jpg",
+          "score": 0.7096505165100098
+        }
+      ],
+      "gemma-int8-storage-q4": [
+        {
+          "index": 1354,
+          "path": "../albums/snapshots/DSCF9045.JPG",
+          "score": 0.6909774541854858
+        },
+        {
+          "index": 512,
+          "path": "../albums/2511japan/DSCF8059.JPG",
+          "score": 0.6818419694900513
+        },
+        {
+          "index": 296,
+          "path": "../albums/24okinawa-taipei/DSCF2220.JPG",
+          "score": 0.6810587644577026
+        }
+      ],
+      "gemma-caption-bf16": [
+        {
+          "index": 293,
+          "path": "../albums/24okinawa-taipei/DSCF2188.JPG",
+          "score": 0.7360946536064148
+        },
+        {
+          "index": 512,
+          "path": "../albums/2511japan/DSCF8059.JPG",
+          "score": 0.7347038984298706
+        },
+        {
+          "index": 1354,
+          "path": "../albums/snapshots/DSCF9045.JPG",
+          "score": 0.7282083630561829
+        }
+      ],
+      "gemma-caption-onnx-q4": [
+        {
+          "index": 512,
+          "path": "../albums/2511japan/DSCF8059.JPG",
+          "score": 0.7378115653991699
+        },
+        {
+          "index": 293,
+          "path": "../albums/24okinawa-taipei/DSCF2188.JPG",
+          "score": 0.7374866008758545
+        },
+        {
+          "index": 1354,
+          "path": "../albums/snapshots/DSCF9045.JPG",
+          "score": 0.7337822914123535
+        }
+      ],
+      "gemma-caption-unsloth-q4": [
+        {
+          "index": 293,
+          "path": "../albums/24okinawa-taipei/DSCF2188.JPG",
+          "score": 0.7392797470092773
+        },
+        {
+          "index": 512,
+          "path": "../albums/2511japan/DSCF8059.JPG",
+          "score": 0.7355697154998779
+        },
+        {
+          "index": 1354,
+          "path": "../albums/snapshots/DSCF9045.JPG",
+          "score": 0.7266478538513184
+        }
+      ],
+      "gemma-onnx-q4f16": [
+        {
+          "index": 1354,
+          "path": "../albums/snapshots/DSCF9045.JPG",
+          "score": 0.6911534070968628
+        },
+        {
+          "index": 512,
+          "path": "../albums/2511japan/DSCF8059.JPG",
+          "score": 0.6818655729293823
+        },
+        {
+          "index": 296,
+          "path": "../albums/24okinawa-taipei/DSCF2220.JPG",
+          "score": 0.6813368797302246
+        }
+      ]
+    },
+    "T23": {
+      "siglip1-current-q4": [
+        {
+          "index": 144,
+          "path": "../albums/2411japan/DSCF8298.JPG",
+          "score": 0.11120159924030304
+        },
+        {
+          "index": 538,
+          "path": "../albums/2602japan/DSCF8612.JPG",
+          "score": 0.11095800995826721
+        },
+        {
+          "index": 338,
+          "path": "../albums/2502japan/DSCF0939.jpg",
+          "score": 0.10488952696323395
+        }
+      ],
+      "siglip1-fp32": [
+        {
+          "index": 144,
+          "path": "../albums/2411japan/DSCF8298.JPG",
+          "score": 0.11301732063293457
+        },
+        {
+          "index": 538,
+          "path": "../albums/2602japan/DSCF8612.JPG",
+          "score": 0.11204148828983307
+        },
+        {
+          "index": 338,
+          "path": "../albums/2502japan/DSCF0939.jpg",
+          "score": 0.10825883597135544
+        }
+      ],
+      "siglip2-fp32": [
+        {
+          "index": 1434,
+          "path": "../albums/türkiye/PXL_20231110_144052279.jpg",
+          "score": 0.13753683865070343
+        },
+        {
+          "index": 538,
+          "path": "../albums/2602japan/DSCF8612.JPG",
+          "score": 0.13735169172286987
+        },
+        {
+          "index": 338,
+          "path": "../albums/2502japan/DSCF0939.jpg",
+          "score": 0.13602055609226227
+        }
+      ],
+      "gemma-bf16": [
+        {
+          "index": 338,
+          "path": "../albums/2502japan/DSCF0939.jpg",
+          "score": 0.7608505487442017
+        },
+        {
+          "index": 321,
+          "path": "../albums/24okinawa-taipei/DSCF2731.JPG",
+          "score": 0.7456179857254028
+        },
+        {
+          "index": 538,
+          "path": "../albums/2602japan/DSCF8612.JPG",
+          "score": 0.742946207523346
+        }
+      ],
+      "gemma-onnx-q4": [
+        {
+          "index": 338,
+          "path": "../albums/2502japan/DSCF0939.jpg",
+          "score": 0.7560607194900513
+        },
+        {
+          "index": 321,
+          "path": "../albums/24okinawa-taipei/DSCF2731.JPG",
+          "score": 0.7469198107719421
+        },
+        {
+          "index": 1203,
+          "path": "../albums/snapshots/DSCF2437.JPG",
+          "score": 0.7443381547927856
+        }
+      ],
+      "gemma-onnx-q8": [
+        {
+          "index": 338,
+          "path": "../albums/2502japan/DSCF0939.jpg",
+          "score": 0.7606054544448853
+        },
+        {
+          "index": 321,
+          "path": "../albums/24okinawa-taipei/DSCF2731.JPG",
+          "score": 0.7453856468200684
+        },
+        {
+          "index": 538,
+          "path": "../albums/2602japan/DSCF8612.JPG",
+          "score": 0.743279218673706
+        }
+      ],
+      "gemma-unsloth-q4": [
+        {
+          "index": 338,
+          "path": "../albums/2502japan/DSCF0939.jpg",
+          "score": 0.759352445602417
+        },
+        {
+          "index": 321,
+          "path": "../albums/24okinawa-taipei/DSCF2731.JPG",
+          "score": 0.744876503944397
+        },
+        {
+          "index": 538,
+          "path": "../albums/2602japan/DSCF8612.JPG",
+          "score": 0.7419808506965637
+        }
+      ],
+      "gemma-unsloth-q8": [
+        {
+          "index": 338,
+          "path": "../albums/2502japan/DSCF0939.jpg",
+          "score": 0.7610514163970947
+        },
+        {
+          "index": 321,
+          "path": "../albums/24okinawa-taipei/DSCF2731.JPG",
+          "score": 0.7455977201461792
+        },
+        {
+          "index": 538,
+          "path": "../albums/2602japan/DSCF8612.JPG",
+          "score": 0.742713451385498
+        }
+      ],
+      "gemma-256d": [
+        {
+          "index": 338,
+          "path": "../albums/2502japan/DSCF0939.jpg",
+          "score": 0.7876744270324707
+        },
+        {
+          "index": 321,
+          "path": "../albums/24okinawa-taipei/DSCF2731.JPG",
+          "score": 0.7816168069839478
+        },
+        {
+          "index": 334,
+          "path": "../albums/2502japan/DSCF0824.jpg",
+          "score": 0.7727479934692383
+        }
+      ],
+      "gemma-int8-storage-q4": [
+        {
+          "index": 338,
+          "path": "../albums/2502japan/DSCF0939.jpg",
+          "score": 0.7563161849975586
+        },
+        {
+          "index": 321,
+          "path": "../albums/24okinawa-taipei/DSCF2731.JPG",
+          "score": 0.7471673488616943
+        },
+        {
+          "index": 1203,
+          "path": "../albums/snapshots/DSCF2437.JPG",
+          "score": 0.7440145015716553
+        }
+      ],
+      "gemma-caption-bf16": [
+        {
+          "index": 538,
+          "path": "../albums/2602japan/DSCF8612.JPG",
+          "score": 0.7919120788574219
+        },
+        {
+          "index": 321,
+          "path": "../albums/24okinawa-taipei/DSCF2731.JPG",
+          "score": 0.789291501045227
+        },
+        {
+          "index": 1203,
+          "path": "../albums/snapshots/DSCF2437.JPG",
+          "score": 0.7880337238311768
+        }
+      ],
+      "gemma-caption-onnx-q4": [
+        {
+          "index": 538,
+          "path": "../albums/2602japan/DSCF8612.JPG",
+          "score": 0.7922471761703491
+        },
+        {
+          "index": 1203,
+          "path": "../albums/snapshots/DSCF2437.JPG",
+          "score": 0.7922208905220032
+        },
+        {
+          "index": 321,
+          "path": "../albums/24okinawa-taipei/DSCF2731.JPG",
+          "score": 0.7917178273200989
+        }
+      ],
+      "gemma-caption-unsloth-q4": [
+        {
+          "index": 538,
+          "path": "../albums/2602japan/DSCF8612.JPG",
+          "score": 0.7935070991516113
+        },
+        {
+          "index": 321,
+          "path": "../albums/24okinawa-taipei/DSCF2731.JPG",
+          "score": 0.7903590202331543
+        },
+        {
+          "index": 1203,
+          "path": "../albums/snapshots/DSCF2437.JPG",
+          "score": 0.7890041470527649
+        }
+      ],
+      "gemma-onnx-q4f16": [
+        {
+          "index": 338,
+          "path": "../albums/2502japan/DSCF0939.jpg",
+          "score": 0.7559618949890137
+        },
+        {
+          "index": 321,
+          "path": "../albums/24okinawa-taipei/DSCF2731.JPG",
+          "score": 0.7468976974487305
+        },
+        {
+          "index": 1203,
+          "path": "../albums/snapshots/DSCF2437.JPG",
+          "score": 0.7442846894264221
+        }
+      ]
+    },
+    "T24": {
+      "siglip1-current-q4": [
+        {
+          "index": 1024,
+          "path": "../albums/melbourne/DSCF0106-2.jpg",
+          "score": 0.09975899755954742
+        },
+        {
+          "index": 638,
+          "path": "../albums/eastcoast/DSCF4833.jpg",
+          "score": 0.09580386430025101
+        },
+        {
+          "index": 639,
+          "path": "../albums/eastcoast/DSCF4854.jpg",
+          "score": 0.0692053884267807
+        }
+      ],
+      "siglip1-fp32": [
+        {
+          "index": 1024,
+          "path": "../albums/melbourne/DSCF0106-2.jpg",
+          "score": 0.10065630078315735
+        },
+        {
+          "index": 638,
+          "path": "../albums/eastcoast/DSCF4833.jpg",
+          "score": 0.0939221978187561
+        },
+        {
+          "index": 755,
+          "path": "../albums/hokkaido/DSCF6811.JPG",
+          "score": 0.07222256809473038
+        }
+      ],
+      "siglip2-fp32": [
+        {
+          "index": 638,
+          "path": "../albums/eastcoast/DSCF4833.jpg",
+          "score": 0.11933178454637527
+        },
+        {
+          "index": 1024,
+          "path": "../albums/melbourne/DSCF0106-2.jpg",
+          "score": 0.11358129978179932
+        },
+        {
+          "index": 755,
+          "path": "../albums/hokkaido/DSCF6811.JPG",
+          "score": 0.099710613489151
+        }
+      ],
+      "gemma-bf16": [
+        {
+          "index": 1024,
+          "path": "../albums/melbourne/DSCF0106-2.jpg",
+          "score": 0.734657347202301
+        },
+        {
+          "index": 638,
+          "path": "../albums/eastcoast/DSCF4833.jpg",
+          "score": 0.7269724011421204
+        },
+        {
+          "index": 1023,
+          "path": "../albums/melbourne/DSCF0083-2.jpg",
+          "score": 0.7115990519523621
+        }
+      ],
+      "gemma-onnx-q4": [
+        {
+          "index": 1024,
+          "path": "../albums/melbourne/DSCF0106-2.jpg",
+          "score": 0.7256739735603333
+        },
+        {
+          "index": 638,
+          "path": "../albums/eastcoast/DSCF4833.jpg",
+          "score": 0.7248685956001282
+        },
+        {
+          "index": 1023,
+          "path": "../albums/melbourne/DSCF0083-2.jpg",
+          "score": 0.705742597579956
+        }
+      ],
+      "gemma-onnx-q8": [
+        {
+          "index": 1024,
+          "path": "../albums/melbourne/DSCF0106-2.jpg",
+          "score": 0.7350269556045532
+        },
+        {
+          "index": 638,
+          "path": "../albums/eastcoast/DSCF4833.jpg",
+          "score": 0.7273442149162292
+        },
+        {
+          "index": 1023,
+          "path": "../albums/melbourne/DSCF0083-2.jpg",
+          "score": 0.7123469114303589
+        }
+      ],
+      "gemma-unsloth-q4": [
+        {
+          "index": 1024,
+          "path": "../albums/melbourne/DSCF0106-2.jpg",
+          "score": 0.7365203499794006
+        },
+        {
+          "index": 638,
+          "path": "../albums/eastcoast/DSCF4833.jpg",
+          "score": 0.7284419536590576
+        },
+        {
+          "index": 1023,
+          "path": "../albums/melbourne/DSCF0083-2.jpg",
+          "score": 0.7142423391342163
+        }
+      ],
+      "gemma-unsloth-q8": [
+        {
+          "index": 1024,
+          "path": "../albums/melbourne/DSCF0106-2.jpg",
+          "score": 0.7359592914581299
+        },
+        {
+          "index": 638,
+          "path": "../albums/eastcoast/DSCF4833.jpg",
+          "score": 0.7285621166229248
+        },
+        {
+          "index": 1023,
+          "path": "../albums/melbourne/DSCF0083-2.jpg",
+          "score": 0.7135322690010071
+        }
+      ],
+      "gemma-256d": [
+        {
+          "index": 1024,
+          "path": "../albums/melbourne/DSCF0106-2.jpg",
+          "score": 0.754872739315033
+        },
+        {
+          "index": 638,
+          "path": "../albums/eastcoast/DSCF4833.jpg",
+          "score": 0.7495162487030029
+        },
+        {
+          "index": 755,
+          "path": "../albums/hokkaido/DSCF6811.JPG",
+          "score": 0.740876317024231
+        }
+      ],
+      "gemma-int8-storage-q4": [
+        {
+          "index": 1024,
+          "path": "../albums/melbourne/DSCF0106-2.jpg",
+          "score": 0.7264562845230103
+        },
+        {
+          "index": 638,
+          "path": "../albums/eastcoast/DSCF4833.jpg",
+          "score": 0.7245715856552124
+        },
+        {
+          "index": 1023,
+          "path": "../albums/melbourne/DSCF0083-2.jpg",
+          "score": 0.7064240574836731
+        }
+      ],
+      "gemma-caption-bf16": [
+        {
+          "index": 638,
+          "path": "../albums/eastcoast/DSCF4833.jpg",
+          "score": 0.7727750539779663
+        },
+        {
+          "index": 1024,
+          "path": "../albums/melbourne/DSCF0106-2.jpg",
+          "score": 0.7630457878112793
+        },
+        {
+          "index": 755,
+          "path": "../albums/hokkaido/DSCF6811.JPG",
+          "score": 0.7424128651618958
+        }
+      ],
+      "gemma-caption-onnx-q4": [
+        {
+          "index": 638,
+          "path": "../albums/eastcoast/DSCF4833.jpg",
+          "score": 0.7675530910491943
+        },
+        {
+          "index": 1024,
+          "path": "../albums/melbourne/DSCF0106-2.jpg",
+          "score": 0.7516335248947144
+        },
+        {
+          "index": 755,
+          "path": "../albums/hokkaido/DSCF6811.JPG",
+          "score": 0.7338719964027405
+        }
+      ],
+      "gemma-caption-unsloth-q4": [
+        {
+          "index": 638,
+          "path": "../albums/eastcoast/DSCF4833.jpg",
+          "score": 0.7697887420654297
+        },
+        {
+          "index": 1024,
+          "path": "../albums/melbourne/DSCF0106-2.jpg",
+          "score": 0.76353919506073
+        },
+        {
+          "index": 755,
+          "path": "../albums/hokkaido/DSCF6811.JPG",
+          "score": 0.7442878484725952
+        }
+      ],
+      "gemma-onnx-q4f16": [
+        {
+          "index": 1024,
+          "path": "../albums/melbourne/DSCF0106-2.jpg",
+          "score": 0.7257462739944458
+        },
+        {
+          "index": 638,
+          "path": "../albums/eastcoast/DSCF4833.jpg",
+          "score": 0.7249206304550171
+        },
+        {
+          "index": 1023,
+          "path": "../albums/melbourne/DSCF0083-2.jpg",
+          "score": 0.7058722376823425
+        }
+      ]
+    },
+    "I01": {
+      "siglip1-image": [
+        {
+          "index": 258,
+          "path": "../albums/24okinawa-taipei/DSCF1547.JPG",
+          "score": 0.8757914304733276
+        },
+        {
+          "index": 1207,
+          "path": "../albums/snapshots/DSCF2464.JPG",
+          "score": 0.8643571138381958
+        },
+        {
+          "index": 354,
+          "path": "../albums/2502japan/DSCF1335.jpg",
+          "score": 0.8600060343742371
+        }
+      ],
+      "siglip2-image": [
+        {
+          "index": 258,
+          "path": "../albums/24okinawa-taipei/DSCF1547.JPG",
+          "score": 0.9016814231872559
+        },
+        {
+          "index": 257,
+          "path": "../albums/24okinawa-taipei/DSCF1543.JPG",
+          "score": 0.879473090171814
+        },
+        {
+          "index": 1207,
+          "path": "../albums/snapshots/DSCF2464.JPG",
+          "score": 0.863392174243927
+        }
+      ],
+      "gemma-image": [
+        {
+          "index": 321,
+          "path": "../albums/24okinawa-taipei/DSCF2731.JPG",
+          "score": 0.8710806965827942
+        },
+        {
+          "index": 1432,
+          "path": "../albums/türkiye/PXL_20231110_073254500.cover.jpg",
+          "score": 0.8700296878814697
+        },
+        {
+          "index": 338,
+          "path": "../albums/2502japan/DSCF0939.jpg",
+          "score": 0.8685475587844849
+        }
+      ],
+      "gemma-caption-image": [
+        {
+          "index": 257,
+          "path": "../albums/24okinawa-taipei/DSCF1543.JPG",
+          "score": 0.9382119178771973
+        },
+        {
+          "index": 258,
+          "path": "../albums/24okinawa-taipei/DSCF1547.JPG",
+          "score": 0.9261345863342285
+        },
+        {
+          "index": 321,
+          "path": "../albums/24okinawa-taipei/DSCF2731.JPG",
+          "score": 0.9129297733306885
+        }
+      ]
+    },
+    "I03": {
+      "siglip1-image": [
+        {
+          "index": 638,
+          "path": "../albums/eastcoast/DSCF4833.jpg",
+          "score": 0.8301757574081421
+        },
+        {
+          "index": 1023,
+          "path": "../albums/melbourne/DSCF0083-2.jpg",
+          "score": 0.790227472782135
+        },
+        {
+          "index": 755,
+          "path": "../albums/hokkaido/DSCF6811.JPG",
+          "score": 0.7730950117111206
+        }
+      ],
+      "siglip2-image": [
+        {
+          "index": 638,
+          "path": "../albums/eastcoast/DSCF4833.jpg",
+          "score": 0.8603576421737671
+        },
+        {
+          "index": 755,
+          "path": "../albums/hokkaido/DSCF6811.JPG",
+          "score": 0.8282914161682129
+        },
+        {
+          "index": 1023,
+          "path": "../albums/melbourne/DSCF0083-2.jpg",
+          "score": 0.8164430260658264
+        }
+      ],
+      "gemma-image": [
+        {
+          "index": 638,
+          "path": "../albums/eastcoast/DSCF4833.jpg",
+          "score": 0.8641995787620544
+        },
+        {
+          "index": 1023,
+          "path": "../albums/melbourne/DSCF0083-2.jpg",
+          "score": 0.8326209783554077
+        },
+        {
+          "index": 755,
+          "path": "../albums/hokkaido/DSCF6811.JPG",
+          "score": 0.8208131790161133
+        }
+      ],
+      "gemma-caption-image": [
+        {
+          "index": 638,
+          "path": "../albums/eastcoast/DSCF4833.jpg",
+          "score": 0.9005513787269592
+        },
+        {
+          "index": 755,
+          "path": "../albums/hokkaido/DSCF6811.JPG",
+          "score": 0.8913499116897583
+        },
+        {
+          "index": 1023,
+          "path": "../albums/melbourne/DSCF0083-2.jpg",
+          "score": 0.8664849400520325
+        }
+      ]
+    },
+    "I05": {
+      "siglip1-image": [
+        {
+          "index": 759,
+          "path": "../albums/hokkaido/DSCF6915-2.jpg",
+          "score": 0.8122968673706055
+        },
+        {
+          "index": 955,
+          "path": "../albums/kanto/DSCF3463.JPG",
+          "score": 0.7997974157333374
+        },
+        {
+          "index": 389,
+          "path": "../albums/2502japan/DSCF2584.jpg",
+          "score": 0.7940346002578735
+        }
+      ],
+      "siglip2-image": [
+        {
+          "index": 759,
+          "path": "../albums/hokkaido/DSCF6915-2.jpg",
+          "score": 0.8688515424728394
+        },
+        {
+          "index": 389,
+          "path": "../albums/2502japan/DSCF2584.jpg",
+          "score": 0.8647257089614868
+        },
+        {
+          "index": 955,
+          "path": "../albums/kanto/DSCF3463.JPG",
+          "score": 0.8450586795806885
+        }
+      ],
+      "gemma-image": [
+        {
+          "index": 748,
+          "path": "../albums/hokkaido/DSCF6345.JPG",
+          "score": 0.8748581409454346
+        },
+        {
+          "index": 759,
+          "path": "../albums/hokkaido/DSCF6915-2.jpg",
+          "score": 0.8649649024009705
+        },
+        {
+          "index": 751,
+          "path": "../albums/hokkaido/DSCF6483-2.jpg",
+          "score": 0.8617684245109558
+        }
+      ],
+      "gemma-caption-image": [
+        {
+          "index": 748,
+          "path": "../albums/hokkaido/DSCF6345.JPG",
+          "score": 0.9056748151779175
+        },
+        {
+          "index": 759,
+          "path": "../albums/hokkaido/DSCF6915-2.jpg",
+          "score": 0.8960683345794678
+        },
+        {
+          "index": 750,
+          "path": "../albums/hokkaido/DSCF6472-2_1.jpg",
+          "score": 0.8882016539573669
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,123 @@
+{
+  "judge": "gpt-6.1-sol",
+  "grades": {
+    "T01": {
+      "P1238": {
+        "grade": 3,
+        "reason": "A reclining cat fills the foreground against outdoor greenery."
+      },
+      "P0322": {
+        "grade": 3,
+        "reason": "A cat lies stretched out asleep on outdoor paving."
+      },
+      "P1208": {
+        "grade": 3,
+        "reason": "A sleeping cat lies prominently on a ledge with greenery behind."
+      },
+      "P0339": {
+        "grade": 2,
+        "reason": "A cat lies on its side on outdoor concrete, small within a wide scene."
+      },
+      "P0335": {
+        "grade": 3,
+        "reason": "A sleeping cat rests prominently on rock beside outdoor plants."
+      },
+      "P1204": {
+        "grade": 3,
+        "reason": "A cat sprawls asleep along an outdoor brick wall."
+      },
+      "P0145": {
+        "grade": 2,
+        "reason": "A cat sits under outdoor shrubs; resting is less explicit than in a reclining pose."
+      }
+    },
+    "T02": {
+      "P0163": {
+        "grade": 3,
+        "reason": "A small bird is prominently perched on a thin branch against the sky."
+      },
+      "P1113": {
+        "grade": 2,
+        "reason": "A relatively large bird stands on a cut woody perch rather than a small bird on a branch."
+      },
+      "P1108": {
+        "grade": 3,
+        "reason": "A small bird is clearly perched on a slender diagonal branch."
+      },
+      "P1107": {
+        "grade": 0,
+        "reason": "The perched subject is an insect, with no bird visible."
+      },
+      "P0214": {
+        "grade": 2,
+        "reason": "A bird sits in a nest among blossom branches rather than visibly perching on a branch."
+      },
+      "P1120": {
+        "grade": 2,
+        "reason": "A colourful bird clings to a vertical trunk rather than perching on a branch."
+      },
+      "P1001": {
+        "grade": 2,
+        "reason": "A large long-tailed bird perches on a branch; the small-bird requirement is absent."
+      }
+    },
+    "T03": {
+      "P1089": {
+        "grade": 3,
+        "reason": "A small insect sits prominently on a curled green leaf."
+      },
+      "P1104": {
+        "grade": 2,
+        "reason": "An insect is perched on a thin plant stalk rather than a leaf."
+      },
+      "P1092": {
+        "grade": 3,
+        "reason": "A small insect sits visibly on a green leaf."
+      },
+      "P1119": {
+        "grade": 3,
+        "reason": "A tiny insect rests clearly on the surface of a broad leaf."
+      }
+    },
+    "T06": {
+      "P0688": {
+        "grade": 3,
+        "reason": "A city street is visibly snow-covered beneath night lighting."
+      },
+      "P0689": {
+        "grade": 3,
+        "reason": "Snow covers the street outside an illuminated building at night."
+      },
+      "P0732": {
+        "grade": 2,
+        "reason": "Snow-covered buildings and a narrow outdoor passage appear at night; the street is unclear."
+      },
+      "P0690": {
+        "grade": 3,
+        "reason": "A snow-covered city street recedes beneath streetlights at night."
+      }
+    },
+    "T09": {
+      "P0937": {
+        "grade": 2,
+        "reason": "Distant mountains appear above reflective water, but their reflection is faint beside reflected clouds."
+      },
+      "P0749": {
+        "grade": 1,
+        "reason": "Mountainous islands sit across calm water without a clear mountain reflection."
+      },
+      "P0752": {
+        "grade": 3,
+        "reason": "Mountainous islands form visible reflections in calm, lightly rippled water."
+      },
+      "P0608": {
+        "grade": 3,
+        "reason": "Snow-covered mountains are clearly reflected in a still mountain lake."
+      },
+      "P0848": {
+        "grade": 3,
+        "reason": "Mountain slopes and shoreline buildings form visible reflections in calm water."
+      }
+    }
+  }
+}

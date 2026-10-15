@@ -1,0 +1,116 @@
+{
+  "runtime": {
+    "python": "3.12.4",
+    "torch": "2.14.1+cu130",
+    "transformers_python": "5.20.0",
+    "tokenizers": "0.23.3",
+    "transformers_js": "4.3.1",
+    "node": "v26.5.0",
+    "cpu": "AMD Ryzen 9 5950X 16-Core Processor",
+    "gpu": "NVIDIA GeForce RTX 3080 10 GB",
+    "llama_cpp": "b11669 / 620d2225c",
+    "desktop_activity": "shared, not an isolated performance machine"
+  },
+  "models": {
+    "google/embeddinggemma-2": {
+      "revision": "914f7f89142e33e77833254d9c9b90c3cef7303b",
+      "files": [
+        {
+          "name": "model.safetensors",
+          "size": 1488915288
+        },
+        {
+          "name": "tokenizer.json",
+          "size": 32170510
+        },
+        {
+          "name": "tokenizer.model",
+          "size": 4689013
+        }
+      ]
+    },
+    "onnx-community/embeddinggemma-2-ONNX": {
+      "revision": "daa72c51243991dfcaf9f9137d2c573d8f7790c0",
+      "files": [
+        {
+          "name": "config.json",
+          "size": 5031
+        },
+        {
+          "name": "onnx/model_q4.onnx",
+          "size": 490742
+        },
+        {
+          "name": "onnx/model_q4.onnx_data",
+          "size": 174028800
+        },
+        {
+          "name": "onnx/model_quantized.onnx",
+          "size": 495165
+        },
+        {
+          "name": "onnx/model_quantized.onnx_data",
+          "size": 313724928
+        },
+        {
+          "name": "tokenizer.json",
+          "size": 32170510
+        },
+        {
+          "name": "tokenizer_config.json",
+          "size": 1599
+        },
+        {
+          "name": "onnx/model_q4f16.onnx",
+          "size": 495298
+        },
+        {
+          "name": "onnx/model_q4f16.onnx_data",
+          "size": 156862464
+        }
+      ]
+    },
+    "unsloth/embeddinggemma-2-GGUF": {
+      "revision": "031f0d4b35536f69ab3509d4893c923264fcf253",
+      "files": [
+        {
+          "name": "embeddinggemma-2-Q8_0.gguf",
+          "size": 309855520
+        },
+        {
+          "name": "embeddinggemma-2-UD-Q4_K_XL.gguf",
+          "size": 175673856
+        }
+      ]
+    },
+    "Xenova/siglip-base-patch16-224": {
+      "revision": "4649052661e53c7000355844105f8a1792088239",
+      "files": [
+        {
+          "name": "config.json",
+          "size": 457
+        },
+        {
+          "name": "onnx/text_model_q4.onnx",
+          "size": 154693262
+        },
+        {
+          "name": "tokenizer.json",
+          "size": 2398744
+        },
+        {
+          "name": "tokenizer_config.json",
+          "size": 739
+        }
+      ]
+    },
+    "google/siglip-base-patch16-224": {
+      "revision": "7fd15f0689c79d79e38b1c2e2e2370a7bf2761ed",
+      "source": "cached reference weights; image embeddings read from existing archive"
+    },
+    "google/siglip2-base-patch16-224": {
+      "revision": "75de2d55ec2d0b4efc50b3e9ad70dba96a7b2fa2",
+      "source": "cached reference weights; image embeddings read from existing archive"
+    }
+  }
+}

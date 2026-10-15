@@ -1,0 +1,598 @@
+{
+  "rubric": "0 irrelevant, 1 weak, 2 relevant, 3 strong/complete. Judge visible semantic relevance, not aesthetics. Unknown details remain uncertain.",
+  "queries": [
+    {
+      "id": "T01",
+      "category": "subject",
+      "text": "a cat resting outdoors",
+      "candidates": [
+        "P0335",
+        "P1204",
+        "P0339",
+        "P1238",
+        "P0322",
+        "P0145",
+        "P1208"
+      ],
+      "sheets": [
+        "docs/images/embedding-benchmark/T01-1.jpg"
+      ]
+    },
+    {
+      "id": "T02",
+      "category": "subject",
+      "text": "a small bird perched on a branch",
+      "candidates": [
+        "P1001",
+        "P1113",
+        "P0163",
+        "P1107",
+        "P0214",
+        "P1108",
+        "P1120"
+      ],
+      "sheets": [
+        "docs/images/embedding-benchmark/T02-1.jpg"
+      ]
+    },
+    {
+      "id": "T03",
+      "category": "detail",
+      "text": "a tiny insect sitting on a leaf",
+      "candidates": [
+        "P1092",
+        "P1119",
+        "P1089",
+        "P1104"
+      ],
+      "sheets": [
+        "docs/images/embedding-benchmark/T03-1.jpg"
+      ]
+    },
+    {
+      "id": "T06",
+      "category": "scene",
+      "text": "a snowy street at night",
+      "candidates": [
+        "P0689",
+        "P0688",
+        "P0690",
+        "P0732"
+      ],
+      "sheets": [
+        "docs/images/embedding-benchmark/T06-1.jpg"
+      ]
+    },
+    {
+      "id": "T09",
+      "category": "composition",
+      "text": "mountains reflected in still water",
+      "candidates": [
+        "P0848",
+        "P0749",
+        "P0608",
+        "P0937",
+        "P0752"
+      ],
+      "sheets": [
+        "docs/images/embedding-benchmark/T09-1.jpg"
+      ]
+    },
+    {
+      "id": "T11",
+      "category": "atmosphere",
+      "text": "a quiet forest with sunlight filtering through the trees",
+      "candidates": [
+        "P1491",
+        "P0983",
+        "P0764",
+        "P0827",
+        "P0957",
+        "P0814",
+        "P0884"
+      ],
+      "sheets": [
+        "docs/images/embedding-benchmark/T11-1.jpg"
+      ]
+    },
+    {
+      "id": "T12",
+      "category": "atmosphere",
+      "text": "a rainy city street with reflections on the road",
+      "candidates": [
+        "P0129",
+        "P1071",
+        "P0297",
+        "P0861",
+        "P1355",
+        "P0775",
+        "P0740",
+        "P0583"
+      ],
+      "sheets": [
+        "docs/images/embedding-benchmark/T12-1.jpg"
+      ]
+    },
+    {
+      "id": "T16",
+      "category": "detail",
+      "text": "Japanese writing on a shop sign",
+      "candidates": [
+        "P0425",
+        "P0445",
+        "P0931",
+        "P0288",
+        "P0351",
+        "P0509",
+        "P0232"
+      ],
+      "sheets": [
+        "docs/images/embedding-benchmark/T16-1.jpg"
+      ]
+    },
+    {
+      "id": "T19",
+      "category": "multilingual",
+      "language": "ja",
+      "text": "夜の雪道",
+      "meaning": "a snowy road at night",
+      "candidates": [
+        "P0365",
+        "P0732",
+        "P1333",
+        "P0360",
+        "P0502",
+        "P0362",
+        "P0690",
+        "P0738",
+        "P0688",
+        "P0175",
+        "P0695",
+        "P0715"
+      ],
+      "sheets": [
+        "docs/images/embedding-benchmark/T19-1.jpg"
+      ]
+    },
+    {
+      "id": "T21",
+      "category": "multilingual",
+      "language": "zh",
+      "text": "雨后街道上的倒影",
+      "meaning": "reflections on a street after rain",
+      "candidates": [
+        "P0583",
+        "P0804",
+        "P0294",
+        "P0513",
+        "P0770",
+        "P0842",
+        "P1333",
+        "P0297",
+        "P0365",
+        "P0775",
+        "P1355",
+        "P0774",
+        "P0502",
+        "P0769"
+      ],
+      "sheets": [
+        "docs/images/embedding-benchmark/T21-1.jpg"
+      ]
+    },
+    {
+      "id": "T23",
+      "category": "multilingual",
+      "language": "fr",
+      "text": "un chat qui se repose dehors",
+      "meaning": "a cat resting outdoors",
+      "candidates": [
+        "P0339",
+        "P1204",
+        "P0322",
+        "P0145",
+        "P1435",
+        "P0335",
+        "P0539"
+      ],
+      "sheets": [
+        "docs/images/embedding-benchmark/T23-1.jpg"
+      ]
+    },
+    {
+      "id": "T24",
+      "category": "multilingual",
+      "language": "es",
+      "text": "olas rompiendo contra una costa rocosa",
+      "meaning": "waves crashing against a rocky coast",
+      "candidates": [
+        "P0639",
+        "P1025",
+        "P0756",
+        "P0640",
+        "P1024"
+      ],
+      "sheets": [
+        "docs/images/embedding-benchmark/T24-1.jpg"
+      ]
+    },
+    {
+      "id": "I01",
+      "category": "image",
+      "reference_index": 334,
+      "reference_path": "../albums/2502japan/DSCF0824.jpg",
+      "selection_query": "T01",
+      "candidates": [
+        "P0339",
+        "P1433",
+        "P0322",
+        "P0355",
+        "P0258",
+        "P1208",
+        "P0259"
+      ],
+      "sheets": [
+        "docs/images/embedding-benchmark/I01-1.jpg"
+      ]
+    },
+    {
+      "id": "I03",
+      "category": "image",
+      "reference_index": 1024,
+      "reference_path": "../albums/melbourne/DSCF0106-2.jpg",
+      "selection_query": "T10",
+      "candidates": [
+        "P1024",
+        "P0639",
+        "P0756"
+      ],
+      "sheets": [
+        "docs/images/embedding-benchmark/I03-1.jpg"
+      ]
+    },
+    {
+      "id": "I05",
+      "category": "image",
+      "reference_index": 754,
+      "reference_path": "../albums/hokkaido/DSCF6691.JPG",
+      "selection_query": "T15",
+      "candidates": [
+        "P0760",
+        "P0751",
+        "P0752",
+        "P0390",
+        "P0956",
+        "P0749"
+      ],
+      "sheets": [
+        "docs/images/embedding-benchmark/I05-1.jpg"
+      ]
+    }
+  ],
+  "photos": {
+    "P0129": {
+      "path": "../albums/2411japan/DSCF7828.JPG",
+      "source": "albums/2411japan/DSCF7828.JPG"
+    },
+    "P0145": {
+      "path": "../albums/2411japan/DSCF8298.JPG",
+      "source": "albums/2411japan/DSCF8298.JPG"
+    },
+    "P0163": {
+      "path": "../albums/2411japan/DSCF8715_1.jpg",
+      "source": "albums/2411japan/DSCF8715_1.jpg"
+    },
+    "P0175": {
+      "path": "../albums/24japan/DSCF5880_1.jpg",
+      "source": "albums/24japan/DSCF5880_1.jpg"
+    },
+    "P0214": {
+      "path": "../albums/24japan/PXL_20240223_011325877.jpg",
+      "source": "albums/24japan/PXL_20240223_011325877.jpg"
+    },
+    "P0232": {
+      "path": "../albums/24okinawa-taipei/DSCF1072.JPG",
+      "source": "albums/24okinawa-taipei/DSCF1072.JPG"
+    },
+    "P0258": {
+      "path": "../albums/24okinawa-taipei/DSCF1543.JPG",
+      "source": "albums/24okinawa-taipei/DSCF1543.JPG"
+    },
+    "P0259": {
+      "path": "../albums/24okinawa-taipei/DSCF1547.JPG",
+      "source": "albums/24okinawa-taipei/DSCF1547.JPG"
+    },
+    "P0288": {
+      "path": "../albums/24okinawa-taipei/DSCF2025_2.jpg",
+      "source": "albums/24okinawa-taipei/DSCF2025_2.jpg"
+    },
+    "P0294": {
+      "path": "../albums/24okinawa-taipei/DSCF2188.JPG",
+      "source": "albums/24okinawa-taipei/DSCF2188.JPG"
+    },
+    "P0297": {
+      "path": "../albums/24okinawa-taipei/DSCF2220.JPG",
+      "source": "albums/24okinawa-taipei/DSCF2220.JPG"
+    },
+    "P0322": {
+      "path": "../albums/24okinawa-taipei/DSCF2731.JPG",
+      "source": "albums/24okinawa-taipei/DSCF2731.JPG"
+    },
+    "P0335": {
+      "path": "../albums/2502japan/DSCF0824.jpg",
+      "source": "albums/2502japan/DSCF0824.jpg"
+    },
+    "P0339": {
+      "path": "../albums/2502japan/DSCF0939.jpg",
+      "source": "albums/2502japan/DSCF0939.jpg"
+    },
+    "P0351": {
+      "path": "../albums/2502japan/DSCF1167.jpg",
+      "source": "albums/2502japan/DSCF1167.jpg"
+    },
+    "P0355": {
+      "path": "../albums/2502japan/DSCF1335.jpg",
+      "source": "albums/2502japan/DSCF1335.jpg"
+    },
+    "P0360": {
+      "path": "../albums/2502japan/DSCF1606.jpg",
+      "source": "albums/2502japan/DSCF1606.jpg"
+    },
+    "P0362": {
+      "path": "../albums/2502japan/DSCF1695-2.jpg",
+      "source": "albums/2502japan/DSCF1695-2.jpg"
+    },
+    "P0365": {
+      "path": "../albums/2502japan/DSCF1804-2.jpg",
+      "source": "albums/2502japan/DSCF1804-2.jpg"
+    },
+    "P0390": {
+      "path": "../albums/2502japan/DSCF2584.jpg",
+      "source": "albums/2502japan/DSCF2584.jpg"
+    },
+    "P0425": {
+      "path": "../albums/2511japan/DSCF6501.JPG",
+      "source": "albums/2511japan/DSCF6501.JPG"
+    },
+    "P0445": {
+      "path": "../albums/2511japan/DSCF7018.JPG",
+      "source": "albums/2511japan/DSCF7018.JPG"
+    },
+    "P0502": {
+      "path": "../albums/2511japan/DSCF7895.JPG",
+      "source": "albums/2511japan/DSCF7895.JPG"
+    },
+    "P0509": {
+      "path": "../albums/2511japan/DSCF7992.JPG",
+      "source": "albums/2511japan/DSCF7992.JPG"
+    },
+    "P0513": {
+      "path": "../albums/2511japan/DSCF8059.JPG",
+      "source": "albums/2511japan/DSCF8059.JPG"
+    },
+    "P0539": {
+      "path": "../albums/2602japan/DSCF8612.JPG",
+      "source": "albums/2602japan/DSCF8612.JPG"
+    },
+    "P0583": {
+      "path": "../albums/2607hongkong/DSCF2322-14.jpg",
+      "source": "albums/2607hongkong/DSCF2322-14.jpg"
+    },
+    "P0608": {
+      "path": "../albums/chuugoku/DSCF0520.jpg",
+      "source": "albums/chuugoku/DSCF0520.jpg"
+    },
+    "P0639": {
+      "path": "../albums/eastcoast/DSCF4833.jpg",
+      "source": "albums/eastcoast/DSCF4833.jpg"
+    },
+    "P0640": {
+      "path": "../albums/eastcoast/DSCF4854.jpg",
+      "source": "albums/eastcoast/DSCF4854.jpg"
+    },
+    "P0688": {
+      "path": "../albums/hokkaido/DSCF1442-2.jpg",
+      "source": "albums/hokkaido/DSCF1442-2.jpg"
+    },
+    "P0689": {
+      "path": "../albums/hokkaido/DSCF1449-2.jpg",
+      "source": "albums/hokkaido/DSCF1449-2.jpg"
+    },
+    "P0690": {
+      "path": "../albums/hokkaido/DSCF1455.JPG",
+      "source": "albums/hokkaido/DSCF1455.JPG"
+    },
+    "P0695": {
+      "path": "../albums/hokkaido/DSCF1593-2.jpg",
+      "source": "albums/hokkaido/DSCF1593-2.jpg"
+    },
+    "P0715": {
+      "path": "../albums/hokkaido/DSCF1940-2.jpg",
+      "source": "albums/hokkaido/DSCF1940-2.jpg"
+    },
+    "P0732": {
+      "path": "../albums/hokkaido/DSCF2248.JPG",
+      "source": "albums/hokkaido/DSCF2248.JPG"
+    },
+    "P0738": {
+      "path": "../albums/hokkaido/DSCF2334.JPG",
+      "source": "albums/hokkaido/DSCF2334.JPG"
+    },
+    "P0740": {
+      "path": "../albums/hokkaido/DSCF5948-2_2.jpg",
+      "source": "albums/hokkaido/DSCF5948-2_2.jpg"
+    },
+    "P0749": {
+      "path": "../albums/hokkaido/DSCF6345.JPG",
+      "source": "albums/hokkaido/DSCF6345.JPG"
+    },
+    "P0751": {
+      "path": "../albums/hokkaido/DSCF6472-2_1.jpg",
+      "source": "albums/hokkaido/DSCF6472-2_1.jpg"
+    },
+    "P0752": {
+      "path": "../albums/hokkaido/DSCF6483-2.jpg",
+      "source": "albums/hokkaido/DSCF6483-2.jpg"
+    },
+    "P0755": {
+      "path": "../albums/hokkaido/DSCF6691.JPG",
+      "source": "albums/hokkaido/DSCF6691.JPG"
+    },
+    "P0756": {
+      "path": "../albums/hokkaido/DSCF6811.JPG",
+      "source": "albums/hokkaido/DSCF6811.JPG"
+    },
+    "P0760": {
+      "path": "../albums/hokkaido/DSCF6915-2.jpg",
+      "source": "albums/hokkaido/DSCF6915-2.jpg"
+    },
+    "P0764": {
+      "path": "../albums/hokkaido/DSCF6941.JPG",
+      "source": "albums/hokkaido/DSCF6941.JPG"
+    },
+    "P0769": {
+      "path": "../albums/hyouka/DSCF2124-5.jpg",
+      "source": "albums/hyouka/DSCF2124-5.jpg"
+    },
+    "P0770": {
+      "path": "../albums/hyouka/DSCF2150-2.jpg",
+      "source": "albums/hyouka/DSCF2150-2.jpg"
+    },
+    "P0774": {
+      "path": "../albums/hyouka/DSCF2473-3.jpg",
+      "source": "albums/hyouka/DSCF2473-3.jpg"
+    },
+    "P0775": {
+      "path": "../albums/hyouka/DSCF2487-3.jpg",
+      "source": "albums/hyouka/DSCF2487-3.jpg"
+    },
+    "P0804": {
+      "path": "../albums/kansai/DSCF2174-3.jpg",
+      "source": "albums/kansai/DSCF2174-3.jpg"
+    },
+    "P0814": {
+      "path": "../albums/kansai/DSCF2304.jpg",
+      "source": "albums/kansai/DSCF2304.jpg"
+    },
+    "P0827": {
+      "path": "../albums/kansai/DSCF2379-2.jpg",
+      "source": "albums/kansai/DSCF2379-2.jpg"
+    },
+    "P0842": {
+      "path": "../albums/kansai/DSCF2584-2.jpg",
+      "source": "albums/kansai/DSCF2584-2.jpg"
+    },
+    "P0848": {
+      "path": "../albums/kansai/DSCF2951-2.jpg",
+      "source": "albums/kansai/DSCF2951-2.jpg"
+    },
+    "P0861": {
+      "path": "../albums/kansai/DSCF3212-2.jpg",
+      "source": "albums/kansai/DSCF3212-2.jpg"
+    },
+    "P0884": {
+      "path": "../albums/kansai/DSCF3667.jpg",
+      "source": "albums/kansai/DSCF3667.jpg"
+    },
+    "P0931": {
+      "path": "../albums/kansai/IMG_20161120_155921.jpg",
+      "source": "albums/kansai/IMG_20161120_155921.jpg"
+    },
+    "P0937": {
+      "path": "../albums/kansai/IMG_20161125_135448.jpg",
+      "source": "albums/kansai/IMG_20161125_135448.jpg"
+    },
+    "P0956": {
+      "path": "../albums/kanto/DSCF3463.JPG",
+      "source": "albums/kanto/DSCF3463.JPG"
+    },
+    "P0957": {
+      "path": "../albums/kanto/DSCF3470.JPG",
+      "source": "albums/kanto/DSCF3470.JPG"
+    },
+    "P0983": {
+      "path": "../albums/kanto/DSCF4047.JPG",
+      "source": "albums/kanto/DSCF4047.JPG"
+    },
+    "P1001": {
+      "path": "../albums/kanto/PXL_20221113_032430297.jpg",
+      "source": "albums/kanto/PXL_20221113_032430297.jpg"
+    },
+    "P1024": {
+      "path": "../albums/melbourne/DSCF0083-2.jpg",
+      "source": "albums/melbourne/DSCF0083-2.jpg"
+    },
+    "P1025": {
+      "path": "../albums/melbourne/DSCF0106-2.jpg",
+      "source": "albums/melbourne/DSCF0106-2.jpg"
+    },
+    "P1071": {
+      "path": "../albums/nagano/PXL_20230313_110000702.MP.jpg",
+      "source": "albums/nagano/PXL_20230313_110000702.MP.jpg"
+    },
+    "P1089": {
+      "path": "../albums/sg-parks/DSCF0423.JPG",
+      "source": "albums/sg-parks/DSCF0423.JPG"
+    },
+    "P1092": {
+      "path": "../albums/sg-parks/DSCF0502.JPG",
+      "source": "albums/sg-parks/DSCF0502.JPG"
+    },
+    "P1104": {
+      "path": "../albums/sg-parks/DSCF3028_1.jpg",
+      "source": "albums/sg-parks/DSCF3028_1.jpg"
+    },
+    "P1107": {
+      "path": "../albums/sg-parks/DSCF3102.JPG",
+      "source": "albums/sg-parks/DSCF3102.JPG"
+    },
+    "P1108": {
+      "path": "../albums/sg-parks/DSCF3125_2.jpg",
+      "source": "albums/sg-parks/DSCF3125_2.jpg"
+    },
+    "P1113": {
+      "path": "../albums/sg-parks/DSCF4356-1.JPG",
+      "source": "albums/sg-parks/DSCF4356-1.JPG"
+    },
+    "P1119": {
+      "path": "../albums/sg-parks/DSCF4500.JPG",
+      "source": "albums/sg-parks/DSCF4500.JPG"
+    },
+    "P1120": {
+      "path": "../albums/sg-parks/DSCF4545.JPG",
+      "source": "albums/sg-parks/DSCF4545.JPG"
+    },
+    "P1204": {
+      "path": "../albums/snapshots/DSCF2437.JPG",
+      "source": "albums/snapshots/DSCF2437.JPG"
+    },
+    "P1208": {
+      "path": "../albums/snapshots/DSCF2464.JPG",
+      "source": "albums/snapshots/DSCF2464.JPG"
+    },
+    "P1238": {
+      "path": "../albums/snapshots/DSCF3018.JPG",
+      "source": "albums/snapshots/DSCF3018.JPG"
+    },
+    "P1333": {
+      "path": "../albums/snapshots/DSCF6019-2.jpg",
+      "source": "albums/snapshots/DSCF6019-2.jpg"
+    },
+    "P1355": {
+      "path": "../albums/snapshots/DSCF9045.JPG",
+      "source": "albums/snapshots/DSCF9045.JPG"
+    },
+    "P1433": {
+      "path": "../albums/türkiye/PXL_20231110_073254500.cover.jpg",
+      "source": "albums/türkiye/PXL_20231110_073254500.cover.jpg"
+    },
+    "P1435": {
+      "path": "../albums/türkiye/PXL_20231110_144052279.jpg",
+      "source": "albums/türkiye/PXL_20231110_144052279.jpg"
+    },
+    "P1491": {
+      "path": "../albums/westcoast/DSCF8526.JPG",
+      "source": "albums/westcoast/DSCF8526.JPG"
+    }
+  }
+}

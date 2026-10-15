@@ -1,5 +1,9 @@
 # Caption backend bake-off — 17–18 July 2026
 
+> For the later photo-retrieval comparison, see the
+> [October embedding benchmark](embedding-benchmark.md). Its scores measure
+> retrieval, not caption or tag accuracy.
+
 > **Status: shipped.** Default swapped from Janus-Pro-1B to Gemma 4 E4B `UD-Q4_K_XL` on a
 > resident `llama-server`, tags reshaped for facets, visible-text capture added, and the full
 > library reindexed and published on 18 Jul. See *Decision and outcome* below for the result and

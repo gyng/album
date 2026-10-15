@@ -1,0 +1,181 @@
+{
+  "judge": "gpt-6.1-sol",
+  "grades": {
+    "T21": {
+      "P0513": {
+        "grade": 0,
+        "reason": "The reflection is in a roadside mirror, not on a wet street."
+      },
+      "P0769": {
+        "grade": 0,
+        "reason": "Buildings and lights reflect in a river, not on a street."
+      },
+      "P0297": {
+        "grade": 3,
+        "reason": "Bright reflections break across a wet cobbled street surface."
+      },
+      "P0775": {
+        "grade": 1,
+        "reason": "People carry umbrellas at a street corner, but wet reflections are unclear."
+      },
+      "P1333": {
+        "grade": 0,
+        "reason": "A glowing shop sign is shown without reflected light on a street."
+      },
+      "P0842": {
+        "grade": 0,
+        "reason": "Trees and sky reflect in a field of water, not on a street."
+      },
+      "P1355": {
+        "grade": 0,
+        "reason": "A street is reflected in a car mirror rather than on rain-wet ground."
+      },
+      "P0365": {
+        "grade": 0,
+        "reason": "Roadside warning signs and woodland show no rain reflections."
+      },
+      "P0770": {
+        "grade": 1,
+        "reason": "An umbrella-carrying pedestrian is on a street, but ground reflections are unclear."
+      },
+      "P0774": {
+        "grade": 0,
+        "reason": "The subject is umbrellas beside a small building, without reflected street surfaces."
+      },
+      "P0502": {
+        "grade": 0,
+        "reason": "A sunlit road has no visible rain or reflections."
+      },
+      "P0583": {
+        "grade": 1,
+        "reason": "Umbrellas suggest rain in an urban setting, but the ground and reflections are obscured."
+      },
+      "P0804": {
+        "grade": 2,
+        "reason": "Street lights reflect on the pavement around a cyclist, though wetness is less prominent."
+      }
+    },
+    "T23": {
+      "P1435": {
+        "grade": 3,
+        "reason": "A cat rests in a tucked posture on an outdoor stone doorstep."
+      },
+      "P0539": {
+        "grade": 3,
+        "reason": "A cat lies resting on a sunlit doorstep outside a doorway."
+      },
+      "P0145": {
+        "grade": 3,
+        "reason": "A cat sits quietly beneath a tree in outdoor grass."
+      },
+      "P1204": {
+        "grade": 3,
+        "reason": "A sleeping cat stretches along an outdoor brick wall."
+      },
+      "P0335": {
+        "grade": 3,
+        "reason": "A cat sleeps on rough ground beside outdoor vegetation."
+      },
+      "P0322": {
+        "grade": 3,
+        "reason": "A cat lies asleep with paws stretched across an outdoor path."
+      },
+      "P0339": {
+        "grade": 3,
+        "reason": "A cat lies asleep on an open paved area."
+      }
+    },
+    "T24": {
+      "P1025": {
+        "grade": 3,
+        "reason": "A large foaming wave breaks directly against a rock face."
+      },
+      "P0756": {
+        "grade": 3,
+        "reason": "White surf breaks along a prominently rocky cliff-lined coast."
+      },
+      "P0639": {
+        "grade": 3,
+        "reason": "Foaming waves churn against shoreline rocks below the viewpoint."
+      },
+      "P0640": {
+        "grade": 2,
+        "reason": "Foaming water reaches a rocky edge, though a built platform dominates the foreground."
+      },
+      "P1024": {
+        "grade": 3,
+        "reason": "Bands of breaking surf surround sea stacks and high coastal cliffs."
+      }
+    },
+    "I01": {
+      "P0259": {
+        "grade": 2,
+        "reason": "An outdoor cat beside rocks matches the subject and setting, but it is sitting awake."
+      },
+      "P1208": {
+        "grade": 3,
+        "reason": "A sleeping cat lies outdoors against a background of greenery."
+      },
+      "P1433": {
+        "grade": 2,
+        "reason": "A cat sits on rough coastal ground outdoors, but is awake and upright."
+      },
+      "P0339": {
+        "grade": 3,
+        "reason": "A cat lies asleep on outdoor ground, matching the resting subject and scene."
+      },
+      "P0355": {
+        "grade": 2,
+        "reason": "A cat lies on outdoor stone but is awake rather than sleeping."
+      },
+      "P0258": {
+        "grade": 2,
+        "reason": "A cat rests beside a tree outdoors, but its upright awake pose differs."
+      },
+      "P0322": {
+        "grade": 3,
+        "reason": "A cat lies asleep on an outdoor path beside a rough wall."
+      }
+    },
+    "I03": {
+      "P1024": {
+        "grade": 3,
+        "reason": "Breaking surf surrounds large coastal rocks and cliffs."
+      },
+      "P0639": {
+        "grade": 3,
+        "reason": "Foaming waves churn against rocks immediately below the viewpoint."
+      },
+      "P0756": {
+        "grade": 3,
+        "reason": "Foaming surf breaks against a rocky cliff-lined coast."
+      }
+    },
+    "I05": {
+      "P0760": {
+        "grade": 1,
+        "reason": "Cloud-covered mountains match part of the scene, but there is no visible lake."
+      },
+      "P0956": {
+        "grade": 1,
+        "reason": "A mountain rises beyond foreground vegetation, but the lake scene is absent."
+      },
+      "P0752": {
+        "grade": 2,
+        "reason": "Mountains across calm water match the main landscape, but the peaks are clearly exposed."
+      },
+      "P0751": {
+        "grade": 3,
+        "reason": "Low cloud obscures mountains across a lake framed by foreground vegetation."
+      },
+      "P0390": {
+        "grade": 1,
+        "reason": "Low cloud obscures a mountain above trees, but a lake is not visible."
+      },
+      "P0749": {
+        "grade": 3,
+        "reason": "Muted mountains sit across calm lake water beneath a low grey sky."
+      }
+    }
+  }
+}

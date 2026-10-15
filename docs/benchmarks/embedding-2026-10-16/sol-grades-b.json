@@ -1,0 +1,141 @@
+{
+  "judge": "gpt-6.1-sol",
+  "grades": {
+    "T11": {
+      "P0827": {
+        "grade": 2,
+        "reason": "Sunlit forest edge beyond a field; filtering light is visible but the forest is distant."
+      },
+      "P0764": {
+        "grade": 2,
+        "reason": "Quiet stand of trees with light between trunks; distinct sunlight is subdued."
+      },
+      "P0957": {
+        "grade": 2,
+        "reason": "Light passes between tall trees, but the view chiefly frames a distant mountain."
+      },
+      "P1491": {
+        "grade": 3,
+        "reason": "Sunlight filters between tall forest trunks onto an empty forest floor."
+      },
+      "P0884": {
+        "grade": 3,
+        "reason": "Quiet bamboo forest with sunlight filtering through the leafy canopy."
+      },
+      "P0814": {
+        "grade": 2,
+        "reason": "Quiet shaded trees border a sunlit clearing; filtering sunlight is less prominent."
+      },
+      "P0983": {
+        "grade": 2,
+        "reason": "Wooded setting with patches of daylight, though a glowing lantern dominates."
+      }
+    },
+    "T12": {
+      "P0129": {
+        "grade": 0,
+        "reason": "Suspension bridge over water; no rainy city street or road reflections."
+      },
+      "P0583": {
+        "grade": 2,
+        "reason": "Umbrellas and mist show a rainy urban scene, but the road and reflections are obscured."
+      },
+      "P0297": {
+        "grade": 2,
+        "reason": "Wet cobbles carry clear reflections; the wider city setting is not visible."
+      },
+      "P0775": {
+        "grade": 1,
+        "reason": "Urban street and umbrellas are visible, but the road appears sunlit without clear rain reflections."
+      },
+      "P0740": {
+        "grade": 3,
+        "reason": "Night city junction has a visibly wet road reflecting coloured lights."
+      },
+      "P1355": {
+        "grade": 1,
+        "reason": "City street appears in a vehicle mirror; this is not a wet-road reflection."
+      },
+      "P0861": {
+        "grade": 2,
+        "reason": "Lit city street has a reflective-looking surface, but rain is not clearly visible."
+      }
+    },
+    "T16": {
+      "P0351": {
+        "grade": 3,
+        "reason": "Large Japanese characters and hiragana prominently label a shopfront."
+      },
+      "P0509": {
+        "grade": 3,
+        "reason": "Close-up of a food shop sign with clear Japanese hiragana."
+      },
+      "P0288": {
+        "grade": 3,
+        "reason": "Japanese writing covers the signs around a clearly visible shopfront."
+      },
+      "P0445": {
+        "grade": 1,
+        "reason": "A faded sign is visible in darkness, but Japanese lettering and a shop context are unclear."
+      },
+      "P0425": {
+        "grade": 2,
+        "reason": "Clear Japanese signage points to transport and toilets, without a shop."
+      },
+      "P0232": {
+        "grade": 3,
+        "reason": "Large Japanese writing advertises local products and souvenirs above a shop."
+      }
+    },
+    "T19": {
+      "P0365": {
+        "grade": 0,
+        "reason": "Roadside signs in daylight, without visible snow or night conditions."
+      },
+      "P0502": {
+        "grade": 0,
+        "reason": "A clear road is shown in daylight with no snow."
+      },
+      "P0695": {
+        "grade": 1,
+        "reason": "Snow covers shrine steps in bright daylight, rather than a night road."
+      },
+      "P0362": {
+        "grade": 1,
+        "reason": "Snow and shrine banners appear in daylight, without a road."
+      },
+      "P1333": {
+        "grade": 0,
+        "reason": "A neon sign at night contains no snowy road."
+      },
+      "P0360": {
+        "grade": 0,
+        "reason": "Steaming wooden structures are shown, without a snowy night road."
+      },
+      "P0688": {
+        "grade": 3,
+        "reason": "A snow-covered city street is clearly shown under night lighting."
+      },
+      "P0715": {
+        "grade": 1,
+        "reason": "People stand by snow and ice displays at night; no road is visible."
+      },
+      "P0690": {
+        "grade": 3,
+        "reason": "An empty city road is thickly covered in snow at night."
+      },
+      "P0175": {
+        "grade": 1,
+        "reason": "A snowy landscape lies beneath a starry night sky, but no road is clear."
+      },
+      "P0732": {
+        "grade": 2,
+        "reason": "A snowy lane-like space runs beside houses at night; the road is partly obscured."
+      },
+      "P0738": {
+        "grade": 1,
+        "reason": "Feet and small snow lanterns appear on snowy ground at night, without a road view."
+      }
+    }
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "gemma-onnx-q4": {
+    "mean_cosine_to_bf16": 0.9916620254516602,
+    "min_cosine_to_bf16": 0.983676552772522,
+    "mean_top3_overlap": 0.8888888888888888,
+    "top1_agreement": 0.8333333333333334
+  },
+  "gemma-onnx-q8": {
+    "mean_cosine_to_bf16": 0.9999478459358215,
+    "min_cosine_to_bf16": 0.9999219179153442,
+    "mean_top3_overlap": 0.986111111111111,
+    "top1_agreement": 1.0
+  },
+  "gemma-onnx-q4f16": {
+    "mean_cosine_to_bf16": 0.9916574358940125,
+    "min_cosine_to_bf16": 0.9837562441825867,
+    "mean_top3_overlap": 0.8888888888888888,
+    "top1_agreement": 0.8333333333333334
+  },
+  "unsloth-q4": {
+    "mean_cosine_to_bf16": 0.9970211982727051,
+    "min_cosine_to_bf16": 0.9925258159637451,
+    "mean_top3_overlap": 0.9722222222222222,
+    "top1_agreement": 0.9166666666666666
+  },
+  "unsloth-q8": {
+    "mean_cosine_to_bf16": 0.9998903274536133,
+    "min_cosine_to_bf16": 0.9997993111610413,
+    "mean_top3_overlap": 0.986111111111111,
+    "top1_agreement": 0.9583333333333334
+  }
+}

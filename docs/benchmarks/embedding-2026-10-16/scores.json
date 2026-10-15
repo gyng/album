@@ -1,0 +1,2543 @@
+{
+  "judge": "Sol (gpt-6.1-sol)",
+  "aggregates": {
+    "all_text": {
+      "gemma-256d": {
+        "queries": 12,
+        "ndcg3": 0.8263248818180879,
+        "zero_gain_queries": 0,
+        "precision3": 0.8611111111111112,
+        "top1_relevant": 0.9166666666666666,
+        "mean_grade": 2.444444444444444
+      },
+      "gemma-bf16": {
+        "queries": 12,
+        "ndcg3": 0.8887567785875746,
+        "zero_gain_queries": 0,
+        "precision3": 0.9166666666666666,
+        "top1_relevant": 0.9166666666666666,
+        "mean_grade": 2.5833333333333335
+      },
+      "gemma-caption-bf16": {
+        "queries": 12,
+        "ndcg3": 0.807130020691627,
+        "zero_gain_queries": 0,
+        "precision3": 0.8611111111111112,
+        "top1_relevant": 0.9166666666666666,
+        "mean_grade": 2.472222222222222
+      },
+      "gemma-caption-onnx-q4": {
+        "queries": 12,
+        "ndcg3": 0.7986175335744758,
+        "zero_gain_queries": 0,
+        "precision3": 0.8333333333333334,
+        "top1_relevant": 0.9166666666666666,
+        "mean_grade": 2.4166666666666665
+      },
+      "gemma-caption-unsloth-q4": {
+        "queries": 12,
+        "ndcg3": 0.7965554130904883,
+        "zero_gain_queries": 0,
+        "precision3": 0.8611111111111112,
+        "top1_relevant": 0.8333333333333334,
+        "mean_grade": 2.444444444444444
+      },
+      "gemma-int8-storage-q4": {
+        "queries": 12,
+        "ndcg3": 0.8427630030139434,
+        "zero_gain_queries": 0,
+        "precision3": 0.8611111111111112,
+        "top1_relevant": 0.9166666666666666,
+        "mean_grade": 2.444444444444444
+      },
+      "gemma-onnx-q4": {
+        "queries": 12,
+        "ndcg3": 0.8441365663339516,
+        "zero_gain_queries": 0,
+        "precision3": 0.8611111111111112,
+        "top1_relevant": 0.9166666666666666,
+        "mean_grade": 2.444444444444444
+      },
+      "gemma-onnx-q4f16": {
+        "queries": 12,
+        "ndcg3": 0.8264807451947612,
+        "zero_gain_queries": 0,
+        "precision3": 0.8611111111111112,
+        "top1_relevant": 0.9166666666666666,
+        "mean_grade": 2.444444444444444
+      },
+      "gemma-onnx-q8": {
+        "queries": 12,
+        "ndcg3": 0.8887567785875746,
+        "zero_gain_queries": 0,
+        "precision3": 0.9166666666666666,
+        "top1_relevant": 0.9166666666666666,
+        "mean_grade": 2.5833333333333335
+      },
+      "gemma-unsloth-q4": {
+        "queries": 12,
+        "ndcg3": 0.9150565304097144,
+        "zero_gain_queries": 0,
+        "precision3": 0.9166666666666666,
+        "top1_relevant": 1.0,
+        "mean_grade": 2.5833333333333335
+      },
+      "gemma-unsloth-q8": {
+        "queries": 12,
+        "ndcg3": 0.8887567785875746,
+        "zero_gain_queries": 0,
+        "precision3": 0.9166666666666666,
+        "top1_relevant": 0.9166666666666666,
+        "mean_grade": 2.5833333333333335
+      },
+      "siglip1-current-q4": {
+        "queries": 12,
+        "ndcg3": 0.6588616950268129,
+        "zero_gain_queries": 0,
+        "precision3": 0.7777777777777778,
+        "top1_relevant": 0.75,
+        "mean_grade": 2.111111111111111
+      },
+      "siglip1-fp32": {
+        "queries": 12,
+        "ndcg3": 0.69885905424341,
+        "zero_gain_queries": 0,
+        "precision3": 0.7777777777777778,
+        "top1_relevant": 0.75,
+        "mean_grade": 2.2777777777777777
+      },
+      "siglip2-fp32": {
+        "queries": 12,
+        "ndcg3": 0.7588487872994879,
+        "zero_gain_queries": 0,
+        "precision3": 0.75,
+        "top1_relevant": 0.8333333333333334,
+        "mean_grade": 2.25
+      }
+    },
+    "english": {
+      "gemma-256d": {
+        "queries": 8,
+        "ndcg3": 0.8445252012746445,
+        "zero_gain_queries": 0,
+        "precision3": 0.875,
+        "top1_relevant": 1.0,
+        "mean_grade": 2.5
+      },
+      "gemma-bf16": {
+        "queries": 8,
+        "ndcg3": 0.8793977967078945,
+        "zero_gain_queries": 0,
+        "precision3": 0.9166666666666666,
+        "top1_relevant": 1.0,
+        "mean_grade": 2.5833333333333335
+      },
+      "gemma-caption-bf16": {
+        "queries": 8,
+        "ndcg3": 0.8550501070902987,
+        "zero_gain_queries": 0,
+        "precision3": 0.9166666666666666,
+        "top1_relevant": 1.0,
+        "mean_grade": 2.625
+      },
+      "gemma-caption-onnx-q4": {
+        "queries": 8,
+        "ndcg3": 0.8422813764145718,
+        "zero_gain_queries": 0,
+        "precision3": 0.875,
+        "top1_relevant": 1.0,
+        "mean_grade": 2.5416666666666665
+      },
+      "gemma-caption-unsloth-q4": {
+        "queries": 8,
+        "ndcg3": 0.8391881956885905,
+        "zero_gain_queries": 0,
+        "precision3": 0.9166666666666666,
+        "top1_relevant": 0.875,
+        "mean_grade": 2.5833333333333335
+      },
+      "gemma-int8-storage-q4": {
+        "queries": 8,
+        "ndcg3": 0.8425662211317777,
+        "zero_gain_queries": 0,
+        "precision3": 0.875,
+        "top1_relevant": 1.0,
+        "mean_grade": 2.4583333333333335
+      },
+      "gemma-onnx-q4": {
+        "queries": 8,
+        "ndcg3": 0.8374979104558626,
+        "zero_gain_queries": 0,
+        "precision3": 0.875,
+        "top1_relevant": 1.0,
+        "mean_grade": 2.4583333333333335
+      },
+      "gemma-onnx-q4f16": {
+        "queries": 8,
+        "ndcg3": 0.8374979104558626,
+        "zero_gain_queries": 0,
+        "precision3": 0.875,
+        "top1_relevant": 1.0,
+        "mean_grade": 2.4583333333333335
+      },
+      "gemma-onnx-q8": {
+        "queries": 8,
+        "ndcg3": 0.8793977967078945,
+        "zero_gain_queries": 0,
+        "precision3": 0.9166666666666666,
+        "top1_relevant": 1.0,
+        "mean_grade": 2.5833333333333335
+      },
+      "gemma-unsloth-q4": {
+        "queries": 8,
+        "ndcg3": 0.8844661073838095,
+        "zero_gain_queries": 0,
+        "precision3": 0.9166666666666666,
+        "top1_relevant": 1.0,
+        "mean_grade": 2.5833333333333335
+      },
+      "gemma-unsloth-q8": {
+        "queries": 8,
+        "ndcg3": 0.8793977967078945,
+        "zero_gain_queries": 0,
+        "precision3": 0.9166666666666666,
+        "top1_relevant": 1.0,
+        "mean_grade": 2.5833333333333335
+      },
+      "siglip1-current-q4": {
+        "queries": 8,
+        "ndcg3": 0.7550524970410321,
+        "zero_gain_queries": 0,
+        "precision3": 0.9166666666666666,
+        "top1_relevant": 0.875,
+        "mean_grade": 2.458333333333333
+      },
+      "siglip1-fp32": {
+        "queries": 8,
+        "ndcg3": 0.7493078419449365,
+        "zero_gain_queries": 0,
+        "precision3": 0.9166666666666666,
+        "top1_relevant": 0.875,
+        "mean_grade": 2.4166666666666665
+      },
+      "siglip2-fp32": {
+        "queries": 8,
+        "ndcg3": 0.8724897962406095,
+        "zero_gain_queries": 0,
+        "precision3": 0.875,
+        "top1_relevant": 1.0,
+        "mean_grade": 2.5416666666666665
+      }
+    },
+    "multilingual": {
+      "gemma-256d": {
+        "queries": 4,
+        "ndcg3": 0.7899242429049749,
+        "zero_gain_queries": 0,
+        "precision3": 0.8333333333333334,
+        "top1_relevant": 0.75,
+        "mean_grade": 2.3333333333333335
+      },
+      "gemma-bf16": {
+        "queries": 4,
+        "ndcg3": 0.9074747423469347,
+        "zero_gain_queries": 0,
+        "precision3": 0.9166666666666666,
+        "top1_relevant": 0.75,
+        "mean_grade": 2.5833333333333335
+      },
+      "gemma-caption-bf16": {
+        "queries": 4,
+        "ndcg3": 0.7112898478942837,
+        "zero_gain_queries": 0,
+        "precision3": 0.75,
+        "top1_relevant": 0.75,
+        "mean_grade": 2.1666666666666665
+      },
+      "gemma-caption-onnx-q4": {
+        "queries": 4,
+        "ndcg3": 0.7112898478942837,
+        "zero_gain_queries": 0,
+        "precision3": 0.75,
+        "top1_relevant": 0.75,
+        "mean_grade": 2.1666666666666665
+      },
+      "gemma-caption-unsloth-q4": {
+        "queries": 4,
+        "ndcg3": 0.7112898478942837,
+        "zero_gain_queries": 0,
+        "precision3": 0.75,
+        "top1_relevant": 0.75,
+        "mean_grade": 2.1666666666666665
+      },
+      "gemma-int8-storage-q4": {
+        "queries": 4,
+        "ndcg3": 0.8431565667782747,
+        "zero_gain_queries": 0,
+        "precision3": 0.8333333333333334,
+        "top1_relevant": 0.75,
+        "mean_grade": 2.4166666666666665
+      },
+      "gemma-onnx-q4": {
+        "queries": 4,
+        "ndcg3": 0.8574138780901297,
+        "zero_gain_queries": 0,
+        "precision3": 0.8333333333333334,
+        "top1_relevant": 0.75,
+        "mean_grade": 2.4166666666666665
+      },
+      "gemma-onnx-q4f16": {
+        "queries": 4,
+        "ndcg3": 0.8044464146725585,
+        "zero_gain_queries": 0,
+        "precision3": 0.8333333333333334,
+        "top1_relevant": 0.75,
+        "mean_grade": 2.4166666666666665
+      },
+      "gemma-onnx-q8": {
+        "queries": 4,
+        "ndcg3": 0.9074747423469347,
+        "zero_gain_queries": 0,
+        "precision3": 0.9166666666666666,
+        "top1_relevant": 0.75,
+        "mean_grade": 2.5833333333333335
+      },
+      "gemma-unsloth-q4": {
+        "queries": 4,
+        "ndcg3": 0.9762373764615243,
+        "zero_gain_queries": 0,
+        "precision3": 0.9166666666666666,
+        "top1_relevant": 1.0,
+        "mean_grade": 2.5833333333333335
+      },
+      "gemma-unsloth-q8": {
+        "queries": 4,
+        "ndcg3": 0.9074747423469347,
+        "zero_gain_queries": 0,
+        "precision3": 0.9166666666666666,
+        "top1_relevant": 0.75,
+        "mean_grade": 2.5833333333333335
+      },
+      "siglip1-current-q4": {
+        "queries": 4,
+        "ndcg3": 0.4664800909983745,
+        "zero_gain_queries": 0,
+        "precision3": 0.5,
+        "top1_relevant": 0.5,
+        "mean_grade": 1.4166666666666665
+      },
+      "siglip1-fp32": {
+        "queries": 4,
+        "ndcg3": 0.5979614788403572,
+        "zero_gain_queries": 0,
+        "precision3": 0.5,
+        "top1_relevant": 0.5,
+        "mean_grade": 2.0
+      },
+      "siglip2-fp32": {
+        "queries": 4,
+        "ndcg3": 0.5315667694172447,
+        "zero_gain_queries": 0,
+        "precision3": 0.5,
+        "top1_relevant": 0.5,
+        "mean_grade": 1.6666666666666667
+      }
+    },
+    "image": {
+      "gemma-caption-image": {
+        "queries": 3,
+        "ndcg3": 0.8081370107518392,
+        "zero_gain_queries": 0,
+        "precision3": 0.8888888888888888,
+        "top1_relevant": 1.0,
+        "mean_grade": 2.555555555555556
+      },
+      "gemma-image": {
+        "queries": 3,
+        "ndcg3": 0.8459098986152188,
+        "zero_gain_queries": 0,
+        "precision3": 0.8888888888888888,
+        "top1_relevant": 1.0,
+        "mean_grade": 2.5555555555555554
+      },
+      "siglip1-image": {
+        "queries": 3,
+        "ndcg3": 0.5875794405850632,
+        "zero_gain_queries": 0,
+        "precision3": 0.6666666666666666,
+        "top1_relevant": 0.6666666666666666,
+        "mean_grade": 2.111111111111111
+      },
+      "siglip2-image": {
+        "queries": 3,
+        "ndcg3": 0.5758760981175418,
+        "zero_gain_queries": 0,
+        "precision3": 0.6666666666666666,
+        "top1_relevant": 0.6666666666666666,
+        "mean_grade": 2.111111111111111
+      }
+    }
+  },
+  "per_query": {
+    "T01": {
+      "siglip1-current-q4": {
+        "grades": [
+          2,
+          3,
+          3
+        ],
+        "ndcg3": 0.7318407279869963,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 2.6666666666666665
+      },
+      "siglip1-fp32": {
+        "grades": [
+          3,
+          2,
+          3
+        ],
+        "ndcg3": 0.8308103365909342,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 2.6666666666666665
+      },
+      "siglip2-fp32": {
+        "grades": [
+          3,
+          3,
+          3
+        ],
+        "ndcg3": 1.0,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 3.0
+      },
+      "gemma-bf16": {
+        "grades": [
+          2,
+          3,
+          3
+        ],
+        "ndcg3": 0.7318407279869963,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 2.6666666666666665
+      },
+      "gemma-onnx-q4": {
+        "grades": [
+          2,
+          3,
+          3
+        ],
+        "ndcg3": 0.7318407279869963,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 2.6666666666666665
+      },
+      "gemma-onnx-q8": {
+        "grades": [
+          2,
+          3,
+          3
+        ],
+        "ndcg3": 0.7318407279869963,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 2.6666666666666665
+      },
+      "gemma-unsloth-q4": {
+        "grades": [
+          2,
+          3,
+          3
+        ],
+        "ndcg3": 0.7318407279869963,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 2.6666666666666665
+      },
+      "gemma-unsloth-q8": {
+        "grades": [
+          2,
+          3,
+          3
+        ],
+        "ndcg3": 0.7318407279869963,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 2.6666666666666665
+      },
+      "gemma-256d": {
+        "grades": [
+          2,
+          3,
+          3
+        ],
+        "ndcg3": 0.7318407279869963,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 2.6666666666666665
+      },
+      "gemma-int8-storage-q4": {
+        "grades": [
+          2,
+          3,
+          3
+        ],
+        "ndcg3": 0.7318407279869963,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 2.6666666666666665
+      },
+      "gemma-caption-bf16": {
+        "grades": [
+          2,
+          3,
+          3
+        ],
+        "ndcg3": 0.7318407279869963,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 2.6666666666666665
+      },
+      "gemma-caption-onnx-q4": {
+        "grades": [
+          3,
+          2,
+          3
+        ],
+        "ndcg3": 0.8308103365909342,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 2.6666666666666665
+      },
+      "gemma-caption-unsloth-q4": {
+        "grades": [
+          3,
+          2,
+          3
+        ],
+        "ndcg3": 0.8308103365909342,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 2.6666666666666665
+      },
+      "gemma-onnx-q4f16": {
+        "grades": [
+          2,
+          3,
+          3
+        ],
+        "ndcg3": 0.7318407279869963,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 2.6666666666666665
+      }
+    },
+    "T02": {
+      "siglip1-current-q4": {
+        "grades": [
+          3,
+          3,
+          2
+        ],
+        "ndcg3": 1.0,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 2.6666666666666665
+      },
+      "siglip1-fp32": {
+        "grades": [
+          3,
+          2,
+          2
+        ],
+        "ndcg3": 0.8046129061698147,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 2.3333333333333335
+      },
+      "siglip2-fp32": {
+        "grades": [
+          3,
+          3,
+          2
+        ],
+        "ndcg3": 1.0,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 2.6666666666666665
+      },
+      "gemma-bf16": {
+        "grades": [
+          3,
+          3,
+          0
+        ],
+        "ndcg3": 0.8838695436828513,
+        "precision3": 0.6666666666666666,
+        "top1_relevant": true,
+        "mean_grade": 2.0
+      },
+      "gemma-onnx-q4": {
+        "grades": [
+          3,
+          3,
+          0
+        ],
+        "ndcg3": 0.8838695436828513,
+        "precision3": 0.6666666666666666,
+        "top1_relevant": true,
+        "mean_grade": 2.0
+      },
+      "gemma-onnx-q8": {
+        "grades": [
+          3,
+          3,
+          0
+        ],
+        "ndcg3": 0.8838695436828513,
+        "precision3": 0.6666666666666666,
+        "top1_relevant": true,
+        "mean_grade": 2.0
+      },
+      "gemma-unsloth-q4": {
+        "grades": [
+          3,
+          3,
+          0
+        ],
+        "ndcg3": 0.8838695436828513,
+        "precision3": 0.6666666666666666,
+        "top1_relevant": true,
+        "mean_grade": 2.0
+      },
+      "gemma-unsloth-q8": {
+        "grades": [
+          3,
+          3,
+          0
+        ],
+        "ndcg3": 0.8838695436828513,
+        "precision3": 0.6666666666666666,
+        "top1_relevant": true,
+        "mean_grade": 2.0
+      },
+      "gemma-256d": {
+        "grades": [
+          3,
+          3,
+          0
+        ],
+        "ndcg3": 0.8838695436828513,
+        "precision3": 0.6666666666666666,
+        "top1_relevant": true,
+        "mean_grade": 2.0
+      },
+      "gemma-int8-storage-q4": {
+        "grades": [
+          3,
+          3,
+          0
+        ],
+        "ndcg3": 0.8838695436828513,
+        "precision3": 0.6666666666666666,
+        "top1_relevant": true,
+        "mean_grade": 2.0
+      },
+      "gemma-caption-bf16": {
+        "grades": [
+          3,
+          3,
+          2
+        ],
+        "ndcg3": 1.0,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 2.6666666666666665
+      },
+      "gemma-caption-onnx-q4": {
+        "grades": [
+          3,
+          3,
+          2
+        ],
+        "ndcg3": 1.0,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 2.6666666666666665
+      },
+      "gemma-caption-unsloth-q4": {
+        "grades": [
+          3,
+          3,
+          2
+        ],
+        "ndcg3": 1.0,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 2.6666666666666665
+      },
+      "gemma-onnx-q4f16": {
+        "grades": [
+          3,
+          3,
+          0
+        ],
+        "ndcg3": 0.8838695436828513,
+        "precision3": 0.6666666666666666,
+        "top1_relevant": true,
+        "mean_grade": 2.0
+      }
+    },
+    "T03": {
+      "siglip1-current-q4": {
+        "grades": [
+          3,
+          3,
+          2
+        ],
+        "ndcg3": 0.8659203639934981,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 2.6666666666666665
+      },
+      "siglip1-fp32": {
+        "grades": [
+          3,
+          3,
+          2
+        ],
+        "ndcg3": 0.8659203639934981,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 2.6666666666666665
+      },
+      "siglip2-fp32": {
+        "grades": [
+          3,
+          3,
+          3
+        ],
+        "ndcg3": 1.0,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 3.0
+      },
+      "gemma-bf16": {
+        "grades": [
+          3,
+          3,
+          3
+        ],
+        "ndcg3": 1.0,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 3.0
+      },
+      "gemma-onnx-q4": {
+        "grades": [
+          3,
+          3,
+          3
+        ],
+        "ndcg3": 1.0,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 3.0
+      },
+      "gemma-onnx-q8": {
+        "grades": [
+          3,
+          3,
+          3
+        ],
+        "ndcg3": 1.0,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 3.0
+      },
+      "gemma-unsloth-q4": {
+        "grades": [
+          3,
+          3,
+          3
+        ],
+        "ndcg3": 1.0,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 3.0
+      },
+      "gemma-unsloth-q8": {
+        "grades": [
+          3,
+          3,
+          3
+        ],
+        "ndcg3": 1.0,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 3.0
+      },
+      "gemma-256d": {
+        "grades": [
+          3,
+          3,
+          3
+        ],
+        "ndcg3": 1.0,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 3.0
+      },
+      "gemma-int8-storage-q4": {
+        "grades": [
+          3,
+          3,
+          3
+        ],
+        "ndcg3": 1.0,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 3.0
+      },
+      "gemma-caption-bf16": {
+        "grades": [
+          3,
+          3,
+          3
+        ],
+        "ndcg3": 1.0,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 3.0
+      },
+      "gemma-caption-onnx-q4": {
+        "grades": [
+          3,
+          3,
+          3
+        ],
+        "ndcg3": 1.0,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 3.0
+      },
+      "gemma-caption-unsloth-q4": {
+        "grades": [
+          3,
+          3,
+          3
+        ],
+        "ndcg3": 1.0,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 3.0
+      },
+      "gemma-onnx-q4f16": {
+        "grades": [
+          3,
+          3,
+          3
+        ],
+        "ndcg3": 1.0,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 3.0
+      }
+    },
+    "T06": {
+      "siglip1-current-q4": {
+        "grades": [
+          3,
+          3,
+          3
+        ],
+        "ndcg3": 1.0,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 3.0
+      },
+      "siglip1-fp32": {
+        "grades": [
+          3,
+          3,
+          3
+        ],
+        "ndcg3": 1.0,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 3.0
+      },
+      "siglip2-fp32": {
+        "grades": [
+          3,
+          3,
+          2
+        ],
+        "ndcg3": 0.8659203639934981,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 2.6666666666666665
+      },
+      "gemma-bf16": {
+        "grades": [
+          3,
+          3,
+          2
+        ],
+        "ndcg3": 0.8659203639934981,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 2.6666666666666665
+      },
+      "gemma-onnx-q4": {
+        "grades": [
+          3,
+          3,
+          2
+        ],
+        "ndcg3": 0.8659203639934981,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 2.6666666666666665
+      },
+      "gemma-onnx-q8": {
+        "grades": [
+          3,
+          3,
+          2
+        ],
+        "ndcg3": 0.8659203639934981,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 2.6666666666666665
+      },
+      "gemma-unsloth-q4": {
+        "grades": [
+          3,
+          3,
+          2
+        ],
+        "ndcg3": 0.8659203639934981,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 2.6666666666666665
+      },
+      "gemma-unsloth-q8": {
+        "grades": [
+          3,
+          3,
+          2
+        ],
+        "ndcg3": 0.8659203639934981,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 2.6666666666666665
+      },
+      "gemma-256d": {
+        "grades": [
+          3,
+          3,
+          2
+        ],
+        "ndcg3": 0.8659203639934981,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 2.6666666666666665
+      },
+      "gemma-int8-storage-q4": {
+        "grades": [
+          3,
+          3,
+          2
+        ],
+        "ndcg3": 0.8659203639934981,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 2.6666666666666665
+      },
+      "gemma-caption-bf16": {
+        "grades": [
+          3,
+          3,
+          2
+        ],
+        "ndcg3": 0.8659203639934981,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 2.6666666666666665
+      },
+      "gemma-caption-onnx-q4": {
+        "grades": [
+          3,
+          3,
+          2
+        ],
+        "ndcg3": 0.8659203639934981,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 2.6666666666666665
+      },
+      "gemma-caption-unsloth-q4": {
+        "grades": [
+          3,
+          3,
+          2
+        ],
+        "ndcg3": 0.8659203639934981,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 2.6666666666666665
+      },
+      "gemma-onnx-q4f16": {
+        "grades": [
+          3,
+          3,
+          2
+        ],
+        "ndcg3": 0.8659203639934981,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 2.6666666666666665
+      }
+    },
+    "T09": {
+      "siglip1-current-q4": {
+        "grades": [
+          3,
+          2,
+          3
+        ],
+        "ndcg3": 0.8308103365909342,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 2.6666666666666665
+      },
+      "siglip1-fp32": {
+        "grades": [
+          3,
+          3,
+          2
+        ],
+        "ndcg3": 0.8659203639934981,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 2.6666666666666665
+      },
+      "siglip2-fp32": {
+        "grades": [
+          3,
+          3,
+          1
+        ],
+        "ndcg3": 0.7988805459902473,
+        "precision3": 0.6666666666666666,
+        "top1_relevant": true,
+        "mean_grade": 2.3333333333333335
+      },
+      "gemma-bf16": {
+        "grades": [
+          3,
+          3,
+          3
+        ],
+        "ndcg3": 1.0,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 3.0
+      },
+      "gemma-onnx-q4": {
+        "grades": [
+          3,
+          3,
+          2
+        ],
+        "ndcg3": 0.8659203639934981,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 2.6666666666666665
+      },
+      "gemma-onnx-q8": {
+        "grades": [
+          3,
+          3,
+          3
+        ],
+        "ndcg3": 1.0,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 3.0
+      },
+      "gemma-unsloth-q4": {
+        "grades": [
+          3,
+          3,
+          3
+        ],
+        "ndcg3": 1.0,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 3.0
+      },
+      "gemma-unsloth-q8": {
+        "grades": [
+          3,
+          3,
+          3
+        ],
+        "ndcg3": 1.0,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 3.0
+      },
+      "gemma-256d": {
+        "grades": [
+          3,
+          3,
+          3
+        ],
+        "ndcg3": 1.0,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 3.0
+      },
+      "gemma-int8-storage-q4": {
+        "grades": [
+          3,
+          3,
+          2
+        ],
+        "ndcg3": 0.8659203639934981,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 2.6666666666666665
+      },
+      "gemma-caption-bf16": {
+        "grades": [
+          3,
+          3,
+          3
+        ],
+        "ndcg3": 1.0,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 3.0
+      },
+      "gemma-caption-onnx-q4": {
+        "grades": [
+          3,
+          3,
+          3
+        ],
+        "ndcg3": 1.0,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 3.0
+      },
+      "gemma-caption-unsloth-q4": {
+        "grades": [
+          3,
+          3,
+          3
+        ],
+        "ndcg3": 1.0,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 3.0
+      },
+      "gemma-onnx-q4f16": {
+        "grades": [
+          3,
+          3,
+          2
+        ],
+        "ndcg3": 0.8659203639934981,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 2.6666666666666665
+      }
+    },
+    "T11": {
+      "siglip1-current-q4": {
+        "grades": [
+          2,
+          2,
+          3
+        ],
+        "ndcg3": 0.6497722977469499,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 2.3333333333333335
+      },
+      "siglip1-fp32": {
+        "grades": [
+          2,
+          3,
+          2
+        ],
+        "ndcg3": 0.6903187831542703,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 2.3333333333333335
+      },
+      "siglip2-fp32": {
+        "grades": [
+          2,
+          3,
+          2
+        ],
+        "ndcg3": 0.6903187831542703,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 2.3333333333333335
+      },
+      "gemma-bf16": {
+        "grades": [
+          2,
+          2,
+          3
+        ],
+        "ndcg3": 0.6497722977469499,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 2.3333333333333335
+      },
+      "gemma-onnx-q4": {
+        "grades": [
+          2,
+          2,
+          3
+        ],
+        "ndcg3": 0.6497722977469499,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 2.3333333333333335
+      },
+      "gemma-onnx-q8": {
+        "grades": [
+          2,
+          2,
+          3
+        ],
+        "ndcg3": 0.6497722977469499,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 2.3333333333333335
+      },
+      "gemma-unsloth-q4": {
+        "grades": [
+          2,
+          3,
+          2
+        ],
+        "ndcg3": 0.6903187831542703,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 2.3333333333333335
+      },
+      "gemma-unsloth-q8": {
+        "grades": [
+          2,
+          2,
+          3
+        ],
+        "ndcg3": 0.6497722977469499,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 2.3333333333333335
+      },
+      "gemma-256d": {
+        "grades": [
+          2,
+          2,
+          3
+        ],
+        "ndcg3": 0.6497722977469499,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 2.3333333333333335
+      },
+      "gemma-int8-storage-q4": {
+        "grades": [
+          2,
+          3,
+          2
+        ],
+        "ndcg3": 0.6903187831542703,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 2.3333333333333335
+      },
+      "gemma-caption-bf16": {
+        "grades": [
+          2,
+          3,
+          3
+        ],
+        "ndcg3": 0.8451593915771352,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 2.6666666666666665
+      },
+      "gemma-caption-onnx-q4": {
+        "grades": [
+          2,
+          3,
+          3
+        ],
+        "ndcg3": 0.8451593915771352,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 2.6666666666666665
+      },
+      "gemma-caption-unsloth-q4": {
+        "grades": [
+          2,
+          3,
+          2
+        ],
+        "ndcg3": 0.6903187831542703,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 2.3333333333333335
+      },
+      "gemma-onnx-q4f16": {
+        "grades": [
+          2,
+          2,
+          3
+        ],
+        "ndcg3": 0.6497722977469499,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 2.3333333333333335
+      }
+    },
+    "T12": {
+      "siglip1-current-q4": {
+        "grades": [
+          0,
+          2,
+          1
+        ],
+        "ndcg3": 0.2302355220228817,
+        "precision3": 0.3333333333333333,
+        "top1_relevant": false,
+        "mean_grade": 1.0
+      },
+      "siglip1-fp32": {
+        "grades": [
+          0,
+          1,
+          2
+        ],
+        "ndcg3": 0.2050392536704803,
+        "precision3": 0.3333333333333333,
+        "top1_relevant": false,
+        "mean_grade": 1.0
+      },
+      "siglip2-fp32": {
+        "grades": [
+          3,
+          1,
+          2
+        ],
+        "ndcg3": 0.8785831719004588,
+        "precision3": 0.6666666666666666,
+        "top1_relevant": true,
+        "mean_grade": 2.0
+      },
+      "gemma-bf16": {
+        "grades": [
+          3,
+          2,
+          1
+        ],
+        "ndcg3": 0.9037794402528602,
+        "precision3": 0.6666666666666666,
+        "top1_relevant": true,
+        "mean_grade": 2.0
+      },
+      "gemma-onnx-q4": {
+        "grades": [
+          3,
+          2,
+          1
+        ],
+        "ndcg3": 0.9037794402528602,
+        "precision3": 0.6666666666666666,
+        "top1_relevant": true,
+        "mean_grade": 2.0
+      },
+      "gemma-onnx-q8": {
+        "grades": [
+          3,
+          2,
+          1
+        ],
+        "ndcg3": 0.9037794402528602,
+        "precision3": 0.6666666666666666,
+        "top1_relevant": true,
+        "mean_grade": 2.0
+      },
+      "gemma-unsloth-q4": {
+        "grades": [
+          3,
+          2,
+          1
+        ],
+        "ndcg3": 0.9037794402528602,
+        "precision3": 0.6666666666666666,
+        "top1_relevant": true,
+        "mean_grade": 2.0
+      },
+      "gemma-unsloth-q8": {
+        "grades": [
+          3,
+          2,
+          1
+        ],
+        "ndcg3": 0.9037794402528602,
+        "precision3": 0.6666666666666666,
+        "top1_relevant": true,
+        "mean_grade": 2.0
+      },
+      "gemma-256d": {
+        "grades": [
+          3,
+          1,
+          2
+        ],
+        "ndcg3": 0.8785831719004588,
+        "precision3": 0.6666666666666666,
+        "top1_relevant": true,
+        "mean_grade": 2.0
+      },
+      "gemma-int8-storage-q4": {
+        "grades": [
+          3,
+          2,
+          1
+        ],
+        "ndcg3": 0.9037794402528602,
+        "precision3": 0.6666666666666666,
+        "top1_relevant": true,
+        "mean_grade": 2.0
+      },
+      "gemma-caption-bf16": {
+        "grades": [
+          2,
+          1,
+          1
+        ],
+        "ndcg3": 0.39748037316475987,
+        "precision3": 0.3333333333333333,
+        "top1_relevant": true,
+        "mean_grade": 1.3333333333333333
+      },
+      "gemma-caption-onnx-q4": {
+        "grades": [
+          2,
+          1,
+          1
+        ],
+        "ndcg3": 0.39748037316475987,
+        "precision3": 0.3333333333333333,
+        "top1_relevant": true,
+        "mean_grade": 1.3333333333333333
+      },
+      "gemma-caption-unsloth-q4": {
+        "grades": [
+          1,
+          2,
+          1
+        ],
+        "ndcg3": 0.32645608177002144,
+        "precision3": 0.3333333333333333,
+        "top1_relevant": false,
+        "mean_grade": 1.3333333333333333
+      },
+      "gemma-onnx-q4f16": {
+        "grades": [
+          3,
+          2,
+          1
+        ],
+        "ndcg3": 0.9037794402528602,
+        "precision3": 0.6666666666666666,
+        "top1_relevant": true,
+        "mean_grade": 2.0
+      }
+    },
+    "T16": {
+      "siglip1-current-q4": {
+        "grades": [
+          2,
+          3,
+          3
+        ],
+        "ndcg3": 0.7318407279869963,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 2.6666666666666665
+      },
+      "siglip1-fp32": {
+        "grades": [
+          2,
+          3,
+          3
+        ],
+        "ndcg3": 0.7318407279869963,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 2.6666666666666665
+      },
+      "siglip2-fp32": {
+        "grades": [
+          3,
+          1,
+          3
+        ],
+        "ndcg3": 0.7462155048864012,
+        "precision3": 0.6666666666666666,
+        "top1_relevant": true,
+        "mean_grade": 2.3333333333333335
+      },
+      "gemma-bf16": {
+        "grades": [
+          3,
+          3,
+          3
+        ],
+        "ndcg3": 1.0,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 3.0
+      },
+      "gemma-onnx-q4": {
+        "grades": [
+          3,
+          3,
+          1
+        ],
+        "ndcg3": 0.7988805459902473,
+        "precision3": 0.6666666666666666,
+        "top1_relevant": true,
+        "mean_grade": 2.3333333333333335
+      },
+      "gemma-onnx-q8": {
+        "grades": [
+          3,
+          3,
+          3
+        ],
+        "ndcg3": 1.0,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 3.0
+      },
+      "gemma-unsloth-q4": {
+        "grades": [
+          3,
+          3,
+          3
+        ],
+        "ndcg3": 1.0,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 3.0
+      },
+      "gemma-unsloth-q8": {
+        "grades": [
+          3,
+          3,
+          3
+        ],
+        "ndcg3": 1.0,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 3.0
+      },
+      "gemma-256d": {
+        "grades": [
+          3,
+          1,
+          3
+        ],
+        "ndcg3": 0.7462155048864012,
+        "precision3": 0.6666666666666666,
+        "top1_relevant": true,
+        "mean_grade": 2.3333333333333335
+      },
+      "gemma-int8-storage-q4": {
+        "grades": [
+          3,
+          3,
+          1
+        ],
+        "ndcg3": 0.7988805459902473,
+        "precision3": 0.6666666666666666,
+        "top1_relevant": true,
+        "mean_grade": 2.3333333333333335
+      },
+      "gemma-caption-bf16": {
+        "grades": [
+          3,
+          3,
+          3
+        ],
+        "ndcg3": 1.0,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 3.0
+      },
+      "gemma-caption-onnx-q4": {
+        "grades": [
+          3,
+          3,
+          1
+        ],
+        "ndcg3": 0.7988805459902473,
+        "precision3": 0.6666666666666666,
+        "top1_relevant": true,
+        "mean_grade": 2.3333333333333335
+      },
+      "gemma-caption-unsloth-q4": {
+        "grades": [
+          3,
+          3,
+          3
+        ],
+        "ndcg3": 1.0,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 3.0
+      },
+      "gemma-onnx-q4f16": {
+        "grades": [
+          3,
+          3,
+          1
+        ],
+        "ndcg3": 0.7988805459902473,
+        "precision3": 0.6666666666666666,
+        "top1_relevant": true,
+        "mean_grade": 2.3333333333333335
+      }
+    },
+    "T19": {
+      "siglip1-current-q4": {
+        "grades": [
+          0,
+          0,
+          0
+        ],
+        "ndcg3": 0.0,
+        "precision3": 0.0,
+        "top1_relevant": false,
+        "mean_grade": 0.0
+      },
+      "siglip1-fp32": {
+        "grades": [
+          1,
+          1,
+          1
+        ],
+        "ndcg3": 0.164977229774695,
+        "precision3": 0.0,
+        "top1_relevant": false,
+        "mean_grade": 1.0
+      },
+      "siglip2-fp32": {
+        "grades": [
+          1,
+          1,
+          0
+        ],
+        "ndcg3": 0.12626707766897877,
+        "precision3": 0.0,
+        "top1_relevant": false,
+        "mean_grade": 0.6666666666666666
+      },
+      "gemma-bf16": {
+        "grades": [
+          3,
+          3,
+          2
+        ],
+        "ndcg3": 1.0,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 2.6666666666666665
+      },
+      "gemma-onnx-q4": {
+        "grades": [
+          3,
+          2,
+          3
+        ],
+        "ndcg3": 0.9594535145926796,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 2.6666666666666665
+      },
+      "gemma-onnx-q8": {
+        "grades": [
+          3,
+          3,
+          2
+        ],
+        "ndcg3": 1.0,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 2.6666666666666665
+      },
+      "gemma-unsloth-q4": {
+        "grades": [
+          3,
+          3,
+          2
+        ],
+        "ndcg3": 1.0,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 2.6666666666666665
+      },
+      "gemma-unsloth-q8": {
+        "grades": [
+          3,
+          3,
+          2
+        ],
+        "ndcg3": 1.0,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 2.6666666666666665
+      },
+      "gemma-256d": {
+        "grades": [
+          3,
+          3,
+          2
+        ],
+        "ndcg3": 1.0,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 2.6666666666666665
+      },
+      "gemma-int8-storage-q4": {
+        "grades": [
+          3,
+          3,
+          2
+        ],
+        "ndcg3": 1.0,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 2.6666666666666665
+      },
+      "gemma-caption-bf16": {
+        "grades": [
+          2,
+          3,
+          3
+        ],
+        "ndcg3": 0.8451593915771352,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 2.6666666666666665
+      },
+      "gemma-caption-onnx-q4": {
+        "grades": [
+          2,
+          3,
+          3
+        ],
+        "ndcg3": 0.8451593915771352,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 2.6666666666666665
+      },
+      "gemma-caption-unsloth-q4": {
+        "grades": [
+          2,
+          3,
+          3
+        ],
+        "ndcg3": 0.8451593915771352,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 2.6666666666666665
+      },
+      "gemma-onnx-q4f16": {
+        "grades": [
+          2,
+          3,
+          3
+        ],
+        "ndcg3": 0.8451593915771352,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 2.6666666666666665
+      }
+    },
+    "T21": {
+      "siglip1-current-q4": {
+        "grades": [
+          0,
+          0,
+          0
+        ],
+        "ndcg3": 0.0,
+        "precision3": 0.0,
+        "top1_relevant": false,
+        "mean_grade": 0.0
+      },
+      "siglip1-fp32": {
+        "grades": [
+          1,
+          1,
+          1
+        ],
+        "ndcg3": 0.22686868558673368,
+        "precision3": 0.0,
+        "top1_relevant": false,
+        "mean_grade": 1.0
+      },
+      "siglip2-fp32": {
+        "grades": [
+          0,
+          0,
+          0
+        ],
+        "ndcg3": 0.0,
+        "precision3": 0.0,
+        "top1_relevant": false,
+        "mean_grade": 0.0
+      },
+      "gemma-bf16": {
+        "grades": [
+          0,
+          3,
+          2
+        ],
+        "ndcg3": 0.6298989693877386,
+        "precision3": 0.6666666666666666,
+        "top1_relevant": false,
+        "mean_grade": 1.6666666666666667
+      },
+      "gemma-onnx-q4": {
+        "grades": [
+          0,
+          3,
+          0
+        ],
+        "ndcg3": 0.47020199776783905,
+        "precision3": 0.3333333333333333,
+        "top1_relevant": false,
+        "mean_grade": 1.0
+      },
+      "gemma-onnx-q8": {
+        "grades": [
+          0,
+          3,
+          2
+        ],
+        "ndcg3": 0.6298989693877386,
+        "precision3": 0.6666666666666666,
+        "top1_relevant": false,
+        "mean_grade": 1.6666666666666667
+      },
+      "gemma-unsloth-q4": {
+        "grades": [
+          3,
+          0,
+          2
+        ],
+        "ndcg3": 0.9049495058460971,
+        "precision3": 0.6666666666666666,
+        "top1_relevant": true,
+        "mean_grade": 1.6666666666666667
+      },
+      "gemma-unsloth-q8": {
+        "grades": [
+          0,
+          3,
+          2
+        ],
+        "ndcg3": 0.6298989693877386,
+        "precision3": 0.6666666666666666,
+        "top1_relevant": false,
+        "mean_grade": 1.6666666666666667
+      },
+      "gemma-256d": {
+        "grades": [
+          0,
+          0,
+          2
+        ],
+        "ndcg3": 0.15969697161989949,
+        "precision3": 0.3333333333333333,
+        "top1_relevant": false,
+        "mean_grade": 0.6666666666666666
+      },
+      "gemma-int8-storage-q4": {
+        "grades": [
+          0,
+          0,
+          3
+        ],
+        "ndcg3": 0.3726262671130988,
+        "precision3": 0.3333333333333333,
+        "top1_relevant": false,
+        "mean_grade": 1.0
+      },
+      "gemma-caption-bf16": {
+        "grades": [
+          0,
+          0,
+          0
+        ],
+        "ndcg3": 0.0,
+        "precision3": 0.0,
+        "top1_relevant": false,
+        "mean_grade": 0.0
+      },
+      "gemma-caption-onnx-q4": {
+        "grades": [
+          0,
+          0,
+          0
+        ],
+        "ndcg3": 0.0,
+        "precision3": 0.0,
+        "top1_relevant": false,
+        "mean_grade": 0.0
+      },
+      "gemma-caption-unsloth-q4": {
+        "grades": [
+          0,
+          0,
+          0
+        ],
+        "ndcg3": 0.0,
+        "precision3": 0.0,
+        "top1_relevant": false,
+        "mean_grade": 0.0
+      },
+      "gemma-onnx-q4f16": {
+        "grades": [
+          0,
+          0,
+          3
+        ],
+        "ndcg3": 0.3726262671130988,
+        "precision3": 0.3333333333333333,
+        "top1_relevant": false,
+        "mean_grade": 1.0
+      }
+    },
+    "T23": {
+      "siglip1-current-q4": {
+        "grades": [
+          3,
+          3,
+          3
+        ],
+        "ndcg3": 1.0,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 3.0
+      },
+      "siglip1-fp32": {
+        "grades": [
+          3,
+          3,
+          3
+        ],
+        "ndcg3": 1.0,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 3.0
+      },
+      "siglip2-fp32": {
+        "grades": [
+          3,
+          3,
+          3
+        ],
+        "ndcg3": 1.0,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 3.0
+      },
+      "gemma-bf16": {
+        "grades": [
+          3,
+          3,
+          3
+        ],
+        "ndcg3": 1.0,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 3.0
+      },
+      "gemma-onnx-q4": {
+        "grades": [
+          3,
+          3,
+          3
+        ],
+        "ndcg3": 1.0,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 3.0
+      },
+      "gemma-onnx-q8": {
+        "grades": [
+          3,
+          3,
+          3
+        ],
+        "ndcg3": 1.0,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 3.0
+      },
+      "gemma-unsloth-q4": {
+        "grades": [
+          3,
+          3,
+          3
+        ],
+        "ndcg3": 1.0,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 3.0
+      },
+      "gemma-unsloth-q8": {
+        "grades": [
+          3,
+          3,
+          3
+        ],
+        "ndcg3": 1.0,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 3.0
+      },
+      "gemma-256d": {
+        "grades": [
+          3,
+          3,
+          3
+        ],
+        "ndcg3": 1.0,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 3.0
+      },
+      "gemma-int8-storage-q4": {
+        "grades": [
+          3,
+          3,
+          3
+        ],
+        "ndcg3": 1.0,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 3.0
+      },
+      "gemma-caption-bf16": {
+        "grades": [
+          3,
+          3,
+          3
+        ],
+        "ndcg3": 1.0,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 3.0
+      },
+      "gemma-caption-onnx-q4": {
+        "grades": [
+          3,
+          3,
+          3
+        ],
+        "ndcg3": 1.0,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 3.0
+      },
+      "gemma-caption-unsloth-q4": {
+        "grades": [
+          3,
+          3,
+          3
+        ],
+        "ndcg3": 1.0,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 3.0
+      },
+      "gemma-onnx-q4f16": {
+        "grades": [
+          3,
+          3,
+          3
+        ],
+        "ndcg3": 1.0,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 3.0
+      }
+    },
+    "T24": {
+      "siglip1-current-q4": {
+        "grades": [
+          3,
+          3,
+          2
+        ],
+        "ndcg3": 0.8659203639934981,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 2.6666666666666665
+      },
+      "siglip1-fp32": {
+        "grades": [
+          3,
+          3,
+          3
+        ],
+        "ndcg3": 1.0,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 3.0
+      },
+      "siglip2-fp32": {
+        "grades": [
+          3,
+          3,
+          3
+        ],
+        "ndcg3": 1.0,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 3.0
+      },
+      "gemma-bf16": {
+        "grades": [
+          3,
+          3,
+          3
+        ],
+        "ndcg3": 1.0,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 3.0
+      },
+      "gemma-onnx-q4": {
+        "grades": [
+          3,
+          3,
+          3
+        ],
+        "ndcg3": 1.0,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 3.0
+      },
+      "gemma-onnx-q8": {
+        "grades": [
+          3,
+          3,
+          3
+        ],
+        "ndcg3": 1.0,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 3.0
+      },
+      "gemma-unsloth-q4": {
+        "grades": [
+          3,
+          3,
+          3
+        ],
+        "ndcg3": 1.0,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 3.0
+      },
+      "gemma-unsloth-q8": {
+        "grades": [
+          3,
+          3,
+          3
+        ],
+        "ndcg3": 1.0,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 3.0
+      },
+      "gemma-256d": {
+        "grades": [
+          3,
+          3,
+          3
+        ],
+        "ndcg3": 1.0,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 3.0
+      },
+      "gemma-int8-storage-q4": {
+        "grades": [
+          3,
+          3,
+          3
+        ],
+        "ndcg3": 1.0,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 3.0
+      },
+      "gemma-caption-bf16": {
+        "grades": [
+          3,
+          3,
+          3
+        ],
+        "ndcg3": 1.0,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 3.0
+      },
+      "gemma-caption-onnx-q4": {
+        "grades": [
+          3,
+          3,
+          3
+        ],
+        "ndcg3": 1.0,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 3.0
+      },
+      "gemma-caption-unsloth-q4": {
+        "grades": [
+          3,
+          3,
+          3
+        ],
+        "ndcg3": 1.0,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 3.0
+      },
+      "gemma-onnx-q4f16": {
+        "grades": [
+          3,
+          3,
+          3
+        ],
+        "ndcg3": 1.0,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 3.0
+      }
+    },
+    "I01": {
+      "siglip1-image": {
+        "grades": [
+          2,
+          3,
+          2
+        ],
+        "ndcg3": 0.5977610919804944,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 2.3333333333333335
+      },
+      "siglip2-image": {
+        "grades": [
+          2,
+          2,
+          3
+        ],
+        "ndcg3": 0.5626510645779305,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 2.3333333333333335
+      },
+      "gemma-image": {
+        "grades": [
+          3,
+          2,
+          3
+        ],
+        "ndcg3": 0.8308103365909342,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 2.6666666666666665
+      },
+      "gemma-caption-image": {
+        "grades": [
+          2,
+          2,
+          3
+        ],
+        "ndcg3": 0.5626510645779305,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 2.3333333333333335
+      }
+    },
+    "I03": {
+      "siglip1-image": {
+        "grades": [
+          3,
+          3,
+          3
+        ],
+        "ndcg3": 1.0,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 3.0
+      },
+      "siglip2-image": {
+        "grades": [
+          3,
+          3,
+          3
+        ],
+        "ndcg3": 1.0,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 3.0
+      },
+      "gemma-image": {
+        "grades": [
+          3,
+          3,
+          3
+        ],
+        "ndcg3": 1.0,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 3.0
+      },
+      "gemma-caption-image": {
+        "grades": [
+          3,
+          3,
+          3
+        ],
+        "ndcg3": 1.0,
+        "precision3": 1.0,
+        "top1_relevant": true,
+        "mean_grade": 3.0
+      }
+    },
+    "I05": {
+      "siglip1-image": {
+        "grades": [
+          1,
+          1,
+          1
+        ],
+        "ndcg3": 0.164977229774695,
+        "precision3": 0.0,
+        "top1_relevant": false,
+        "mean_grade": 1.0
+      },
+      "siglip2-image": {
+        "grades": [
+          1,
+          1,
+          1
+        ],
+        "ndcg3": 0.164977229774695,
+        "precision3": 0.0,
+        "top1_relevant": false,
+        "mean_grade": 1.0
+      },
+      "gemma-image": {
+        "grades": [
+          3,
+          1,
+          2
+        ],
+        "ndcg3": 0.706919359254722,
+        "precision3": 0.6666666666666666,
+        "top1_relevant": true,
+        "mean_grade": 2.0
+      },
+      "gemma-caption-image": {
+        "grades": [
+          3,
+          1,
+          3
+        ],
+        "ndcg3": 0.8617599676775869,
+        "precision3": 0.6666666666666666,
+        "top1_relevant": true,
+        "mean_grade": 2.3333333333333335
+      }
+    }
+  },
+  "paired_query_bootstrap": {
+    "all_text": {
+      "gemma-256d": {
+        "mean_delta": 0.16746318679127503,
+        "low95": 0.010505466201298446,
+        "high95": 0.3634510720585845,
+        "wins": 7,
+        "ties": 3,
+        "losses": 2
+      },
+      "gemma-bf16": {
+        "mean_delta": 0.22989508356076163,
+        "low95": 0.04873140832098835,
+        "high95": 0.43441821706614864,
+        "wins": 7,
+        "ties": 3,
+        "losses": 2
+      },
+      "gemma-caption-bf16": {
+        "mean_delta": 0.14826832566481418,
+        "low95": 0.035490351255244544,
+        "high95": 0.2956568681208682,
+        "wins": 7,
+        "ties": 4,
+        "losses": 1
+      },
+      "gemma-caption-onnx-q4": {
+        "mean_delta": 0.13975583854766294,
+        "low95": 0.03378087704289191,
+        "high95": 0.28609943659956555,
+        "wins": 8,
+        "ties": 3,
+        "losses": 1
+      },
+      "gemma-caption-unsloth-q4": {
+        "mean_delta": 0.1376937180636754,
+        "low95": 0.02842030296467625,
+        "high95": 0.28440528789362524,
+        "wins": 8,
+        "ties": 3,
+        "losses": 1
+      },
+      "gemma-int8-storage-q4": {
+        "mean_delta": 0.18390130798713047,
+        "low95": 0.01916525501965271,
+        "high95": 0.3836632713506189,
+        "wins": 8,
+        "ties": 2,
+        "losses": 2
+      },
+      "gemma-onnx-q4": {
+        "mean_delta": 0.1852748713071388,
+        "low95": 0.018520739208415248,
+        "high95": 0.3817333082355636,
+        "wins": 7,
+        "ties": 3,
+        "losses": 2
+      },
+      "gemma-onnx-q4f16": {
+        "mean_delta": 0.1676190501679484,
+        "low95": 0.015594903591534925,
+        "high95": 0.3464224827403443,
+        "wins": 7,
+        "ties": 3,
+        "losses": 2
+      },
+      "gemma-onnx-q8": {
+        "mean_delta": 0.22989508356076163,
+        "low95": 0.04873140832098835,
+        "high95": 0.43441821706614864,
+        "wins": 7,
+        "ties": 3,
+        "losses": 2
+      },
+      "gemma-unsloth-q4": {
+        "mean_delta": 0.2561948353829016,
+        "low95": 0.06171818623646977,
+        "high95": 0.4736925466219414,
+        "wins": 8,
+        "ties": 2,
+        "losses": 2
+      },
+      "gemma-unsloth-q8": {
+        "mean_delta": 0.22989508356076163,
+        "low95": 0.04873140832098835,
+        "high95": 0.43441821706614864,
+        "wins": 7,
+        "ties": 3,
+        "losses": 2
+      },
+      "siglip1-current-q4": {
+        "mean_delta": 0.0,
+        "low95": 0.0,
+        "high95": 0.0,
+        "wins": 0,
+        "ties": 12,
+        "losses": 0
+      },
+      "siglip1-fp32": {
+        "mean_delta": 0.039997359216597174,
+        "low95": -0.020046470484681445,
+        "high95": 0.09715883841530688,
+        "wins": 6,
+        "ties": 4,
+        "losses": 2
+      },
+      "siglip2-fp32": {
+        "mean_delta": 0.099987092272675,
+        "low95": 0.007114905396826305,
+        "high95": 0.2200304932103804,
+        "wins": 7,
+        "ties": 3,
+        "losses": 2
+      }
+    },
+    "image": {
+      "gemma-caption-image": {
+        "mean_delta": 0.2322609126342973,
+        "low95": 0.0,
+        "high95": 0.6967827379028919,
+        "wins": 1,
+        "ties": 2,
+        "losses": 0
+      },
+      "gemma-image": {
+        "mean_delta": 0.27003380049767695,
+        "low95": 0.0,
+        "high95": 0.5419421294800271,
+        "wins": 2,
+        "ties": 1,
+        "losses": 0
+      },
+      "siglip1-image": {
+        "mean_delta": 0.011703342467521324,
+        "low95": 0.0,
+        "high95": 0.03511002740256397,
+        "wins": 1,
+        "ties": 2,
+        "losses": 0
+      },
+      "siglip2-image": {
+        "mean_delta": 0.0,
+        "low95": 0.0,
+        "high95": 0.0,
+        "wins": 0,
+        "ties": 3,
+        "losses": 0
+      }
+    }
+  }
+}

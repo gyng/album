@@ -37,6 +37,9 @@ available without an additional data request.
 
 ## Cold search
 
+The [October embedding benchmark](embedding-benchmark.md) extends the model
+comparison below. It adds relevance grades and tests EmbeddingGemma 2 exports.
+
 The observed large download was `text_model_q4.onnx`: 154,693,262 bytes. The local
 embedding database is 3,346,432 bytes. Opening an empty search page no longer
 starts the model download. Hybrid queries show keyword matches as soon as the

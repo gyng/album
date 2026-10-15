@@ -2,6 +2,10 @@
 
 Date: 2026-04-03
 
+> Historical result. The [July caption test](caption-backend-bakeoff.md) replaced
+> this recommendation. The [October embedding test](embedding-benchmark.md)
+> covers photo retrieval. It tests a different task.
+
 ## Goal
 
 Evaluate whether Gemma 4 is a better local captioning backend than Janus-Pro-1B for the photo indexer on an RTX 3080 10 GB machine.
