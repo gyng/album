@@ -262,6 +262,13 @@
 }
 .filterRow {
   display: flex;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+.filterControls {
+  display: flex;
+  flex: 1 1 30rem;
   flex-wrap: wrap;
   align-items: center;
   gap: var(--space-3);
@@ -285,4 +292,21 @@
 
 .clusterName[hidden] {
   display: none;
+}
+
+.spotlight {
+  flex: 1 1 24rem;
+  max-inline-size: 32rem;
+  min-inline-size: 0;
+  margin-inline-start: auto;
+}
+.canvas:focus-visible {
+  outline: var(--line-strong) solid var(--c-accent);
+  outline-offset: calc(-1 * var(--line-strong));
+}
+@media (max-width: 720px) {
+  .spotlight {
+    max-inline-size: none;
+    flex-basis: 100%;
+  }
 }

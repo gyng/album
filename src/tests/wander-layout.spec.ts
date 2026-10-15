@@ -23,7 +23,13 @@ test("Wander surrounds the current photograph and respects reduced motion", asyn
       body: '<svg xmlns="http://www.w3.org/2000/svg" width="600" height="400"><rect width="600" height="400" fill="silver"/></svg>',
     }),
   );
-  await gotoHydrated(page, "/explore?wander=../albums/test-simple/scene0.jpg");
+  await gotoHydrated(page, "/explore/wander?wander=../albums/test-simple/scene0.jpg");
+  await expect(
+    page
+      .getByRole("navigation", { name: "Explore views" })
+      .getByRole("link", { name: "Wander", exact: true }),
+  ).toHaveAttribute("aria-current", "page");
+
   const ways = page.getByRole("list", { name: "Ways on" });
   await ways.scrollIntoViewIfNeeded();
   await expect(ways.getByRole("button")).toHaveCount(6);
@@ -90,8 +96,7 @@ test("Wander escapes a closed city loop and offers fresh scene shortcuts after B
       body: '<svg xmlns="http://www.w3.org/2000/svg" width="600" height="400"><rect width="600" height="400" fill="silver"/></svg>',
     }),
   );
-  await gotoHydrated(page, "/explore?wander=../albums/test-simple/escape0.jpg");
-  await page.getByRole("button", { name: "Show Wander", exact: true }).click();
+  await gotoHydrated(page, "/explore/wander?wander=../albums/test-simple/escape0.jpg");
   const ways = page.getByRole("list", { name: "Ways on" });
   await expect(ways.getByRole("button", { name: "further afield", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Nature", exact: true })).toBeHidden();
@@ -137,7 +142,7 @@ test("Explore opens the Fun quest and Wander offers photo hunts and difficulty",
       body: '<svg xmlns="http://www.w3.org/2000/svg" width="600" height="400"><rect width="600" height="400" fill="silver"/></svg>',
     }),
   );
-  await gotoHydrated(page, "/explore?wander=../albums/test-simple/quest0.jpg");
+  await gotoHydrated(page, "/explore/wander?wander=../albums/test-simple/quest0.jpg");
   await page.getByRole("link", { name: "Give me a quest", exact: true }).click();
   await expect(page).toHaveURL(/\/fun\/wander\?/);
   await expect(page.getByRole("list", { name: "Quest targets" })).toContainText("cat + stairs");
@@ -178,4 +183,16 @@ test("Explore opens the Fun quest and Wander offers photo hunts and difficulty",
     .filter({ has: page.getByRole("heading", { name: "Wander", exact: true }) });
   await expect(card).toHaveAttribute("href", "/fun/wander");
   await expect(card.locator("image")).toHaveAttribute("href", "/fun/wander.avif");
+});
+
+test("old Wander photo links retain their starting photo in the new Explore tab", async ({
+  page,
+}) => {
+  await gotoHydrated(page, "/explore?wander=../albums/test-simple/scene0.jpg#wander");
+  await expect(page).toHaveURL(/\/explore\/wander\?wander=/);
+  await expect(
+    page
+      .getByRole("navigation", { name: "Explore views" })
+      .getByRole("link", { name: "Wander", exact: true }),
+  ).toHaveAttribute("aria-current", "page");
 });

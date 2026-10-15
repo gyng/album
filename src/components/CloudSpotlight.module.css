@@ -20,17 +20,17 @@
 
 .search form {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
   gap: var(--space-2);
-}
-
-.search label {
-  font-size: var(--fs-s);
 }
 
 .query {
   min-inline-size: 0;
   flex: 1 1 var(--size-180);
   max-inline-size: var(--size-360);
+}
+
+.search button {
+  flex-shrink: 0;
 }

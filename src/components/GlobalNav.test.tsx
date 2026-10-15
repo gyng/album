@@ -80,3 +80,11 @@ it("groups timeline and trips under Explore with a current subpage", () => {
   expect(screen.getByRole("navigation", { name: "Explore views" })).toBeInTheDocument();
   expect(screen.getByRole("link", { name: "Timeline" })).toHaveAttribute("aria-current", "page");
 });
+
+it("places the dedicated Wander view after Trips in Explore navigation", () => {
+  render(<GlobalNav currentPage="explore-wander" />);
+  const links = screen.getAllByRole("link");
+  const trips = links.findIndex((link) => link.getAttribute("href") === "/explore/trips");
+  expect(links[trips + 1]).toHaveAttribute("href", "/explore/wander");
+  expect(links[trips + 1]).toHaveAttribute("aria-current", "page");
+});

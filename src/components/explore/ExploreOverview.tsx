@@ -4,7 +4,7 @@ import sharedStyles from "./ExploreShared.module.css";
 import localStyles from "./ExploreOverview.module.css";
 
 const sectionGroups = [
-  { label: "Visuals", ids: ["#embedding-space", "#wander", "#visual-sameness", "#colour"] },
+  { label: "Visuals", ids: ["#embedding-space", "#visual-sameness", "#colour"] },
   {
     label: "Archive",
     ids: [

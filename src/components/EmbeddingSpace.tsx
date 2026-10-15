@@ -331,6 +331,8 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
 
   const canvasRef = React.useRef<HTMLCanvasElement | null>(null);
   const stageRef = React.useRef<HTMLDivElement | null>(null);
+  const wheelActiveRef = React.useRef(false);
+  const activationClickRef = React.useRef(false);
   /**
    * Whether the cloud has the screen to itself.
    *
@@ -530,7 +532,7 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
   }, [fullscreen]);
 
   /**
-   * Scrolling over the cloud moves the eye in and out.
+   * After activation, scrolling over the cloud moves the eye in and out.
    *
    * Attached by hand because React's `onWheel` is registered passively, so it
    * cannot take the gesture from the page. It only takes it while there is room
@@ -545,6 +547,7 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
     if (!stage) return;
 
     const onWheel = (event: WheelEvent) => {
+      if (!wheelActiveRef.current) return;
       if (sheetRef.current) {
         // The sheet zooms by row height, about the pointer, so what is under it
         // stays under it. Against the target rather than the eased value, so a
@@ -579,8 +582,15 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
       event.preventDefault();
     };
 
+    const releaseOutside = (event: PointerEvent) => {
+      if (!stage.contains(event.target as Node)) wheelActiveRef.current = false;
+    };
     stage.addEventListener("wheel", onWheel, { passive: false });
-    return () => stage.removeEventListener("wheel", onWheel);
+    document.addEventListener("pointerdown", releaseOutside, true);
+    return () => {
+      stage.removeEventListener("wheel", onWheel);
+      document.removeEventListener("pointerdown", releaseOutside, true);
+    };
   }, []);
 
   // The sheets, fetched once. Every photograph in the cloud is a cell of one.
@@ -1537,6 +1547,8 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
   }, [atlas, axisScale, clusters, entries, fullResolution, theme]);
 
   const onPointerDown = (event: React.PointerEvent<HTMLCanvasElement>) => {
+    activationClickRef.current = !wheelActiveRef.current && event.pointerType === "mouse";
+    wheelActiveRef.current = true;
     event.currentTarget.setPointerCapture(event.pointerId);
     const bounds = event.currentTarget.getBoundingClientRect();
     // A finger arrives without ever having moved, so the position has to be
@@ -1717,72 +1729,82 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
   return (
     <figure className={[styles.space, className].filter(Boolean).join(" ")}>
       <div className={styles.filters}>
-        <CloudSpotlight onMatches={setRankedPaths} />
         <div className={styles.filterRow}>
-          {hasSemantic ? (
-            <SegmentedToggle
-              size="compact"
-              ariaLabel="Cloud layout"
-              value={projectionMode}
-              onChange={setProjectionMode}
-              options={[
-                { value: "semantic", label: "Similar photos" },
-                { value: "overview", label: "Overview" },
-              ]}
-            />
-          ) : null}
+          <div className={styles.filterControls}>
+            {hasSemantic ? (
+              <SegmentedToggle
+                size="compact"
+                ariaLabel="Cloud layout"
+                value={projectionMode}
+                onChange={setProjectionMode}
+                options={[
+                  { value: "semantic", label: "Similar photos" },
+                  { value: "overview", label: "Overview" },
+                ]}
+              />
+            ) : null}
 
-          <label>
-            Year{" "}
-            <Select
-              aria-label="Year"
-              value={yearFilter}
-              onChange={(event) => setYearFilter(event.target.value)}
-            >
-              <option value="">All years</option>
-              {years.map((year) => (
-                <option key={year} value={year}>
-                  {year}
-                </option>
-              ))}
-            </Select>
-          </label>
-          <label>
-            Lens{" "}
-            <Select
-              aria-label="Lens"
-              value={lensFilter}
-              onChange={(event) => setLensFilter(event.target.value)}
-            >
-              <option value="">All lenses</option>
-              {lenses.map((lens) => (
-                <option key={lens} value={lens}>
-                  {lens}
-                </option>
-              ))}
-            </Select>
-          </label>
-          {yearFilter || lensFilter ? (
-            <Button
-              variant="quiet"
-              onClick={() => {
-                setYearFilter("");
-                setLensFilter("");
-              }}
-            >
-              Clear filters
-            </Button>
-          ) : null}
-          <span role="status">
-            <Caption as="span">
-              {rankedPaths ? `${count} closest matches` : `${count} photographs`}
-            </Caption>
-          </span>
+            <label>
+              Year{" "}
+              <Select
+                aria-label="Year"
+                value={yearFilter}
+                onChange={(event) => setYearFilter(event.target.value)}
+              >
+                <option value="">All years</option>
+                {years.map((year) => (
+                  <option key={year} value={year}>
+                    {year}
+                  </option>
+                ))}
+              </Select>
+            </label>
+            <label>
+              Lens{" "}
+              <Select
+                aria-label="Lens"
+                value={lensFilter}
+                onChange={(event) => setLensFilter(event.target.value)}
+              >
+                <option value="">All lenses</option>
+                {lenses.map((lens) => (
+                  <option key={lens} value={lens}>
+                    {lens}
+                  </option>
+                ))}
+              </Select>
+            </label>
+            {yearFilter || lensFilter ? (
+              <Button
+                variant="quiet"
+                onClick={() => {
+                  setYearFilter("");
+                  setLensFilter("");
+                }}
+              >
+                Clear filters
+              </Button>
+            ) : null}
+            <span role="status">
+              <Caption as="span">
+                {rankedPaths ? `${count} closest matches` : `${count} photographs`}
+              </Caption>
+            </span>
+          </div>
+          <div className={styles.spotlight}>
+            <CloudSpotlight onMatches={setRankedPaths} />
+          </div>
         </div>
       </div>
       <div
         ref={stageRef}
         className={styles.stage}
+        onFocusCapture={() => {
+          wheelActiveRef.current = true;
+        }}
+        onBlurCapture={(event) => {
+          if (!event.currentTarget.contains(event.relatedTarget)) wheelActiveRef.current = false;
+        }}
         {...(height === undefined ? {} : { style: { blockSize: `${height}px` } })}
       >
         {entries && !count ? (
@@ -1794,6 +1816,7 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
           ref={canvasRef}
           className={styles.canvas}
           role="img"
+          tabIndex={0}
           aria-label={`${count} photographs arranged by what they are of. Drag to turn the cloud.`}
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
@@ -1806,6 +1829,10 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
             endDrag(event);
           }}
           onClick={() => {
+            if (activationClickRef.current) {
+              activationClickRef.current = false;
+              return;
+            }
             if (!isTouch()) resolvePress();
           }}
         />

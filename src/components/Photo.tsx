@@ -650,7 +650,7 @@ export const PhotoBlockEl: React.FC<{
                     <>
                       &nbsp;&middot;&nbsp;
                       <AppLink
-                        href={`/explore?wander=${encodeURIComponent(props.block._build.tags.path)}#wander`}
+                        href={`/explore/wander?wander=${encodeURIComponent(props.block._build.tags.path)}`}
                       >
                         Wander from here
                       </AppLink>

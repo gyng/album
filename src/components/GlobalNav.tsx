@@ -16,6 +16,7 @@ export type GlobalNavPage =
   | "slideshow"
   | "explore"
   | "trips"
+  | "explore-wander"
   | FunPage;
 
 type Props = {
@@ -60,7 +61,10 @@ export const GlobalNav: React.FC<Props> = ({
   const MapLink = onMapClick ? "a" : Link;
 
   const exploreView =
-    currentPage === "explore" || currentPage === "timeline" || currentPage === "trips";
+    currentPage === "explore" ||
+    currentPage === "timeline" ||
+    currentPage === "trips" ||
+    currentPage === "explore-wander";
   const funView =
     currentPage === "wander" ||
     currentPage === "photo-pairs" ||
@@ -162,7 +166,9 @@ export const GlobalNav: React.FC<Props> = ({
         }
       />
       {exploreView ? (
-        <ExploreSubnav current={currentPage as "explore" | "timeline" | "trips"} />
+        <ExploreSubnav
+          current={currentPage as "explore" | "timeline" | "trips" | "explore-wander"}
+        />
       ) : null}
       {funView ? <FunSubnav current={currentPage as FunPage} /> : null}
     </div>

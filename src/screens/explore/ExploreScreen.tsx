@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AppLink as Link } from "../../components/platform";
 import { GlobalNav } from "../../components/GlobalNav";
 import { MiniHistogram } from "../../components/MiniHistogram";
@@ -60,7 +60,6 @@ import { ExploreLookYearPhotos } from "../../components/explore/ExploreLookYearP
 import { ExploreColourSection } from "../../components/explore/ExploreColourSection";
 import { ExploreGearSection } from "../../components/explore/ExploreGearSection";
 import { EmbeddingSpaceDeferred } from "../../components/EmbeddingSpaceDeferred";
-import { ExploreWander } from "../../components/explore/ExploreWander";
 import { formatPageTitle } from "../../lib/seo";
 import { unpackExploreStats, type PackedExploreStats } from "../../util/explorePageData";
 
@@ -242,8 +241,14 @@ const ExploreScreen = ({
     visualSameness?.lookTimeline.toReversed().slice(0, visibleLookTimeline) ?? [];
   const overviewCards = buildExploreOverviewCards(stats);
   const funStats = buildExploreFunStats(stats);
-  // Wander's walk, drawn through the cloud above it.
-  const [wanderTrail, setWanderTrail] = useState<string[]>([]);
+  useEffect(() => {
+    if (
+      new URLSearchParams(window.location.search).has("wander") ||
+      window.location.hash === "#wander"
+    ) {
+      window.location.replace(`/explore/wander${window.location.search}`);
+    }
+  }, []);
   const sectionLinks = EXPLORE_SECTION_LINKS.filter(
     (link) => link.href !== "#weather" || weatherCoverage > 0,
   );
@@ -367,18 +372,7 @@ const ExploreScreen = ({
             deferredSummary="Every photograph, placed by what it is of — or by when it happened."
           >
             <section className={`${styles.section} ${styles.sectionWide}`}>
-              <EmbeddingSpaceDeferred trail={wanderTrail} />
-            </section>
-          </StatGroup>
-
-          <StatGroup
-            id="wander"
-            title="Wander"
-            deferContent
-            deferredSummary="Follow visual connections, or jump to a different scene."
-          >
-            <section className={`${styles.section} ${styles.sectionWide}`}>
-              <ExploreWander onTrailChange={setWanderTrail} />
+              <EmbeddingSpaceDeferred />
             </section>
           </StatGroup>
 

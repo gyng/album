@@ -1,12 +1,11 @@
-import { useEffect, useState, useId } from "react";
-import { Button, LoadingIndicator, Input } from "./ui";
+import { useEffect, useState } from "react";
+import { Button, LoadingIndicator, Input, Icon } from "./ui";
 import { useEmbeddingsDatabase } from "./database/useDatabase";
 import { encodeSearchText } from "./search/textEmbeddings";
 import { fetchSemanticPaths } from "./search/api";
 import styles from "./CloudSpotlight.module.css";
 
 export const CloudSpotlight = ({ onMatches }: { onMatches: (paths: string[] | null) => void }) => {
-  const queryId = useId();
   const [input, setInput] = useState("");
   const [query, setQuery] = useState("");
   return (
@@ -20,9 +19,8 @@ export const CloudSpotlight = ({ onMatches }: { onMatches: (paths: string[] | nu
           }
         }}
       >
-        <label htmlFor={queryId}>Find a scene</label>
         <Input
-          id={queryId}
+          aria-label="Find a scene"
           className={styles.query}
           type="search"
           value={input}
@@ -34,6 +32,8 @@ export const CloudSpotlight = ({ onMatches }: { onMatches: (paths: string[] | nu
         </Button>
         <Button
           variant="quiet"
+          size="icon"
+          aria-label="Clear search"
           className={styles.clear}
           disabled={!query}
           aria-hidden={!query}
@@ -43,7 +43,7 @@ export const CloudSpotlight = ({ onMatches }: { onMatches: (paths: string[] | nu
             onMatches(null);
           }}
         >
-          Clear search
+          <Icon kind="close" />
         </Button>
       </form>
       <div className={styles.feedback}>

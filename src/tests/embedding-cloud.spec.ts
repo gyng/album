@@ -30,6 +30,14 @@ for (const width of [390, 1280]) {
     await gotoHydrated(page, "/explore#embedding-space");
     const canvas = page.getByRole("img", { name: /photographs arranged/ });
     await expect(canvas).toBeVisible();
+    await expect(page.getByText("Find a scene", { exact: true })).toHaveCount(0);
+    if (width === 1280) {
+      const search = await page.getByRole("searchbox", { name: "Find a scene" }).boundingBox();
+      const year = await page.getByLabel("Year", { exact: true }).boundingBox();
+      expect(Math.abs(search!.y - year!.y)).toBeLessThan(10);
+      expect(search!.x).toBeGreaterThan(year!.x + year!.width);
+    }
+
     await expect(page.getByRole("radio", { name: "Similar photos", exact: true })).toBeChecked();
     await page.getByLabel("Year", { exact: true }).selectOption("2024");
     await expect(canvas).toHaveAttribute("aria-label", /^2 photographs/);
