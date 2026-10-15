@@ -3,7 +3,7 @@
 ## Semantic games and Wander — 14 October 2026
 
 - Warmer and Caption It: ranked against the archive with the in-browser text
-  encoder, dailies, stats and placeholder art. Details in `docs/fun-games.md`.
+  encoder, dailies, stats and original animal artwork. Details in `docs/fun-games.md`.
 - Wander: a section of `/explore` rather than a Fun game. Details in
   `docs/explore-cloud.md`.
 

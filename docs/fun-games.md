@@ -88,7 +88,7 @@ bonsai target 42 instead of 89, and a daffodil-portrait target 26 instead of 78.
 
 ## Illustrations
 
-The nine game illustrations are animal editorial cartoons with transparent
+The twelve game illustrations are animal editorial cartoons with transparent
 outer backgrounds, generated using the built-in imagegen tool. Final 960×640
 AVIFs preserve alpha in `src/public/fun/`. The shared `GameIllustration` component renders their inverted
 luminance through an SVG mask, removing pale paper interiors as well as the

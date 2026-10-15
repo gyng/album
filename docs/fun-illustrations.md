@@ -14,29 +14,31 @@ AVIF, quality 85, effort 6. Cards and starts share the existing asset URL.
 
 > Use case: illustration-story. Asset type: decorative photo-game card illustration. Create an original witty animal-only editorial cartoon. Match the loose lively pen-and-ink, expressive deadpan animal faces and restrained cross-hatching of reference 2 (mole and pigeon); reference 1 is the existing Photo Relay concept, whose composition must become much taller and more compact. Subject: two perplexed dachshunds, sitting close together at the bottom left and right, hold the two ends of a looping string of five photographic prints. Between and above them a pompous pigeon has hopelessly tangled itself in the string, wings spread, one loop around its belly and another over its head. The prints hang in a gentle zigzag between all three animals, showing a doorway, arch, bridge, hill and mountain, clearly connecting the two endpoints. The dogs exchange dry sceptical looks while the pigeon pretends everything is under control. Compose the three animals into a compact triangular vignette, using both height and width, NOT a thin horizontal clothesline or long panorama. The subject fills about 75 percent of a landscape 3:2 canvas height, all subjects visible with generous transparent margins. Strong silhouettes and clear visual humour at small card size. Pure black ink marks on genuinely transparent background, including uninked interiors, no white fills or paper backdrop. Animal paws/wings only. No humans, human body parts, captions, speech bubbles, text, lettering, numbers, signatures, artist attribution, logos, borders or watermark. Application recolours the ink with an inverted luminance mask.
 
-## Placeholder — `hindsight.avif`
+## Hindsight, Warmer and Caption It — 15 October 2026
 
-**Hindsight has no artwork of its own yet.** `hindsight.avif` is the retired
-Photo Relay cartoon from 07549cc (two dachshunds holding either end of a line
-of prints), reused because a line of photographs reads as a sequence and it
-already belongs to the animal set. It was retired from Relay only for its long
-horizontal composition. Replace it with a generated Hindsight cartoon in this
-style, encoded like the others, then remove the placeholder comment in
-`components/fun/games.ts`.
+Replaced all three borrowed placeholders with original animal cartoons using
+built-in imagegen, one generation per asset, with transparent backgrounds.
+Encoded at 960×640, AVIF quality 85, effort 6, preserving alpha. Cards and
+start screens continue to share the existing URLs.
 
-## Placeholders — `warmer.avif` and `caption-it.avif`
+### Replacement prompts (verbatim)
 
-**Warmer and Caption It have no artwork of their own yet.** `warmer.avif` is
-the retired Photo Oracle engraving (a crystal ball over prints) and
-`caption-it.avif` the retired Blind Frame engraving (a sketchbook and pencil),
-both from before 07549cc. They are the older engraving style rather than the
-animal cartoons. Replace each with a generated cartoon in the current
-direction, then remove its placeholder comment in `components/fun/games.ts`.
+#### `hindsight.avif`
+
+> Use case: illustration-story. Asset type: decorative photo-game card illustration. Original witty animal-only editorial cartoon. Loose lively black pen-and-ink contours, expressive deadpan animal faces, sparse cross-hatching, strong simple silhouettes, dry visual humour. No dense antique engraving. Compact centred landscape 3:2 vignette, whole animals visible, generous transparent margins, readable at small card scale. Pure black ink marks on genuinely transparent background, including uninked interiors; no white fills or paper backdrop. Animal paws/wings only. No humans, human body parts, captions, speech bubbles, text, letters, numbers, signatures, logos, borders or watermarks. Application recolours ink with inverted luminance mask. Subject: a meticulous tortoise arranging four small photographs of a flower's progression from seedling to bud to bloom to drooping flower, while a cheeky rabbit beside it confidently places the drooping flower first. The tortoise gives the rabbit a patient sceptical side-eye. Photographs form a compact curved row between the animals. The visual joke is an obviously muddled sequence.
+
+#### `warmer.avif`
+
+> Use case: illustration-story. Asset type: decorative photo-game card illustration. Original witty animal-only editorial cartoon. Loose lively black pen-and-ink contours, expressive deadpan animal faces, sparse cross-hatching, strong simple silhouettes, dry visual humour. No dense antique engraving. Compact centred landscape 3:2 vignette, whole animals visible, generous transparent margins, readable at small card scale. Pure black ink marks on genuinely transparent background, including uninked interiors; no white fills or paper backdrop. Animal paws/wings only. No humans, human body parts, captions, speech bubbles, text, letters, numbers, signatures, logos, borders or watermarks. Application recolours ink with inverted luminance mask. Subject: an earnest mole detective leans very close to a small photographic print of a volcano using an absurdly long magnifying glass, while a deadpan penguin beside it fans itself with one flipper and holds a second print showing a snowy iceberg. Small heat squiggles above the volcano print, no actual flames. The joke is searching for a warmer photographic guess.
+
+#### `caption-it.avif`
+
+> Use case: illustration-story. Asset type: decorative photo-game card illustration. Original witty animal-only editorial cartoon. Loose lively black pen-and-ink contours, expressive deadpan animal faces, sparse cross-hatching, strong simple silhouettes, dry visual humour. No dense antique engraving. Compact centred landscape 3:2 vignette, whole animals visible, generous transparent margins, readable at small card scale. Pure black ink marks on genuinely transparent background, including uninked interiors; no white fills or paper backdrop. Animal paws/wings only. No humans, human body parts, captions, speech bubbles, text, letters, numbers, signatures, logos, borders or watermarks. Application recolours ink with inverted luminance mask. Subject: a self-important owl perched beside a small framed photograph of a tiny unassuming snail, pondering with a large feather quill over an open notebook, while the real snail sits beside its portrait looking unimpressed. Notebook pages blank except a few abstract ink squiggles that are not writing. The joke is grand literary ambition for a modest photographic subject.
 
 ## Current direction — animal editorial cartoons
 
 Updated 13 October 2026 with the built-in imagegen tool, one generation per
-asset, with `transparent_background: true`. All nine game illustrations use
+asset, with `transparent_background: true`. All twelve game illustrations use
 animal mascots and visual humour: deadpan expressions, misplaced confidence
 and absurd situations. No humans or human body parts, including in the small
 photographs. Keep future artwork original, with no artist signatures or

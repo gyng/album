@@ -69,8 +69,6 @@ export const FUN_GAMES = [
     id: "hindsight",
     href: "/fun/hindsight",
     title: "Hindsight",
-    // PLACEHOLDER: the retired Photo Relay cartoon (07549cc), reused until
-    // Hindsight has artwork of its own. See docs/fun-illustrations.md.
     illustration: "/fun/hindsight.avif",
     description: "Put the photographs in the order they were taken.",
   },
@@ -78,8 +76,6 @@ export const FUN_GAMES = [
     id: "warmer",
     href: "/fun/warmer",
     title: "Warmer",
-    // PLACEHOLDER: the retired Photo Oracle engraving (before 07549cc), reused
-    // until Warmer has artwork of its own. See docs/fun-illustrations.md.
     illustration: "/fun/warmer.avif",
     description: "Describe a hidden photograph. Each guess says how close you are.",
   },
@@ -87,8 +83,6 @@ export const FUN_GAMES = [
     id: "caption-it",
     href: "/fun/caption-it",
     title: "Caption It",
-    // PLACEHOLDER: the retired Blind Frame engraving (before 07549cc), reused
-    // until Caption It has artwork of its own. See docs/fun-illustrations.md.
     illustration: "/fun/caption-it.avif",
     description: "Caption a photograph so well it stands out from the whole archive.",
   },
