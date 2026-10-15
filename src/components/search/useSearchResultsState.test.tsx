@@ -55,6 +55,7 @@ const baseProps = () => ({
 });
 
 const baseVectorState = () => ({
+  isTextModelReady: false,
   textVector: null,
   textVectorQuery: null,
   isTextVectorLoading: false,
@@ -123,6 +124,32 @@ describe("useSearchResultsState", () => {
     expect(config.queryKey).not.toEqual(earlyKey);
     await config.queryFn({ pageParam: 0 });
     expect(fetchHybridResults).toHaveBeenCalled();
+  });
+
+  it("waits for the current hybrid vector once the model is ready", () => {
+    textVector.mockReturnValue({
+      ...baseVectorState(),
+      isTextModelReady: true,
+      isTextVectorLoading: true,
+    });
+    const { rerender } = renderState({ searchMode: "hybrid", searchInputValue: "cats" });
+    expect(config.enabled).toBe(false);
+    textVector.mockReturnValue({
+      ...baseVectorState(),
+      isTextModelReady: true,
+      textVector: [1],
+      textVectorQuery: "dogs",
+    });
+    rerender();
+    expect(config.enabled).toBe(false);
+    textVector.mockReturnValue({
+      ...baseVectorState(),
+      isTextModelReady: true,
+      textVector: [1],
+      textVectorQuery: "cats",
+    });
+    rerender();
+    expect(config.enabled).toBe(true);
   });
 
   it.each([

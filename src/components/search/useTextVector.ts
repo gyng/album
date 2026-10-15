@@ -30,6 +30,7 @@ type ProgressDetails = {
 };
 
 export type TextVectorState = {
+  isTextModelReady: boolean;
   textVector: number[] | null;
   textVectorQuery: string | null;
   isTextVectorLoading: boolean;
@@ -56,6 +57,7 @@ type Action =
   | { type: "vector:done" };
 
 const initialState: TextVectorState = {
+  isTextModelReady: false,
   textVector: null,
   textVectorQuery: null,
   isTextVectorLoading: false,
@@ -84,6 +86,7 @@ const reducer = (state: TextVectorState, action: Action): TextVectorState => {
     case "warmup:ready":
       return {
         ...state,
+        isTextModelReady: true,
         textModelProgress: 100,
         textModelStage: "Search model ready",
         textModelProgressDetails: { loaded: 0, total: 0 },
@@ -123,6 +126,7 @@ const reducer = (state: TextVectorState, action: Action): TextVectorState => {
     case "vector:success":
       return {
         ...state,
+        isTextModelReady: true,
         textVector: action.vector,
         textVectorQuery: action.query,
         textModelProgress: 100,

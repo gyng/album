@@ -5,10 +5,17 @@ import { encodeSearchText } from "./search/textEmbeddings";
 import { fetchSemanticPaths } from "./search/api";
 import styles from "./CloudSpotlight.module.css";
 
-export const CloudSpotlight = ({ onMatches }: { onMatches: (paths: string[] | null) => void }) => {
+export const CloudSpotlight = ({
+  onMatches,
+  tags = [],
+}: {
+  onMatches: (paths: string[] | null) => void;
+  tags?: readonly string[];
+}) => {
   const inputRef = useRef<HTMLInputElement>(null);
   const [input, setInput] = useState("");
   const [query, setQuery] = useState("");
+  const randomTags = tags.filter((tag) => tag !== query && tag.trim());
   return (
     <div className={styles.search}>
       <form
@@ -47,6 +54,21 @@ export const CloudSpotlight = ({ onMatches }: { onMatches: (paths: string[] | nu
             <Icon kind="close" />
           </Button>
         </div>
+        <Button
+          size="icon"
+          aria-label="Random tag spotlight"
+          title="Random tag spotlight"
+          disabled={!randomTags.length}
+          onClick={() => {
+            const tag = randomTags[Math.floor(Math.random() * randomTags.length)];
+            if (!tag) return;
+            setInput(tag);
+            onMatches(null);
+            setQuery(tag);
+          }}
+        >
+          <Icon kind="shuffle" />
+        </Button>
         <Button type="submit" disabled={!input.trim() || input.trim() === query}>
           Spotlight
         </Button>

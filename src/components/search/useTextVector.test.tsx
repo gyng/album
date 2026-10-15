@@ -50,6 +50,28 @@ describe("useTextVector", () => {
     expect(encode).not.toHaveBeenCalled();
   });
 
+  it("retains model readiness while encoding another query", async () => {
+    const { result, rerender } = renderHook(
+      ({ trimmedQuery }) =>
+        useTextVector({
+          isSimilarMode: false,
+          searchMode: "hybrid",
+          needsTextVector: true,
+          trimmedQuery,
+        }),
+      { initialProps: { trimmedQuery: "cats" } },
+    );
+    await act(async () => {
+      await resolved();
+    });
+    expect(result.current.isTextModelReady).toBe(true);
+    encode.mockImplementation(() => new Promise(() => {}));
+    rerender({ trimmedQuery: "snow" });
+    expect(result.current.isTextVectorLoading).toBe(true);
+    expect(result.current.textVector).toBeNull();
+    expect(result.current.isTextModelReady).toBe(true);
+  });
+
   it("reports warmup progress and readiness", async () => {
     let report!: Parameters<typeof warmup>[0];
     warmup.mockImplementation(async (onProgress) => {
@@ -70,6 +92,7 @@ describe("useTextVector", () => {
     });
     expect(result.current.textModelProgress).toBe(100);
     expect(result.current.textModelStage).toBe("Search model ready");
+    expect(result.current.isTextModelReady).toBe(true);
   });
 
   it("uses empty progress details when the worker omits them", async () => {

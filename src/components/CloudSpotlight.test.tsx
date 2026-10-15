@@ -60,3 +60,19 @@ it("clears unsubmitted text without starting scene search", () => {
   expect(screen.getByRole("searchbox")).toHaveFocus();
   expect(screen.queryByRole("status")).toBeNull();
 });
+
+it("spotlights a random tag immediately and avoids repeating the current tag", async () => {
+  jest.mocked(encodeSearchText).mockResolvedValue([1, 0]);
+  render(<CloudSpotlight tags={["rain", "snow"]} onMatches={jest.fn()} />);
+  fireEvent.click(screen.getByRole("button", { name: "Random tag spotlight" }));
+  const first = (screen.getByRole("searchbox") as HTMLInputElement).value;
+  expect(["rain", "snow"]).toContain(first);
+  await waitFor(() => expect(encodeSearchText).toHaveBeenCalledWith(first, expect.any(Function)));
+  fireEvent.click(screen.getByRole("button", { name: "Random tag spotlight" }));
+  expect(screen.getByRole("searchbox")).not.toHaveValue(first);
+});
+
+it("disables random spotlight when no tags are available", () => {
+  render(<CloudSpotlight onMatches={jest.fn()} />);
+  expect(screen.getByRole("button", { name: "Random tag spotlight" })).toBeDisabled();
+});

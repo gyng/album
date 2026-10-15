@@ -161,6 +161,7 @@ export const Search: React.FC<{
     similarPreviewSrc,
     textModelProgress,
     textModelProgressDetails,
+    isTextModelReady,
     isTextQueryResolving,
     textVectorError,
     trimmedQuery,
@@ -234,13 +235,16 @@ export const Search: React.FC<{
 
   // While the embeddings DB is still downloading, similar / pure-semantic /
   // image queries can't run yet — present the grid as pending (loading) instead
-  // of a definitive empty state (HIGH-8). Hybrid is deliberately excluded: it
-  // degrades to keyword-only ranking meanwhile rather than waiting.
+  // of a definitive empty state (HIGH-8). Warm hybrid searches also wait so a
+  // provisional keyword ranking does not flash before the fused results.
   const isAwaitingVectorDatabase =
     needsEmbeddingsDatabase &&
     !embeddingsDatabase &&
     !embeddingsError &&
-    (isSimilarMode || Boolean(imageQuery) || searchMode === "semantic");
+    (isSimilarMode ||
+      Boolean(imageQuery) ||
+      searchMode === "semantic" ||
+      (searchMode === "hybrid" && isTextModelReady));
 
   // The image query also waits on the vision model encoding the image itself.
   const isAwaitingImageVector = Boolean(imageQuery) && !imageQuery?.vector;

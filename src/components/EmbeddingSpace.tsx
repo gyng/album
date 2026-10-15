@@ -299,6 +299,16 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
     [entries, yearFilter, lensFilter, rankedPaths],
   );
   const visibleRef = React.useRef(visibleIndices);
+  const spotlightTags = React.useMemo(
+    () => [
+      ...new Set(
+        [...selectCloudIndices(entries ?? [], yearFilter, lensFilter, null)].flatMap(
+          (index) => entries?.[index]?.tags ?? [],
+        ),
+      ),
+    ],
+    [entries, yearFilter, lensFilter],
+  );
   const years = React.useMemo(
     () =>
       [...new Set((entries ?? []).flatMap((entry) => (entry.year ? [entry.year] : [])))].sort(
@@ -1792,7 +1802,7 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
             </span>
           </div>
           <div className={styles.spotlight}>
-            <CloudSpotlight onMatches={setRankedPaths} />
+            <CloudSpotlight onMatches={setRankedPaths} tags={spotlightTags} />
           </div>
         </div>
       </div>

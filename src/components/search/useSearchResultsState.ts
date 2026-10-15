@@ -83,7 +83,7 @@ export const useSearchResultsState = ({
     warmupEnabled: needsTextVector && !isImageQueryMode,
   });
 
-  const { textVector, textVectorError, textVectorQuery } = textVectorState;
+  const { textVector, textVectorError, textVectorQuery, isTextModelReady } = textVectorState;
   // Only the embeddings DB (or its search.sqlite fallback, once loaded) can
   // answer vector queries. The main DB is NOT a stand-in: in a split build it
   // has no `embeddings` table, so treating it as "ready" made cold-cache visitors
@@ -118,9 +118,10 @@ export const useSearchResultsState = ({
         : hasSearchQuery
           ? searchMode === "keyword" ||
             textVectorFailed ||
-            // Hybrid may run before the embeddings DB finishes downloading: it
-            // degrades to keyword-only ranking and re-fuses once vectors arrive.
-            searchMode === "hybrid" ||
+            // Offer keyword results during the first model download. Once it is
+            // ready, publish only the final hybrid ranking for each new query.
+            (searchMode === "hybrid" &&
+              (!isTextModelReady || (hasVectorDatabase && hasCurrentTextVector))) ||
             // Pure semantic needs the vector DB — otherwise it stays pending.
             (searchMode === "semantic" && hasVectorDatabase && hasCurrentTextVector)
           : hasFacetFilters || isColorMode);
