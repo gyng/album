@@ -9,15 +9,17 @@ jest.mock("@huggingface/transformers", () => ({
   AutoTokenizer: {
     from_pretrained: (...args: unknown[]) => mockTokenizerFromPretrained(...args),
   },
-  SiglipTextModel: {
-    from_pretrained: (...args: unknown[]) => mockTextModelFromPretrained(...args),
+  AutoConfig: { from_pretrained: async () => ({ vision_config: {}, audio_config: {} }) },
+  AutoModel: {
+    from_pretrained: (id: unknown, options: { config: { vision_config: unknown } }) =>
+      options.config.vision_config === null
+        ? mockTextModelFromPretrained(id, options)
+        : mockVisionModelFromPretrained(id, options),
   },
   AutoProcessor: {
     from_pretrained: (...args: unknown[]) => mockProcessorFromPretrained(...args),
   },
-  SiglipVisionModel: {
-    from_pretrained: (...args: unknown[]) => mockVisionModelFromPretrained(...args),
-  },
+
   RawImage: {
     fromBlob: (...args: unknown[]) => mockRawImageFromBlob(...args),
   },
@@ -67,9 +69,9 @@ describe("embedding worker", () => {
     jest.clearAllMocks();
     mockEnv.allowLocalModels = true;
     tokenizer.mockReturnValue({ input_ids: [1] });
-    textModel.mockResolvedValue({ pooler_output: { data: new Float32Array([3, 4]) } });
+    textModel.mockResolvedValue({ sentence_embedding: { data: new Float32Array([3, 4]) } });
     processor.mockResolvedValue({ pixel_values: [1] });
-    visionModel.mockResolvedValue({ pooler_output: { data: new Float32Array([0, 2]) } });
+    visionModel.mockResolvedValue({ sentence_embedding: { data: new Float32Array([0, 2]) } });
     mockRawImageFromBlob.mockResolvedValue({ width: 10, height: 10 });
     mockTokenizerFromPretrained.mockImplementation(async (_id, options) => {
       options.progress_callback(progress("ready"));
@@ -98,7 +100,7 @@ describe("embedding worker", () => {
     expect(mockEnv.allowLocalModels).toBe(false);
     expect(mockTokenizerFromPretrained).toHaveBeenCalledTimes(1);
     expect(mockTextModelFromPretrained).toHaveBeenCalledWith(
-      "Xenova/siglip-base-patch16-224",
+      "onnx-community/embeddinggemma-2-ONNX",
       expect.objectContaining({ device: "wasm", dtype: "q4" }),
     );
     expect(postMessage).toHaveBeenCalledWith(
@@ -119,27 +121,28 @@ describe("embedding worker", () => {
     const { handler } = loadWorker();
     const loading = handler({ data: { id: 30, type: "warmup" } });
     await Promise.resolve();
+    await Promise.resolve();
     expect(mockTextModelFromPretrained).toHaveBeenCalledTimes(1);
     finish(tokenizer);
     await loading;
   });
 
-  it("normalises lower-cased text embeddings and preserves a zero vector", async () => {
+  it("normalises task-prefixed text embeddings and preserves a zero vector", async () => {
     const first = loadWorker({});
     await first.handler({ data: { id: 3, type: "encode", text: "HarBor" } });
-    expect(tokenizer).toHaveBeenCalledWith("harbor", {
-      padding: "max_length",
+    expect(tokenizer).toHaveBeenCalledWith("task: search result | query: HarBor", {
+      padding: true,
       truncation: true,
-      max_length: 64,
+      max_length: 8192,
     });
     expect(first.postMessage).toHaveBeenLastCalledWith({ id: 3, ok: true, vector: [0.6, 0.8] });
 
-    textModel.mockResolvedValue({ pooler_output: { data: new Float32Array([0, 0]) } });
+    textModel.mockResolvedValue({ sentence_embedding: { data: new Float32Array([0, 0]) } });
     const second = loadWorker({});
     await second.handler({ data: { id: 4, type: "encode", text: "still" } });
     expect(second.postMessage).toHaveBeenLastCalledWith({ id: 4, ok: true, vector: [0, 0] });
 
-    textModel.mockResolvedValue({ pooler_output: { data: [3, undefined, 4] } });
+    textModel.mockResolvedValue({ sentence_embedding: { data: [3, undefined, 4] } });
     const sparse = loadWorker({});
     await sparse.handler({ data: { id: 41, type: "encode", text: "sparse" } });
     expect(sparse.postMessage).toHaveBeenLastCalledWith({
@@ -170,7 +173,7 @@ describe("embedding worker", () => {
     await handler({ data: { id: 51, type: "encode-image", blob } });
 
     expect(mockRawImageFromBlob).toHaveBeenCalledWith(blob);
-    expect(processor).toHaveBeenCalledWith({ width: 10, height: 10 });
+    expect(processor).toHaveBeenCalledWith(null, { width: 10, height: 10 });
     expect(visionModel).toHaveBeenCalledWith({ pixel_values: [1] });
     expect(postMessage).toHaveBeenCalledWith({ id: 5, ok: true, vector: [0, 1] });
     expect(mockProcessorFromPretrained).toHaveBeenCalledTimes(1);
@@ -254,22 +257,22 @@ describe("embedding worker", () => {
   });
 
   it("reports empty tower outputs, unknown requests, and non-Error failures", async () => {
-    textModel.mockResolvedValueOnce({ pooler_output: null });
+    textModel.mockResolvedValueOnce({ sentence_embedding: null });
     const text = loadWorker({});
     await text.handler({ data: { id: 12, type: "encode", text: "empty" } });
     expect(text.postMessage).toHaveBeenLastCalledWith({
       id: 12,
       ok: false,
-      error: "SigLIP text embedding output was empty.",
+      error: "EmbeddingGemma text embedding output was empty.",
     });
 
-    visionModel.mockResolvedValueOnce({ pooler_output: {} });
+    visionModel.mockResolvedValueOnce({ sentence_embedding: {} });
     const vision = loadWorker({});
     await vision.handler({ data: { id: 13, type: "encode-image", blob: new Blob() } });
     expect(vision.postMessage).toHaveBeenLastCalledWith({
       id: 13,
       ok: false,
-      error: "SigLIP image embedding output was empty.",
+      error: "EmbeddingGemma image embedding output was empty.",
     });
 
     const unknown = loadWorker({});

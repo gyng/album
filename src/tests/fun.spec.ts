@@ -71,15 +71,8 @@ test.beforeAll(() => {
       .prepare(
         "INSERT INTO embeddings (path, model_id, embedding_dim, embedding_blob, embedding_scale) VALUES (?, ?, 3, ?, ?)",
       )
-      .run(
-        photoPath,
-        "google/siglip2-base-patch16-224",
-        new Uint8Array([80, index ? 40 : 90, 0]),
-        1 / 127,
-      );
+      .run(photoPath, "google/embeddinggemma-2", new Uint8Array([80, index ? 40 : 90, 0]), 1 / 127);
   }
-  vectorDb.exec(`INSERT INTO embeddings (path, model_id, embedding_dim, embedding_blob, embedding_scale)
-    SELECT path, 'google/siglip-base-patch16-224', embedding_dim, embedding_blob, embedding_scale FROM embeddings WHERE model_id = 'google/siglip2-base-patch16-224'`);
   db.close();
   vectorDb.close();
   core = readFileSync(corePath);

@@ -10,7 +10,7 @@ import {
 } from "./computeEmbeddingStats";
 
 const V1_MODEL_ID = "google/siglip-base-patch16-224";
-const V2_MODEL_ID = "google/siglip2-base-patch16-224";
+const V2_MODEL_ID = "google/embeddinggemma-2";
 
 const normalize = (vector: number[]): number[] => {
   const norm = Math.sqrt(vector.reduce((sum, value) => sum + value * value, 0));
@@ -121,16 +121,16 @@ const createDatabaseWithStatements = async (statements: string[]): Promise<strin
 };
 
 describe("selectEmbeddingModelId", () => {
-  it("prefers the v2 model when both spaces are present", () => {
+  it("uses Gemma when legacy vectors remain", () => {
     expect(selectEmbeddingModelId([V1_MODEL_ID, V2_MODEL_ID])).toBe(V2_MODEL_ID);
   });
 
-  it("falls back to v1 when v2 is absent", () => {
-    expect(selectEmbeddingModelId([V1_MODEL_ID])).toBe(V1_MODEL_ID);
+  it("rejects legacy vectors when Gemma is absent", () => {
+    expect(selectEmbeddingModelId([V1_MODEL_ID])).toBeNull();
   });
 
-  it("uses any single available model when neither known id is present", () => {
-    expect(selectEmbeddingModelId(["some/other-model"])).toBe("some/other-model");
+  it("rejects unknown embedding spaces", () => {
+    expect(selectEmbeddingModelId(["some/other-model"])).toBeNull();
   });
 
   it("returns null when no models are available", () => {

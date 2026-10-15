@@ -34,7 +34,7 @@ const makeDatabase = () => {
         if (bind?.[0] === "../albums/test-simple/DSCF0506-2.jpg") {
           callback([
             "../albums/test-simple/DSCF0506-2.jpg",
-            "google/siglip-base-patch16-224",
+            "google/embeddinggemma-2",
             3,
             JSON.stringify([1, 0, 0]),
           ]);
@@ -45,19 +45,19 @@ const makeDatabase = () => {
       if (sql.includes("FROM embeddings") && sql.includes("WHERE model_id = ?")) {
         callback([
           "../albums/test-simple/DSCF0506-2.jpg",
-          "google/siglip-base-patch16-224",
+          "google/embeddinggemma-2",
           3,
           JSON.stringify([1, 0, 0]),
         ]);
         callback([
           "../albums/test-simple/DSCF0593.jpg",
-          "google/siglip-base-patch16-224",
+          "google/embeddinggemma-2",
           3,
           JSON.stringify([0.9, 0.1, 0]),
         ]);
         callback([
           "../albums/test-simple/DSCF2581-2_2.jpg",
-          "google/siglip-base-patch16-224",
+          "google/embeddinggemma-2",
           3,
           JSON.stringify([0, 1, 0]),
         ]);
@@ -170,7 +170,7 @@ describe("fetchSimilarResults", () => {
         if (sql.includes("FROM embeddings") && sql.includes("WHERE path = ?")) {
           callback([
             "../albums/test-simple/DSCF0506-2.jpg",
-            "google/siglip-base-patch16-224",
+            "google/embeddinggemma-2",
             3,
             JSON.stringify([1, 0, 0]),
           ]);
@@ -180,7 +180,7 @@ describe("fetchSimilarResults", () => {
         if (sql.includes("FROM embeddings") && sql.includes("WHERE model_id = ?")) {
           callback([
             "../albums/test-simple/DSCF0593.jpg",
-            "google/siglip-base-patch16-224",
+            "google/embeddinggemma-2",
             3,
             JSON.stringify([0.9, 0.1, 0]),
           ]);
@@ -226,7 +226,7 @@ describe("fetchSimilarResults", () => {
         if (sql.includes("FROM embeddings") && sql.includes("WHERE path = ?")) {
           callback([
             "../albums/test-simple/DSCF0506-2.jpg",
-            "google/siglip-base-patch16-224",
+            "google/embeddinggemma-2",
             3,
             "{{not valid json",
           ]);
@@ -251,7 +251,7 @@ describe("fetchSimilarResults", () => {
         if (sql.includes("FROM embeddings") && sql.includes("WHERE path = ?")) {
           callback([
             "../albums/test-simple/DSCF0506-2.jpg",
-            "google/siglip-base-patch16-224",
+            "google/embeddinggemma-2",
             3,
             JSON.stringify([1, 0, 0]),
           ]);
@@ -261,13 +261,13 @@ describe("fetchSimilarResults", () => {
         if (sql.includes("FROM embeddings") && sql.includes("WHERE model_id = ?")) {
           callback([
             "../albums/test-simple/DSCF0593.jpg",
-            "google/siglip-base-patch16-224",
+            "google/embeddinggemma-2",
             3,
             JSON.stringify([0.9, 0.1, 0]),
           ]);
           callback([
             "../albums/test-simple/DSCF2581-2_2.jpg",
-            "google/siglip-base-patch16-224",
+            "google/embeddinggemma-2",
             3,
             "{{not valid json",
           ]);
@@ -333,7 +333,7 @@ describe("blob-format embeddings", () => {
         if (bind?.[0] === "../albums/test-simple/DSCF0506-2.jpg") {
           callback([
             "../albums/test-simple/DSCF0506-2.jpg",
-            "google/siglip-base-patch16-224",
+            "google/embeddinggemma-2",
             3,
             int8Blob([127, 0, 0]),
             1 / 127,
@@ -345,14 +345,14 @@ describe("blob-format embeddings", () => {
       if (sql.includes("FROM embeddings") && sql.includes("WHERE model_id = ?")) {
         callback([
           "../albums/test-simple/DSCF0593.jpg",
-          "google/siglip-base-patch16-224",
+          "google/embeddinggemma-2",
           3,
           int8Blob([127, 14, 0]),
           0.9 / 127,
         ]);
         callback([
           "../albums/test-simple/DSCF2581-2_2.jpg",
-          "google/siglip-base-patch16-224",
+          "google/embeddinggemma-2",
           3,
           int8Blob([0, 127, 0]),
           1 / 127,
@@ -477,7 +477,7 @@ describe("fetchSemanticResults", () => {
       textVector: [1, 0, 0],
       page: 0,
       pageSize: 2,
-      modelId: "google/siglip-base-patch16-224",
+      modelId: "google/embeddinggemma-2",
     });
 
     if ((results.data.length ?? 0) !== 2) {
@@ -507,7 +507,7 @@ describe("fetchSemanticResults", () => {
       textVector: [1, 0, 0],
       page: 0,
       pageSize: 2,
-      modelId: "google/siglip-base-patch16-224",
+      modelId: "google/embeddinggemma-2",
     });
 
     expect(results.data).toEqual([]);
@@ -529,13 +529,13 @@ describe("fetchSemanticResults", () => {
         if (sql.includes("FROM embeddings") && sql.includes("WHERE model_id = ?")) {
           callback([
             "../albums/test-simple/DSCF0506-2.jpg",
-            "google/siglip-base-patch16-224",
+            "google/embeddinggemma-2",
             3,
             JSON.stringify([1, 0, 0]),
           ]);
           callback([
             "../albums/test-simple/DSCF0593.jpg",
-            "google/siglip-base-patch16-224",
+            "google/embeddinggemma-2",
             3,
             JSON.stringify([0.9, 0.1, 0]),
           ]);
@@ -567,7 +567,7 @@ describe("fetchSemanticResults", () => {
       textVector: [1, 0, 0],
       page: 0,
       pageSize: 10,
-      modelId: "google/siglip-base-patch16-224",
+      modelId: "google/embeddinggemma-2",
       selectedFacets: [{ facetId: "location", value: "Japan" }],
     });
 
@@ -594,19 +594,19 @@ describe("fetchHybridResults", () => {
         if (sql.includes("FROM embeddings") && sql.includes("WHERE model_id = ?")) {
           callback([
             "../albums/test-simple/DSCF0506-2.jpg",
-            "google/siglip-base-patch16-224",
+            "google/embeddinggemma-2",
             3,
             JSON.stringify([1, 0, 0]),
           ]);
           callback([
             "../albums/test-simple/DSCF0593.jpg",
-            "google/siglip-base-patch16-224",
+            "google/embeddinggemma-2",
             3,
             JSON.stringify([0.9, 0.1, 0]),
           ]);
           callback([
             "../albums/test-simple/DSCF2581-2_2.jpg",
-            "google/siglip-base-patch16-224",
+            "google/embeddinggemma-2",
             3,
             JSON.stringify([0, 1, 0]),
           ]);
@@ -666,7 +666,7 @@ describe("fetchHybridResults", () => {
       textVector: [1, 0, 0],
       page: 0,
       pageSize: 3,
-      modelId: "google/siglip-base-patch16-224",
+      modelId: "google/embeddinggemma-2",
     });
 
     expect(results.data.map((row) => row.path)).toEqual([
@@ -707,13 +707,13 @@ describe("fetchHybridResults", () => {
         if (sql.includes("FROM embeddings") && sql.includes("WHERE model_id = ?")) {
           callback([
             "../albums/test-simple/DSCF0506-2.jpg",
-            "google/siglip-base-patch16-224",
+            "google/embeddinggemma-2",
             3,
             JSON.stringify([1, 0, 0]),
           ]);
           callback([
             "../albums/test-simple/DSCF0593.jpg",
-            "google/siglip-base-patch16-224",
+            "google/embeddinggemma-2",
             3,
             JSON.stringify([0.9, 0.1, 0]),
           ]);
@@ -746,7 +746,7 @@ describe("fetchHybridResults", () => {
       textVector: [1, 0, 0],
       page: 0,
       pageSize: 10,
-      modelId: "google/siglip-base-patch16-224",
+      modelId: "google/embeddinggemma-2",
       selectedFacets: [{ facetId: "location", value: "Japan" }],
     });
 
@@ -984,7 +984,7 @@ describe("fetchHybridResults keyword degradation", () => {
       textVector: [1, 0, 0],
       page: 0,
       pageSize: 10,
-      modelId: "google/siglip-base-patch16-224",
+      modelId: "google/embeddinggemma-2",
     });
 
     // Keyword ranking survives instead of the whole result collapsing to empty.
@@ -2030,9 +2030,9 @@ describe("vector filtering and pagination", () => {
         return;
       }
       if (sql.includes("FROM embeddings") && sql.includes("WHERE model_id")) {
-        callback(["a.jpg", "google/siglip-base-patch16-224", 2, "[1,0]"]);
-        callback(["b.jpg", "google/siglip-base-patch16-224", 2, "[0.8,0.2]"]);
-        callback(["c.jpg", "google/siglip-base-patch16-224", 2, "[0,1]"]);
+        callback(["a.jpg", "google/embeddinggemma-2", 2, "[1,0]"]);
+        callback(["b.jpg", "google/embeddinggemma-2", 2, "[0.8,0.2]"]);
+        callback(["c.jpg", "google/embeddinggemma-2", 2, "[0,1]"]);
         return;
       }
       if (sql.includes("bm25(images)")) {

@@ -36,7 +36,7 @@ test.beforeAll(() => {
       .prepare(
         "INSERT INTO embeddings (path,model_id,embedding_dim,embedding_blob,embedding_scale) VALUES (?,?,?,?,?)",
       )
-      .run(photo, "google/siglip2-base-patch16-224", 24, vector, 1 / 127);
+      .run(photo, "google/embeddinggemma-2", 24, vector, 1 / 127);
   }
   db.close();
   embeddings.close();

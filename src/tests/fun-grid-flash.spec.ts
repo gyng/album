@@ -50,7 +50,7 @@ test.beforeAll(() => {
       )
       .run(
         photoPath,
-        "google/siglip2-base-patch16-224",
+        "google/embeddinggemma-2",
         new Uint8Array([100, index % 2 ? 30 : 0, 0]),
         1 / 127,
       );

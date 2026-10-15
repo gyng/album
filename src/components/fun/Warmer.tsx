@@ -216,7 +216,7 @@ export const Warmer = ({ photos }: { photos: PhotoGamePhoto[] }) => {
           ))}
         </div>
         <Caption>{LEVELS.find((item) => item.value === settings.level)!.detail}</Caption>
-        <Caption>The first guess downloads a 155 MB language model.</Caption>
+        <Caption>The first guess downloads a 207 MB language model.</Caption>
         <Button variant="primary" onClick={start}>
           Start Warmer
           <KeyHint aria-hidden="true">N</KeyHint>

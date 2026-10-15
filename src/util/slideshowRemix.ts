@@ -43,7 +43,7 @@ export const decideRemixPlan = (input: {
 
   const strategy = input.rollStrategy();
 
-  // A SigLIP-backed strategy resolves via the async embeddings fetch — but
+  // A EmbeddingGemma 2-backed strategy resolves via the async embeddings fetch — but
   // only when embeddings are ready; otherwise fall through to the sync filter
   // chain (which ignores the vector strategy and walks to the best available).
   if (VECTOR_REMIX_STRATEGIES.has(strategy) && input.vectorReady) {

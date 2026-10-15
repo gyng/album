@@ -190,10 +190,12 @@ The JSON artifact stores the side-by-side rows. The Markdown report is the first
 ## Model profiles
 
 - `captions`: generate search tags, short alt text, and metadata only.
-- `siglip2`: generate both browser-compatible SigLIP v1 and visual-similarity
-  SigLIP v2 embeddings only; it does not parse EXIF, extract colours, or touch
-  caption rows.
-- `hybrid`: generate caption metadata and SigLIP embeddings in one pass.
+- `gemma2`: generate image-only photo embeddings and frame/audio embeddings for local videos.
+- `gemma2-hybrid`: generate caption metadata and EmbeddingGemma 2 embeddings in separate passes.
+- `siglip2` and `hybrid`: legacy profiles for reproducing older indexes; production scripts no longer select them.
+
+See [the migration record](../docs/embedding-migration.md) for media sampling,
+browser compatibility and validation.
 
 The caption prompt emits only `tags` and `alt_text`. The primary subject is the
 first tag, followed by other concrete objects and useful visual themes. A separate
@@ -372,7 +374,10 @@ The generated SQLite databases drive all search features in the Next.js app:
 - `Semantic search` embeds user text in the browser and compares it against the same stored image vectors.
 - `Hybrid search` fuses the keyword and semantic rankings with Reciprocal Rank Fusion.
 
-The browser text encoder uses SigLIP v1 (`Xenova/siglip-base-patch16-224`, ONNX, q4) because the v2 model is too large to ship to the browser — do not upgrade without a viable ONNX-quantised v2 alternative. If you change the embedding model, update the browser text encoder to match: semantic and hybrid search require both to share the same embedding space. Similar-photo search works with image embeddings alone and is not affected by the model family constraint.
+The browser text encoder uses EmbeddingGemma 2 ONNX q4. Text, uploaded images,
+photos and local video content share its embedding space. Photo vectors use pixels
+only. Gemma 4 captions remain available to keyword search and display. Hybrid
+search still fuses keyword and semantic rankings. There is no legacy model fallback.
 
 ## Prerequisites
 

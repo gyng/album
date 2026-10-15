@@ -3,7 +3,7 @@ import { Button, Icon, LoadingIndicator } from "../ui";
 import { warmSearchImageModel } from "./imageEmbeddings";
 import styles from "./SearchDrawPad.module.css";
 
-// Canvas backing resolution. SigLIP downsamples to 224×224, so 448 keeps
+// Canvas backing resolution. The vision encoder resizes the input, so 448 keeps
 // strokes crisp at 2× without wasting encode time on a huge bitmap.
 const CANVAS_SIZE = 448;
 

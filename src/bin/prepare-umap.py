@@ -18,8 +18,9 @@ output = root / "public/data/embedding-umap.json"
 digest = hashlib.sha256(source.read_bytes()).hexdigest()
 with sqlite3.connect(f"file:{source}?mode=ro", uri=True) as db:
     models = [row[0] for row in db.execute("SELECT DISTINCT model_id FROM embeddings")]
-    preferred = ["google/siglip2-base-patch16-224", "google/siglip-base-patch16-224"]
-    model = next((name for name in preferred if name in models), models[0])
+    model = "google/embeddinggemma-2"
+    if model not in models:
+        raise ValueError("EmbeddingGemma 2 vectors are required; rebuild the index first")
     rows = list(db.execute(
         "SELECT path, embedding_blob, embedding_scale FROM embeddings "
         "WHERE model_id=? ORDER BY path",

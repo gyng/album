@@ -28,20 +28,20 @@ const createDatabase = (models: string[]) => ({
   },
 });
 
-it("never silently uses v2 vectors for drawings from the v1 encoder", async () => {
+it("never silently uses legacy vectors for the Gemma encoder", async () => {
   const database = createDatabase(["google/siglip2-base-patch16-224"]);
   expect(await fetchPhotoGameArchive({ database: database as never, game: "blind-frame" })).toEqual(
     [],
   );
   expect(await fetchPhotoGameArchive({ database: database as never, game: "relay" })).toHaveLength(
-    1,
+    0,
   );
 });
 
 it("uses the separate embeddings database and removes markup from hidden prompts", async () => {
   const photos = await fetchPhotoGameArchive({
     database: createDatabase([]) as never,
-    embeddingsDatabase: createDatabase(["google/siglip-base-patch16-224"]) as never,
+    embeddingsDatabase: createDatabase(["google/embeddinggemma-2"]) as never,
     game: "blind-frame",
   });
   expect(photos[0]).toMatchObject({ caption: "A quiet city street.", vector: [1, 0] });
@@ -54,7 +54,7 @@ it("loads oracle photographs without requiring embeddings", async () => {
 });
 
 it("joins stored local dates and coordinates to double-take photographs", async () => {
-  const base = createDatabase(["google/siglip2-base-patch16-224"]);
+  const base = createDatabase(["google/embeddinggemma-2"]);
   const database = {
     exec: (args: Parameters<typeof base.exec>[0]) => {
       if (args.sql.startsWith("SELECT path, lat_deg"))

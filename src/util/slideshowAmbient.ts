@@ -131,7 +131,7 @@ export type RemixStrategy =
   | "proximity"
   | "golden-hour"
   | "shared-camera"
-  // Vector-only: produced by the SigLIP path in the slideshow component, not
+  // Vector-only: produced by the EmbeddingGemma 2 path in the slideshow component, not
   // by the sync weighted roll. Their entries in `strategyFilters` are no-ops
   // so they can never surface from the sync path even if rolled.
   | "similar"
@@ -430,7 +430,7 @@ const strategyFilters: Record<
     });
   },
   // Vector strategies — implemented in the slideshow component against the
-  // SigLIP embeddings DB. `similar` is nearest-neighbour; `juxtapose` is the
+  // EmbeddingGemma 2 embeddings DB. `similar` is nearest-neighbour; `juxtapose` is the
   // farthest-neighbour (anti-similar). Their sync filters return [] so the
   // weighted roll always falls through; the slideshow's vector path is the
   // only producer of these labels.
@@ -626,7 +626,7 @@ export const getRemixSwatchRgb = (
 };
 
 // Probability weights for one unified roll across every strategy, including
-// `similar` and `juxtapose` (SigLIP / anti-SigLIP). Vector strategies have to
+// `similar` and `juxtapose` (EmbeddingGemma 2 / inverse similarity). Vector strategies have to
 // be resolved asynchronously by the slideshow component; the sync entry
 // `pickRemixCompanions` treats them as no-ops and falls through, so the
 // slideshow is responsible for handling the async path when those names are
@@ -665,7 +665,7 @@ const pickWeightedStrategy = (random: () => number): RemixStrategy => {
 /**
  * Public weighted roll for callers that need to dispatch on the chosen
  * strategy before resolving companions (e.g. the slideshow component takes
- * the async SigLIP path when the roll picks `similar` or `juxtapose`).
+ * the async EmbeddingGemma 2 path when the roll picks `similar` or `juxtapose`).
  */
 export const rollRemixStrategy = (random: () => number = Math.random): RemixStrategy =>
   pickWeightedStrategy(random);

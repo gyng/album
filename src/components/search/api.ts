@@ -79,10 +79,9 @@ type RankedColorResult = {
   matchingColor: [number, number, number];
 };
 
-const DEFAULT_EMBEDDING_MODEL_ID = "google/siglip-base-patch16-224";
-// v2 gives higher-quality image-to-image similarity; prefer it when the DB holds
-// both spaces so seed lookups and ranking use a deterministic embedding space.
-const PREFERRED_EMBEDDING_MODEL_ID = "google/siglip2-base-patch16-224";
+const DEFAULT_EMBEDDING_MODEL_ID = "google/embeddinggemma-2";
+// Text, drawings and archive photos now share one embedding space.
+const PREFERRED_EMBEDDING_MODEL_ID = DEFAULT_EMBEDDING_MODEL_ID;
 const RECIPROCAL_RANK_FUSION_K = 60;
 
 const IMAGE_COLUMNS = [
@@ -1108,21 +1107,14 @@ const fetchEmbeddingByPath = async (
   path: string,
 ): Promise<EmbeddingRow | null> => {
   const hasBlobColumn = await embeddingsTableHasBlobColumn(database);
-  // Deterministically prefer the v2 space (then v1) so the seed's embedding
-  // space — and hence result ordering and "% match" scale — doesn't depend on
-  // physical row order when the DB holds both models.
+  // Restrict seed lookups to the current space, even if old rows remain locally.
   const result = await exec(
     database,
     `SELECT ${embeddingColumnsSql(hasBlobColumn)}
       FROM embeddings
-      WHERE path = ?
-      ORDER BY CASE model_id
-        WHEN ? THEN 0
-        WHEN ? THEN 1
-        ELSE 2
-      END
+      WHERE path = ? AND model_id = ?
       LIMIT 1`,
-    [path, PREFERRED_EMBEDDING_MODEL_ID, DEFAULT_EMBEDDING_MODEL_ID],
+    [path, DEFAULT_EMBEDDING_MODEL_ID],
     { suppressMissingEmbeddingsTableError: true },
   );
 
@@ -1174,8 +1166,7 @@ export const fetchPhotoGameArchive = async (opts: {
   const { database, game } = opts;
   const vectorDatabase = opts.embeddingsDatabase ?? database;
   let embeddings: EmbeddingRow[] = [];
-  // Drawings and words come from the browser's v1 encoders. Never compare
-  // them to v2 image vectors, even when both spaces have the same dimensions.
+  // Every query and archive vector uses the same Gemma space.
   const browserEncoded = game === "blind-frame" || game === "warmer" || game === "caption-it";
   if (game === "photo-pairs" || game === "relay" || game === "double-take" || browserEncoded) {
     try {
@@ -1183,8 +1174,6 @@ export const fetchPhotoGameArchive = async (opts: {
         vectorDatabase,
         browserEncoded ? DEFAULT_EMBEDDING_MODEL_ID : PREFERRED_EMBEDDING_MODEL_ID,
       );
-      if (!browserEncoded && !embeddings.length)
-        embeddings = await fetchEmbeddingsByModel(vectorDatabase, DEFAULT_EMBEDDING_MODEL_ID);
     } catch (error) {
       if (!isMissingEmbeddingsTableError(error)) throw error;
       return [];

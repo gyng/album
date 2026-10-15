@@ -87,7 +87,7 @@ const extractGeocodeLabel = (geocode: string): string | null =>
         .join(", ") || null
     : null;
 
-// Cosine similarity from SigLIP is almost always in [0, 1] for normalised image
+// Cosine similarity from EmbeddingGemma 2 is almost always in [0, 1] for normalised image
 // embeddings, but the contract isn't strictly bounded — clamp before rounding
 // so a stray negative score can't render as "105% distance".
 const clampPercent = (value: number): number => Math.max(0, Math.min(100, Math.round(value * 100)));

@@ -36,6 +36,8 @@ import exifread
 import fast_colorthief
 import numpy as np
 import reverse_geocode
+from media_embedding import PIPELINE_VERSION as GEMMA_EMBEDDING_VERSION
+from media_embedding import Gemma2Embedder
 from PIL import Image, ImageOps
 
 _MODEL_RUNTIME_AVAILABLE = True
@@ -351,6 +353,9 @@ def enforce_vram_headroom(label: str) -> float:
 MODEL_PROFILE_CAPTIONS = "captions"
 MODEL_PROFILE_SIGLIP2 = "siglip2"
 MODEL_PROFILE_HYBRID = "hybrid"
+MODEL_PROFILE_GEMMA = "gemma2"
+MODEL_PROFILE_GEMMA_HYBRID = "gemma2-hybrid"
+GEMMA_STAGE = "embedding:gemma2"
 CLASSIFIER_BACKEND_GEMMA4 = "gemma4"
 CLASSIFIER_BACKEND_GEMMA4_GGUF = "gemma4-gguf"
 DEFAULT_GEMMA4_MODEL_ID = "google/gemma-4-E2B-it"
@@ -562,6 +567,22 @@ def source_digests_for(
     pixel_by_path = {path: pixel_source_for(path, media_root) for path in paths}
     digests = file_content_sha256_many(list(dict.fromkeys(pixel_by_path.values())))
     return {path: digests.get(pixels) for path, pixels in pixel_by_path.items()}
+
+
+def multimodal_source_digests(paths, digests):
+    """Include local clip bytes, so audio or later-frame edits invalidate vectors."""
+    clips = {split_scene_path(path)[0] for path in paths if is_video_path(path)}
+    clip_digests = file_content_sha256_many(list(clips))
+    result = dict(digests)
+    for path in paths:
+        if is_video_path(path):
+            clip_digest = clip_digests.get(split_scene_path(path)[0])
+            if clip_digest is None:
+                raise click.ClickException(f"Could not fingerprint local clip: {path}")
+            result[path] = hashlib.sha256(
+                f"{digests[path]}:{clip_digest}".encode()
+            ).hexdigest()
+    return result
 
 
 def partition_indexable(
@@ -3156,9 +3177,15 @@ class Sqlite3Client:
                 "ORDER BY CASE "
                 "WHEN model_id = ? THEN 0 "
                 "WHEN model_id = ? THEN 1 "
-                "ELSE 2 END "
+                "WHEN model_id = ? THEN 2 "
+                "ELSE 3 END "
                 "LIMIT 1",
-                (path, Siglip2Embedder.MODEL_ID, SiglipEmbedder.MODEL_ID),
+                (
+                    path,
+                    Gemma2Embedder.MODEL_ID,
+                    Siglip2Embedder.MODEL_ID,
+                    SiglipEmbedder.MODEL_ID,
+                ),
             )
         return self._decode_embedding_row(res.fetchone())
 
@@ -3266,11 +3293,17 @@ def run_embedding_pass(
 @click.option(
     "--model-profile",
     type=click.Choice(
-        [MODEL_PROFILE_CAPTIONS, MODEL_PROFILE_SIGLIP2, MODEL_PROFILE_HYBRID],
+        [
+            MODEL_PROFILE_CAPTIONS,
+            MODEL_PROFILE_SIGLIP2,
+            MODEL_PROFILE_HYBRID,
+            MODEL_PROFILE_GEMMA,
+            MODEL_PROFILE_GEMMA_HYBRID,
+        ],
         case_sensitive=False,
     ),
     default=MODEL_PROFILE_CAPTIONS,
-    help="Indexing profile: captions (captions/core), siglip2 (embeddings), hybrid (both).",
+    help="Indexing profile: captions, gemma2 (multimodal embeddings), gemma2-hybrid (both). Legacy siglip2/hybrid profiles reproduce older indexes.",
 )
 @click.option(
     "--benchmark-output",
@@ -3405,17 +3438,28 @@ def index(
         raise click.ClickException(
             f"Could not fingerprint {len(unreadable)} input file(s), first: {unreadable[0]}"
         )
+    embedding_digests = (
+        multimodal_source_digests(files, current_digests)
+        if model_profile in (MODEL_PROFILE_GEMMA, MODEL_PROFILE_GEMMA_HYBRID)
+        else current_digests
+    )
     existing_image_paths = db.list_image_paths()
     existing_caption_paths = db.list_caption_paths()
     existing_core_paths = existing_image_paths & db.list_metadata_paths()
-    uses_embeddings = model_profile in [MODEL_PROFILE_SIGLIP2, MODEL_PROFILE_HYBRID]
-    # One bulk SELECT into a set, then O(1) membership checks per file.
-    # Better than SELECT EXISTS per image which would be N SQLite round-trips.
+    gemma_profile = model_profile in (MODEL_PROFILE_GEMMA, MODEL_PROFILE_GEMMA_HYBRID)
+    embedding_class = Gemma2Embedder if gemma_profile else Siglip2Embedder
+    embedding_stage = GEMMA_STAGE if gemma_profile else SIGLIP_V2_STAGE
+    uses_embeddings = gemma_profile or model_profile in [
+        MODEL_PROFILE_SIGLIP2,
+        MODEL_PROFILE_HYBRID,
+    ]
     existing_embedding_paths_v2 = db.list_embedding_paths(
-        model_id=Siglip2Embedder.MODEL_ID if uses_embeddings else None
+        model_id=embedding_class.MODEL_ID if uses_embeddings else None
     )
     existing_embedding_paths_v1 = db.list_embedding_paths(
-        model_id=SiglipEmbedder.MODEL_ID if uses_embeddings else None
+        model_id=SiglipEmbedder.MODEL_ID
+        if uses_embeddings and not gemma_profile
+        else "unused"
     )
 
     # Detect files that changed on disk since they were indexed and force a
@@ -3450,7 +3494,7 @@ def index(
     )
     desired_embedding_versions = {
         SIGLIP_V1_STAGE: embedding_pipeline_version(SiglipEmbedder.MODEL_ID),
-        SIGLIP_V2_STAGE: embedding_pipeline_version(Siglip2Embedder.MODEL_ID),
+        embedding_stage: embedding_pipeline_version(embedding_class.MODEL_ID),
     }
 
     def stage_needs_refresh(
@@ -3488,7 +3532,11 @@ def index(
             rewritten = rewrite_default_caption_provenance(stored_version)
             if rewritten is not None:
                 stored_version = rewritten[0]
-        return digest != current_digests[path] or stored_version != version
+        return (
+            digest
+            != (embedding_digests if stage == GEMMA_STAGE else current_digests)[path]
+            or stored_version != version
+        )
 
     work_items = []
     for file_path in files:
@@ -3499,6 +3547,7 @@ def index(
         uses_classifier = model_profile in [
             MODEL_PROFILE_CAPTIONS,
             MODEL_PROFILE_HYBRID,
+            MODEL_PROFILE_GEMMA_HYBRID,
         ]
         # Core is EXIF, GPS, geocode and colours — pure CPU work that no model
         # produces, so it is deliberately NOT gated on the classifier. It used to
@@ -3518,15 +3567,19 @@ def index(
         )
         needs_embedding_v2 = uses_embeddings and stage_needs_refresh(
             file_path,
-            SIGLIP_V2_STAGE,
-            desired_embedding_versions[SIGLIP_V2_STAGE],
+            embedding_stage,
+            desired_embedding_versions[embedding_stage],
             has_embedding_v2,
         )
-        needs_embedding_v1 = uses_embeddings and stage_needs_refresh(
-            file_path,
-            SIGLIP_V1_STAGE,
-            desired_embedding_versions[SIGLIP_V1_STAGE],
-            has_embedding_v1,
+        needs_embedding_v1 = (
+            uses_embeddings
+            and not gemma_profile
+            and stage_needs_refresh(
+                file_path,
+                SIGLIP_V1_STAGE,
+                desired_embedding_versions[SIGLIP_V1_STAGE],
+                has_embedding_v1,
+            )
         )
 
         if needs_core or needs_classifier or needs_embedding_v2 or needs_embedding_v1:
@@ -3578,14 +3631,14 @@ def index(
                     )
                 if (
                     path in existing_embedding_paths_v2
-                    and (path, SIGLIP_V2_STAGE) not in states
+                    and (path, embedding_stage) not in states
                 ):
                     db.upsert_pipeline_state(
                         path,
-                        SIGLIP_V2_STAGE,
-                        digest,
-                        desired_embedding_versions[SIGLIP_V2_STAGE],
-                        Siglip2Embedder.MODEL_ID,
+                        embedding_stage,
+                        embedding_digests[path],
+                        desired_embedding_versions[embedding_stage],
+                        embedding_class.MODEL_ID,
                         cur=cur,
                     )
         db.upsert_file_signatures(signatures_to_backfill)
@@ -3597,7 +3650,11 @@ def index(
     )
     log(f"(skipping {skipped} already-indexed)")
     log(f"Analysing {len(work_items)} files needing work")
-    if model_profile in [MODEL_PROFILE_CAPTIONS, MODEL_PROFILE_HYBRID]:
+    if model_profile in [
+        MODEL_PROFILE_CAPTIONS,
+        MODEL_PROFILE_HYBRID,
+        MODEL_PROFILE_GEMMA_HYBRID,
+    ]:
         log(f"Classifier backend: {classifier_backend}")
 
     if not dry_run and len(work_items) > 0:
@@ -3854,7 +3911,7 @@ def index(
             stage = (
                 SIGLIP_V1_STAGE
                 if model_id == SiglipEmbedder.MODEL_ID
-                else SIGLIP_V2_STAGE
+                else embedding_stage
             )
             with db.transaction() as cur:
                 for path, embedding in completed:
@@ -3862,7 +3919,7 @@ def index(
                     db.upsert_pipeline_state(
                         path,
                         stage,
-                        current_digests[path],
+                        embedding_digests[path],
                         embedding_pipeline_version(model_id),
                         model_id,
                         cur,
@@ -3892,7 +3949,9 @@ def index(
             ]
             try:
                 model_init_ms += run_embedding_pass(
-                    Siglip2Embedder(),
+                    embedding_class(pixel_source=pixel_source_for)
+                    if gemma_profile
+                    else embedding_class(),
                     v2_paths,
                     precomputed_embeddings,
                     persist_batch=persist_embedding_batch,
@@ -4054,7 +4113,7 @@ def index(
         refreshed_images = db.list_image_paths()
         refreshed_captions = db.list_caption_paths()
         refreshed_v1 = db.list_embedding_paths(SiglipEmbedder.MODEL_ID)
-        refreshed_v2 = db.list_embedding_paths(Siglip2Embedder.MODEL_ID)
+        refreshed_v2 = db.list_embedding_paths(embedding_class.MODEL_ID)
         completed_signatures = {}
         for item in work_items:
             path = item["path"]
@@ -4067,9 +4126,10 @@ def index(
             if path in refreshed_v1:
                 required_stages.append(SIGLIP_V1_STAGE)
             if path in refreshed_v2:
-                required_stages.append(SIGLIP_V2_STAGE)
+                required_stages.append(embedding_stage)
             if all(
-                refreshed_states.get((path, stage), (None, None, None))[0] == digest
+                refreshed_states.get((path, stage), (None, None, None))[0]
+                == (embedding_digests[path] if stage == GEMMA_STAGE else digest)
                 for stage in required_stages
             ):
                 signature = file_signature(path)
@@ -5275,7 +5335,11 @@ def validate_index_database(
             )
         }
         required_tables = {"pipeline_state"}
-        if model_profile in (MODEL_PROFILE_CAPTIONS, MODEL_PROFILE_HYBRID):
+        if model_profile in (
+            MODEL_PROFILE_CAPTIONS,
+            MODEL_PROFILE_HYBRID,
+            MODEL_PROFILE_GEMMA_HYBRID,
+        ):
             required_tables.update({"images", "metadata", "image_tags", "tags"})
         missing_tables = required_tables - tables
         if missing_tables:
@@ -5284,7 +5348,11 @@ def validate_index_database(
             )
 
         stages: list[tuple[str, str, str | None]] = []
-        if model_profile in (MODEL_PROFILE_CAPTIONS, MODEL_PROFILE_HYBRID):
+        if model_profile in (
+            MODEL_PROFILE_CAPTIONS,
+            MODEL_PROFILE_HYBRID,
+            MODEL_PROFILE_GEMMA_HYBRID,
+        ):
             images = {row[0] for row in con.execute("SELECT path FROM images")}
             metadata = {row[0] for row in con.execute("SELECT path FROM metadata")}
             captions = {
@@ -5364,13 +5432,23 @@ def validate_index_database(
                 ]
             )
 
-        if model_profile in (MODEL_PROFILE_SIGLIP2, MODEL_PROFILE_HYBRID):
+        if model_profile in (
+            MODEL_PROFILE_SIGLIP2,
+            MODEL_PROFILE_HYBRID,
+            MODEL_PROFILE_GEMMA,
+            MODEL_PROFILE_GEMMA_HYBRID,
+        ):
             if "embeddings" not in tables:
                 raise click.ClickException("validate: missing table: embeddings")
-            for stage, model_id in (
-                (SIGLIP_V1_STAGE, SiglipEmbedder.MODEL_ID),
-                (SIGLIP_V2_STAGE, Siglip2Embedder.MODEL_ID),
-            ):
+            required_models = (
+                [(GEMMA_STAGE, Gemma2Embedder.MODEL_ID)]
+                if model_profile in (MODEL_PROFILE_GEMMA, MODEL_PROFILE_GEMMA_HYBRID)
+                else [
+                    (SIGLIP_V1_STAGE, SiglipEmbedder.MODEL_ID),
+                    (SIGLIP_V2_STAGE, Siglip2Embedder.MODEL_ID),
+                ]
+            )
+            for stage, model_id in required_models:
                 rows = con.execute(
                     "SELECT path, embedding_dim, length(embedding_blob), embedding_scale "
                     "FROM embeddings WHERE model_id = ?",
@@ -5406,6 +5484,11 @@ def validate_index_database(
         # Provenance is pinned to the pixels the models saw, which for a video
         # is its poster frame — the same rule the index run applies.
         digests = source_digests_for(sorted(expected), media_root)
+        embedding_digests = (
+            multimodal_source_digests(sorted(expected), digests)
+            if model_profile in (MODEL_PROFILE_GEMMA, MODEL_PROFILE_GEMMA_HYBRID)
+            else digests
+        )
         for stage, version, model_id in stages:
             for path in expected:
                 # Scenes are embedding-only by design, so a caption stage they
@@ -5413,7 +5496,11 @@ def validate_index_database(
                 if stage == CAPTION_STAGE and not needs_caption_for(path):
                     continue
                 state = state_rows.get((path, stage))
-                if state is None or state[0] != digests[path]:
+                if (
+                    state is None
+                    or state[0]
+                    != (embedding_digests if stage == GEMMA_STAGE else digests)[path]
+                ):
                     raise click.ClickException(
                         f"validate: stale or missing {stage} provenance for {path}"
                     )
@@ -5449,7 +5536,13 @@ def validate_index_database(
 @click.option(
     "--model-profile",
     type=click.Choice(
-        [MODEL_PROFILE_CAPTIONS, MODEL_PROFILE_SIGLIP2, MODEL_PROFILE_HYBRID]
+        [
+            MODEL_PROFILE_CAPTIONS,
+            MODEL_PROFILE_SIGLIP2,
+            MODEL_PROFILE_HYBRID,
+            MODEL_PROFILE_GEMMA,
+            MODEL_PROFILE_GEMMA_HYBRID,
+        ]
     ),
     required=True,
 )
@@ -6168,25 +6261,47 @@ def search_similar_path(dbpath: str, query_path: str, limit: int, model_id: str 
     pprint.pprint(scored)
 
 
+@cli.command("retire-legacy-embeddings")
+@click.option("--dbpath", required=True)
+def retire_legacy_embeddings(dbpath):
+    """Remove old spaces only once Gemma covers every existing embedding path."""
+    lock_fd = acquire_single_instance_lock(dbpath)
+    try:
+        db = Sqlite3Client(dbpath)
+        db.setup_tables()
+        all_paths = db.list_embedding_paths()
+        gemma_paths = db.list_embedding_paths(Gemma2Embedder.MODEL_ID)
+        if not gemma_paths or all_paths != gemma_paths:
+            raise click.ClickException(
+                "Gemma coverage is incomplete; retaining legacy embeddings"
+            )
+        with db.transaction() as cur:
+            cur.execute(
+                "DELETE FROM embeddings WHERE model_id != ?", (Gemma2Embedder.MODEL_ID,)
+            )
+            cur.execute(
+                "DELETE FROM pipeline_state WHERE stage LIKE 'embedding:%' AND stage != ?",
+                (GEMMA_STAGE,),
+            )
+        db.finalize_journal_mode()
+    finally:
+        os.close(lock_fd)
+
+
 @cli.command("model-info")
 def model_info():
     """Print the current embedding model configuration as JSON.
 
-    The hybrid profile (production default) writes one row per photo under
-    *each* listed model ID. `embeddingModelId` is retained for callers that
-    only understand a single ID — it names the richer v2 model.
+    Production uses one shared EmbeddingGemma 2 space for all query modalities.
+    Legacy profiles are retained only for reproducing older indexes.
     """
     print(
         json.dumps(
             {
-                "embeddingModelIds": [
-                    SiglipEmbedder.MODEL_ID,
-                    Siglip2Embedder.MODEL_ID,
-                ],
-                "embeddingModelId": Siglip2Embedder.MODEL_ID,
+                "embeddingModelIds": [Gemma2Embedder.MODEL_ID],
+                "embeddingModelId": Gemma2Embedder.MODEL_ID,
                 "embeddingModelRevisions": {
-                    SiglipEmbedder.MODEL_ID: SiglipEmbedder.MODEL_REVISION,
-                    Siglip2Embedder.MODEL_ID: Siglip2Embedder.MODEL_REVISION,
+                    Gemma2Embedder.MODEL_ID: Gemma2Embedder.MODEL_REVISION,
                 },
             }
         )
@@ -6385,6 +6500,8 @@ def caption_pipeline_version(
 
 
 def embedding_pipeline_version(model_id: str) -> str:
+    if model_id == Gemma2Embedder.MODEL_ID:
+        return GEMMA_EMBEDDING_VERSION
     revisions = {
         SiglipEmbedder.MODEL_ID: SIGLIP_V1_MODEL_REVISION,
         Siglip2Embedder.MODEL_ID: SIGLIP_V2_MODEL_REVISION,

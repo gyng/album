@@ -69,6 +69,23 @@ The image-only and image-plus-caption rows use separate corpus indexes.
 Both contain all 1,518 photos. The caption text comes from the existing gallery
 index. This tests caption-aware retrieval. It does not test a new caption generator.
 
+## Caption generation is a separate task
+
+EmbeddingGemma 2 produces vectors. It cannot generate a photo caption.
+The previous SigLIP models could not generate captions either. Our caption
+model is Gemma 4, and this embedding upgrade does not replace it.
+
+| Task | Before | After the embedding upgrade |
+| --- | --- | --- |
+| Write captions and tags | Gemma 4 | Gemma 4, unchanged |
+| Encode search queries | SigLIP v1 | EmbeddingGemma 2 |
+| Encode gallery photos | SigLIP v1 and v2 | EmbeddingGemma 2 |
+
+A generated-caption quality score for EmbeddingGemma 2 is not applicable.
+No caption-generation benchmark was run for it. The visual report shows the
+actual existing Gemma 4 caption under each judged result. The caption-aware
+rows below test retrieval with those captions as inputs.
+
 ## Effect of captions
 
 Captions reduced the ranking score in this sample. With the same ONNX q4 query
@@ -149,6 +166,42 @@ Times use native CPU inference on a Ryzen 9 5950X with four threads. They cover
 all 24 queries and include the first query. Model load and download time are excluded.
 They are not phone, browser WASM or WebGPU timings. Other desktop activity was
 present. Do not use these times as a direct comparison with the old caption tests.
+
+## Browser deployment checks
+
+The published ONNX q4 export contains `GatherBlockQuantized`, which the standard
+browser WASM runtime does not implement. Two small adapted graphs replace this
+operation with standard row gathering and exact 4-bit block dequantisation. The
+original quantised weights stay unchanged. Across all 24 saved text queries,
+the largest vector-value difference is 1.39e-7. Vision outputs are identical on
+three image shapes. Chromium WASM returns finite 768-dimensional unit vectors.
+The gallery's real browser worker returns the benchmark's top three cat photos.
+
+### UD-Q4 and wllama
+
+Unsloth UD-Q4 has the highest score in this sample, but the current browser
+package is not compatible. A real Chromium check with `@wllama/wllama` 3.8.1
+fails to load the exact benchmarked file. The error is
+`unknown model architecture: 'gemma-embedding2'`. The native llama.cpp benchmark
+passed. These are different runtime builds. Do not label UD-Q4 browser-ready.
+An updated WASM build with the required model architecture must pass loading,
+vector parity and phone checks before replacing the ONNX text-query runtime.
+
+| wllama 3.8.1 browser asset | Raw size | Locally gzip-compressed |
+| --- | ---: | ---: |
+| Minified JavaScript | 0.33 MB | 0.15 MB |
+| WASM runtime | 8.76 MB | 2.38 MB |
+| Total runtime | 9.09 MB | 2.53 MB |
+
+The npm package contains two copies of the WASM binary. A browser loads one.
+The model plus this raw runtime is about 184.8 MB, before transport compression.
+The 206.7 MB ONNX figure excludes its runtime. These figures do not measure RAM,
+phone speed or actual network transfer. The failed load gives no browser query
+timing. Keep the tested ONNX q4 path for this upgrade.
+
+- [ONNX parity and media compatibility](benchmarks/embedding-2026-10-16/browser-compatibility.json)
+- [wllama failure and exact asset sizes](benchmarks/embedding-2026-10-16/wllama-browser-check.json)
+- [wllama package](https://www.npmjs.com/package/@wllama/wllama)
 
 ## Method and records
 

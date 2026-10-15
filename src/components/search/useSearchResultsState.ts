@@ -28,7 +28,7 @@ type Props = {
   searchMode: SearchMode;
   selectedFacets: SearchFacetSelection[];
   hasHydratedFromUrl: boolean;
-  /** Ephemeral uploaded/drawn image query. The vector is SigLIP v1-space (the
+  /** Ephemeral uploaded/drawn image query. The vector is EmbeddingGemma 2-space (the
    *  browser vision encoder), ranked against the DB's v1 image embeddings. */
   imageQuery?: { id: number; vector: number[] | null } | null;
   pageSize?: number;

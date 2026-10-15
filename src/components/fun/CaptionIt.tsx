@@ -315,7 +315,7 @@ export const CaptionIt = ({ photos }: { photos: PhotoGamePhoto[] }) => {
             The words that would make it easiest.
           </Caption>
         </div>
-        <Caption>Scoring downloads a 155 MB language model the first time.</Caption>
+        <Caption>Scoring downloads a 207 MB language model the first time.</Caption>
         {message ? <p role="alert">{message}</p> : null}
         <Button variant="primary" onClick={start}>
           Start Caption It

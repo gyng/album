@@ -4624,6 +4624,48 @@ class TestDeriveZone(unittest.TestCase):
         self.assertEqual(derive_zone(35.6762, 139.6503, "not a date"), (None, None))
 
 
+class GemmaMigrationTests(unittest.TestCase):
+    def test_retirement_requires_complete_gemma_coverage(self):
+        from media_embedding import MODEL_ID
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = str(Path(directory) / "index.sqlite")
+            db = Sqlite3Client(path)
+            db.setup_tables()
+            db.insert_embedding("a.jpg", SiglipEmbedder.MODEL_ID, [1.0, 0.0])
+            db.insert_embedding("b.jpg", SiglipEmbedder.MODEL_ID, [0.0, 1.0])
+            db.insert_embedding("a.jpg", MODEL_ID, [1.0, 0.0])
+            result = CliRunner().invoke(
+                cli, ["retire-legacy-embeddings", "--dbpath", path]
+            )
+            self.assertNotEqual(result.exit_code, 0)
+            self.assertEqual(
+                db.list_embedding_paths(SiglipEmbedder.MODEL_ID), {"a.jpg", "b.jpg"}
+            )
+            db.insert_embedding("b.jpg", MODEL_ID, [0.0, 1.0])
+            result = CliRunner().invoke(
+                cli, ["retire-legacy-embeddings", "--dbpath", path]
+            )
+            self.assertEqual(result.exit_code, 0, result.output)
+            self.assertEqual(db.list_embedding_paths(SiglipEmbedder.MODEL_ID), set())
+            self.assertEqual(db.list_embedding_paths(MODEL_ID), {"a.jpg", "b.jpg"})
+
+    def test_audio_edits_invalidate_video_without_changing_poster_digest(self):
+        from index import multimodal_source_digests
+
+        with tempfile.TemporaryDirectory() as directory:
+            clip = Path(directory) / "clip.mp4"
+            clip.write_bytes(b"frames and original audio")
+            paths = [str(clip), str(clip) + "@t60"]
+            pixels = dict.fromkeys(paths, "same-poster-digest")
+            before = multimodal_source_digests(paths, pixels)
+            clip.write_bytes(b"frames and different audio")
+            after = multimodal_source_digests(paths, pixels)
+            for path in paths:
+                self.assertNotEqual(before[path], after[path])
+            self.assertEqual(set(pixels.values()), {"same-poster-digest"})
+
+
 if __name__ == "__main__":
     print(f"cwd:\t{os.getcwd()}")
     unittest.main()

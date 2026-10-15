@@ -1,0 +1,28 @@
+{
+  "textQueries": 24,
+  "imageShapes": 3,
+  "textMaxAbsoluteError": 1.3885982169670186e-07,
+  "visionMaxAbsoluteError": 0,
+  "passed": true,
+  "runtime": "Chromium WASM; native ONNX parity",
+  "browser_text_dimensions": 768,
+  "browser_vision_dimensions": 768,
+  "browser_finite_unit_vectors": true,
+  "weight_revision": "daa72c51243991dfcaf9f9137d2c573d8f7790c0",
+  "graph_changes": "GatherBlockQuantized replaced with standard row gather and exact 4-bit block dequantisation; original weights unchanged",
+  "graphs": {
+    "model-q4-wasm-v1.onnx": "89af0a2b82298e888566197908a4de303fe43f5081d601cd3022e6f1c2d4ff52",
+    "vision-q4-wasm-v1.onnx": "9ea21f62cb9c2711171591a7001ca1236032446b1b3c6cb152ee8ffd46bb020a"
+  },
+  "media_check": {
+    "kind": "synthetic one-minute local video with audio",
+    "frames": 24,
+    "audio_samples": 960000,
+    "sampling_rate": 16000,
+    "input_tokens": 4457,
+    "embedding_dimensions": 768,
+    "norm": 1.0000000495015302,
+    "finite": true,
+    "retrieval_quality_benchmarked": false
+  }
+}

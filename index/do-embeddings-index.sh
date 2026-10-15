@@ -22,13 +22,15 @@ uv run python index.py prepare-staging --source "$EMBED_DB" --staging "$STAGING_
 uv run --extra inference python index.py index \
   --glob "$GLOB" \
   --dbpath "$STAGING_DB" \
-  --model-profile siglip2
+  --model-profile gemma2 --embedding-batch-size 4
 uv run python index.py prune --glob "$GLOB" --dbpath "$STAGING_DB"
 uv run python index.py weather --dbpath "$STAGING_DB" || echo "Weather enrichment unavailable; retaining indexed photo data."
 uv run python index.py validate \
   --glob "$GLOB" \
   --dbpath "$STAGING_DB" \
-  --model-profile siglip2
+  --model-profile gemma2
+uv run python index.py retire-legacy-embeddings --dbpath "$STAGING_DB"
+
 uv run python index.py publish \
   --dbpath "$STAGING_DB" \
   --embeddings-output "$OUTPUT_DB"

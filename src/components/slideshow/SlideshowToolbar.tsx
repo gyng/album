@@ -147,7 +147,7 @@ export type SlideshowToolbarProps = {
   alignCadence: boolean;
   onToggleAlign: () => void;
 
-  // Topic seeding — encode a free-text topic with the SigLIP text tower and
+  // Topic seeding — encode a free-text topic with the EmbeddingGemma 2 text tower and
   // seed the similar-mode flow from the top matches. `topic` is the active
   // topic (null when off); busy covers model load + query encode; error is a
   // short message shown when the model is unavailable (e.g. offline first use).

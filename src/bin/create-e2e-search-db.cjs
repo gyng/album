@@ -236,7 +236,7 @@ const createE2eSearchDatabases = ({ outputPath, embeddingsOutputPath, force = fa
     const encodedEmbedding = encodeEmbedding(embeddingVectors[index]);
     insertEmbedding.run(
       photoPath,
-      "google/siglip2-base-patch16-224",
+      "google/embeddinggemma-2",
       3,
       encodedEmbedding.blob,
       encodedEmbedding.scale,

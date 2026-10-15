@@ -11,28 +11,11 @@ import { pairingLabel } from "./computeGearStats";
 import { CAMERA_FACET, LENS_FACET } from "./photoBuckets";
 import { distinctiveTag, nearestNeighbours, projectToThreeDimensions } from "./embeddingSpace";
 
-// The shipped search-embeddings DB holds two embedding spaces (SigLIP v1 and
-// v2), one row per photo per model. These stats must run against a single space
-// or the maths averages two near-orthogonal populations (and double-counts every
-// photo). Prefer v2 for image-to-image quality, fall back to v1.
-const PREFERRED_EMBEDDING_MODEL_ID = "google/siglip2-base-patch16-224";
-const FALLBACK_EMBEDDING_MODEL_ID = "google/siglip-base-patch16-224";
+// A single shared model space prevents counting a photograph more than once.
+const PREFERRED_EMBEDDING_MODEL_ID = "google/embeddinggemma-2";
 
-/**
- * Chooses which embedding model to use for the visual-sameness stats given the
- * model_ids actually present in the DB. Prefers v2, then v1, then any other
- * single model (deterministic first entry) so a DB with only one space still
- * works.
- */
-export const selectEmbeddingModelId = (availableModelIds: string[]): string | null => {
-  if (availableModelIds.includes(PREFERRED_EMBEDDING_MODEL_ID)) {
-    return PREFERRED_EMBEDDING_MODEL_ID;
-  }
-  if (availableModelIds.includes(FALLBACK_EMBEDDING_MODEL_ID)) {
-    return FALLBACK_EMBEDDING_MODEL_ID;
-  }
-  return availableModelIds[0] ?? null;
-};
+export const selectEmbeddingModelId = (availableModelIds: string[]): string | null =>
+  availableModelIds.includes(PREFERRED_EMBEDDING_MODEL_ID) ? PREFERRED_EMBEDDING_MODEL_ID : null;
 
 const MIN_EMBEDDING_SAMPLE = 24;
 const HIGH_SIMILARITY_THRESHOLD = 0.9;

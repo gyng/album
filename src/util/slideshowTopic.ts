@@ -2,7 +2,7 @@ import { RandomPhotoRow } from "../components/search/api";
 import { SlideshowMode } from "./slideshowUrl";
 
 // Pure decision core for topical slideshow seeding. A topic is a free-text
-// query the user types (e.g. "cat"): the screen encodes it with the SigLIP v1
+// query the user types (e.g. "cat"): the screen encodes it with the EmbeddingGemma 2
 // text tower and ranks the library semantically, then feeds the ranked paths
 // here. This module reconciles those results against the in-memory photo pool
 // and decides how to seed the existing similar-mode flow — the async encode /

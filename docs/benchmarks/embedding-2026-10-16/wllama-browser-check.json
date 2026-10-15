@@ -1,0 +1,18 @@
+{
+  "package": "@wllama/wllama",
+  "version": "3.8.1",
+  "measurement": "Published npm package; decimal MB; gzip computed locally, not measured network transfer",
+  "javascript_raw_bytes": 331458,
+  "wasm_raw_bytes": 8763949,
+  "javascript_gzip_bytes": 147033,
+  "wasm_gzip_bytes": 2378957,
+  "browser_check": {
+    "browser": "Chromium",
+    "backend": "WASM CPU, one thread",
+    "model": "embeddinggemma-2-UD-Q4_K_XL.gguf",
+    "success": false,
+    "failure": "unknown model architecture: 'gemma-embedding2'",
+    "native_benchmark_passed": true,
+    "browser_speed_and_memory_measured": false
+  }
+}

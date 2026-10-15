@@ -1209,7 +1209,7 @@ export const Slideshow: React.FC<{
   }, []);
 
   // Seed the slideshow from a free-text topic. Encodes the text with the shared
-  // SigLIP text tower (the SAME worker the search page uses — never a second
+  // EmbeddingGemma 2 text tower (the SAME worker the search page uses — never a second
   // worker entry), ranks the library semantically, then hands the ranked paths
   // to the pure decideTopicSeed to reconcile against the pool/filter. On success
   // it switches to similar mode, commits the best match, and remembers the

@@ -1,7 +1,7 @@
 /**
  * The embedding space, made small enough to look at.
  *
- * Every photograph carries a 768-dimension SigLIP vector describing what is in
+ * Every photograph carries a 768-dimension EmbeddingGemma 2 vector describing what is in
  * it. Nobody can see 768 dimensions, but the three directions along which this
  * particular collection varies most are a real, defensible view of it — so
  * principal components take the corpus down to a cloud you can turn around.

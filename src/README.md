@@ -85,7 +85,7 @@ The app stays fully static. There is no API route or search server involved.
 2. The frontend opens `search.sqlite` with SQLite WASM directly in the browser.
 3. Keyword mode and browse surfaces issue local FTS5 and metadata queries against the core DB.
 4. Semantic and similarity features lazily open `search-embeddings.sqlite` when needed.
-5. Semantic mode warms a SigLIP text encoder in a worker, shows model-load progress in the search UI, embeds the query, and ranks image embeddings with cosine similarity.
+5. Semantic mode warms an EmbeddingGemma 2 text encoder in a worker, shows model-load progress in the search UI, embeds the query, and ranks image embeddings with cosine similarity.
 6. Hybrid mode runs both paths and merges the rankings with RRF so exact textual hits and semantically similar photos can both score well.
 
 The result is a static deployment with richer search behavior, while keeping the heavier embeddings download off the critical path for keyword and browse flows.

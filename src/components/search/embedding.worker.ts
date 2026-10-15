@@ -1,12 +1,17 @@
 import {
+  AutoConfig,
+  AutoModel,
   AutoProcessor,
   AutoTokenizer,
   RawImage,
-  SiglipTextModel,
-  SiglipVisionModel,
   env,
   type ProgressInfo,
 } from "@huggingface/transformers";
+
+import { createGemmaModelCache } from "./gemmaModelCache";
+
+env.useCustomCache = true;
+env.customCache = createGemmaModelCache(() => caches.open(env.cacheKey));
 
 // One worker entry serves BOTH the text and the vision encoder. It must stay a
 // single file: with two near-identical sibling worker entries, Turbopack
@@ -42,19 +47,19 @@ type WorkerProgressDetails = {
 const textLoadingRequestIds = new Set<number>();
 const visionLoadingRequestIds = new Set<number>();
 
-// Both towers must stay in the SigLIP v1 space — image and text query vectors
-// are ranked against the DB's `google/siglip-base-patch16-224` embeddings.
-const MODEL_ID = "Xenova/siglip-base-patch16-224";
-const MAX_TEXT_LENGTH = 64;
+// All query modalities share the offline EmbeddingGemma 2 corpus space.
+const MODEL_ID = "onnx-community/embeddinggemma-2-ONNX";
+const MODEL_REVISION = "daa72c51243991dfcaf9f9137d2c573d8f7790c0";
+const MAX_TEXT_LENGTH = 8192;
 
 let textRuntimePromise: Promise<{
   tokenizer: Awaited<ReturnType<typeof AutoTokenizer.from_pretrained>>;
-  model: Awaited<ReturnType<typeof SiglipTextModel.from_pretrained>>;
+  model: Awaited<ReturnType<typeof AutoModel.from_pretrained>>;
 }> | null = null;
 
 let visionRuntimePromise: Promise<{
   processor: Awaited<ReturnType<typeof AutoProcessor.from_pretrained>>;
-  model: Awaited<ReturnType<typeof SiglipVisionModel.from_pretrained>>;
+  model: Awaited<ReturnType<typeof AutoModel.from_pretrained>>;
 }> | null = null;
 
 type WebGpuNavigator = Navigator & {
@@ -172,7 +177,12 @@ const loadTextRuntime = async (requestId?: number) =>
       textRuntimePromise = (async () => {
         postLoadProgress(textLoadingRequestIds, 5, "Starting model load");
         // Independent downloads overlap on a cold visit.
+        const config = Object.assign(
+          await AutoConfig.from_pretrained(MODEL_ID, { revision: MODEL_REVISION }),
+          { audio_config: null, vision_config: null },
+        );
         const tokenizerPromise = AutoTokenizer.from_pretrained(MODEL_ID, {
+          revision: MODEL_REVISION,
           progress_callback: (info: ProgressInfo) => {
             reportProgress(textLoadingRequestIds, 5, 30, "Loading tokenizer", info);
           },
@@ -180,7 +190,9 @@ const loadTextRuntime = async (requestId?: number) =>
 
         const modelPromise = loadModelWithFallback(
           (device) =>
-            SiglipTextModel.from_pretrained(MODEL_ID, {
+            AutoModel.from_pretrained(MODEL_ID, {
+              revision: MODEL_REVISION,
+              config,
               device,
               dtype: "q4",
               progress_callback: (info: ProgressInfo) => {
@@ -215,7 +227,12 @@ const loadVisionRuntime = async (requestId?: number) =>
 
       visionRuntimePromise = (async () => {
         postLoadProgress(visionLoadingRequestIds, 5, "Starting image model load");
+        const config = Object.assign(
+          await AutoConfig.from_pretrained(MODEL_ID, { revision: MODEL_REVISION }),
+          { audio_config: null },
+        );
         const processorPromise = AutoProcessor.from_pretrained(MODEL_ID, {
+          revision: MODEL_REVISION,
           progress_callback: (info: ProgressInfo) => {
             reportProgress(visionLoadingRequestIds, 5, 10, "Loading image processor", info);
           },
@@ -223,10 +240,11 @@ const loadVisionRuntime = async (requestId?: number) =>
 
         const modelPromise = loadModelWithFallback(
           (device) =>
-            SiglipVisionModel.from_pretrained(MODEL_ID, {
+            AutoModel.from_pretrained(MODEL_ID, {
+              revision: MODEL_REVISION,
+              config,
               device,
-              // q4 verified against the DB embeddings: 5/5 sample photos
-              // re-embedded in-browser ranked themselves #1 of 1495.
+              // Vision loads only for uploaded images and drawings.
               dtype: "q4",
               progress_callback: (info: ProgressInfo) => {
                 reportProgress(visionLoadingRequestIds, 15, 80, "Loading image model", info);
@@ -253,16 +271,16 @@ const loadVisionRuntime = async (requestId?: number) =>
 
 const encodeText = async (text: string, requestId: number): Promise<number[]> => {
   const { tokenizer, model } = await loadTextRuntime(requestId);
-  const modelInputs = tokenizer(text.toLowerCase(), {
-    padding: "max_length",
+  const modelInputs = tokenizer(`task: search result | query: ${text}`, {
+    padding: true,
     truncation: true,
     max_length: MAX_TEXT_LENGTH,
   });
   const outputs = await model(modelInputs);
-  const embedding = outputs.pooler_output;
+  const embedding = outputs.sentence_embedding;
 
   if (!embedding?.data) {
-    throw new Error("SigLIP text embedding output was empty.");
+    throw new Error("EmbeddingGemma text embedding output was empty.");
   }
 
   return normalizeVector(embedding.data as Float32Array);
@@ -271,12 +289,12 @@ const encodeText = async (text: string, requestId: number): Promise<number[]> =>
 const encodeImage = async (blob: Blob, requestId: number): Promise<number[]> => {
   const { processor, model } = await loadVisionRuntime(requestId);
   const image = await RawImage.fromBlob(blob);
-  const modelInputs = await processor(image);
+  const modelInputs = await processor(null, image);
   const outputs = await model(modelInputs);
-  const embedding = outputs.pooler_output;
+  const embedding = outputs.sentence_embedding;
 
   if (!embedding?.data) {
-    throw new Error("SigLIP image embedding output was empty.");
+    throw new Error("EmbeddingGemma image embedding output was empty.");
   }
 
   return normalizeVector(embedding.data as Float32Array);
