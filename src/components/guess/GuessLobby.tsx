@@ -4,7 +4,7 @@ import { Button, Caption, Heading, KeyHint, Select, SegmentedToggle } from "../u
 import { fetchGuessRegions, GuessRegionOption } from "../search/api";
 import { GameSettings } from "./guessTypes";
 import { type GameShortcut, useGameShortcuts } from "../fun/useGameShortcuts";
-import { GameIllustration } from "../fun/GameIllustration";
+import { GameIntro } from "../fun/GameIllustration";
 import { useGameSettings, type GameSettingsRegistry } from "../fun/useGameSettings";
 import { useUrlSearchParams } from "../platform";
 import { GameStatsLine, ShareResult, dailyShareText, useShareOrigin } from "../fun/GameRecord";
@@ -153,111 +153,105 @@ export const GuessLobby: React.FC<GuessLobbyProps> = ({
 
   return (
     <div className={styles.lobby}>
-      <div className={styles.illustration}>
-        <GameIllustration src="/fun/guess-where.avif" />
-      </div>
       <div className={styles.header}>
         <Heading level={1} as="h1">
           Guess Where
         </Heading>
-        <Caption as="p">Guess where each photo was taken on the map</Caption>
-        <GameStatsLine stats={stats} wins={false} />
       </div>
+      <GameIntro game="guess">
+        <p>Guess where each photograph was taken on the map.</p>
+        <div className={styles.options}>
+          <label className={styles.optionRow}>
+            <span className={styles.optionLabel}>Region</span>
+            <Select
+              value={region}
+              onChange={(e) => setSettings((previous) => ({ ...previous, region: e.target.value }))}
+              className={styles.regionSelect}
+            >
+              <option value="">Everywhere</option>
+              {regions.map((r) => (
+                <option key={r.country} value={r.country}>
+                  {r.country} ({r.count})
+                </option>
+              ))}
+            </Select>
+          </label>
 
-      <div className={styles.options}>
-        <label className={styles.optionRow}>
-          <span className={styles.optionLabel}>Region</span>
-          <Select
-            value={region}
-            onChange={(e) => setSettings((previous) => ({ ...previous, region: e.target.value }))}
-            className={styles.regionSelect}
-          >
-            <option value="">Everywhere</option>
-            {regions.map((r) => (
-              <option key={r.country} value={r.country}>
-                {r.country} ({r.count})
-              </option>
-            ))}
-          </Select>
-        </label>
+          <div className={styles.optionRow}>
+            <span className={styles.optionLabel}>Timer</span>
+            <SegmentedToggle
+              className={styles.optionControl}
+              options={TIMER_OPTIONS}
+              value={timer}
+              onChange={(value) =>
+                setSettings((previous) => ({
+                  ...previous,
+                  timeLimit: timerValueToLimit(value) as null | 15 | 30,
+                }))
+              }
+              ariaLabel="Timer per round"
+            />
+          </div>
 
-        <div className={styles.optionRow}>
-          <span className={styles.optionLabel}>Timer</span>
-          <SegmentedToggle
-            className={styles.optionControl}
-            options={TIMER_OPTIONS}
-            value={timer}
-            onChange={(value) =>
-              setSettings((previous) => ({
-                ...previous,
-                timeLimit: timerValueToLimit(value) as null | 15 | 30,
-              }))
-            }
-            ariaLabel="Timer per round"
-          />
+          <div className={styles.optionRow}>
+            <span className={styles.optionLabel}>Rounds</span>
+            <SegmentedToggle
+              className={styles.optionControl}
+              options={ROUND_OPTIONS}
+              value={rounds}
+              onChange={(value) =>
+                setSettings((previous) => ({ ...previous, rounds: Number(value) as 3 | 5 | 10 }))
+              }
+              ariaLabel="Number of rounds"
+            />
+          </div>
         </div>
 
-        <div className={styles.optionRow}>
-          <span className={styles.optionLabel}>Rounds</span>
-          <SegmentedToggle
-            className={styles.optionControl}
-            options={ROUND_OPTIONS}
-            value={rounds}
-            onChange={(value) =>
-              setSettings((previous) => ({ ...previous, rounds: Number(value) as 3 | 5 | 10 }))
-            }
-            ariaLabel="Number of rounds"
-          />
-        </div>
-      </div>
+        {selectedCount > 0 ? (
+          <Caption as="p">{selectedCount.toLocaleString("en-GB")} photos available</Caption>
+        ) : null}
 
-      {selectedCount > 0 ? (
-        <Caption as="p" className={styles.photoCount}>
-          {selectedCount.toLocaleString("en-GB")} photos available
-        </Caption>
-      ) : null}
+        {error ? (
+          <p className={styles.error} role="alert">
+            {error}
+          </p>
+        ) : null}
 
-      {error ? (
-        <p className={styles.error} role="alert">
-          {error}
-        </p>
-      ) : null}
-
-      <div className={styles.buttonRow}>
-        {todaysDaily ? (
-          // Today's daily is done: its result is shared, not replayed.
-          <div className={styles.dailyAction}>
-            <div className={styles.dailyShare}>
-              <ShareResult text={dailyShareText("guess", today, todaysDaily.summary, siteOrigin)} />
-            </div>
-            <Caption as="span" size="sm" className={styles.dailyDescription}>
-              Daily #{dailyNumber(today)} · {todaysDaily.summary}
-            </Caption>
-          </div>
-        ) : (
-          <div className={styles.dailyAction}>
-            <Button
-              className={styles.dailyButton}
-              aria-describedby={dailyDescriptionId}
-              onClick={handleDaily}
-            >
-              Daily challenge
-            </Button>
-            <Caption
-              id={dailyDescriptionId}
-              as="span"
-              size="sm"
-              className={styles.dailyDescription}
-            >
-              Five rounds · same photos for everyone today
-            </Caption>
-          </div>
-        )}
-        <Button variant="primary" className={styles.playButton} onClick={handleStart}>
+        <Button variant="primary" onClick={handleStart}>
           Play
           <KeyHint>Enter</KeyHint>
         </Button>
-      </div>
+        <div className={styles.buttonRow}>
+          {todaysDaily ? (
+            // Today's daily is done: its result is shared, not replayed.
+            <div className={styles.dailyAction}>
+              <div className={styles.dailyShare}>
+                <ShareResult
+                  text={dailyShareText("guess", today, todaysDaily.summary, siteOrigin)}
+                />
+              </div>
+              <Caption as="span" size="sm" className={styles.dailyDescription}>
+                Daily #{dailyNumber(today)} · {todaysDaily.summary}
+              </Caption>
+            </div>
+          ) : (
+            <div className={styles.dailyAction}>
+              <Button aria-describedby={dailyDescriptionId} onClick={handleDaily}>
+                Daily challenge
+              </Button>
+              <Caption
+                id={dailyDescriptionId}
+                as="span"
+                size="sm"
+                className={styles.dailyDescription}
+              >
+                Five rounds · same photos for everyone today
+              </Caption>
+            </div>
+          )}
+        </div>
+        <GameStatsLine stats={stats} wins={false} />
+      </GameIntro>
     </div>
   );
 };

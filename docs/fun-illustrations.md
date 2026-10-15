@@ -1,5 +1,94 @@
 # Fun illustrations
 
+## Caption It: vanity as censorship — 16 October 2026
+
+Replaced the crowned-worm scene with the approved censoring-cat concept.
+Owl writes a caption for the cat's portrait on a continuous paper ribbon;
+cat poses grandly while feeding the same ribbon into a shredder. The clear
+paper path and falling strips make the censorship visible without words.
+Subjective editorial review: absurdity 8/10, humour 9/10. Generated using
+built-in imagegen with existing owl and cat references; 960×640 transparent
+AVIF, quality 85, effort 6, at `src/public/fun/caption-it.avif`.
+
+### Caption It production prompt (verbatim)
+
+> Use case: illustration-story. Decorative Caption It photo-game card. Original witty animal editorial cartoon matching reference character designs and loose black pen-and-ink with restrained sparse cross-hatching. Clear joke: vanity CENSORS its own caption before anyone can read it. Bow-tied owl writer at left carefully writes a caption for a framed photograph of the striped tabby cat on a LONG CONTINUOUS RIBBON OF PAPER across a small writing desk. At right the REAL stocky fluffy-cheeked tabby cat poses grandly beside its own flattering framed photographic portrait, chin raised, smug half-lidded eyes, curled striped tail. While posing, one cat paw QUIETLY FEEDS THE SAME PAPER RIBBON straight into the slot of a SMALL OFFICE PAPER SHREDDER immediately beside it, with unmistakable thin shredded strips tumbling into the open basket below. The continuous paper clearly runs FROM OWL'S WRITING QUILL along desk INTO SHREDDER beneath cat paw, so destruction happens as the caption is written. Owl obliviously earnest, cat self-satisfied, strong expressive relationship. Only ONE owl and ONE live cat, plus cat's photographic portrait. Small desk, inkpot, one quill, framed portrait and shredder only, simple composition. Shredder mechanically readable with top slot and vertical strips below, no labels or buttons with writing. Paper contains only a few abstract short ink strokes, NO readable words, letters or numerals. No humans, human hands, caption, speech bubbles, signatures, logos or watermark. Landscape 3:2 compact centred vignette, whole characters visible, generous clear margins, genuinely TRANSPARENT BACKGROUND and uninked interiors, no white paper backdrop or opaque white fills. Photo portrait is a paper prop, preserve border distinction. Aim absurdity 8+ humour 8+. References for owl and tabby appearance only, do not reproduce reference compositions.
+
+## Solo Hindsight and Sight Lines — 16 October 2026
+
+Hindsight now features only the fox, hiding the incriminating print while
+reordering the other photographs with a sausage still in its mouth.
+Sight Lines now features only the pigeon and its self-portrait tail; removed
+the penguin and peacock print. Both use built-in imagegen edits, encoded at
+960×640 AVIF, quality 85, effort 6 with transparency preserved.
+
+Caption It was subsequently replaced by the approved censoring-cat concept above.
+
+### Solo-scene prompts (verbatim)
+
+#### `hindsight.avif`
+
+> Use case: precise-object-edit. Rework supplied Hindsight cartoon to feature FOX ALONE. Remove cat entirely. Keep exact expressive fox design, pointed ears, pale cheek tufts, black forepaws, huge white-tipped bushy tail. Fox sits with comically guilty face and a SHORT SAUSAGE END still protruding from its mouth. In front, one forepaw desperately rearranges TWO photographic prints: an EMPTY PLATE print pushed before a WHOLE SAUSAGE ON PLATE print. Its other forepaw hides a THIRD incriminating print behind its own back, but angles it enough that viewer clearly sees photograph of this SAME FOX EATING THE SAUSAGE. Exactly three prints total. Whole fox visible, compact centred solo vignette, strong guilty sideways eyes and visible concealment gesture, no cat or other live animal. Joke: falsifying photographic chronology despite evidence still in its mouth. No writing, arrows, numerals or clocks. Preserve loose lively black pen-and-ink, sparse hatching and genuine transparent background, no white paper or fills. Landscape 3:2 generous clear margins. Target absurdity 8+ humour 8+.
+
+#### `sight-lines.avif`
+
+> Use case: precise-object-edit. Edit supplied Sight Lines illustration. REMOVE PENGUIN and its held peacock photograph entirely. Keep ONLY the existing plump pigeon with postal satchel and its enormous symmetrical fan-shaped fake peacock tail made from seven photographic self-portraits on thin quills with clips. Preserve pigeon's proud pose and tilted-up head, each portrait's expression, satchel, feet, all seven tail photographs. Re-centre the solo pigeon and entire fan as a compact full landscape 3:2 vignette with generous transparent margins; enlarge slightly to use freed space but retain whole fan and feet. Preserve original black pen-and-ink detail and transparent background. No live penguin, no peacock photo, no new props, no extra birds, no lettering, signatures, border or watermark. The absurdity is a pigeon proudly manufacturing grandeur out of its own portraits.
+
+
+
+## Distinct game concepts and simpler Oracle — 15 October 2026
+
+Latest replacements use built-in imagegen, with the established cast as visual
+references. Final assets stay at the shared `src/public/fun/*.avif` URLs,
+960×640, quality 85, effort 6, preserving transparency.
+
+- Connect the Shots: penguin files the actual pigeon in a bird-photo album,
+  held in photograph corners. This replaces the food-sorting scene that was
+  too similar to Cross Exposure.
+- Photo Hangman: pigeon photographs its own body parts to supply the baffled
+  owl with more clues.
+- Photo Relay: owl aims the fox's stretched tail as a launcher; pigeon rides
+  with the photograph while cat waits with a pocket watch.
+- Guess Where: fox sells penguin a sightseeing tour by holding a mountain
+  photograph immediately in front of its binoculars.
+- Photo Oracle: one ordinary open-topped fishbowl below the costumed cat;
+  removed crystal ball, pedestal, duplicate bowl and all cards.
+- Double Take: exactly one penguin inspector and one pigeon suspect; large
+  undisguised pigeon portrait beside the moustached real pigeon.
+
+**Cast rule: at most one live character of each species in an illustration.**
+Portraits may depict a character again. Continue to use only the five recurring
+leads. Subjective editorial scores for these replacements remain at least
+eight in both absurdity and humour; the table below reflects current artwork.
+
+### Latest production prompts (verbatim; supersede earlier prompts)
+
+#### `connect-the-shots.avif`
+
+> Use case: illustration-story. Decorative photo-game card illustration. Original witty animal editorial cartoon, loose lively black pen contours, expressive deadpan faces, restrained sparse cross-hatching, clean readable silhouettes. Compact centred landscape 3:2 vignette, entire characters and essential props visible, generous transparent margins. BLACK INK on genuinely TRANSPARENT background, including uninked interiors; do not reproduce the references' white backdrop, no white fills, no paper. No humans, human hands, text, lettering, numbers, captions, speech bubbles, signatures, logos, borders or watermark. Application recolours ink with luminance mask. Input images are references for character design and drawing style ONLY, not compositions. Recurring cast: plump pigeon with small cross-body postal satchel, round tufted owl with heavy eyelids and black bow tie, pear-shaped penguin with small peaked official cap, fox with pointed ears dark forepaws and huge white-tipped bushy tail, stocky tabby cat with fluffy cheeks half-lidded eyes and curled striped tail. Preserve recognisable designs. Aim for a strong immediate visual joke with at least 8/10 absurdity AND humour. The penguin files the ACTUAL PIGEON in a photo album. Large open bird-photo album tilted towards viewer, taking most of the scene; one page contains three small neatly mounted bird photographs. On the facing page the REAL plump pigeon is wedged in four tiny triangular photograph mounting corners like an oversized three-dimensional photograph: wings awkwardly pinned, enormous belly bulging out of the page, feet squeezed into bottom corners, satchel still on, offended deadpan expression. Penguin official stands beside album, calmly comparing its pigeon photograph with the captive real pigeon, satisfied that they match and belong together. Main joke is the absurd category error of filing a real bird among bird portraits. Clearly show album spine, pages and mounting corners; pigeon is visibly alive and protrudes, not a flat printed portrait. Simple, two characters only, no table of sorted food photographs, no hungry predator.
+
+#### `photo-hangman.avif`
+
+> Use case: illustration-story. Decorative photo-game card illustration. Original witty animal editorial cartoon, loose lively black pen contours, expressive deadpan faces, restrained sparse cross-hatching, clean readable silhouettes. Compact centred landscape 3:2 vignette, entire characters and essential props visible, generous transparent margins. BLACK INK on genuinely TRANSPARENT background, including uninked interiors; do not reproduce the references' white backdrop, no white fills, no paper. No humans, human hands, text, lettering, numbers, captions, speech bubbles, signatures, logos, borders or watermark. Application recolours ink with luminance mask. Input images are references for character design and drawing style ONLY, not compositions. Recurring cast: plump pigeon with small cross-body postal satchel, round tufted owl with heavy eyelids and black bow tie, pear-shaped penguin with small peaked official cap, fox with pointed ears dark forepaws and huge white-tipped bushy tail, stocky tabby cat with fluffy cheeks half-lidded eyes and curled striped tail. Preserve recognisable designs. Aim for a strong immediate visual joke with at least 8/10 absurdity AND humour. The suspect supplies the evidence. Bow-tied owl detective on left scrutinises three photographic clues laid on a little stand: close-ups of pigeon beak, wing and feet. On right, the pigeon with satchel is proudly operating an old camera with a visible mechanical shutter-release cable. Pigeon balances absurdly on one leg, stretching its OTHER FOOT right up into the camera lens, and uses one wing to press the shutter cable, supplying another dramatic close-up clue of itself. Pigeon face delighted by its own ingenuity, owl intensely baffled with narrowed scholarly eyes, overlooking the obvious bird beside it. Camera lens clearly faces pigeon's raised foot, camera on tripod. Compact two-character scene, clear foot-to-camera gesture, only three photographic clue prints, no mystery board, no text or punctuation. Joke: elaborate identification mystery staged by its own utterly obvious subject.
+
+#### `photo-relay.avif`
+
+> Use case: illustration-story. Decorative photo-game card illustration. Original witty animal editorial cartoon, loose lively black pen contours, expressive deadpan faces, restrained sparse cross-hatching, clean readable silhouettes. Compact centred landscape 3:2 vignette, entire characters and essential props visible, generous transparent margins. BLACK INK on genuinely TRANSPARENT background, including uninked interiors; do not reproduce the references' white backdrop, no white fills, no paper. No humans, human hands, text, lettering, numbers, captions, speech bubbles, signatures, logos, borders or watermark. Application recolours ink with luminance mask. Input images are references for character design and drawing style ONLY, not compositions. Recurring cast: plump pigeon with small cross-body postal satchel, round tufted owl with heavy eyelids and black bow tie, pear-shaped penguin with small peaked official cap, fox with pointed ears dark forepaws and huge white-tipped bushy tail, stocky tabby cat with fluffy cheeks half-lidded eyes and curled striped tail. Preserve recognisable designs. Aim for a strong immediate visual joke with at least 8/10 absurdity AND humour. An outrageously literal photo handover. Compact diagonal composition. Fox bottom-left braces on all four paws; its enormous bushy white-tipped TAIL has been stretched upward and backwards into an absurd elastic SLINGSHOT pouch. Pigeon with postal satchel sits confidently in the tail's pulled-back bushy pouch near upper centre, ready to be launched, holding a rectangular photographic print tightly to its chest. Bow-tied owl just behind the pouch grips the stretched tail and solemnly aims the improvised launcher. Fox looks back in sudden alarm, having only now understood what launch entails. Tabby cat waits at right with unimpressed half-lidded eyes, holding a pocket watch in one paw and reaching out other paw to receive the photograph. Tail must visibly connect to fox's rump, thick bushy fur, not a separate rubber slingshot or string. Pigeon is passenger holding a photo, not in a nest. Four recognisable characters whole bodies visible, minimal props, no lettering on pocket watch. Strong slapstick anticipation.
+
+#### `guess-where.avif`
+
+> Use case: illustration-story. Decorative photo-game card illustration. Original witty animal editorial cartoon, loose lively black pen contours, expressive deadpan faces, restrained sparse cross-hatching, clean readable silhouettes. Compact centred landscape 3:2 vignette, entire characters and essential props visible, generous transparent margins. BLACK INK on genuinely TRANSPARENT background, including uninked interiors; do not reproduce the references' white backdrop, no white fills, no paper. No humans, human hands, text, lettering, numbers, captions, speech bubbles, signatures, logos, borders or watermark. Application recolours ink with luminance mask. Input images are references for character design and drawing style ONLY, not compositions. Recurring cast: plump pigeon with small cross-body postal satchel, round tufted owl with heavy eyelids and black bow tie, pear-shaped penguin with small peaked official cap, fox with pointed ears dark forepaws and huge white-tipped bushy tail, stocky tabby cat with fluffy cheeks half-lidded eyes and curled striped tail. Preserve recognisable designs. Aim for a strong immediate visual joke with at least 8/10 absurdity AND humour. Fox runs a fraudulent sightseeing tour. Two characters only. Penguin wearing its small peaked official cap and an ENORMOUS bulging expedition backpack peers eagerly into a comically large pair of binoculars held in its flippers. At the far end of the binoculars, just a few centimetres from their front lenses, fox stands holding up a small rectangular photographic print of a spectacular mountain, facing the lenses. Penguin is thrilled, convinced it has reached a magnificent destination; fox has half-lidded sly eyes and an expression of impeccable professional service, selling the view without going anywhere. Show clear side-on relationship: penguin left, binoculars pointing right, mountain photo directly before lenses, fox right holding photo with its dark forepaws. Angle the print enough that viewer can also see the mountain picture. Fox's huge white-tipped bushy tail curves behind. No actual mountains, no landscape background, no tickets or signs. Joke is travel fraud using a tiny photograph and gullible expedition equipment.
+
+#### `photo-oracle.avif`
+
+> Use case: precise-object-edit. Edit the supplied Photo Oracle illustration. Preserve the original pen-and-ink drawing style, cat's exact face, turban, star-and-moon cloak, pose, decorative tablecloth, table and three fish photographs on right. Replace the CENTRAL sealed crystal ball and ornate pedestal with the ACTUAL OPEN-TOPPED FISHBOWL currently at left, centred under the cat's paws. ONE bowl only: remove the old left bowl completely, leaving that portion of tabletop clear. The centre fishbowl must have an unmistakable wide OPEN oval rim at top, visible water surface below the rim, no dome or lid, and rest directly on tabletop without crystal-ball stand. Its large fish should have the original left fish's deeply unimpressed expression, looking up sideways at the hungry cat, with a few simple aquatic plants and pebbles. Cat peers intently down into ordinary fishbowl as if divining the future. Paws rest either side of bowl opening. Preserve compact landscape 3:2 composition, all subjects visible, transparent outer background, black ink only, no new props, no human hands, no text, signatures or logos. Preserve transparency; white uninked paper interiors may remain as in source, application uses luminance mask. FINAL REQUIREMENT: remove ALL tarot cards / photographic cards from the table as well. No cards anywhere. Leave tabletop clear except ONE centred open-topped fishbowl. Only costumed cat, actual open fishbowl with one deadpan fish, and decorative table. This removal supersedes earlier instruction to preserve three photographs.
+
+#### `double-take.avif`
+
+> Use case: illustration-story. Decorative photo-game card illustration. Original witty animal editorial cartoon, loose lively black pen contours, expressive deadpan faces, restrained sparse cross-hatching, clean readable silhouettes. Compact centred landscape 3:2 vignette, entire characters and essential props visible, generous transparent margins. BLACK INK on genuinely TRANSPARENT background, including uninked interiors; do not reproduce the references' white backdrop, no white fills, no paper. No humans, human hands, text, lettering, numbers, captions, speech bubbles, signatures, logos, borders or watermark. Application recolours ink with luminance mask. Input images are references for character design and drawing style ONLY, not compositions. Recurring cast: plump pigeon with small cross-body postal satchel, round tufted owl with heavy eyelids and black bow tie, pear-shaped penguin with small peaked official cap, fox with pointed ears dark forepaws and huge white-tipped bushy tail, stocky tabby cat with fluffy cheeks half-lidded eyes and curled striped tail. Preserve recognisable designs. Aim for a strong immediate visual joke with at least 8/10 absurdity AND humour. DOUBLE TAKE passport fraud. Exactly ONE penguin and ONE pigeon, NO duplicate live species. Penguin inspector in peaked official cap sits left at a very small passport desk. Pigeon with small cross-body postal satchel stands right, wearing an enormous obviously fake curly moustache and two stuck-on bushy eyebrows, elastic moustache strap visible round head, one wing nervously holding moustache in place, a few sweat marks, toes turned inward. Inspector holds up a LARGE passport portrait of this SAME PIGEON without moustache/eyebrows, directly beside the actual pigeon's face, both faces same scale, for immediate visual comparison. Inspector squints suspiciously sideways; pigeon tries to look innocent. Pigeon beak stays visible above moustache. The same plump pigeon as reference, NOT another penguin or a hybrid penguin-pigeon. Two distinct silhouettes. Whole characters visible, no additional staff or queues. No writing on passport, no speech bubbles. Joke is hopelessly transparent disguise versus deadpan bureaucratic scrutiny. Improve clarity through big faces and obvious portrait comparison, sparse props.
+
+
+
 ## Recurring cast — 15 October 2026
 
 The current set uses five recurring leads. Incidental animals appear only as
@@ -20,7 +109,8 @@ overthinking with unfounded confidence; penguin tries to police the nonsense.
 
 Replaced eight scenes with built-in imagegen using the retained Cross Exposure,
 Caption It, Oracle and Double Take artwork as character/style references.
-Those four remain unchanged. The new Sight Lines pigeon makes a peacock tail
+At that stage those four remained unchanged; Oracle and Double Take were
+subsequently refined above. The new Sight Lines pigeon makes a peacock tail
 from its own portraits. All twelve cards now draw their leads from this cast.
 
 ### Editorial review
@@ -30,20 +120,20 @@ visual judgements at card size, not measured user ratings.
 
 | Illustration | Absurdity | Humour | Visual joke |
 | --- | --- | --- | --- |
-| Guess Where | 9 | 8 | The explorers search for the cat-shaped landmark from atop the cat |
-| Connect the Shots | 9 | 9 | Pigeon proudly volunteers its portraits for the cat's food categories |
+| Guess Where | 9 | 9 | Fox sells a sightseeing tour with a print held before penguin’s binoculars |
+| Connect the Shots | 9 | 8 | Penguin files a real pigeon among the bird photographs |
 | Cross Exposure | 8 | 9 | Fox treats chicken classification as a menu |
 | Sight Lines | 10 | 9 | Pigeon manufactures a peacock tail from self-portraits |
-| Photo Hangman | 8 | 8 | Owl studies fish clues while cat barely conceals the enormous fish |
-| Photo Relay | 9 | 8 | Pigeon converts the delivery line into its own suspended nest |
+| Photo Hangman | 8 | 9 | Pigeon supplies close-up clues of itself to the baffled owl |
+| Photo Relay | 9 | 9 | Pigeon rides the fox’s tail as owl aims a photographic delivery |
 | Blind Frame | 9 | 9 | Owl flatters pigeon with a ridiculously muscular heroic portrait |
-| Photo Oracle | 9 | 8 | Cat predicts fish with a fishbowl beside it |
-| Double Take | 9 | 8 | Penguin passport fraud with an obvious false moustache |
-| Hindsight | 8 | 9 | Fox rearranges photographs to deny the sausage still in its mouth |
+| Photo Oracle | 9 | 8 | Costumed cat divines the future directly in an ordinary open fishbowl |
+| Double Take | 9 | 8 | Penguin compares a pigeon passport with its transparently disguised owner |
+| Hindsight | 8 | 9 | Solo fox hides the evidence while reordering photographs, sausage still in its mouth |
 | Warmer | 9 | 9 | Pigeon redirects its predator with a photograph of tastier prey |
-| Caption It | 8 | 8 | Grand publicity convinces an ordinary worm it deserves a crown |
+| Caption It | 8 | 9 | Cat shreds its own caption as fast as owl writes it |
 
-### Current cast prompts (verbatim; supersede earlier prompts for these assets)
+### First cast prompts (historical; see latest production prompts above)
 
 #### `connect-the-shots.avif`
 

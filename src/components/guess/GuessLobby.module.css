@@ -1,123 +1,66 @@
 .lobby {
   display: grid;
-  gap: var(--space-5);
-  max-inline-size: var(--content-width-compact);
-  margin: var(--space-6) auto 0;
-  padding: var(--space-5) var(--space-3);
+  gap: var(--space-6);
+  max-inline-size: 72rem;
+  inline-size: 100%;
+  margin-block-start: var(--space-6);
 }
-
 .header {
-  display: grid;
-  gap: var(--space-2);
-  text-align: center;
+  min-inline-size: 0;
 }
-
 .options {
   display: grid;
   gap: var(--space-4);
+  inline-size: 100%;
 }
-
 .optionRow {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 12rem);
   align-items: center;
   gap: var(--space-4);
 }
-
 .optionLabel {
   font-size: var(--fs-sm);
   line-height: var(--lh-label);
 }
-
 .regionSelect,
 .optionControl {
   inline-size: 100%;
   min-inline-size: 0;
 }
-
 .optionControl > button {
   flex: 1;
   min-inline-size: 0;
   padding-inline: var(--space-1);
 }
-
-.photoCount {
-  text-align: center;
-}
-
 .error {
   margin: 0;
-  text-align: center;
   font-size: var(--fs-sm);
   color: var(--c-danger);
 }
-
-.buttonRow {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-3);
-  align-items: start;
-}
-
+.buttonRow,
 .dailyAction {
-  display: contents;
-  text-align: center;
+  display: grid;
+  justify-items: start;
+  gap: var(--space-2);
 }
-
 .dailyDescription {
   line-height: var(--lh-caption);
 }
-
-.dailyButton,
-.playButton {
-  inline-size: 100%;
-  align-self: stretch;
-  justify-self: stretch;
-  padding-inline: var(--space-2);
+.dailyShare > span {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
 }
-
-@media (max-width: 480px) {
+@media (max-width: 720px) {
   .lobby {
-    margin-block-start: var(--space-5);
-    padding: var(--space-5) var(--space-2);
+    margin-block-start: var(--space-4);
+    gap: var(--space-4);
   }
 }
-
 @media (max-width: 360px) {
   .optionRow {
     grid-template-columns: minmax(0, 1fr);
     gap: var(--space-2);
   }
-}
-
-.illustration {
-  max-inline-size: 20rem;
-  inline-size: 100%;
-  margin-inline: auto;
-}
-
-.dailyButton {
-  grid-column: 1;
-  grid-row: 1;
-}
-.playButton {
-  grid-column: 2;
-  grid-row: 1;
-}
-.dailyDescription {
-  grid-column: 1;
-  grid-row: 2;
-}
-
-/* A finished daily's Share action takes the Daily button's cell and width;
-   the share status sits beside it when there is one. */
-.dailyShare {
-  grid-column: 1;
-  grid-row: 1;
-  display: grid;
-}
-
-.dailyShare > span {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
 }

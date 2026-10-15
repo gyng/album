@@ -1,5 +1,11 @@
 # Fun
 
+Guess Where uses the shared `GameIntro` setup layout: title above, artwork
+beside controls on desktop and above them on mobile, then Play, daily action
+and statistics. Its settings, keyboard shortcuts and challenge URLs retain
+their existing behaviour. Keyboard hints centre their contents beside action
+labels through the shared `KeyHint` component.
+
 `/fun` is the illustrated entry to Guess Where, Photo Relay, Blind Frame and
 Photo Oracle. The global navigation selects Fun for every game; its subnav
 selects the current game. `/guess` redirects permanently to `/fun/guess`,
