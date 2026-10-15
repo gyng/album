@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button, LoadingIndicator, Input, Icon } from "./ui";
 import { useEmbeddingsDatabase } from "./database/useDatabase";
 import { encodeSearchText } from "./search/textEmbeddings";
@@ -6,6 +6,7 @@ import { fetchSemanticPaths } from "./search/api";
 import styles from "./CloudSpotlight.module.css";
 
 export const CloudSpotlight = ({ onMatches }: { onMatches: (paths: string[] | null) => void }) => {
+  const inputRef = useRef<HTMLInputElement>(null);
   const [input, setInput] = useState("");
   const [query, setQuery] = useState("");
   return (
@@ -19,31 +20,35 @@ export const CloudSpotlight = ({ onMatches }: { onMatches: (paths: string[] | nu
           }
         }}
       >
-        <Input
-          aria-label="Find a scene"
-          className={styles.query}
-          type="search"
-          value={input}
-          onChange={(event) => setInput(event.target.value)}
-          placeholder="Rainy streets, quiet rooms…"
-        />
+        <div className={styles.inputContainer}>
+          <Input
+            ref={inputRef}
+            aria-label="Find a scene"
+            className={styles.query}
+            type="search"
+            value={input}
+            onChange={(event) => setInput(event.target.value)}
+            placeholder="Rainy streets, quiet rooms…"
+          />
+          <Button
+            variant="quiet"
+            size="icon"
+            aria-label="Clear search"
+            className={styles.clear}
+            disabled={!input && !query}
+            aria-hidden={!input && !query}
+            onClick={() => {
+              inputRef.current?.focus();
+              setQuery("");
+              setInput("");
+              onMatches(null);
+            }}
+          >
+            <Icon kind="close" />
+          </Button>
+        </div>
         <Button type="submit" disabled={!input.trim() || input.trim() === query}>
           Spotlight
-        </Button>
-        <Button
-          variant="quiet"
-          size="icon"
-          aria-label="Clear search"
-          className={styles.clear}
-          disabled={!query}
-          aria-hidden={!query}
-          onClick={() => {
-            setQuery("");
-            setInput("");
-            onMatches(null);
-          }}
-        >
-          <Icon kind="close" />
         </Button>
       </form>
       <div className={styles.feedback}>

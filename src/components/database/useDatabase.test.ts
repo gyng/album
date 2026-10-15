@@ -388,6 +388,8 @@ describe("database cache", () => {
       undefined,
       true,
     );
+    // Loading the WASM module is lazy; wait until both initialisations start.
+    while (!failOld || !finishNew) await Promise.resolve();
     failOld(new Error("old download failed"));
     await failed;
     const concurrent = databaseLoaderInternals.getDatabase("/race.sqlite");

@@ -48,13 +48,20 @@ test.describe("Search", () => {
     // A silent worker represents a cold model download without transferring
     // the real 155 MB model into a deterministic browser test.
     await page.addInitScript(() => {
-      class PendingWorker extends EventTarget {
-        onmessage = null;
-        onerror = null;
-        postMessage() {}
-        terminate() {}
-      }
-      Object.defineProperty(window, "Worker", { value: PendingWorker, configurable: true });
+      const OriginalWorker = window.Worker;
+      window.Worker = class extends OriginalWorker {
+        override postMessage(message: unknown, transfer: Transferable[]): void;
+        override postMessage(message: unknown, options?: StructuredSerializeOptions): void;
+        override postMessage(
+          message: unknown,
+          options: Transferable[] | StructuredSerializeOptions = {},
+        ) {
+          const request = message as { type?: string };
+          if (request.type === "warmup" || request.type === "encode") return;
+          if (Array.isArray(options)) super.postMessage(message, options);
+          else super.postMessage(message, options);
+        }
+      };
     });
     await gotoHydrated(page, "/search?q=japan&mode=hybrid");
     await expectJapanResults(page);

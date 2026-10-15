@@ -171,14 +171,14 @@ const loadTextRuntime = async (requestId?: number) =>
 
       textRuntimePromise = (async () => {
         postLoadProgress(textLoadingRequestIds, 5, "Starting model load");
-        const tokenizer = await AutoTokenizer.from_pretrained(MODEL_ID, {
+        // Independent downloads overlap on a cold visit.
+        const tokenizerPromise = AutoTokenizer.from_pretrained(MODEL_ID, {
           progress_callback: (info: ProgressInfo) => {
             reportProgress(textLoadingRequestIds, 5, 30, "Loading tokenizer", info);
           },
         });
-        postLoadProgress(textLoadingRequestIds, 35, "Tokenizer ready");
 
-        const model = await loadModelWithFallback(
+        const modelPromise = loadModelWithFallback(
           (device) =>
             SiglipTextModel.from_pretrained(MODEL_ID, {
               device,
@@ -190,6 +190,7 @@ const loadTextRuntime = async (requestId?: number) =>
           "text model",
         );
 
+        const [tokenizer, model] = await Promise.all([tokenizerPromise, modelPromise]);
         postLoadProgress(textLoadingRequestIds, 95, "Search model ready");
         return { tokenizer, model };
       })();
@@ -214,14 +215,13 @@ const loadVisionRuntime = async (requestId?: number) =>
 
       visionRuntimePromise = (async () => {
         postLoadProgress(visionLoadingRequestIds, 5, "Starting image model load");
-        const processor = await AutoProcessor.from_pretrained(MODEL_ID, {
+        const processorPromise = AutoProcessor.from_pretrained(MODEL_ID, {
           progress_callback: (info: ProgressInfo) => {
             reportProgress(visionLoadingRequestIds, 5, 10, "Loading image processor", info);
           },
         });
-        postLoadProgress(visionLoadingRequestIds, 15, "Image processor ready");
 
-        const model = await loadModelWithFallback(
+        const modelPromise = loadModelWithFallback(
           (device) =>
             SiglipVisionModel.from_pretrained(MODEL_ID, {
               device,
@@ -235,6 +235,7 @@ const loadVisionRuntime = async (requestId?: number) =>
           "image model",
         );
 
+        const [processor, model] = await Promise.all([processorPromise, modelPromise]);
         postLoadProgress(visionLoadingRequestIds, 95, "Image search model ready");
         return { processor, model };
       })();

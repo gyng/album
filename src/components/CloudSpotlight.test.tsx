@@ -51,3 +51,12 @@ it("does not restore a cleared query when its model finishes loading", async () 
   expect(screen.getByLabelText("Matches")).toHaveTextContent("all");
   expect(screen.queryByRole("status")).toBeNull();
 });
+
+it("clears unsubmitted text without starting scene search", () => {
+  render(<Harness />);
+  fireEvent.change(screen.getByRole("searchbox"), { target: { value: "rain" } });
+  fireEvent.click(screen.getByRole("button", { name: "Clear search" }));
+  expect(screen.getByRole("searchbox")).toHaveValue("");
+  expect(screen.getByRole("searchbox")).toHaveFocus();
+  expect(screen.queryByRole("status")).toBeNull();
+});

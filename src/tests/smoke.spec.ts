@@ -39,8 +39,13 @@ test.describe("Smoke Tests", () => {
     await gotoHydrated(page, "/album/test-simple");
 
     await expect(page.locator('a:has-text("Albums")')).toBeVisible();
-    await expect(page.locator('a:has-text("Album map")')).toBeVisible();
-    await expect(page.locator('a:has-text("Album slideshow")')).toBeVisible();
+    await expect(page.getByRole("link", { name: "Album map", exact: true })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Album slideshow", exact: true })).toBeVisible();
+
+    const controls = page.getByRole("group", { name: "Album navigation", exact: true });
+    const controlsBox = await controls.boundingBox();
+    const searchBox = await page.getByRole("link", { name: "Search", exact: true }).boundingBox();
+    expect(controlsBox!.x).toBeGreaterThan(searchBox!.x + searchBox!.width);
 
     const photos = page.locator("img");
     await expect(photos.first()).toBeVisible();

@@ -18,10 +18,8 @@ jest.mock("next/router", () => ({
 }));
 jest.mock("../../../components/Seo", () => ({ Seo: () => null }));
 jest.mock("../../../components/GlobalNav", () => ({
-  GlobalNav: ({ extraItems }: { extraItems: React.ReactNode }) => (
-    <nav>
-      <ul>{extraItems}</ul>
-    </nav>
+  GlobalNav: ({ themeAdjacentItem }: { themeAdjacentItem: React.ReactNode }) => (
+    <nav>{themeAdjacentItem}</nav>
   ),
 }));
 jest.mock("../../../components/PhotoAlbum", () => ({

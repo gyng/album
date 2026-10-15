@@ -208,7 +208,8 @@ Design system primitives live in `src/components/ui/` with a barrel export. Impo
 - Stack utilities in `common.module.css`: `.stack` (8px) / `.stackL` (20px) / `.stackXl` (40px) / `.stackPage` (64px)
 
 ## Search
-- SQLite runs in-browser via sql.js (WASM)
+- SQLite runs in-browser via `@sqlite.org/sqlite-wasm`, with one dedicated worker per loaded database generation. Application data queries go through `executeDatabase`; synchronous `exec` on a worker handle supports only cached metadata schema probes. Keep the loader free of React/platform imports so it can run in a worker.
+- Refinement counts cache each candidate tag’s FTS row IDs per immutable database handle, then intersect with the current keyword/facet result. A refreshed catalogue must get a new handle so these posting lists cannot become stale.
 - Two-phase: JS colour pre-filter → SQL text/facet filter — never do colour filtering in SQL
 - Colour-matched paths capped at 900 before building SQL `IN` clause (SQLite bind-parameter limit)
 - Colour filter composes with text search and facets — not a separate mode

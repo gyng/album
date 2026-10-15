@@ -108,6 +108,22 @@ describe("embedding worker", () => {
     expect(postMessage).toHaveBeenCalledWith({ id: 2, ok: true });
   });
 
+  it("starts the text model download while the tokenizer is still loading", async () => {
+    let finish!: (value: typeof tokenizer) => void;
+    mockTokenizerFromPretrained.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    );
+    const { handler } = loadWorker();
+    const loading = handler({ data: { id: 30, type: "warmup" } });
+    await Promise.resolve();
+    expect(mockTextModelFromPretrained).toHaveBeenCalledTimes(1);
+    finish(tokenizer);
+    await loading;
+  });
+
   it("normalises lower-cased text embeddings and preserves a zero vector", async () => {
     const first = loadWorker({});
     await first.handler({ data: { id: 3, type: "encode", text: "HarBor" } });

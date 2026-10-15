@@ -26,7 +26,23 @@
   gap: var(--space-2);
 }
 
+.inputContainer {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-inline-size: 0;
+  flex: 1 1 var(--size-180);
+  max-inline-size: var(--size-360);
+}
+
+.clear {
+  position: absolute;
+  inset-inline-end: var(--line-hairline);
+}
+
 .query {
+  padding-inline-end: var(--tap-target);
+  inline-size: 100%;
   min-inline-size: 0;
   flex: 1 1 var(--size-180);
   max-inline-size: var(--size-360);
@@ -34,4 +50,8 @@
 
 .search button {
   flex-shrink: 0;
+}
+
+.query::-webkit-search-cancel-button {
+  appearance: none;
 }

@@ -15,6 +15,7 @@ import { AlbumNeighbours } from "../../components/AlbumNeighbours";
 import { getDisplayDimensions } from "../../util/photoDimensions";
 import { Footer, buttonStyles } from "../../components/ui";
 import commonStyles from "../../styles/common.module.css";
+import styles from "./AlbumScreen.module.css";
 import type { AlbumPageData } from "../../util/pageDataTypes";
 import { Seo } from "../../components/Seo";
 import {
@@ -136,47 +137,40 @@ const AlbumScreen = ({ album }: AlbumScreenProps) => {
         routeKey={`${albumName}:${view}`}
         navigation={
           <GlobalNav
-            extraItems={
-              <>
-                <li>
-                  {/* One of the album's views, named like its siblings here rather
+            themeAdjacentItem={
+              <div className={styles.controls} role="group" aria-label="Album navigation">
+                {/* One of the album's views, named like its siblings here rather
                   than shaped as a switch — and a link, so it survives without
                   JavaScript and can be shared. Putting it above the photographs
                   pushed the first one below the fold on a split-screen tablet. */}
-                  <Link
-                    href={
-                      view === "trips" ? `/album/${albumName}` : `/album/${albumName}?view=trips`
-                    }
-                    className={`${buttonStyles.base} ${commonStyles.navContext}`}
-                  >
-                    {view === "trips" ? "Album grid" : "Album trips"}
-                  </Link>
-                </li>
-                <li>
-                  <Link
-                    href={`/map?${new URLSearchParams({ filter_album: albumName })}`}
-                    className={`${buttonStyles.base} ${commonStyles.navContext}`}
-                  >
-                    Album map
-                  </Link>
-                </li>
-                <li>
-                  <Link
-                    href={`/explore/timeline?${new URLSearchParams({ filter_album: albumName })}`}
-                    className={`${buttonStyles.base} ${commonStyles.navContext}`}
-                  >
-                    Album timeline
-                  </Link>
-                </li>
-                <li>
-                  <Link
-                    href={`/slideshow/shell?${new URLSearchParams({ filter: albumName })}`}
-                    className={`${buttonStyles.base} ${commonStyles.navContext}`}
-                  >
-                    Album slideshow
-                  </Link>
-                </li>
-              </>
+                <Link
+                  href={view === "trips" ? `/album/${albumName}` : `/album/${albumName}?view=trips`}
+                  className={`${buttonStyles.base} ${commonStyles.navContext}`}
+                >
+                  {view === "trips" ? "Album grid" : "Album trips"}
+                </Link>
+
+                <Link
+                  href={`/map?${new URLSearchParams({ filter_album: albumName })}`}
+                  className={`${buttonStyles.base} ${commonStyles.navContext}`}
+                >
+                  Album map
+                </Link>
+
+                <Link
+                  href={`/explore/timeline?${new URLSearchParams({ filter_album: albumName })}`}
+                  className={`${buttonStyles.base} ${commonStyles.navContext}`}
+                >
+                  Album timeline
+                </Link>
+
+                <Link
+                  href={`/slideshow/shell?${new URLSearchParams({ filter: albumName })}`}
+                  className={`${buttonStyles.base} ${commonStyles.navContext}`}
+                >
+                  Album slideshow
+                </Link>
+              </div>
             }
           />
         }

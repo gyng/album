@@ -1,3 +1,4 @@
+import { executeDatabase } from "../database/databaseExecution";
 import { yieldToBrowser } from "../../util/yieldToBrowser";
 import { METADATA_FACETS, weatherFacetValue } from "../../util/metadataFacets";
 import { hashSeed, mulberry32 } from "../../util/seededRandom";
@@ -575,17 +576,10 @@ const exec = async (
     suppressMissingEmbeddingsTableError?: boolean;
   },
 ): Promise<PaginatedSearchResult> => {
-  const accumulator: any[] = [];
+  let accumulator: any[];
 
   try {
-    db.exec({
-      sql,
-      bind,
-      returnValue: "resultRows",
-      callback: (msg: any) => {
-        accumulator.push(msg);
-      },
-    });
+    accumulator = await executeDatabase(db, sql, bind);
   } catch (err) {
     if (!(options?.suppressMissingEmbeddingsTableError && isMissingEmbeddingsTableError(err))) {
       console.error(`Bad query ${options?.query} ${options?.page}`, err);
@@ -1373,6 +1367,11 @@ export const fetchResults = async (opts: {
   }
 };
 
+// A database handle is an immutable catalogue generation. Cache each tag’s FTS
+// posting list once, then intersect it with the current keyword/facet result.
+// A refreshed catalogue gets a new handle and therefore a fresh cache.
+const refinementMatches = new WeakMap<Database, Map<string, number[]>>();
+
 export const fetchRefinementTagCounts = async (opts: {
   database: Database;
   activeTerms: string[];
@@ -1402,44 +1401,43 @@ export const fetchRefinementTagCounts = async (opts: {
     return {};
   }
 
-  const counts: Record<string, number> = {};
+  let postings = refinementMatches.get(database);
+  if (!postings) {
+    postings = new Map();
+    refinementMatches.set(database, postings);
+  }
+  const missing = normalizedCandidateTags.filter((tag) => !postings.has(tag));
   const batchSize = 24;
-
-  for (let idx = 0; idx < normalizedCandidateTags.length; idx += batchSize) {
+  for (let idx = 0; idx < missing.length; idx += batchSize) {
     if (signal?.aborted) return {};
-    const batch = normalizedCandidateTags.slice(idx, idx + batchSize);
-    const whereClause = [
-      ...Array.from({ length: normalizedActiveTerms.length + 1 }, () => "images MATCH ?"),
-      ...(facetWhere.sql ? [facetWhere.sql] : []),
-    ].join(" AND ");
-    const sql = batch
-      .map(
-        () =>
-          `SELECT ? AS tag, COUNT(*) AS count
-            FROM images
-            LEFT JOIN metadata m ON m.path = images.path
-            WHERE ${whereClause}`,
-      )
-      .join(" UNION ALL ");
-
-    const bind: Array<string | number> = [];
-    for (const tag of batch) {
-      bind.push(tag);
-      for (const term of [...normalizedActiveTerms, tag]) {
-        bind.push(toFtsMatchTerm(term));
-      }
-      bind.push(...facetWhere.bind);
+    const batch = missing.slice(idx, idx + batchSize);
+    const result = await exec(
+      database,
+      batch
+        .map(() => `SELECT ? AS tag, json_group_array(rowid) FROM images WHERE images MATCH ?`)
+        .join(" UNION ALL "),
+      batch.flatMap((tag) => [tag, toFtsMatchTerm(tag)]),
+    );
+    for (const [tag, rowids] of result.data as unknown as Array<[string, string]>) {
+      postings.set(tag, JSON.parse(rowids) as number[]);
     }
-
-    const result = await exec(database, sql, bind);
-    for (const [tag, count] of result.data as unknown as Array<[string, number]>) {
-      counts[String(tag)] = Number(count);
-    }
-    // Awaiting resolved database promises only queues microtasks. Yield a real
-    // browser task so typing can interrupt an obsolete refinement request.
-    if ((idx / batchSize + 1) % 2 === 0 && idx + batchSize < normalizedCandidateTags.length) {
-      await yieldToBrowser();
-    }
+    if ((idx / batchSize + 1) % 2 === 0 && idx + batchSize < missing.length) await yieldToBrowser();
+  }
+  if (signal?.aborted) return {};
+  const where = [
+    ...normalizedActiveTerms.map(() => "images MATCH ?"),
+    ...(facetWhere.sql ? [facetWhere.sql] : []),
+  ].join(" AND ");
+  const matched = await exec(
+    database,
+    `SELECT images.rowid FROM images LEFT JOIN metadata m ON m.path = images.path WHERE ${where}`,
+    [...normalizedActiveTerms.map(toFtsMatchTerm), ...facetWhere.bind],
+  );
+  if (signal?.aborted) return {};
+  const rows = new Set((matched.data as unknown as number[][]).map((row) => row[0]));
+  const counts: Record<string, number> = {};
+  for (const tag of normalizedCandidateTags) {
+    counts[tag] = postings.get(tag)!.reduce((count, rowid) => count + Number(rows.has(rowid)), 0);
   }
 
   return counts;

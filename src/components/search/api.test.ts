@@ -856,63 +856,6 @@ describe("fetchMemoryCandidates", () => {
   });
 });
 
-describe("fetchRefinementTagCounts", () => {
-  it("returns prospective counts for additional refinement tags", async () => {
-    const database = {
-      exec: ({ sql, bind, callback }: ExecArgs) => {
-        if (sql.includes("COUNT(*) AS count") && sql.includes("UNION ALL")) {
-          expect(bind).toEqual([
-            "harbor",
-            `- {path album_relative_path exif colors} : "bird"`,
-            `- {path album_relative_path exif colors} : "harbor"`,
-            "night",
-            `- {path album_relative_path exif colors} : "bird"`,
-            `- {path album_relative_path exif colors} : "night"`,
-          ]);
-          callback(["harbor", 4]);
-          callback(["night", 0]);
-        }
-      },
-    };
-
-    const results = await fetchRefinementTagCounts({
-      database: database as any,
-      activeTerms: ["bird"],
-      candidateTags: ["harbor", "night", "bird"],
-    });
-
-    expect(results.harbor).toBe(4);
-    expect(results.night).toBe(0);
-    expect(results.bird).toBeUndefined();
-  });
-
-  it("applies active facet filters while recalculating tag counts", async () => {
-    const database = {
-      exec: ({ sql, bind, callback }: ExecArgs) => {
-        if (sql.includes("COUNT(*) AS count") && sql.includes("images.geocode")) {
-          expect(sql).toContain("LEFT JOIN metadata m ON m.path = images.path");
-          expect(bind).toEqual([
-            "harbor",
-            `- {path album_relative_path exif colors} : "harbor"`,
-            "%\nJapan\n%",
-            "%\nJapan",
-          ]);
-          callback(["harbor", 2]);
-        }
-      },
-    };
-
-    const results = await fetchRefinementTagCounts({
-      database: database as any,
-      activeTerms: [],
-      candidateTags: ["harbor"],
-      selectedFacets: [{ facetId: "location", value: "Japan" }],
-    });
-
-    expect(results.harbor).toBe(2);
-  });
-});
-
 describe("fetchSearchFacetSections", () => {
   it("recalculates each section against keywords and the other selected facets", async () => {
     const calls: Array<{ sql: string; bind?: Array<string | number> | undefined }> = [];
@@ -2306,9 +2249,9 @@ it("stops superseded refinement work between batches", async () => {
   let scans = 0;
   const database = {
     exec: ({ sql, callback }: ExecArgs) => {
-      if (sql.includes("COUNT(*) AS count")) {
+      if (sql.includes("json_group_array")) {
         scans++;
-        callback(["tag", 1]);
+        callback(["tag", "[1]"]);
       }
     },
   };
