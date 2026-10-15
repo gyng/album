@@ -36,6 +36,11 @@ for (const width of [390, 1280]) {
       const year = await page.getByLabel("Year", { exact: true }).boundingBox();
       expect(Math.abs(search!.y - year!.y)).toBeLessThan(10);
       expect(search!.x).toBeGreaterThan(year!.x + year!.width);
+      const spotlight = await page
+        .getByRole("button", { name: "Spotlight", exact: true })
+        .boundingBox();
+      const stage = await canvas.boundingBox();
+      expect(Math.abs(spotlight!.x + spotlight!.width - stage!.x - stage!.width)).toBeLessThan(2);
     }
 
     await expect(page.getByRole("radio", { name: "Similar photos", exact: true })).toBeChecked();

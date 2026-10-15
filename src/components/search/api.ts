@@ -916,12 +916,7 @@ export const fetchSearchFacetSections = async (opts: {
   const useGeoColumns = hasStructuredGeocode(database);
   const metadataColumns = searchMetadataColumns(database);
 
-  const fetchFacetItems = async (facetId: string) => {
-    const facetWhere = buildFacetWhereClause(
-      selectedFacets.filter((selection) => selection.facetId !== facetId),
-      useGeoColumns,
-      metadataColumns,
-    );
+  const loadFacetItems = async (facetWhere: ReturnType<typeof buildFacetWhereClause>) => {
     const whereClause = [keywordWhere.sql, facetWhere.sql].filter(Boolean);
     const geoSelect = useGeoColumns
       ? ", m.geo_city, m.geo_region, m.geo_subregion, m.geo_country"
@@ -951,6 +946,24 @@ export const fetchSearchFacetSections = async (opts: {
       orientation: row[useGeoColumns ? 8 : 4] ?? null,
       weather: row[useGeoColumns ? 9 : 5] ?? null,
     }));
+  };
+
+  // Facets without their own selection share the same rows. Keep this cache
+  // within a refresh so changed databases and filters never reuse stale counts.
+  const itemRequests = new Map<string, ReturnType<typeof loadFacetItems>>();
+  const fetchFacetItems = (facetId: string) => {
+    const facetWhere = buildFacetWhereClause(
+      selectedFacets.filter((selection) => selection.facetId !== facetId),
+      useGeoColumns,
+      metadataColumns,
+    );
+    const key = JSON.stringify(facetWhere);
+    let request = itemRequests.get(key);
+    if (!request) {
+      request = loadFacetItems(facetWhere);
+      itemRequests.set(key, request);
+    }
+    return request;
   };
 
   const numericSections = await Promise.all(

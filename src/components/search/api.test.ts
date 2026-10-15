@@ -2246,3 +2246,52 @@ describe("browse snippet fallbacks", () => {
     ).resolves.toEqual([expect.objectContaining({ isoDate: "", snippet: "memory.jpg" })]);
   });
 });
+
+describe("facet row sharing", () => {
+  it("reads identical filter scopes once per refresh without retaining stale rows", async () => {
+    let scans = 0;
+    let year = "2024";
+    const database = {
+      exec: ({ sql, callback }: ExecArgs) => {
+        if (!sql.includes("SELECT images.exif")) return;
+        scans++;
+        callback(["Image Make: FUJIFILM\nImage Model: X-T5", "", `${year}-01-01`]);
+      },
+    };
+    const first = await fetchSearchFacetSections({ database: database as any });
+    expect(first.find((section) => section.facetId === "year")?.options).toEqual([
+      { value: "2024", count: 1 },
+    ]);
+    expect(scans).toBe(1);
+    year = "2023";
+    const second = await fetchSearchFacetSections({ database: database as any });
+    expect(second.find((section) => section.facetId === "year")?.options).toEqual([
+      { value: "2023", count: 1 },
+    ]);
+    expect(scans).toBe(2);
+  });
+  it("keeps the selected facet's alternative counts separate from the filtered counts", async () => {
+    let scans = 0;
+    const database = {
+      exec: ({ sql, bind, callback }: ExecArgs) => {
+        if (!sql.includes("SELECT images.exif")) return;
+        scans++;
+        callback(["Image Make: FUJIFILM\nImage Model: X-T5", "", "2024-01-01"]);
+        if (!bind?.includes("2024"))
+          callback(["Image Make: FUJIFILM\nImage Model: X-T5", "", "2023-01-01"]);
+      },
+    };
+    const sections = await fetchSearchFacetSections({
+      database: database as any,
+      selectedFacets: [{ facetId: "year", value: "2024" }],
+    });
+    expect(sections.find((section) => section.facetId === "year")?.options).toEqual([
+      { value: "2024", count: 1 },
+      { value: "2023", count: 1 },
+    ]);
+    expect(sections.find((section) => section.facetId === "camera")?.options).toEqual([
+      { value: "FUJIFILM X-T5", count: 1 },
+    ]);
+    expect(scans).toBe(2);
+  });
+});
