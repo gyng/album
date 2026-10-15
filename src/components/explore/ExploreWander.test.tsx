@@ -122,3 +122,13 @@ it("requires an explicit restart once every photograph has been explored", async
     within(screen.getByRole("list", { name: "Ways on" })).getAllByRole("button").length,
   ).toBeGreaterThan(0);
 });
+
+it("links Give me a quest to the Fun game, carrying the current photograph", async () => {
+  await load();
+  const link = screen.getByRole("link", { name: "Give me a quest" });
+  const url = new URL(link.getAttribute("href")!, "https://example.org");
+  expect(url.pathname).toBe("/fun/wander");
+  expect(url.searchParams.get("mode")).toBe("quest");
+  expect(url.searchParams.get("play")).toBe("1");
+  expect(url.searchParams.get("wander")).toBe("../albums/walk/start.jpg");
+});

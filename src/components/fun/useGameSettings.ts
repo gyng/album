@@ -6,6 +6,7 @@ import type { CaptionBudget, CaptionMode } from "../../util/captionModes";
 import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 
 export type GameSettingsRegistry = {
+  wander: { mode: "quest" | "roam" | "hunt" | "photos"; difficulty: "easy" | "normal" | "hard" };
   pairs: {
     mode: "visual" | "semantic";
     matchSize: 2 | 3 | 4;
@@ -36,6 +37,7 @@ export type GameSettingsRegistry = {
 type Game = keyof GameSettingsRegistry;
 
 const defaults: GameSettingsRegistry = {
+  wander: { mode: "quest", difficulty: "normal" },
   pairs: { mode: "visual", matchSize: 2, pairs: 6, twist: "classic" },
   jigsaw: { size: 3, squarePieces: true, mode: "jigsaw" },
   cross: { mode: "hidden", prefill: 0, size: 3 },
@@ -60,6 +62,10 @@ const validators: {
     [K in keyof GameSettingsRegistry[G]]: (value: unknown) => value is GameSettingsRegistry[G][K];
   };
 } = {
+  wander: {
+    mode: oneOf("quest", "roam", "hunt", "photos"),
+    difficulty: oneOf("easy", "normal", "hard"),
+  },
   pairs: {
     mode: oneOf("visual", "semantic"),
     matchSize: oneOf(2, 3, 4),

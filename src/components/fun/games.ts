@@ -1,5 +1,13 @@
 export const FUN_GAMES = [
   {
+    id: "photo-hangman",
+    href: "/fun/photo-hangman",
+    title: "Photo Hangman",
+    illustration: "/fun/photo-hangman.avif",
+    description:
+      "Find the subject shared by eight photographs. Each wrong guess reveals another clue.",
+  },
+  {
     id: "guess",
     href: "/fun/guess",
     title: "Guess Where",
@@ -28,20 +36,19 @@ export const FUN_GAMES = [
     description: "A word search with photographs. Find lines that share a subject.",
   },
   {
-    id: "photo-hangman",
-    href: "/fun/photo-hangman",
-    title: "Photo Hangman",
-    illustration: "/fun/photo-hangman.avif",
+    id: "wander",
+    href: "/fun/wander",
+    title: "Wander",
+    illustration: "/fun/wander.avif",
     description:
-      "Find the subject shared by eight photographs. Each wrong guess reveals another clue.",
+      "Follow photographic trails, find hidden subjects, or wander without a destination.",
   },
   {
-    id: "relay",
-    href: "/fun/relay",
-    title: "Photo Relay",
-    illustration: "/fun/photo-relay.avif",
-    description:
-      "Two photographs, five missing links. Find the smoothest visual route between them.",
+    id: "photo-pairs",
+    href: "/fun/photo-pairs",
+    title: "Photo Pairs",
+    illustration: "/fun/photo-pairs.avif",
+    description: "Remember the photographs. Find the pairs that belong together.",
   },
   {
     id: "blind-frame",
@@ -87,11 +94,12 @@ export const FUN_GAMES = [
     description: "Caption a photograph so well it stands out from the whole archive.",
   },
   {
-    id: "photo-pairs",
-    href: "/fun/photo-pairs",
-    title: "Photo Pairs",
-    illustration: "/fun/photo-pairs.avif",
-    description: "Remember the photographs. Find the pairs that belong together.",
+    id: "relay",
+    href: "/fun/relay",
+    title: "Photo Relay",
+    illustration: "/fun/photo-relay.avif",
+    description:
+      "Two photographs, five missing links. Find the smoothest visual route between them.",
   },
   {
     id: "photo-jigsaw",
@@ -116,4 +124,4 @@ export type PhotoGameKind =
   | "hindsight"
   | "warmer"
   | "caption-it";
-export type FunPage = "fun" | "guess" | PhotoGameKind;
+export type FunPage = "fun" | "guess" | "wander" | PhotoGameKind;

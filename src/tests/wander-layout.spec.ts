@@ -92,3 +92,57 @@ test("Wander escapes a closed city loop and offers fresh scene shortcuts after B
   await expect(page).toHaveURL(/wander=.*escape4/);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
 });
+
+test("Explore opens the Fun quest and Wander offers photo hunts and difficulty", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 1000 });
+  const tags = [
+    [],
+    ["cat", "stairs"],
+    ...Array.from({ length: 8 }, () => ["cat"]),
+    ...Array.from({ length: 8 }, () => ["stairs"]),
+  ];
+  const points = tags.map((tags, i) => ({
+    src: `/data/albums/test-simple/.resized_images/quest${i}.jpg%40800.avif`,
+    href: `/album/test-simple#quest${i}.jpg`,
+    label: `Quest scene ${i}`,
+    tags,
+    near: i === 0 ? [1, 2, 3] : [0, 1, 2].filter((index) => index !== i),
+    around: [],
+    x: i,
+    y: 0,
+    z: 0,
+  }));
+  await page.route("**/data/embedding-space.json", (route) =>
+    route.fulfill({ json: { points, clusters: [], axisScale: { x: 1, y: 1, z: 1 }, atlas: null } }),
+  );
+  await page.route("**/quest*.avif", (route) =>
+    route.fulfill({
+      contentType: "image/svg+xml",
+      body: '<svg xmlns="http://www.w3.org/2000/svg" width="600" height="400"><rect width="600" height="400" fill="silver"/></svg>',
+    }),
+  );
+  await gotoHydrated(page, "/explore?wander=../albums/test-simple/quest0.jpg");
+  await page.getByRole("link", { name: "Give me a quest", exact: true }).click();
+  await expect(page).toHaveURL(/\/fun\/wander\?/);
+  await expect(page.getByRole("list", { name: "Quest targets" })).toContainText("cat + stairs");
+  await page
+    .getByRole("list", { name: "Ways on" })
+    .getByRole("button", { name: "closest", exact: true })
+    .click();
+  await expect(page.getByRole("region", { name: "Wander result" })).toContainText("Quest complete");
+  await page.getByRole("button", { name: "Change mode", exact: true }).click();
+  await page.getByRole("radio", { name: "Photo hunt", exact: true }).click();
+  await page.getByRole("radio", { name: "Hard", exact: true }).click();
+  await page.getByRole("button", { name: "Start hunt", exact: true }).click();
+  await expect(page.getByRole("list", { name: "Quest targets" }).getByRole("img")).toHaveCount(5);
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+  await gotoHydrated(page, "/fun");
+  const card = page
+    .getByRole("link")
+    .filter({ has: page.getByRole("heading", { name: "Wander", exact: true }) });
+  await expect(card).toHaveAttribute("href", "/fun/wander");
+  await expect(card.locator("image")).toHaveAttribute("href", "/fun/wander.avif");
+});

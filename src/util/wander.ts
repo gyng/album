@@ -192,10 +192,10 @@ const QUEST_PAIR_MAX = 5;
  * A pair of subjects that appear together in a handful of photographs: a
  * direction for a walk, not a puzzle. Null when the archive has no such pair.
  */
-export const wanderQuest = (
+const questCandidates = (
   entries: readonly WanderEntry[],
-  random: () => number = Math.random,
-): WanderQuest | null => {
+  maxMatches = QUEST_PAIR_MAX,
+): WanderQuest[] => {
   const tagCounts = new Map<string, number>();
   for (const entry of entries)
     for (const tag of new Set(entry.tags ?? [])) tagCounts.set(tag, (tagCounts.get(tag) ?? 0) + 1);
@@ -211,14 +211,46 @@ export const wanderQuest = (
       }
   }
   const pairs = [...pairCounts]
-    .filter(([, count]) => count <= QUEST_PAIR_MAX)
+    .filter(([, count]) => count <= maxMatches)
     .map(([key]) => key)
     .sort();
-  const chosen = pairs[Math.floor(random() * pairs.length)];
-  if (!chosen) return null;
-  const [a, b] = chosen.split("\u0000") as [string, string];
-  return { tags: [a, b] };
+  return pairs.map((pair) => ({ tags: pair.split("\u0000") as [string, string] }));
 };
+
+/** Select separate finds, with no photograph satisfying two of the hunt's targets. */
+export const wanderHunt = (
+  entries: readonly WanderEntry[],
+  count: number,
+  random: () => number = Math.random,
+  avoid?: WanderEntry,
+  maxMatches = QUEST_PAIR_MAX,
+): WanderQuest[] => {
+  const candidates = questCandidates(entries, maxMatches).filter(
+    (quest) => !meetsQuest(avoid, quest),
+  );
+  const chosen: WanderQuest[] = [];
+  while (candidates.length && chosen.length < count) {
+    const index = Math.min(
+      candidates.length - 1,
+      Math.max(0, Math.floor(random() * candidates.length)),
+    );
+    const quest = candidates.splice(index, 1)[0]!;
+    if (
+      entries.some(
+        (entry) =>
+          meetsQuest(entry, quest) && chosen.some((previous) => meetsQuest(entry, previous)),
+      )
+    )
+      continue;
+    chosen.push(quest);
+  }
+  return chosen;
+};
+
+export const wanderQuest = (
+  entries: readonly WanderEntry[],
+  random: () => number = Math.random,
+): WanderQuest | null => wanderHunt(entries, 1, random)[0] ?? null;
 
 export const meetsQuest = (entry: WanderEntry | undefined, quest: WanderQuest | null): boolean =>
   Boolean(entry && quest && quest.tags.every((tag) => entry.tags?.includes(tag)));

@@ -3,6 +3,7 @@ import {
   meetsQuest,
   wanderExits,
   wanderJump,
+  wanderHunt,
   wanderQuest,
   type WanderEntry,
 } from "./wander";
@@ -72,6 +73,23 @@ describe("wanderQuest", () => {
     expect(meetsQuest(entries[0]!, { tags: ["cat", "staircase"] })).toBe(false);
   });
 
+  it("restricts harder quests to unique targets while easy quests allow more matches", () => {
+    const entries = [
+      ...common(["cat"], 10),
+      ...common(["stairs"], 10),
+      ...common(["cat", "stairs"], 7),
+    ];
+    expect(wanderHunt(entries, 1, () => 0, undefined, 10)).toHaveLength(1);
+    expect(wanderHunt(entries, 1, () => 0, undefined, 5)).toEqual([]);
+    expect(wanderHunt(entries, 1, () => 0, undefined, 1)).toEqual([]);
+    const unique = [
+      ...common(["cat"], 10),
+      ...common(["stairs"], 10),
+      ...common(["cat", "stairs"], 1),
+    ];
+    expect(wanderHunt(unique, 1, () => 0, undefined, 1)).toHaveLength(1);
+  });
+
   it("is null when no pair qualifies", () => {
     expect(wanderQuest(common(["rare", "pair"], 3))).toBeNull();
   });
@@ -110,4 +128,23 @@ describe("escaping a local loop", () => {
     expect(wanderJump(photos, 0, new Set([0]), () => 0, "water")).toBe(4);
     expect(wanderJump(photos, 0, new Set([0, 3]), () => 0, "nature")).toBeNull();
   });
+});
+
+it("builds a hunt with distinct, solvable targets and avoids a goal already met at the start", () => {
+  const source = [
+    ...Array.from({ length: 8 }, (_, i) => entry(`/album/q#cat-${i}`, ["cat"], "")),
+    ...Array.from({ length: 8 }, (_, i) => entry(`/album/q#stairs-${i}`, ["stairs"], "")),
+    ...Array.from({ length: 8 }, (_, i) => entry(`/album/q#forest-${i}`, ["forest"], "")),
+    ...Array.from({ length: 8 }, (_, i) => entry(`/album/q#lake-${i}`, ["lake"], "")),
+    entry("/album/q#cat-stairs", ["cat", "stairs"], ""),
+    entry("/album/q#forest-lake", ["forest", "lake"], ""),
+  ];
+  const goals = wanderHunt(source, 3, () => 0);
+  expect(goals).toHaveLength(2);
+  expect(new Set(goals.map((goal) => goal.tags.join("/"))).size).toBe(2);
+  for (const goal of goals) expect(source.some((photo) => meetsQuest(photo, goal))).toBe(true);
+  const avoid = source.at(-2)!;
+  expect(wanderHunt(source, 1, () => 0, avoid).every((goal) => !meetsQuest(avoid, goal))).toBe(
+    true,
+  );
 });

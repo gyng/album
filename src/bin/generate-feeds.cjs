@@ -321,6 +321,7 @@ const generateSitemap = (albumEntries) => {
     { url: getCanonicalUrl("/explore"), lastmod: latestLastmod },
     ...[
       "/fun",
+      "/fun/wander",
       "/fun/guess",
       "/fun/relay",
       "/fun/blind-frame",

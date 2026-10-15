@@ -1,16 +1,13 @@
 import React from "react";
 import { AppLink, useUrlSearchParams } from "../platform";
-import { Button, Caption, LoadingIndicator } from "../ui";
+import { Button, Caption, LoadingIndicator, buttonStyles } from "../ui";
 import { fetchEmbeddingSpaceOnce, type EmbeddingSpaceEntry } from "../../util/embeddingSpaceData";
 import {
   findWanderEntry,
-  meetsQuest,
   wanderExits,
   wanderJump,
   wanderScenes,
   wanderKey,
-  wanderQuest,
-  type WanderQuest,
 } from "../../util/wander";
 import styles from "./ExploreWander.module.css";
 
@@ -31,13 +28,16 @@ const labelOf = (entry: EmbeddingSpaceEntry) =>
 export const ExploreWander: React.FC<{
   /** The walk so far as photograph sources, oldest first, for the cloud to draw. */
   onTrailChange?: (sources: string[]) => void;
-}> = ({ onTrailChange }) => {
+  initialIndex?: number;
+  questLink?: boolean;
+  onVisit?: (entry: EmbeddingSpaceEntry, steps: number) => void;
+}> = ({ onTrailChange, initialIndex, questLink = true, onVisit }) => {
   const { ready, searchParams, getSearchParam, replaceSearchParams } = useUrlSearchParams();
   const [entries, setEntries] = React.useState<EmbeddingSpaceEntry[] | null>(null);
   const [failed, setFailed] = React.useState(false);
   const [trail, setTrail] = React.useState<number[]>([]);
   const [explored, setExplored] = React.useState<Set<number>>(() => new Set());
-  const [quest, setQuest] = React.useState<WanderQuest | null>(null);
+  const [steps, setSteps] = React.useState(0);
   const currentRef = React.useRef<HTMLAnchorElement>(null);
   const moved = React.useRef(false);
   const [motion, setMotion] = React.useState({ x: 0, y: 12 });
@@ -60,7 +60,12 @@ export const ExploreWander: React.FC<{
   React.useEffect(() => {
     if (!entries?.length || !ready || trail.length) return;
     const linked = findWanderEntry(entries, getSearchParam("wander"));
-    const first = linked >= 0 ? linked : randomIndex(entries.length);
+    const first =
+      initialIndex !== undefined && entries[initialIndex]
+        ? initialIndex
+        : linked >= 0
+          ? linked
+          : randomIndex(entries.length);
     setTrail([first]);
     setExplored(new Set([first]));
     // Only the first arrival chooses a start; later URL writes are our own.
@@ -69,6 +74,10 @@ export const ExploreWander: React.FC<{
 
   const current = trail.at(-1) ?? null;
   const here = entries && current !== null ? entries[current] : undefined;
+
+  React.useEffect(() => {
+    if (here) onVisit?.(here, steps);
+  }, [here, steps, onVisit]);
 
   React.useEffect(() => {
     if (!entries) return;
@@ -87,6 +96,7 @@ export const ExploreWander: React.FC<{
   }, [here, getSearchParam, searchParams, replaceSearchParams]);
 
   const go = (next: number[], direction = { x: 0, y: 12 }) => {
+    if (next.at(-1) !== current) setSteps((previous) => previous + 1);
     setMotion(direction);
     moved.current = true;
     setTrail(next);
@@ -104,7 +114,6 @@ export const ExploreWander: React.FC<{
   );
   const hasUnexplored =
     !!entries && entries.some((_, index) => index !== current && !visited.has(index));
-  const questMet = meetsQuest(here, quest);
 
   if (failed) return <p>The walk could not be loaded.</p>;
   if (!entries || !here || current === null)
@@ -180,6 +189,7 @@ export const ExploreWander: React.FC<{
               onClick={() => {
                 const next = entries.length > 1 ? (current + 1) % entries.length : current;
                 setExplored(new Set([next]));
+                setSteps(0);
                 moved.current = true;
                 setTrail([next]);
               }}
@@ -207,25 +217,14 @@ export const ExploreWander: React.FC<{
           </div>
         ) : null}
         {!hasUnexplored ? <Caption>You’ve explored every photograph in this walk.</Caption> : null}
-        <div className={styles.quest}>
-          {quest ? (
-            <p role="status">
-              {questMet ? "Found: " : "Find a photograph of "}
-              <strong>{readable(quest.tags[0])}</strong> and{" "}
-              <strong>{readable(quest.tags[1])}</strong>
-              {questMet ? ` in ${trail.length - 1} steps.` : "."}
-            </p>
-          ) : null}
-          <Button
-            variant="quiet"
-            onClick={() => {
-              setQuest(wanderQuest(entries));
-              if (trail.length > 1) setTrail([current]);
-            }}
+        {questLink ? (
+          <AppLink
+            className={[buttonStyles.base, buttonStyles.quiet].join(" ")}
+            href={`/fun/wander?${new URLSearchParams({ mode: "quest", play: "1", ...(wanderKey(here) ? { wander: wanderKey(here)! } : {}) })}`}
           >
-            {quest ? "Another quest" : "Give me a quest"}
-          </Button>
-        </div>
+            Give me a quest
+          </AppLink>
+        ) : null}
       </div>
       {trail.length > 1 ? (
         <ol className={styles.trail} aria-label="Your walk">

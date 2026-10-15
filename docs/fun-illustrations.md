@@ -466,3 +466,12 @@ magnifying glass diagonally across a line of matching bird photographs.
 Photo Hangman subject: a songbird perched beside a fan of seven photographic
 prints depicting birds and feathers, with an antique magnifying glass. The bird
 is the dominant subject, like an antique zoological plate. No gallows imagery.
+
+
+## Wander
+
+Built-in image generation. Transparent black ink; one pigeon exploring photographic stepping stones. Encoded at 960 × 640, AVIF quality 85, effort 6. Reviewed for cast consistency, clarity, absurdity and humour (8/10 each).
+
+Prompt:
+
+Use case: illustration-story. Asset type: transparent black-ink illustration for Wander, a playful photographic scavenger-hunt game in a coherent animal cast. One live character only: the established plump pigeon with a tiny cross-body postal satchel. The pigeon is absurdly dressed as a determined explorer, with a little pith helmet, enormous hiking boots and a comically oversized magnifying glass. It solemnly follows a short winding trail of clearly rectangular photographic prints laid on the ground as stepping stones, each print depicting a simple tree or mountain. The joke: the explorer pigeon walks laboriously in enormous boots along photographs of distant places, although its perfectly usable wings are tucked neatly behind its back. Pigeon peers intensely through the huge magnifying glass at a tiny photograph of a mountain directly beneath its feet; the full majestic mountain photo is banal but the bird treats it like a major discovery. Compact clear side-on silhouette, a few prints only, no clutter, no text, labels, readable lettering, arrows, speech bubbles, borders, signatures or watermark. Loose lively hand-drawn black pen-and-ink contours, expressive deadpan face and sparse fine cross-hatching, consistent with literary animal cartoons. Landscape 3:2 vignette, whole bird, boots, magnifying glass and trail visible with generous clear margins. BLACK ink only on genuine TRANSPARENT BACKGROUND and transparent uninked interiors. No white paper background, no opaque white fills, colour, large black filled areas or grey wash. Aim absurdity and humour 8+ through the self-defeating expedition.
