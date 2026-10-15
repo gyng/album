@@ -506,14 +506,18 @@ export const PhotoCrossword = ({ photos }: { photos: PhotoGamePhoto[] }) => {
                           : `Column ${columnLetter(index)}`
                       }
                     >
-                      <span className={styles.fullClue} aria-hidden="true">
-                        {showClue("column", index)
-                          ? crosswordClue(question)
-                          : `Column ${columnLetter(index)}`}
-                      </span>
-                      <span className={styles.shortClue} aria-hidden="true">
-                        {columnLetter(index)}
-                      </span>
+                      {showClue("column", index) ? (
+                        crosswordClue(question)
+                      ) : (
+                        <>
+                          <span className={styles.fullClue} aria-hidden="true">
+                            Column {columnLetter(index)}
+                          </span>
+                          <span className={styles.shortClue} aria-hidden="true">
+                            {columnLetter(index)}
+                          </span>
+                        </>
+                      )}
                     </th>
                   ))}
                 </tr>
@@ -525,12 +529,18 @@ export const PhotoCrossword = ({ photos }: { photos: PhotoGamePhoto[] }) => {
                       scope="row"
                       aria-label={showClue("row", row) ? crosswordClue(question) : `Row ${row + 1}`}
                     >
-                      <span className={styles.fullClue} aria-hidden="true">
-                        {showClue("row", row) ? crosswordClue(question) : `Row ${row + 1}`}
-                      </span>
-                      <span className={styles.shortClue} aria-hidden="true">
-                        {row + 1}
-                      </span>
+                      {showClue("row", row) ? (
+                        crosswordClue(question)
+                      ) : (
+                        <>
+                          <span className={styles.fullClue} aria-hidden="true">
+                            Row {row + 1}
+                          </span>
+                          <span className={styles.shortClue} aria-hidden="true">
+                            {row + 1}
+                          </span>
+                        </>
+                      )}
                     </th>
                     {puzzle.columns.map((column, col) => {
                       const index = row * size + col;

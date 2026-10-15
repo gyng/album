@@ -1,5 +1,7 @@
 import {
   dealJigsaw,
+  jigsawPieceEdges,
+  jigsawPiecePath,
   placeJigsawPiece,
   returnJigsawPiece,
   moveJigsaw,
@@ -70,4 +72,39 @@ it("places, displaces and returns pieces without losing any", () => {
   expect(jigsawSolved(state)).toBe(true);
   expect(state.pool).toEqual([]);
   expect(placeJigsawPiece(state, 0, 0)).toBe(state);
+});
+
+it.each([3, 4, 5])(
+  "cuts complementary internal edges and flat outer edges on a %i×%i jigsaw",
+  (size) => {
+    for (let piece = 0; piece < size * size; piece++) {
+      const [top, right, bottom, left] = jigsawPieceEdges(piece, size);
+      const row = Math.floor(piece / size),
+        column = piece % size;
+      if (row === 0) expect(top).toBe(0);
+      else expect(top).toBe(-jigsawPieceEdges(piece - size, size)[2]);
+      if (column === 0) expect(left).toBe(0);
+      else expect(left).toBe(-jigsawPieceEdges(piece - 1, size)[1]);
+      if (row === size - 1) expect(bottom).toBe(0);
+      else expect(Math.abs(bottom)).toBe(1);
+      if (column === size - 1) expect(right).toBe(0);
+      else expect(Math.abs(right)).toBe(1);
+      expect(jigsawPiecePath(piece, size)).toMatch(/^M/);
+      expect(jigsawPiecePath(piece, size)).toMatch(/Z$/);
+    }
+    expect(dealJigsaw(size, "jigsaw").pool).toHaveLength(size * size);
+  },
+);
+
+it.each([2, 6, 8, 10, 12, 20, 50])(
+  "deals a custom %i×%i shaped jigsaw without losing pieces",
+  (size) => {
+    const state = dealJigsaw(size, "jigsaw", () => 0.3);
+    expect(state.tiles).toHaveLength(size * size);
+    expect(new Set(state.pool).size).toBe(size * size);
+    expect(state.pool).toEqual(expect.arrayContaining([0, size * size - 1]));
+  },
+);
+it.each([1, 2.5, NaN, 51])("rejects unsupported jigsaw size %s", (size) => {
+  expect(() => dealJigsaw(size, "jigsaw")).toThrow();
 });

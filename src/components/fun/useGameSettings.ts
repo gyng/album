@@ -1,3 +1,4 @@
+import { isJigsawSize } from "../../util/photoJigsaw";
 import type { PhotoSearchSize, PhotoSearchLineLength } from "../../util/photoWordSearch";
 import type { HindsightSize, HindsightSpread } from "../../util/hindsight";
 import type { WarmerLevel } from "../../util/semanticGames";
@@ -7,10 +8,11 @@ import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 
 export type GameSettingsRegistry = {
   pairs: {
     mode: "visual" | "semantic";
+    matchSize: 2 | 3 | 4;
     pairs: 4 | 6 | 8 | 12 | 18 | 24;
     twist: "classic" | "glimpse" | "moving";
   };
-  jigsaw: { size: 3 | 4 | 5; mode: "pool" | "swap" | "rotate" | "slide" };
+  jigsaw: { size: number; mode: "jigsaw" | "pool" | "swap" | "rotate" | "slide" };
   cross: { mode: "visible" | "hidden"; prefill: 0 | 1 | 2 | 3 | 4; size: 3 | 4 | 5 };
   connections: {
     size: 4 | 5 | 6;
@@ -30,15 +32,15 @@ export type GameSettingsRegistry = {
 type Game = keyof GameSettingsRegistry;
 
 const defaults: GameSettingsRegistry = {
-  pairs: { mode: "visual", pairs: 6, twist: "classic" },
-  jigsaw: { size: 3, mode: "pool" },
+  pairs: { mode: "visual", matchSize: 2, pairs: 6, twist: "classic" },
+  jigsaw: { size: 3, mode: "jigsaw" },
   cross: { mode: "hidden", prefill: 0, size: 3 },
   connections: { size: 4, detail: "broad", hints: true, lives: null },
   sightLines: { size: 5, lineLength: 3 },
   doubleTake: { slower: false },
-  oracle: { mode: "discover" },
+  oracle: { mode: "mind" },
   guess: { region: "", timeLimit: null, rounds: 5 },
-  hindsight: { size: 5, spread: "years" },
+  hindsight: { size: 5, spread: "place" },
   warmer: { level: "normal" },
   caption: { mode: "single", words: null, banned: false },
 };
@@ -56,10 +58,11 @@ const validators: {
 } = {
   pairs: {
     mode: oneOf("visual", "semantic"),
+    matchSize: oneOf(2, 3, 4),
     pairs: oneOf(4, 6, 8, 12, 18, 24),
     twist: oneOf("classic", "glimpse", "moving"),
   },
-  jigsaw: { size: oneOf(3, 4, 5), mode: oneOf("pool", "swap", "rotate", "slide") },
+  jigsaw: { size: isJigsawSize, mode: oneOf("jigsaw", "pool", "swap", "rotate", "slide") },
   cross: {
     mode: oneOf("visible", "hidden"),
     prefill: oneOf(0, 1, 2, 3, 4),
@@ -80,7 +83,7 @@ const validators: {
     timeLimit: oneOf(null, 15, 30),
     rounds: oneOf(3, 5, 10),
   },
-  hindsight: { size: oneOf(4, 5, 6), spread: oneOf("years", "trip") },
+  hindsight: { size: oneOf(4, 5, 6), spread: oneOf("years", "trip", "place") },
   warmer: { level: oneOf("normal", "hard") },
   caption: {
     mode: oneOf("single", "lookalikes", "set"),
@@ -90,7 +93,7 @@ const validators: {
 };
 
 export const gameSettingsStorageKey = (game: Game): string =>
-  `snapshots-fun-settings-${game === "jigsaw" ? "v2" : "v1"}:${game}`;
+  `snapshots-fun-settings-${game === "jigsaw" ? "v3" : game === "oracle" || game === "hindsight" ? "v2" : "v1"}:${game}`;
 
 const validFields = <G extends Game>(game: G, value: unknown): Partial<GameSettingsRegistry[G]> => {
   const fields: Partial<GameSettingsRegistry[G]> = {};
@@ -127,14 +130,26 @@ export const useGameSettings = <G extends Game>(
     try {
       const raw = window.localStorage.getItem(gameSettingsStorageKey(game));
       if (raw) saved = JSON.parse(raw);
-      else if (game === "jigsaw") {
-        const legacy = window.localStorage.getItem("snapshots-fun-settings-v1:jigsaw");
+      else if (game === "jigsaw" || game === "oracle" || game === "hindsight") {
+        const previousJigsaw =
+          game === "jigsaw"
+            ? window.localStorage.getItem("snapshots-fun-settings-v2:jigsaw")
+            : null;
+        const legacy =
+          previousJigsaw ?? window.localStorage.getItem(`snapshots-fun-settings-v1:${game}`);
         if (legacy) {
           const previous: unknown = JSON.parse(legacy);
           if (previous && typeof previous === "object" && !Array.isArray(previous)) {
-            const value = previous as Record<string, unknown>;
-            // The old default was saved even without a deliberate choice.
-            saved = { ...value, mode: value.mode === "swap" ? "pool" : value.mode };
+            const value = { ...previous } as Record<string, unknown>;
+            // Previous defaults were saved even without a deliberate choice.
+            if (
+              game === "jigsaw" &&
+              (value.mode === "pool" || (!previousJigsaw && value.mode === "swap"))
+            )
+              value.mode = "jigsaw";
+            if (game === "oracle" && value.mode === "discover") value.mode = "mind";
+            if (game === "hindsight" && value.spread === "years") value.spread = "place";
+            saved = value;
           }
         }
       }

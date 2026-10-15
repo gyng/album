@@ -6,31 +6,38 @@ export type PairCard = { photo: PhotoGamePhoto; pair: number; subject?: string }
 export type PairsState = { open: number[]; matched: number[]; turns: number };
 export const initialPairsState = (): PairsState => ({ open: [], matched: [], turns: 0 });
 
-export const flipPairCard = (state: PairsState, index: number, cards: PairCard[]): PairsState => {
+export const flipPairCard = (
+  state: PairsState,
+  index: number,
+  cards: PairCard[],
+  matchSize: 2 | 3 | 4 = 2,
+): PairsState => {
   if (
     !cards[index] ||
-    state.open.length === 2 ||
+    state.open.length === matchSize ||
     state.open.includes(index) ||
     state.matched.includes(index)
   )
     return state;
-  const first = state.open[0];
-  if (first === undefined) return { ...state, open: [index] };
-  return cards[first]!.pair === cards[index]!.pair
-    ? { open: [], matched: [...state.matched, first, index], turns: state.turns + 1 }
-    : { ...state, open: [first, index], turns: state.turns + 1 };
+  const open = [...state.open, index];
+  if (open.length < matchSize) return { ...state, open };
+  return open.every((position) => cards[position]!.pair === cards[index]!.pair)
+    ? { open: [], matched: [...state.matched, ...open], turns: state.turns + 1 }
+    : { ...state, open, turns: state.turns + 1 };
 };
 
 const dot = (a: number[], b: number[]) => a.reduce((sum, v, i) => sum + v * b[i]!, 0);
 
-/** Two different photographs per pair; semantic boards use a distinct visible subject per pair. */
+/** Distinct photos per group; semantic boards use a different visible subject for each group. */
 export const buildPhotoPairs = (
   photos: PhotoGamePhoto[],
   count: number,
   mode: PairMode,
   random = Math.random,
+  matchSize: 2 | 3 | 4 = 2,
 ): PairCard[] | null => {
-  if (!Number.isInteger(count) || count < 2 || count > 24) return null;
+  if (!Number.isInteger(count) || count < 2 || count > 24 || ![2, 3, 4].includes(matchSize))
+    return null;
   const unique = [...new Map(photos.map((photo) => [photo.path, photo])).values()];
   const pairs: PairCard[] = [];
   const used = new Set<string>();
@@ -51,17 +58,17 @@ export const buildPhotoPairs = (
       );
       // Earlier pairs must not also belong to the next subject, or a cross-pair guess could be valid.
       if (
-        candidates.length < 2 ||
+        candidates.length < matchSize ||
         pairs.some((card) => photoSubjectClarity(card.photo, topic.pattern) !== null)
       )
         continue;
-      const pair = pairs.length / 2;
-      for (const photo of candidates.slice(0, 2)) {
+      const pair = pairs.length / matchSize;
+      for (const photo of candidates.slice(0, matchSize)) {
         used.add(photo.path);
         pairs.push({ photo, pair, subject: topic.answer });
       }
       chosen.push(topic.pattern);
-      if (pairs.length === count * 2) break;
+      if (pairs.length === count * matchSize) break;
     }
   } else {
     const vectors = unique.flatMap((photo) => {
@@ -79,6 +86,42 @@ export const buildPhotoPairs = (
       vectors.filter((item) => item.vector.length === dimension),
       random,
     );
+    if (matchSize > 2) {
+      const groups: Array<{ members: typeof pool; affinity: number }> = [];
+      for (const anchor of pool) {
+        if (used.has(anchor.photo.path)) continue;
+        const others = pool
+          .filter((item) => item !== anchor && !used.has(item.photo.path))
+          .sort((a, b) => dot(anchor.vector, b.vector) - dot(anchor.vector, a.vector));
+        const members = [anchor, ...others.slice(0, matchSize - 1)];
+        if (members.length !== matchSize) continue;
+        const affinity = Math.min(
+          ...members.flatMap((item, i) =>
+            members.slice(i + 1).map((other) => dot(item.vector, other.vector)),
+          ),
+        );
+        if (
+          affinity < 0.4 ||
+          groups.some((group) =>
+            members.some((item) =>
+              group.members.some(
+                (other) =>
+                  dot(item.vector, other.vector) >= Math.min(affinity, group.affinity) - 0.0001,
+              ),
+            ),
+          )
+        )
+          continue;
+        const pair = groups.length;
+        for (const item of members) {
+          used.add(item.photo.path);
+          pairs.push({ photo: item.photo, pair });
+        }
+        groups.push({ members, affinity });
+        if (groups.length === count) break;
+      }
+      return pairs.length === count * matchSize ? shuffleGamePhotos(pairs, random) : null;
+    }
     const dealtVectors: number[][] = [];
     for (const anchor of pool) {
       if (used.has(anchor.photo.path)) continue;
@@ -112,16 +155,16 @@ export const buildPhotoPairs = (
         )
       )
         continue;
-      const pair = pairs.length / 2;
+      const pair = pairs.length / matchSize;
       for (const photo of [anchor.photo, best.photo]) {
         used.add(photo.path);
         pairs.push({ photo, pair });
       }
       dealtVectors.push(anchor.vector, best.vector);
-      if (pairs.length === count * 2) break;
+      if (pairs.length === count * matchSize) break;
     }
   }
-  return pairs.length === count * 2 ? shuffleGamePhotos(pairs, random) : null;
+  return pairs.length === count * matchSize ? shuffleGamePhotos(pairs, random) : null;
 };
 
 /** Keep solved cards fixed while the remaining identities move to new positions. */

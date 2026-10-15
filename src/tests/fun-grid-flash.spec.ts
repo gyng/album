@@ -115,6 +115,10 @@ test("Cross Exposure keeps its whole mobile grid visible and reveals the clue ke
   for (let hint = 0; hint < 6; hint++)
     await page.getByRole("button", { name: "Hint", exact: true }).click();
   await expect(board.getByRole("columnheader").first()).not.toHaveAccessibleName("Column A");
+  for (const header of await board.locator("th").all()) {
+    await expect(header).toHaveText((await header.getAttribute("aria-label"))!);
+    await expect(header).toBeVisible();
+  }
   const geometry = await board.evaluate((element) => ({
     width: element.clientWidth,
     content: element.scrollWidth,

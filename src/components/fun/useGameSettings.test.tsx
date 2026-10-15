@@ -119,7 +119,7 @@ it("keeps controls working when both reading and writing storage are blocked", (
     throw new Error("blocked");
   });
   const { result } = renderHook(() => useGameSettings("oracle"));
-  expect(result.current[0]).toEqual({ mode: "discover" });
+  expect(result.current[0]).toEqual({ mode: "mind" });
   act(() => result.current[1]({ mode: "discover" }));
   expect(result.current[0]).toEqual({ mode: "discover" });
 });
@@ -153,7 +153,18 @@ it("starts new jigsaws in the piece-pool mode and migrates the old default", () 
     JSON.stringify({ size: 4, mode: "swap" }),
   );
   const { result } = renderHook(() => useGameSettings("jigsaw"));
-  expect(result.current[0]).toEqual({ size: 4, mode: "pool" });
+  expect(result.current[0]).toEqual({ size: 4, mode: "jigsaw" });
   act(() => result.current[1]({ ...result.current[0], mode: "swap" }));
   expect(JSON.parse(localStorage.getItem(gameSettingsStorageKey("jigsaw"))!).mode).toBe("swap");
+});
+
+it("updates the old Oracle default and retains a subsequent discovery choice", () => {
+  localStorage.setItem("snapshots-fun-settings-v1:oracle", JSON.stringify({ mode: "discover" }));
+  const first = renderHook(() => useGameSettings("oracle"));
+  expect(first.result.current[0]).toEqual({ mode: "mind" });
+  act(() => first.result.current[1]({ mode: "discover" }));
+  first.unmount();
+  expect(renderHook(() => useGameSettings("oracle")).result.current[0]).toEqual({
+    mode: "discover",
+  });
 });

@@ -1,5 +1,13 @@
 import { shuffleGamePhotos } from "./photoGames";
-export type JigsawMode = "pool" | "swap" | "rotate" | "slide";
+export const JIGSAW_MIN_SIZE = 2;
+export const JIGSAW_MAX_SIZE = 50;
+export const isJigsawSize = (size: unknown): size is number =>
+  typeof size === "number" &&
+  Number.isInteger(size) &&
+  size >= JIGSAW_MIN_SIZE &&
+  size <= JIGSAW_MAX_SIZE;
+
+export type JigsawMode = "jigsaw" | "pool" | "swap" | "rotate" | "slide";
 export type JigsawState = { tiles: number[]; turns: number[]; moves: number; pool?: number[] };
 export const jigsawSolved = (state: JigsawState): boolean =>
   state.tiles.length > 0 &&
@@ -80,13 +88,13 @@ export const rotateJigsaw = (state: JigsawState, index: number): JigsawState =>
         turns: state.turns.map((v, i) => (i === index ? (v + 1) % 4 : v)),
       };
 export const dealJigsaw = (size: number, mode: JigsawMode, random = Math.random): JigsawState => {
-  if (size !== 3 && size !== 4 && size !== 5) throw new Error("Unsupported jigsaw size");
+  if (!isJigsawSize(size)) throw new Error("Unsupported jigsaw size");
   let state: JigsawState = {
     tiles: Array.from({ length: size * size }, (_, i) => i),
     turns: Array<number>(size * size).fill(0),
     moves: 0,
   };
-  if (mode === "pool")
+  if (mode === "pool" || mode === "jigsaw")
     return {
       ...state,
       tiles: Array<number>(size * size).fill(-1),
@@ -116,4 +124,44 @@ export const dealJigsaw = (size: number, mode: JigsawMode, random = Math.random)
     if (jigsawSolved(state)) [state.tiles[0], state.tiles[1]] = [state.tiles[1]!, state.tiles[0]!];
   }
   return { ...state, moves: 0 };
+};
+
+/** Clockwise edges: 0 is flat, 1 a tab, -1 a socket. Shared cuts are exact opposites. */
+export const jigsawPieceEdges = (piece: number, size: number): [number, number, number, number] => {
+  const row = Math.floor(piece / size),
+    column = piece % size;
+  const cut = (r: number, c: number) => ((r * 17 + c * 31 + r * c * 7) % 3 === 0 ? 1 : -1);
+  return [
+    row === 0 ? 0 : -cut(row, column),
+    column === size - 1 ? 0 : cut(row, column + 1),
+    row === size - 1 ? 0 : cut(row + 1, column),
+    column === 0 ? 0 : -cut(row, column),
+  ];
+};
+
+/** A 100×100 piece with rounded tabs extending at most 22 units beyond its cell. */
+export const jigsawPiecePath = (piece: number, size: number): string => {
+  const edges = jigsawPieceEdges(piece, size);
+  const point = (side: number, x: number, y: number) => {
+    const p =
+      side === 0
+        ? [x, -y]
+        : side === 1
+          ? [100 + y, x]
+          : side === 2
+            ? [100 - x, 100 + y]
+            : [-y, 100 - x];
+    return p.join(" ");
+  };
+  return (
+    "M 0 0 " +
+    edges
+      .map((edge, side) => {
+        if (!edge) return `L ${point(side, 100, 0)}`;
+        const p = (x: number, y: number) => point(side, x, y * edge);
+        return `L ${p(32, 0)} C ${p(42, 0)} ${p(42, 4)} ${p(38, 8)} C ${p(25, 28)} ${p(75, 28)} ${p(62, 8)} C ${p(58, 4)} ${p(58, 0)} ${p(68, 0)} L ${p(100, 0)}`;
+      })
+      .join(" ") +
+    " Z"
+  );
 };

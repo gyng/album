@@ -1,4 +1,9 @@
 .reference {
+  display: grid;
+  gap: var(--space-3);
+  min-inline-size: 0;
+}
+.miniChain {
   display: none;
 }
 
@@ -138,8 +143,17 @@
     max-block-size: clamp(6rem, 22dvh, 12rem);
   }
 
+  .board {
+    grid-row: 1 / span 2;
+  }
+  .reference {
+    grid-column: 2;
+    grid-row: 1;
+  }
   .tray {
-    max-block-size: max(16rem, calc(100dvh - 28rem));
+    grid-column: 2;
+    grid-row: 2;
+    max-block-size: max(16rem, calc(100dvh - 32rem));
     overflow-y: auto;
     overscroll-behavior: contain;
     scrollbar-gutter: stable;
@@ -199,4 +213,37 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: var(--space-2);
   }
+}
+
+.trayHeading {
+  display: grid;
+  gap: var(--space-2);
+}
+.linkPhoto {
+  display: block;
+  inline-size: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+.linkPhoto[aria-pressed="true"] {
+  outline: var(--focus-ring);
+  outline-offset: calc(-1 * var(--line-strong));
+}
+.linkPhoto:focus-visible {
+  outline: var(--focus-ring);
+}
+.slots li[data-current="true"] {
+  border-color: var(--c-accent);
+  background: var(--c-selected);
+}
+.emptySlot {
+  display: grid;
+  gap: var(--space-1);
+  text-align: center;
+  font-size: var(--fs-l);
+}
+.emptySlot small {
+  font-size: var(--fs-s);
 }

@@ -182,3 +182,19 @@
     animation: none;
   }
 }
+
+.review {
+  display: grid;
+  gap: var(--space-4);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.reviewPair {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: var(--line-hairline) solid var(--c-border);
+  border-radius: var(--radius-panel);
+  background: var(--c-surface);
+}

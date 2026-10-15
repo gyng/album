@@ -26,6 +26,7 @@ export const PhotoRelay = ({ photos }: { photos: PhotoGamePhoto[] }) => {
   const { loading } = useGameReadiness();
   const { stats, record } = useGameStats("relay");
   const [puzzle, setPuzzle] = useState<RelayPuzzle | null>(null);
+  const [replaceSlot, setReplaceSlot] = useState<number | null>(null);
   const [order, setOrder] = useState<PhotoGamePhoto[]>([]);
   const [finished, setFinished] = useState(false);
   const [gaveUp, setGaveUp] = useState(false);
@@ -86,6 +87,7 @@ export const PhotoRelay = ({ photos }: { photos: PhotoGamePhoto[] }) => {
     setError(next ? null : "There aren't enough comparable photographs for a relay.");
     setPuzzle(next);
     setOrder([]);
+    setReplaceSlot(null);
     setFinished(false);
     setGaveUp(false);
     cancelDrag();
@@ -183,6 +185,9 @@ export const PhotoRelay = ({ photos }: { photos: PhotoGamePhoto[] }) => {
                   <li
                     key={index}
                     data-filled={!!order[index]}
+                    data-current={
+                      replaceSlot === index || (replaceSlot === null && index === order.length)
+                    }
                     data-drop-active={!!dragged}
                     data-drop-hover={dropTarget === index}
                     data-dragging={order[index]?.path === dragged}
@@ -210,19 +215,27 @@ export const PhotoRelay = ({ photos }: { photos: PhotoGamePhoto[] }) => {
                       const next = order.filter((item) => item.path !== path);
                       next.splice(landingSlot(index), 0, photo);
                       setOrder(next);
+                      setReplaceSlot(null);
                     }}
                   >
                     {order[index] ? (
-                      <div
-                        className={styles.dragFrame}
+                      <button
+                        type="button"
+                        className={[styles.dragFrame, relayStyles.linkPhoto].join(" ")}
+                        aria-label={`Replace link ${index + 1}`}
+                        aria-pressed={replaceSlot === index}
+                        onClick={() => setReplaceSlot(replaceSlot === index ? null : index)}
                         draggable
                         onDragStart={(event) => beginDrag(event, order[index]!.path)}
                         onDragEnd={cancelDrag}
                       >
                         <GamePhoto photo={order[index]!} />
-                      </div>
+                      </button>
                     ) : (
-                      <span>{index + 1}</span>
+                      <span className={relayStyles.emptySlot}>
+                        {index + 1}
+                        {index === order.length ? <small>Next link</small> : null}
+                      </span>
                     )}
                     {order[index] ? (
                       <div className={[styles.slotActions, relayStyles.slotActions].join(" ")}>
@@ -247,6 +260,7 @@ export const PhotoRelay = ({ photos }: { photos: PhotoGamePhoto[] }) => {
                           onClick={(event) => {
                             if (event.detail === 0)
                               requestedFocus.current = { path: order[index]!.path };
+                            setReplaceSlot(null);
                             setOrder(order.filter((_, position) => position !== index));
                           }}
                         >
@@ -313,8 +327,51 @@ export const PhotoRelay = ({ photos }: { photos: PhotoGamePhoto[] }) => {
                   Edit links
                 </Button>
               </div>
+              <div className={styles.actions}>
+                <Button
+                  ref={finishRef}
+                  variant="primary"
+                  disabled={order.length !== 5}
+                  onClick={() => finish(false)}
+                >
+                  Finish relay
+                  <KeyHint aria-hidden="true">Enter</KeyHint>
+                </Button>
+                <Button
+                  onClick={(event) => {
+                    const previous = order.at(-1);
+                    if (event.detail === 0 && previous)
+                      requestedFocus.current = { path: previous.path };
+                    setReplaceSlot(null);
+                    setOrder(order.slice(0, -1));
+                  }}
+                  disabled={!order.length}
+                >
+                  Undo last link
+                </Button>
+                <Button variant="quiet" onClick={() => finish(true)}>
+                  Give up
+                  <KeyHint aria-hidden="true">G</KeyHint>
+                </Button>
+              </div>{" "}
             </GameDock>
             <div className={relayStyles.tray}>
+              <div className={relayStyles.trayHeading}>
+                <Heading level={2}>
+                  {replaceSlot !== null
+                    ? `Replace link ${replaceSlot + 1}`
+                    : order.length < 5
+                      ? `Choose link ${order.length + 1}`
+                      : "Your chain is ready"}
+                </Heading>
+                <Caption>
+                  {replaceSlot !== null
+                    ? "Choose an unused photograph."
+                    : order.length < 5
+                      ? "Connect the previous photograph to the finish."
+                      : "Reorder links, or finish the relay."}
+                </Caption>
+              </div>
               <div className={[styles.choices, relayStyles.choices].join(" ")}>
                 {puzzle.tiles.map((photo, index) => {
                   const position = order.findIndex((item) => item.path === photo.path);
@@ -334,7 +391,11 @@ export const PhotoRelay = ({ photos }: { photos: PhotoGamePhoto[] }) => {
                       onDragEnd={cancelDrag}
                       disabled={position >= 0}
                       onClick={(event) => {
-                        const next = [...order, photo];
+                        const next = [...order];
+                        if (replaceSlot !== null && replaceSlot < next.length)
+                          next[replaceSlot] = photo;
+                        else next.push(photo);
+                        setReplaceSlot(null);
                         if (event.detail === 0) {
                           const available = puzzle.tiles.find(
                             (tile) => !next.some((item) => item.path === tile.path),
@@ -355,32 +416,6 @@ export const PhotoRelay = ({ photos }: { photos: PhotoGamePhoto[] }) => {
                 })}
               </div>
             </div>
-          </div>
-          <div className={styles.actions}>
-            <Button
-              ref={finishRef}
-              variant="primary"
-              disabled={order.length !== 5}
-              onClick={() => finish(false)}
-            >
-              Finish relay
-              <KeyHint aria-hidden="true">Enter</KeyHint>
-            </Button>
-            <Button
-              onClick={(event) => {
-                const previous = order.at(-1);
-                if (event.detail === 0 && previous)
-                  requestedFocus.current = { path: previous.path };
-                setOrder(order.slice(0, -1));
-              }}
-              disabled={!order.length}
-            >
-              Undo last link
-            </Button>
-            <Button variant="quiet" onClick={() => finish(true)}>
-              Give up
-              <KeyHint aria-hidden="true">G</KeyHint>
-            </Button>
           </div>
         </>
       ) : (

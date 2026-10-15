@@ -69,9 +69,10 @@ it("returns keyboard players from the photo tray to the editable links", () => {
   fireEvent.click(screen.getByRole("button", { name: "Start relay" }));
   fireEvent.click(trayChoice(1));
   const remove = screen.getByRole("button", { name: "Remove link 1" });
-  remove.scrollIntoView = jest.fn();
+  const edit = screen.getByRole("button", { name: "Replace link 1" });
+  edit.scrollIntoView = jest.fn();
   fireEvent.click(screen.getByRole("button", { name: "Edit links" }));
-  expect(remove).toHaveFocus();
+  expect(edit).toHaveFocus();
   fireEvent.click(remove);
   expect(screen.getByRole("status")).toHaveTextContent("0 of 5");
 });
@@ -232,4 +233,22 @@ it("offers a search for photographs like the relay's start", () => {
     .getAttribute("href")!;
   const similar = new URL(href, "https://example.org").searchParams.get("similar")!;
   expect(start).toContain(similar.split("/").at(-1));
+});
+
+it("lets a player target a placed link and replace it without rebuilding the chain", () => {
+  render(<PhotoRelay photos={photos} />);
+  fireEvent.click(screen.getByRole("button", { name: "Start relay" }));
+  fireEvent.click(trayChoice(1));
+  fireEvent.click(trayChoice(2));
+  fireEvent.click(screen.getByRole("button", { name: "Replace link 1" }));
+  expect(screen.getByRole("button", { name: "Replace link 1" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  const replacement = within(trayChoice(3)).getByRole("img").getAttribute("src");
+  fireEvent.click(trayChoice(3));
+  const links = screen.getByRole("list", { name: "Your relay links" });
+  expect(within(links).getAllByRole("img")[0]).toHaveAttribute("src", replacement);
+  expect(screen.getByRole("status")).toHaveTextContent("2 of 5");
+  expect(trayChoice(1)).toBeEnabled();
 });

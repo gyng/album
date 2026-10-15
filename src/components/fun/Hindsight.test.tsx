@@ -29,6 +29,7 @@ const placeAll = (sort: (a: number, b: number) => number) => {
 };
 const start = async () => {
   await act(async () => {});
+  fireEvent.click(screen.getByRole("button", { name: "Across the years" }));
   fireEvent.click(screen.getByRole("button", { name: /^Start/ }));
 };
 
@@ -111,6 +112,7 @@ it("deals from the chosen size and spread", async () => {
   render(<Hindsight photos={photos} />);
   await act(async () => {});
   fireEvent.click(screen.getByRole("button", { name: "6" }));
+  fireEvent.click(screen.getByRole("button", { name: "Across the years" }));
   fireEvent.click(screen.getByRole("button", { name: /^Start/ }));
   expect(tray()).toHaveLength(6);
   fireEvent.click(screen.getByRole("button", { name: "Change settings" }));
@@ -189,4 +191,19 @@ it("places by drag and drop into the next free slot and between slots", async ()
   expect(screen.getByRole("status")).toHaveTextContent("2 of 5 placed");
   expect(yearOf(slots()[0]!)).toBe(yearOf(second!));
   expect(yearOf(slots()[1]!)).toBe(yearOf(first!));
+});
+
+it("defaults to ordering different shots of one place", async () => {
+  const located = photos.map((photo) => ({
+    ...photo,
+    location: { lat: 1.3, lng: 103.8, date: photo.takenAt!, label: "Same place" },
+  }));
+  render(<Hindsight photos={located} />);
+  await act(async () => {});
+  expect(screen.getByRole("button", { name: "Same place, different shot" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  fireEvent.click(screen.getByRole("button", { name: /^Start/ }));
+  expect(tray()).toHaveLength(5);
 });

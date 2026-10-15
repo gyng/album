@@ -28,6 +28,7 @@ const choose = (name: string, count: number) =>
 it("checks groups, avoids charging twice for the same mistake and reveals all connections", () => {
   render(<PhotoConnections photos={photos} />);
   fireEvent.click(screen.getByRole("button", { name: "Start connecting" }));
+  fireEvent.click(screen.getByRole("button", { name: "Auto check" }));
   choose("A cat", 2);
   choose("A lake", 2);
   fireEvent.click(screen.getByRole("button", { name: "Check connection" }));
@@ -50,6 +51,7 @@ it("ends after four different mistakes and reveals the groups", () => {
   render(<PhotoConnections photos={photos} />);
   fireEvent.click(screen.getByRole("button", { name: "4 lives" }));
   fireEvent.click(screen.getByRole("button", { name: "Start connecting" }));
+  fireEvent.click(screen.getByRole("button", { name: "Auto check" }));
   const cats = screen.getAllByRole("img", { name: "A cat" });
   const boats = screen.getAllByRole("img", { name: "A lake" });
   for (let i = 0; i < 4; i++) {
@@ -77,6 +79,7 @@ it("lets players choose a six-by-six board and reveals all six groups", () => {
   render(<PhotoConnections photos={archive} />);
   fireEvent.click(screen.getByRole("button", { name: "6×6" }));
   fireEvent.click(screen.getByRole("button", { name: "Start connecting" }));
+  fireEvent.click(screen.getByRole("button", { name: "Auto check" }));
   expect(
     within(screen.getByRole("group", { name: "Photographs" })).getAllByRole("button"),
   ).toHaveLength(36);
@@ -113,6 +116,7 @@ it("restores lobby preferences after remount without restoring an active round",
 it("keeps active selection controls together and removes the dock from the results", () => {
   render(<PhotoConnections photos={photos} />);
   fireEvent.click(screen.getByRole("button", { name: "Start connecting" }));
+  fireEvent.click(screen.getByRole("button", { name: "Auto check" }));
   const controls = screen.getByRole("group", { name: "Connection controls" });
   expect(within(controls).getByRole("button", { name: "Check connection" })).toBeDisabled();
   choose("A cat", 4);
@@ -164,6 +168,7 @@ it.each([6, 8])("ends at the selected %i-life budget", (lives) => {
   render(<PhotoConnections photos={photos} />);
   fireEvent.click(screen.getByRole("button", { name: `${lives} lives` }));
   fireEvent.click(screen.getByRole("button", { name: "Start connecting" }));
+  fireEvent.click(screen.getByRole("button", { name: "Auto check" }));
   makeMistakes(lives - 1);
   expect(screen.queryByRole("region", { name: "Connections result" })).toBeNull();
   fireEvent.keyDown(document.body, { key: "Escape" });
@@ -181,6 +186,7 @@ it.each([6, 8])("ends at the selected %i-life budget", (lives) => {
 it("names tiles by their photographs and keeps focus on the board", () => {
   render(<PhotoConnections photos={photos} />);
   fireEvent.click(screen.getByRole("button", { name: "Start connecting" }));
+  fireEvent.click(screen.getByRole("button", { name: "Auto check" }));
   const board = screen.getByRole("group", { name: "Photographs" });
   expect(board).toHaveFocus();
   expect(within(board).getAllByRole("button", { name: "A cat" })).toHaveLength(4);
@@ -210,6 +216,7 @@ it("keeps focused tiles clear of the sticky dock on small screens", () => {
   try {
     const { container } = render(<PhotoConnections photos={photos} />);
     fireEvent.click(screen.getByRole("button", { name: "Start connecting" }));
+    fireEvent.click(screen.getByRole("button", { name: "Auto check" }));
     expect(
       (container.firstElementChild as HTMLElement).style.getPropertyValue(
         "--connections-dock-height",
@@ -276,6 +283,7 @@ describe("daily", () => {
       </StrictMode>,
     );
     fireEvent.click(screen.getByRole("button", { name: "Start connecting" }));
+    fireEvent.click(screen.getByRole("button", { name: "Auto check" }));
     choose("A cat", 4);
     fireEvent.click(screen.getByRole("button", { name: "Check connection" }));
     fireEvent.click(screen.getByRole("button", { name: "Give up" }));
@@ -330,4 +338,38 @@ describe("daily", () => {
     expect(screen.queryByRole("group", { name: "Photographs" })).toBeNull();
     expect(screen.getByText(`${dailyName} · 4×4 · No mistakes`)).toBeTruthy();
   });
+});
+
+it("automatically checks a full selection by default and can switch to manual checking", () => {
+  render(<PhotoConnections photos={photos} />);
+  fireEvent.click(screen.getByRole("button", { name: "Start connecting" }));
+  const toggle = screen.getByRole("button", { name: "Auto check" });
+  expect(toggle).toHaveAttribute("aria-pressed", "true");
+  choose("A cat", 3);
+  expect(screen.queryByRole("region", { name: "Animals" })).toBeNull();
+  const board = screen.getByRole("group", { name: "Photographs" });
+  fireEvent.click(within(board).getAllByRole("button", { name: "A cat" })[3]!);
+  expect(screen.getByRole("region", { name: "Animals" })).toBeTruthy();
+  fireEvent.click(toggle);
+  choose("A lake", 4);
+  expect(within(board).getAllByRole("button")).toHaveLength(12);
+  expect(screen.getByRole("button", { name: "Check connection" })).toBeEnabled();
+  fireEvent.click(screen.getByRole("button", { name: "Check connection" }));
+  expect(within(board).getAllByRole("button")).toHaveLength(8);
+});
+it("auto-checks mistakes once, permits correcting them and checks a full selection when enabled", () => {
+  render(<PhotoConnections photos={photos} />);
+  fireEvent.click(screen.getByRole("button", { name: "Start connecting" }));
+  choose("A cat", 2);
+  choose("A lake", 2);
+  expect(screen.getByText("1 mistake · Unlimited lives")).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "Check connection" }));
+  expect(screen.getByText("1 mistake · Unlimited lives")).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "Deselect" }));
+  const toggle = screen.getByRole("button", { name: "Auto check" });
+  fireEvent.click(toggle);
+  choose("A cat", 4);
+  expect(screen.queryByRole("region", { name: "Animals" })).toBeNull();
+  fireEvent.click(toggle);
+  expect(screen.getByRole("region", { name: "Animals" })).toBeTruthy();
 });

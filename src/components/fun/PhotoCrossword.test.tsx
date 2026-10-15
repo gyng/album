@@ -91,10 +91,10 @@ it("offers hidden connections and fixed shots, preserves them when clearing, and
   expect(screen.getAllByRole("button", { name: /fixed starting photograph/ })).toHaveLength(4);
   fireEvent.click(screen.getByRole("button", { name: "Hint" }));
   fireEvent.click(screen.getByRole("button", { name: "Hint" }));
-  expect(screen.getByRole("columnheader", { name: "scarlet" })).toBeTruthy();
+  expect(screen.getByRole("columnheader", { name: "scarlet" })).toHaveTextContent(/^scarlet$/);
   fireEvent.click(screen.getByRole("button", { name: "Give up" }));
   expect(screen.getByRole("region", { name: "Cross Exposure result" })).toHaveFocus();
-  expect(screen.getByRole("rowheader", { name: "round" })).toBeTruthy();
+  expect(screen.getByRole("rowheader", { name: "round" })).toHaveTextContent(/^round$/);
 });
 
 it("starts hidden boards empty by default and offers exact additional fixed-photo counts", () => {
@@ -239,7 +239,7 @@ it("reveals one unique clue per hint without exposing other headers, cells or cl
   ).toBeNull();
   expect(screen.getByRole("status")).toHaveTextContent("5 clues still hidden");
   fireEvent.click(screen.getByRole("button", { name: "Hint" }));
-  expect(screen.getByRole("columnheader", { name: "scarlet" })).toBeTruthy();
+  expect(screen.getByRole("columnheader", { name: "scarlet" })).toHaveTextContent(/^scarlet$/);
   expect(
     within(screen.getByRole("region", { name: "Row clues" })).getAllByRole("listitem"),
   ).toHaveLength(1);
@@ -357,7 +357,7 @@ it("supports start, hints, cancellation, checking and give up shortcuts", () => 
   fireEvent.keyDown(window, { key: "n" });
   expect(screen.getByRole("table")).toBeTruthy();
   fireEvent.keyDown(window, { key: "h" });
-  expect(screen.getByRole("rowheader", { name: "round" })).toBeTruthy();
+  expect(screen.getByRole("rowheader", { name: "round" })).toHaveTextContent(/^round$/);
   const tile = screen.getByRole("button", { name: "Select photograph 1" });
   fireEvent.click(tile);
   fireEvent.keyDown(window, { key: "Escape" });

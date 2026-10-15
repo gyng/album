@@ -126,3 +126,41 @@
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
+
+.shape {
+  position: absolute;
+  inset: -24%;
+  inline-size: 148%;
+  block-size: 148%;
+  pointer-events: none;
+}
+.shapedTile {
+  overflow: visible;
+  border: 0;
+  background: transparent;
+}
+.shapedTile[data-empty="true"] {
+  border: 0;
+  background: transparent;
+}
+.shapedTile[data-empty="true"] .shape {
+  opacity: 0.35;
+}
+.shapedPoolPiece,
+.shapedDrag {
+  overflow: visible;
+  border: 0;
+  background: transparent;
+}
+.shapedPoolPiece .shape,
+.shapedDrag .shape {
+  inset: 0;
+  inline-size: 100%;
+  block-size: 100%;
+}
+
+.customSize {
+  display: grid;
+  gap: var(--space-2);
+  max-inline-size: 12rem;
+}

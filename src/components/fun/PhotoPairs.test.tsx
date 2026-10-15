@@ -76,6 +76,34 @@ it.each([
     expect(within(board).getAllByRole("button")).toHaveLength(pairs * 2);
     expect(within(board).queryAllByLabelText("Empty centre square")).toHaveLength(blanks);
     if (blanks) expect(board.children[pairs]).toHaveAttribute("aria-label", "Empty centre square");
-    expect(buildPhotoPairs).toHaveBeenCalledWith(photos, pairs, "visual");
+    expect(buildPhotoPairs).toHaveBeenCalledWith(photos, pairs, "visual", Math.random, 2);
+  },
+);
+
+it.each([3, 4] as const)(
+  "checks all %i selected photographs together and completes the board",
+  (matchSize) => {
+    jest.mocked(buildPhotoPairs).mockImplementation((_photos, count) =>
+      Array.from({ length: count * matchSize }, (_, i) => ({
+        photo: { ...photos[0]!, path: `multi-${i}`, caption: `Photo ${i}` },
+        pair: Math.floor(i / matchSize),
+      })),
+    );
+    render(<PhotoPairs photos={photos} />);
+    expect(screen.getByRole("radio", { name: "Match 2" })).toHaveAttribute("aria-checked", "true");
+    fireEvent.click(screen.getByRole("radio", { name: `Match ${matchSize}` }));
+    fireEvent.click(screen.getByRole("button", { name: "Start matching" }));
+    const board = screen.getByLabelText("Matching cards");
+    const cards = within(board).getAllByRole("button");
+    expect(cards).toHaveLength(12);
+    for (let i = 0; i < matchSize - 1; i++) fireEvent.click(cards[i]!);
+    expect(screen.getByRole("status")).toHaveTextContent(`Choose ${matchSize} cards`);
+    fireEvent.click(cards[matchSize - 1]!);
+    expect(cards[0]).toHaveAccessibleName(/matched/);
+    for (let i = matchSize; i < cards.length; i++) fireEvent.click(cards[i]!);
+    expect(screen.getByRole("status")).toHaveTextContent(
+      `All matches found in ${12 / matchSize} turns.`,
+    );
+    expect(within(board).getAllByRole("link")).toHaveLength(12);
   },
 );

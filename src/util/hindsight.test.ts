@@ -167,3 +167,39 @@ describe("formatHindsightGap", () => {
     expect(formatHindsightGap(gap)).toBe(label);
   });
 });
+
+it("deals same-place shots with usable locations, distinct times and a pairwise 75-metre limit", () => {
+  const source = Array.from({ length: 8 }, (_, i) => ({
+    ...photo(`trip-${i}`, `place-${i}`, `2020-01-${String(i + 1).padStart(2, "0")}T12:00:00`),
+    location: {
+      lat: 1.3,
+      lng: 103.8 + i * 0.00003,
+      date: "2020-01-01T12:00:00",
+      label: "One place",
+    },
+  }));
+  const puzzle = buildHindsightPuzzle(source, { size: 5, spread: "place" }, seededRandom("place"))!;
+  expect(puzzle.hand).toHaveLength(5);
+  expect(puzzle.spread).toBe("place");
+  expect(puzzle.solution.map((item) => item.time)).toEqual(
+    puzzle.solution.map((item) => item.time).toSorted((a, b) => a - b),
+  );
+  expect(
+    buildHindsightPuzzle(
+      source.map((item, i) => ({ ...item, location: { ...item.location, lat: i } })),
+      { size: 5, spread: "place" },
+    ),
+  ).toBeNull();
+  expect(
+    buildHindsightPuzzle(
+      source.map((item) => ({ ...item, location: { ...item.location, lat: NaN } })),
+      { size: 5, spread: "place" },
+    ),
+  ).toBeNull();
+  expect(
+    buildHindsightPuzzle(
+      source.map((item) => ({ ...item, takenAt: "2020-01-01T12:00:00" })),
+      { size: 5, spread: "place" },
+    ),
+  ).toBeNull();
+});

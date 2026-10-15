@@ -66,6 +66,25 @@ const preload = (src: string, signal: AbortSignal): Promise<void> =>
     image.src = src;
   });
 
+const pairDistance = (pair: DoubleTakePair) =>
+  pair.distanceMetres < 1000
+    ? `${Math.round(pair.distanceMetres)} metres apart`
+    : `${(pair.distanceMetres / 1000).toFixed(1)} km apart`;
+
+const PairPhotos = ({ pair }: { pair: DoubleTakePair }) => (
+  <div className={styles.reveal}>
+    {pair.photos.map((photo) => (
+      <figure key={photo.path}>
+        <GamePhoto photo={photo} link />
+        <figcaption>
+          {photo.location?.label || "Recorded location"}
+          <Caption>{exifDayKey(photo.location!.date)}</Caption>
+        </figcaption>
+      </figure>
+    ))}
+  </div>
+);
+
 export const DoubleTake = ({ photos }: { photos: PhotoGamePhoto[] }) => {
   const [deck, setDeck] = useState<DoubleTakePair[]>([]);
   const [round, setRound] = useState(0);
@@ -78,6 +97,9 @@ export const DoubleTake = ({ photos }: { photos: PhotoGamePhoto[] }) => {
   const [streak, setStreak] = useState(0);
   const [score, setScore] = useState(0);
   const [correctCount, setCorrectCount] = useState(0);
+  const [results, setResults] = useState<
+    Array<{ answer: boolean | null; points: number; replayed: boolean }>
+  >([]);
   const [answer, setAnswer] = useState<boolean | null>(null);
   const [points, setPoints] = useState(0);
   const [message, setMessage] = useState("");
@@ -170,6 +192,7 @@ export const DoubleTake = ({ photos }: { photos: PhotoGamePhoto[] }) => {
     setScore(0);
     setStreak(0);
     setCorrectCount(0);
+    setResults([]);
     setAnswer(null);
     setPoints(0);
     setReplayed(false);
@@ -185,6 +208,7 @@ export const DoubleTake = ({ photos }: { photos: PhotoGamePhoto[] }) => {
     if (!pair || phase === "reveal" || phase === "summary") return;
     const correct = guess === pair.samePlace;
     const earned = doubleTakePoints(correct, streak, replayed);
+    setResults((previous) => [...previous, { answer: guess, points: earned, replayed }]);
     setAnswer(guess);
     setPoints(earned);
     setScore((value) => value + earned);
@@ -283,6 +307,37 @@ export const DoubleTake = ({ photos }: { photos: PhotoGamePhoto[] }) => {
         <p>
           {correctCount} of {deck.length} correct · {score} points
         </p>
+        <ol className={styles.review} aria-label="Pair results">
+          {results.map((result, index) => {
+            const played = deck[index]!;
+            return (
+              <li key={index}>
+                <section aria-label={`Pair ${index + 1}`} className={styles.reviewPair}>
+                  <div className={styles.actions}>
+                    <Heading level={2}>Pair {index + 1}</Heading>
+                    <strong>
+                      {result.answer === null
+                        ? "Skipped"
+                        : result.answer === played.samePlace
+                          ? "Correct"
+                          : "Incorrect"}
+                    </strong>
+                    <Caption>
+                      {result.points} points{result.replayed ? " · Replayed" : ""}
+                    </Caption>
+                  </div>
+                  {result.answer !== null ? (
+                    <p>Your answer: {result.answer ? "Same place" : "Different places"}</p>
+                  ) : null}
+                  <p>
+                    {played.samePlace ? "Same place" : "Different places"} · {pairDistance(played)}
+                  </p>
+                  <PairPhotos pair={played} />
+                </section>
+              </li>
+            );
+          })}
+        </ol>
         <ResultNextSteps photos={deck.flatMap((item) => item.photos)} />
         <Button variant="primary" onClick={start}>
           Play again
@@ -334,22 +389,9 @@ export const DoubleTake = ({ photos }: { photos: PhotoGamePhoto[] }) => {
                 : "A convincing double"}
           </Heading>
           <p>
-            {pair.samePlace ? "Same place" : "Different places"} ·{" "}
-            {pair.distanceMetres < 1000
-              ? `${Math.round(pair.distanceMetres)} metres apart`
-              : `${(pair.distanceMetres / 1000).toFixed(1)} km apart`}
+            {pair.samePlace ? "Same place" : "Different places"} · {pairDistance(pair)}
           </p>
-          <div className={styles.reveal}>
-            {pair.photos.map((photo) => (
-              <figure key={photo.path}>
-                <GamePhoto photo={photo} link />
-                <figcaption>
-                  {photo.location?.label || "Recorded location"}
-                  <Caption>{exifDayKey(photo.location!.date)}</Caption>
-                </figcaption>
-              </figure>
-            ))}
-          </div>
+          <PairPhotos pair={pair} />
           {answer === null ? <p>No points this round</p> : null}
           {points > 100 ? <Caption>{points - 100} streak bonus</Caption> : null}
           {replayed ? (

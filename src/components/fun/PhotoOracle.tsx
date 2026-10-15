@@ -65,6 +65,8 @@ export const PhotoOracle = ({ photos }: { photos: PhotoGamePhoto[] }) => {
   const [settings, setSettings] = useGameSettings("oracle");
   const { mode } = settings;
   const [cohort, setCohort] = useState<PhotoGamePhoto[]>([]);
+  const [hintVisible, setHintVisible] = useState(false);
+  const hintId = useId();
   const [secret, setSecret] = useState<PhotoGamePhoto | null>(null);
   const [stage, setStage] = useState<"lobby" | "choose" | "remember" | "questions" | "finished">(
     "lobby",
@@ -91,6 +93,7 @@ export const PhotoOracle = ({ photos }: { photos: PhotoGamePhoto[] }) => {
     setError(null);
     setCohort(selection);
     setSecret(null);
+    setHintVisible(false);
     setCandidates(selection.map((photo) => ({ photo, weight: 1 / selection.length })));
     setAnswers([]);
     setConfirmed(null);
@@ -190,6 +193,12 @@ export const PhotoOracle = ({ photos }: { photos: PhotoGamePhoto[] }) => {
       label: "Previous answer",
       action: back,
       enabled: stage === "questions" && history.length > 0,
+    },
+    {
+      key: "H",
+      label: "Hint",
+      action: () => setHintVisible((visible) => !visible),
+      enabled: stage === "questions" && mode === "mind" && !!secret,
     },
     {
       key: "Space",
@@ -346,6 +355,16 @@ export const PhotoOracle = ({ photos }: { photos: PhotoGamePhoto[] }) => {
             </p>
           )}
           <div className={styles.actions}>
+            {mode === "mind" && secret ? (
+              <Button
+                aria-expanded={hintVisible}
+                aria-controls={hintId}
+                onClick={() => setHintVisible(!hintVisible)}
+              >
+                {hintVisible ? "Hide photo" : "Hint"}
+                <KeyHint aria-hidden="true">H</KeyHint>
+              </Button>
+            ) : null}
             <Button disabled={!history.length} onClick={back}>
               Back
               <KeyHint aria-hidden="true">B</KeyHint>
@@ -359,6 +378,16 @@ export const PhotoOracle = ({ photos }: { photos: PhotoGamePhoto[] }) => {
             </Button>
           </div>
 
+          {mode === "mind" && secret ? (
+            <section
+              id={hintId}
+              hidden={!hintVisible}
+              aria-label="Remembered photograph"
+              className={styles.secret}
+            >
+              {hintVisible ? <GamePhoto photo={secret} /> : null}
+            </section>
+          ) : null}
           <AnswerTrail answers={answers} />
         </>
       ) : null}

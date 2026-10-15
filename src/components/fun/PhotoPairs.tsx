@@ -30,6 +30,9 @@ const BOARD_SIZES = [
 
 type Board = {
   cards: PairCard[];
+  matchSize: 2 | 3 | 4;
+  columns: number;
+  rows: number;
   state: PairsState;
   glimpse: boolean;
   moving: boolean;
@@ -55,10 +58,17 @@ export const PhotoPairs = ({
   }, [active, onActiveChange]);
 
   const start = () => {
-    const cards = buildPhotoPairs(photos, settings.pairs, settings.mode);
+    const layout = BOARD_SIZES.find((size) => size.pairs === settings.pairs)!;
+    const cards = buildPhotoPairs(
+      photos,
+      Math.floor((settings.pairs * 2) / settings.matchSize),
+      settings.mode,
+      Math.random,
+      settings.matchSize,
+    );
     if (!cards) {
       setMessage(
-        "There are not enough distinct pairs for these settings. Try fewer pairs or another mode.",
+        "There are not enough distinct matches for these settings. Try a smaller board or another mode.",
       );
       return;
     }
@@ -66,6 +76,9 @@ export const PhotoPairs = ({
     setMessage("");
     setBoard({
       cards,
+      matchSize: settings.matchSize,
+      columns: layout.columns,
+      rows: Math.ceil((settings.pairs * 2) / layout.columns),
       state: initialPairsState(),
       glimpse: settings.twist === "glimpse",
       moving: settings.twist === "moving",
@@ -82,7 +95,7 @@ export const PhotoPairs = ({
     );
     return () => window.clearTimeout(timer);
   }, [glimpseReady]);
-  const miss = board?.state.open.length === 2;
+  const miss = !!board && board.state.open.length === board.matchSize;
   const missReady =
     !!board &&
     miss &&
@@ -107,18 +120,31 @@ export const PhotoPairs = ({
   const complete = !!board && board.state.matched.length === board.cards.length;
   const flip = (index: number) => {
     if (!board || board.glimpse || complete) return;
-    const state = flipPairCard(board.state, index, board.cards);
+    const state = flipPairCard(board.state, index, board.cards, board.matchSize);
     if (state === board.state) return;
     setBoard({ ...board, state });
     if (state.matched.length === board.cards.length && !recorded.current) {
       recorded.current = true;
-      record({ won: true, score: Math.round((100 * (board.cards.length / 2)) / state.turns) });
+      record({
+        won: true,
+        score: Math.round((100 * (board.cards.length / board.matchSize)) / state.turns),
+      });
     }
   };
   if (!board)
     return (
       <GameIntro game="photo-pairs">
-        <p>Turn over two cards. Find the pairs of different photographs that belong together.</p>
+        <p>
+          Turn over {settings.matchSize} cards. Find the different photographs that belong together.
+        </p>
+        <SegmentedToggle
+          ariaLabel="Cards per match"
+          value={String(settings.matchSize)}
+          options={[2, 3, 4].map((n) => ({ value: String(n), label: `Match ${n}` }))}
+          onChange={(value) =>
+            setSettings((s) => ({ ...s, matchSize: Number(value) as 2 | 3 | 4 }))
+          }
+        />
         <SegmentedToggle
           ariaLabel="Pair connection"
           value={settings.mode}
@@ -130,8 +156,8 @@ export const PhotoPairs = ({
         />
         <Caption>
           {settings.mode === "visual"
-            ? "Pairs are selected by visual resemblance."
-            : "Each pair shares a different visible subject."}
+            ? "Matches are selected by visual resemblance."
+            : "Each match shares a different visible subject."}
         </Caption>
         <div className={styles.sizes} role="group" aria-label="Board size">
           {BOARD_SIZES.map(({ pairs, label }) => (
@@ -145,7 +171,7 @@ export const PhotoPairs = ({
           ))}
         </div>
         {settings.pairs === 12 || settings.pairs === 24 ? (
-          <Caption>Empty centre square; every photograph has a partner.</Caption>
+          <Caption>Empty centre square; every photograph belongs to a match.</Caption>
         ) : null}
         <SegmentedToggle
           ariaLabel="Memory twist"
@@ -162,7 +188,7 @@ export const PhotoPairs = ({
             ? "Three seconds to see the board before the cards turn over."
             : settings.twist === "moving"
               ? "Unmatched cards change places after every miss."
-              : "Matched pairs stay face up."}
+              : "Matched photographs stay face up."}
         </Caption>
         {message ? <p role="alert">{message}</p> : null}
         <Button variant="primary" disabled={loading} onClick={start}>
@@ -171,37 +197,50 @@ export const PhotoPairs = ({
         <GameStatsLine stats={stats} formatBest={(v) => `${v}% efficiency`} />
       </GameIntro>
     );
-  const columns = BOARD_SIZES.find((size) => size.pairs * 2 === board.cards.length)?.columns ?? 4;
+  const columns = board.columns;
   const cells = board.cards.map((card, index) => ({ card, index }));
-  const centre = columns % 2 === 1 ? Math.floor((columns * columns) / 2) : -1;
-  const layout = centre < 0 ? cells : [...cells.slice(0, centre), null, ...cells.slice(centre)];
+  const blanks = board.columns * board.rows - cells.length;
+  const middle = Math.floor(cells.length / 2);
+  const layout = [
+    ...cells.slice(0, middle),
+    ...Array<null>(blanks).fill(null),
+    ...cells.slice(middle),
+  ];
   return (
     <div className={styles.game}>
       <div className={styles.actions}>
         <Button onClick={() => setBoard(null)}>Menu</Button>
         <Caption>
-          {board.state.matched.length / 2} / {board.cards.length / 2} pairs · {board.state.turns}{" "}
-          turns
+          {board.state.matched.length / board.matchSize} / {board.cards.length / board.matchSize}{" "}
+          {board.matchSize === 2 ? "pairs" : "matches"} · {board.state.turns} turns
         </Caption>
       </div>
       <p role="status" aria-live="polite">
         {complete
-          ? `All pairs found in ${board.state.turns} turns.`
+          ? `All ${board.matchSize === 2 ? "pairs" : "matches"} found in ${board.state.turns} turns.`
           : board.glimpse
             ? "Remember the photographs…"
             : miss
               ? board.moving
                 ? "No match. Unmatched cards will move."
                 : "No match."
-              : "Choose two cards."}
+              : `Choose ${board.matchSize} cards.`}
       </p>
       <div
         className={styles.board}
         style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}
         aria-label="Matching cards"
       >
-        {layout.map((cell) => {
-          if (!cell) return <span key="centre" aria-label="Empty centre square" />;
+        {layout.map((cell, position) => {
+          if (!cell)
+            return (
+              <span
+                key={`empty-${position}`}
+                aria-label={
+                  blanks === 1 && columns % 2 === 1 ? "Empty centre square" : "Empty square"
+                }
+              />
+            );
           const { card, index } = cell;
           const matched = board.state.matched.includes(index),
             open = matched || board.glimpse || board.state.open.includes(index);

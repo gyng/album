@@ -76,6 +76,7 @@ export const PhotoConnections = ({ photos }: { photos: PhotoGamePhoto[] }) => {
   const [puzzle, setPuzzle] = useState<ConnectionsPuzzle | null>(null);
   const [tiles, setTiles] = useState<PhotoGamePhoto[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
+  const [autoCheck, setAutoCheck] = useState(true);
   const [found, setFound] = useState<string[]>([]);
   const [mistakes, setMistakes] = useState(0);
   const [gaveUp, setGaveUp] = useState(false);
@@ -86,6 +87,7 @@ export const PhotoConnections = ({ photos }: { photos: PhotoGamePhoto[] }) => {
   const groupRefs = useRef(new Map<string, HTMLElement>());
   const [dockHeight, setDockHeight] = useState(0);
   const tileRefs = useRef(new Map<string, HTMLButtonElement>());
+  const matchedRefs = useRef(new Map<string, HTMLLIElement>());
   const shufflePositions = useRef(new Map<string, DOMRect>());
   const animations = useRef<Animation[]>([]);
   const finished = gaveUp || (lives !== null && mistakes >= lives) || found.length === size;
@@ -94,27 +96,38 @@ export const PhotoConnections = ({ photos }: { photos: PhotoGamePhoto[] }) => {
     shufflePositions.current = new Map();
     if (!previous.size || window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
     for (const [path, before] of previous) {
-      const tile = tileRefs.current.get(path);
+      const tile = tileRefs.current.get(path) ?? matchedRefs.current.get(path);
       if (!tile || typeof tile.animate !== "function") continue;
       const after = tile.getBoundingClientRect();
       const x = before.left - after.left;
       const y = before.top - after.top;
-      if (!x && !y) continue;
+      const scaleX = before.width / after.width;
+      const scaleY = before.height / after.height;
+      if (!x && !y && scaleX === 1 && scaleY === 1) continue;
       animations.current.push(
         tile.animate(
-          [{ transform: `translate(${x}px, ${y}px)` }, { transform: "translate(0, 0)" }],
-          { duration: 320, easing: "cubic-bezier(0.22, 1, 0.36, 1)" },
+          [
+            { transform: `translate(${x}px, ${y}px) scale(${scaleX}, ${scaleY})` },
+            { transform: "translate(0, 0) scale(1)" },
+          ],
+          { duration: 420, easing: "cubic-bezier(0.22, 1, 0.36, 1)" },
         ),
       );
     }
-  }, [tiles]);
+  }, [tiles, found, finished]);
   useEffect(() => () => animations.current.forEach((animation) => animation.cancel()), []);
-  const shuffle = () => {
+  const capturePositions = () => {
     animations.current.forEach((animation) => animation.cancel());
     animations.current = [];
     shufflePositions.current = new Map(
-      Array.from(tileRefs.current, ([path, tile]) => [path, tile.getBoundingClientRect()]),
+      Array.from([...tileRefs.current, ...matchedRefs.current], ([path, tile]) => [
+        path,
+        tile.getBoundingClientRect(),
+      ]),
     );
+  };
+  const shuffle = () => {
+    capturePositions();
     setTiles(shuffleGamePhotos(tiles));
   };
   const deselect = () => {
@@ -127,7 +140,7 @@ export const PhotoConnections = ({ photos }: { photos: PhotoGamePhoto[] }) => {
   // A solved group's tiles leave the board, taking focus with them.
   useEffect(() => {
     const latest = found.at(-1);
-    if (latest && !finished) groupRefs.current.get(latest)?.focus();
+    if (latest && !finished) groupRefs.current.get(latest)?.focus({ preventScroll: true });
   }, [found, finished]);
   useEffect(() => {
     if (puzzle) boardRef.current?.focus();
@@ -192,20 +205,36 @@ export const PhotoConnections = ({ photos }: { photos: PhotoGamePhoto[] }) => {
     setGaveUp(true);
     finish("gave-up", found.length, mistakes);
   };
-  const submit = () => {
-    if (!puzzle || finished || selected.length !== size) return;
-    const key = [...selected].sort().join("\n");
+  const shake = (paths: string[]) => {
+    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+    for (const path of paths) {
+      const tile = tileRefs.current.get(path);
+      if (typeof tile?.animate !== "function") continue;
+      animations.current.push(
+        tile.animate(
+          [0, -8, 7, -5, 4, 0].map((x) => ({ transform: `translateX(${x}px)` })),
+          { duration: 360, easing: "ease-in-out" },
+        ),
+      );
+    }
+  };
+  const submit = (selection = selected) => {
+    if (!puzzle || finished || selection.length !== size) return;
+    const key = [...selection].sort().join("\n");
     if (attempted.current.has(key)) {
+      shake(selection);
       setMessage("You’ve already tried that group.");
       return;
     }
-    const result = checkConnection(puzzle, selected);
+    const result = checkConnection(puzzle, selection);
     if (result.kind === "match") {
+      capturePositions();
       setFound([...found, result.group.id]);
       setSelected([]);
       setMessage(`${result.group.label} — connection found.`);
       if (found.length + 1 === size) finish("won", size, mistakes);
     } else {
+      shake(selection);
       attempted.current.add(key);
       setMistakes(mistakes + 1);
       if (lives !== null && mistakes + 1 >= lives) finish("lost", found.length, mistakes + 1);
@@ -220,7 +249,7 @@ export const PhotoConnections = ({ photos }: { photos: PhotoGamePhoto[] }) => {
     {
       key: "Enter",
       label: "Check connection",
-      action: submit,
+      action: () => submit(),
       enabled: !!puzzle && !finished && selected.length === size,
     },
     {
@@ -353,10 +382,21 @@ export const PhotoConnections = ({ photos }: { photos: PhotoGamePhoto[] }) => {
             aria-label="Check connection"
             variant="primary"
             disabled={selected.length !== size}
-            onClick={submit}
+            onClick={() => submit()}
           >
             Check
             <KeyHint aria-hidden="true">Enter</KeyHint>
+          </Button>
+          <Button
+            aria-label="Auto check"
+            aria-pressed={autoCheck}
+            active={autoCheck}
+            onClick={() => {
+              setAutoCheck(!autoCheck);
+              if (!autoCheck) submit();
+            }}
+          >
+            Auto check
           </Button>
           <Button
             aria-label="Deselect"
@@ -404,7 +444,24 @@ export const PhotoConnections = ({ photos }: { photos: PhotoGamePhoto[] }) => {
               className={styles.connectionGroup}
             >
               <Heading level={2}>{group.label}</Heading>
-              <PhotoChain photos={group.photos} linked={finished} numbered={false} />
+              <ol
+                aria-label="Connected photographs"
+                className={[styles.chain, shuffleStyles.matchedRow].join(" ")}
+                style={{ "--connection-columns": size } as React.CSSProperties}
+              >
+                {group.photos.map((photo) => (
+                  <li
+                    key={photo.path}
+                    className={shuffleStyles.matchedPhoto}
+                    ref={(element) => {
+                      if (element) matchedRefs.current.set(photo.path, element);
+                      else matchedRefs.current.delete(photo.path);
+                    }}
+                  >
+                    <GamePhoto photo={photo} link={finished} />
+                  </li>
+                ))}
+              </ol>
             </section>
           ))}
         </div>
@@ -440,12 +497,12 @@ export const PhotoConnections = ({ photos }: { photos: PhotoGamePhoto[] }) => {
                   aria-pressed={selected.includes(photo.path)}
                   disabled={selected.length === size && !selected.includes(photo.path)}
                   onClick={() => {
-                    setSelected(
-                      selected.includes(photo.path)
-                        ? selected.filter((path) => path !== photo.path)
-                        : [...selected, photo.path],
-                    );
+                    const next = selected.includes(photo.path)
+                      ? selected.filter((path) => path !== photo.path)
+                      : [...selected, photo.path];
+                    setSelected(next);
                     setMessage("");
+                    if (autoCheck && next.length === size) submit(next);
                   }}
                 >
                   <GamePhoto photo={photo} />

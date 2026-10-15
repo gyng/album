@@ -216,6 +216,7 @@ for (const viewport of [
     await gotoHydrated(page, "/fun/connections");
     await page.getByRole("button", { name: "6×6", exact: true }).click();
     await page.getByRole("button", { name: "Start connecting" }).click();
+    await page.getByRole("button", { name: "Auto check", exact: true }).click();
     const controls = page.getByRole("group", { name: "Connection controls" });
     const choices = page
       .getByRole("group", { name: "Photographs", exact: true })
@@ -294,4 +295,123 @@ test("Sight Lines preserves a 10×10 five-photo-line game and keeps mobile targe
   const result = page.getByRole("region", { name: "Sight Lines result" });
   await expect(result).toBeFocused();
   await expect(result.getByRole("link").filter({ has: page.getByRole("img") })).toHaveCount(30);
+});
+
+test("Connections auto-checks and translates matching photographs into their solved row", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await gotoHydrated(page, "/fun/connections");
+  await page.getByRole("button", { name: "Start connecting" }).click();
+  const board = page.getByRole("group", { name: "Photographs", exact: true });
+  await expect(board.getByRole("button")).toHaveCount(16);
+  const name = await board.getByRole("img").first().getAttribute("alt");
+  const group = board.getByRole("button", { name: name!, exact: true });
+  await page.evaluate(() => {
+    // oxlint-disable-next-line typescript/unbound-method -- Invoked with the element as this below.
+    const original = Element.prototype.animate;
+    Element.prototype.animate = function (...args: Parameters<Element["animate"]>) {
+      const animation = original.apply(this, args);
+      if (this.tagName === "LI") {
+        animation.pause();
+        animation.currentTime = 0;
+      }
+      return animation;
+    };
+  });
+  for (let i = 0; i < 3; i++) await group.nth(i).click();
+  await group.nth(3).scrollIntoViewIfNeeded();
+  const sources = await group.evaluateAll((buttons) =>
+    buttons.map((button) => ({
+      src: button.querySelector("img")!.getAttribute("src"),
+      x: button.getBoundingClientRect().x,
+      y: button.getBoundingClientRect().y,
+    })),
+  );
+  await group.nth(3).click();
+  const solved = page.getByRole("list", { name: "Connected photographs" }).first();
+  await expect(board.getByRole("button")).toHaveCount(12);
+  const positions = await solved.locator("li").evaluateAll((items) =>
+    items.map((item) => ({
+      src: item.querySelector("img")!.getAttribute("src"),
+      x: item.getBoundingClientRect().x,
+      y: item.getBoundingClientRect().y,
+      moving: item.getAnimations().filter((animation) => animation.constructor === Animation)
+        .length,
+    })),
+  );
+  expect(positions).toHaveLength(4);
+  for (const position of positions) {
+    const before = sources.find((source) => source.src === position.src)!;
+    expect(position.moving).toBe(1);
+    expect(position.x).toBeCloseTo(before.x, 0);
+    expect(position.y).toBeCloseTo(before.y, 0);
+  }
+  await solved.locator("li").evaluateAll(async (items) => {
+    const animations = items.flatMap((item) => item.getAnimations());
+    animations.forEach((animation) => animation.play());
+    await Promise.all(animations.map((animation) => animation.finished));
+  });
+  const tops = await solved
+    .locator("li")
+    .evaluateAll((items) => items.map((item) => item.getBoundingClientRect().top));
+  expect(Math.max(...tops) - Math.min(...tops)).toBeLessThan(1);
+});
+
+test("Connections shakes only invalid selected photographs and honours reduced motion", async ({
+  page,
+}) => {
+  await gotoHydrated(page, "/fun/connections");
+  await page.getByRole("button", { name: "Start connecting" }).click();
+  const board = page.getByRole("group", { name: "Photographs", exact: true });
+  const names = [
+    ...new Set(
+      await board
+        .getByRole("img")
+        .evaluateAll((images) => images.map((image) => image.getAttribute("alt")!)),
+    ),
+  ];
+  await page.evaluate(() => {
+    // oxlint-disable-next-line typescript/unbound-method -- Invoked with the element as this below.
+    const original = Element.prototype.animate;
+    Element.prototype.animate = function (...args: Parameters<Element["animate"]>) {
+      const animation = original.apply(this, args);
+      animation.pause();
+      animation.currentTime = 100;
+      return animation;
+    };
+  });
+  for (const name of names.slice(0, 2))
+    for (let i = 0; i < 2; i++)
+      await board.getByRole("button", { name, exact: true }).nth(i).click();
+  await expect(page.getByText("1 mistake · Unlimited lives")).toBeVisible();
+  expect(
+    await board
+      .locator('button[aria-pressed="true"]')
+      .evaluateAll((buttons) =>
+        buttons.every((button) =>
+          button.getAnimations().some((animation) => animation.constructor === Animation),
+        ),
+      ),
+  ).toBe(true);
+  expect(
+    await board
+      .locator('button[aria-pressed="false"]')
+      .evaluateAll((buttons) =>
+        buttons.every((button) =>
+          button.getAnimations().every((animation) => animation.constructor !== Animation),
+        ),
+      ),
+  ).toBe(true);
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await board.evaluate((element) =>
+    element
+      .querySelectorAll("button")
+      .forEach((button) => button.getAnimations().forEach((animation) => animation.cancel())),
+  );
+  await page.getByRole("button", { name: "Check connection" }).click();
+  expect(await board.evaluate((element) => element.getAnimations({ subtree: true }).length)).toBe(
+    0,
+  );
+  await expect(page.getByText("1 mistake · Unlimited lives")).toBeVisible();
 });

@@ -77,3 +77,50 @@ it.each([12, 18, 24])("deals %i unambiguous pairs for larger boards", (count) =>
   for (const pair of new Set(cards.map((card) => card.pair)))
     expect(cards.filter((card) => card.pair === pair)).toHaveLength(2);
 });
+
+it.each([3, 4] as const)(
+  "deals distinct groups of %i lookalikes and waits for all cards before checking",
+  (matchSize) => {
+    const source = Array.from({ length: 6 * matchSize }, (_, i) => ({
+      ...photos[0]!,
+      path: `multi-${i}`,
+      vector: Array.from({ length: 6 }, (_, axis) => (axis === Math.floor(i / matchSize) ? 1 : 0)),
+    }));
+    const cards = buildPhotoPairs(source, 6, "visual", () => 0.3, matchSize)!;
+    expect(cards).toHaveLength(6 * matchSize);
+    expect(new Set(cards.map((card) => card.photo.path)).size).toBe(6 * matchSize);
+    const group = cards
+      .map((card, index) => ({ card, index }))
+      .filter(({ card }) => card.pair === cards[0]!.pair);
+    expect(group).toHaveLength(matchSize);
+    let state = initialPairsState();
+    for (const { index } of group.slice(0, -1))
+      state = flipPairCard(state, index, cards, matchSize);
+    expect(state.turns).toBe(0);
+    expect(state.matched).toHaveLength(0);
+    state = flipPairCard(state, group.at(-1)!.index, cards, matchSize);
+    expect(state.turns).toBe(1);
+    expect(state.matched).toHaveLength(matchSize);
+    expect(state.open).toHaveLength(0);
+    let miss = initialPairsState();
+    const mixed = [
+      group[0]!.index,
+      ...cards
+        .map((card, index) => ({ card, index }))
+        .filter(({ card }) => card.pair !== cards[0]!.pair)
+        .slice(0, matchSize - 1)
+        .map(({ index }) => index),
+    ];
+    for (const index of mixed) miss = flipPairCard(miss, index, cards, matchSize);
+    expect(miss.turns).toBe(1);
+    expect(miss.open).toHaveLength(matchSize);
+    expect(miss.matched).toHaveLength(0);
+    expect(flipPairCard(miss, group[1]!.index, cards, matchSize)).toBe(miss);
+  },
+);
+it.each([3, 4] as const)("deals %i photographs per semantic subject", (matchSize) => {
+  const cards = buildPhotoPairs(photos, 2, "semantic", () => 0.3, matchSize)!;
+  expect(cards).toHaveLength(matchSize * 2);
+  for (const subject of ["DOG", "TRAIN"])
+    expect(cards.filter((card) => card.subject === subject)).toHaveLength(matchSize);
+});

@@ -15,7 +15,7 @@ test.beforeAll(() => {
   const db = new DatabaseSync(corePath),
     embeddings = new DatabaseSync(vectorPath);
   embeddings.exec("DELETE FROM embeddings");
-  for (let i = 0; i < 48; i++) {
+  for (let i = 0; i < 96; i++) {
     const photo = `../albums/test-simple/pair-${i}.jpg`;
     db.prepare(
       "INSERT INTO images (path,album_relative_path,filename,geocode,exif,tags,colors,alt_text,subject) VALUES (?,?,?,?,?,?,?,?,?)",
@@ -31,7 +31,7 @@ test.beforeAll(() => {
       "",
     );
     const vector = new Uint8Array(24);
-    vector[Math.floor(i / 2)] = 127;
+    vector[Math.floor(i / 4)] = 127;
     embeddings
       .prepare(
         "INSERT INTO embeddings (path,model_id,embedding_dim,embedding_blob,embedding_scale) VALUES (?,?,?,?,?)",
@@ -63,10 +63,11 @@ test("jigsaw supports pool-to-grid dragging, rearranging, returning and keyboard
 }) => {
   await fixture(page);
   await gotoHydrated(page, "/fun/photo-jigsaw");
-  await expect(page.getByRole("button", { name: "Piece pool", exact: true })).toHaveAttribute(
+  await expect(page.getByRole("button", { name: "Jigsaw", exact: true })).toHaveAttribute(
     "aria-pressed",
     "true",
   );
+  await page.getByRole("button", { name: "Rectangular pieces", exact: true }).click();
   await expect(page.getByRole("button", { name: "Start puzzle" })).toBeEnabled();
   await page.getByRole("button", { name: "Start puzzle" }).click();
   const pool = page.getByRole("region", { name: "Piece pool" });
@@ -130,6 +131,7 @@ test("touch dragging places a piece and cancellation leaves the board intact", a
   await page.setViewportSize({ width: 390, height: 844 });
   await fixture(page);
   await gotoHydrated(page, "/fun/photo-jigsaw");
+  await page.getByRole("button", { name: "Rectangular pieces", exact: true }).click();
   await expect(page.getByRole("button", { name: "Start puzzle" })).toBeEnabled();
   await page.getByRole("button", { name: "Start puzzle" }).click();
   const pool = page.getByRole("region", { name: "Piece pool" }),
@@ -157,3 +159,76 @@ test("touch dragging places a piece and cancellation leaves the board intact", a
   await expect(pool.getByRole("button", { name: /Pool piece/ })).toHaveCount(8);
   await expect(page.getByText("1 move", { exact: true })).toBeVisible();
 });
+
+test("shaped jigsaw pieces fit their cells, filter edges and switch photographs", async ({
+  page,
+}) => {
+  await fixture(page);
+  await gotoHydrated(page, "/fun/photo-jigsaw");
+  await expect(page.getByRole("button", { name: "Jigsaw", exact: true })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await page.getByRole("button", { name: "Start puzzle" }).click();
+  const pool = page.getByRole("region", { name: "Piece pool" });
+  const first = pool.getByRole("button", { name: "Pool piece 1", exact: true });
+  await expect(first).toBeEnabled();
+  const image = first.locator("svg image");
+  const column = -Number(await image.getAttribute("x")) / 100;
+  const row = -Number(await image.getAttribute("y")) / 100;
+  const target = page.getByRole("button", {
+    name: `Empty cell at row ${row + 1}, column ${column + 1}`,
+    exact: true,
+  });
+  await first.dragTo(target);
+  await expect(pool.getByRole("button", { name: /Pool piece/ })).toHaveCount(8);
+  await expect(page.getByText("1 move", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Edges only" }).click();
+  await expect(pool.getByRole("button", { name: /Pool piece/ })).toHaveCount(
+    row === 1 && column === 1 ? 8 : 7,
+  );
+  await page.getByRole("button", { name: "Preview", exact: true }).click();
+  const previous = await page.getByLabel("Photograph puzzle").getByRole("img").getAttribute("src");
+  await page.getByRole("button", { name: "New photo", exact: true }).click();
+  await expect(pool.getByRole("button", { name: /Pool piece/ })).toHaveCount(9);
+  await page.getByRole("button", { name: "Preview", exact: true }).click();
+  await expect(page.getByLabel("Photograph puzzle").getByRole("img")).not.toHaveAttribute(
+    "src",
+    previous!,
+  );
+});
+for (const matchSize of [3, 4])
+  test(`matching ${matchSize} cards fits a 7×7 phone board`, async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await fixture(page, true);
+    await gotoHydrated(page, "/fun/photo-pairs");
+    await page.getByRole("radio", { name: `Match ${matchSize}` }).click();
+    await page.getByRole("button", { name: "7×7", exact: true }).click();
+    await page.getByRole("button", { name: "Start matching" }).click();
+    const board = page.getByLabel("Matching cards");
+    await expect(board.getByRole("button")).toHaveCount(48);
+    for (let i = 0; i < matchSize - 1; i++) await board.getByRole("button").nth(i).click();
+    await expect(board.getByRole("img")).toHaveCount(matchSize - 1);
+    await expect
+      .poll(() => page.evaluate(() => document.documentElement.scrollHeight - innerHeight))
+      .toBeLessThanOrEqual(1);
+  });
+
+for (const width of [390, 1280])
+  test(`custom 12×12 jigsaw supports edge filtering at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 844 });
+    await fixture(page);
+    await gotoHydrated(page, "/fun/photo-jigsaw");
+    await expect(page.getByRole("button", { name: "10 × 10", exact: true })).toBeVisible();
+    await page.getByRole("spinbutton", { name: "Custom grid size" }).fill("12");
+    await page.reload();
+    await expect(page.getByRole("spinbutton", { name: "Custom grid size" })).toHaveValue("12");
+    await page.getByRole("button", { name: "Start puzzle" }).click();
+    const pool = page.getByRole("region", { name: "Piece pool" });
+    await expect(pool.getByRole("button", { name: /Pool piece/ })).toHaveCount(144);
+    await page.getByRole("button", { name: "Edges only", exact: true }).click();
+    await expect(pool.getByRole("button", { name: /Pool piece/ })).toHaveCount(44);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+      width,
+    );
+  });

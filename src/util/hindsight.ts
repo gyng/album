@@ -1,8 +1,9 @@
+import { photoLocationDistance } from "./photoLocationDistance";
 import { exifWallClockTimestamp } from "./exifTime";
 import { shuffleGamePhotos, type PhotoGamePhoto } from "./photoGames";
 
 export type HindsightSize = 4 | 5 | 6;
-export type HindsightSpread = "years" | "trip";
+export type HindsightSpread = "years" | "trip" | "place";
 export type HindsightSettings = { size: HindsightSize; spread: HindsightSpread };
 
 /** A dealt photograph with its parsed wall clock. */
@@ -97,6 +98,39 @@ const dealTrip = (photos: HindsightPhoto[], size: number, random: () => number) 
   return null;
 };
 
+const dealPlace = (photos: HindsightPhoto[], size: number, random: () => number) => {
+  const located = shuffleGamePhotos(
+    photos.filter((photo) => {
+      const point = photo.location;
+      return (
+        point &&
+        Number.isFinite(point.lat) &&
+        Number.isFinite(point.lng) &&
+        Math.abs(point.lat) <= 90 &&
+        Math.abs(point.lng) <= 180 &&
+        !(point.lat === 0 && point.lng === 0)
+      );
+    }),
+    random,
+  );
+  for (const anchor of located) {
+    const chosen = [anchor];
+    for (const photo of located) {
+      if (photo === anchor) continue;
+      if (
+        chosen.every(
+          (other) =>
+            Math.abs(other.time - photo.time) >= HINDSIGHT_MIN_GAP_MS &&
+            photoLocationDistance(other.location!, photo.location!) <= 75,
+        )
+      )
+        chosen.push(photo);
+      if (chosen.length === size) return chosen;
+    }
+  }
+  return null;
+};
+
 export const buildHindsightPuzzle = (
   photos: readonly PhotoGamePhoto[],
   { size, spread }: HindsightSettings,
@@ -105,7 +139,11 @@ export const buildHindsightPuzzle = (
   const candidates = dated(photos);
   if (candidates.length < size) return null;
   const hand =
-    spread === "years" ? dealYears(candidates, size, random) : dealTrip(candidates, size, random);
+    spread === "years"
+      ? dealYears(candidates, size, random)
+      : spread === "place"
+        ? dealPlace(candidates, size, random)
+        : dealTrip(candidates, size, random);
   if (!hand) return null;
   const solution = [...hand].sort((a, b) => a.time - b.time);
   const dealt = shuffleGamePhotos(hand, random);

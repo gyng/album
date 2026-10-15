@@ -4,9 +4,16 @@
 }
 .tile {
   position: relative;
-  transform-origin: center;
+  transform-origin: top left;
   scroll-margin-block-start: calc(var(--connections-dock-height, 0px) + var(--space-3));
 }
 .tile:focus-visible {
   z-index: 1;
+}
+
+.matchedRow {
+  grid-template-columns: repeat(var(--connection-columns, 4), minmax(0, 1fr));
+}
+.matchedPhoto {
+  transform-origin: top left;
 }

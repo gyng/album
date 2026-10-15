@@ -35,6 +35,11 @@ import hindsightStyles from "./Hindsight.module.css";
 const DAILY_SETTINGS: HindsightSettings = { size: 5, spread: "years" };
 
 const SPREADS = [
+  {
+    value: "place",
+    label: "Same place, different shot",
+    detail: "Within 75 metres, at least ten minutes apart.",
+  },
   { value: "years", label: "Across the years", detail: "At least three months between any two." },
   { value: "trip", label: "One trip", detail: "One album, all within two weeks." },
 ] as const;

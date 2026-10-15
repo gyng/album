@@ -306,3 +306,36 @@ it("records a finished game once, scored by correct answers, and leads on from i
   fireEvent.click(screen.getByRole("button", { name: "Change viewing time" }));
   expect(screen.getByText("Played 1 · won 0 · best 1 correct")).toBeInTheDocument();
 });
+
+it("reviews every played pair with the player's answer, actual places and points", async () => {
+  start();
+  await watch();
+  fireEvent.click(screen.getByRole("button", { name: "Same place" }));
+  fireEvent.click(screen.getByRole("button", { name: "Next pair" }));
+  await watch(900);
+  fireEvent.click(screen.getByRole("button", { name: "Same place" }));
+  fireEvent.click(screen.getByRole("button", { name: "See results" }));
+  const first = screen.getByRole("region", { name: "Pair 1" });
+  expect(within(first).getAllByRole("img")).toHaveLength(2);
+  expect(first).toHaveTextContent("Correct");
+  expect(first).toHaveTextContent("100 points");
+  expect(first).toHaveTextContent("20 metres apart");
+  expect(first).toHaveTextContent("Your answer: Same place");
+  const second = screen.getByRole("region", { name: "Pair 2" });
+  expect(second).toHaveTextContent("Incorrect");
+  expect(second).toHaveTextContent("Different places");
+  expect(second).toHaveTextContent("8.0 km apart");
+  expect(second).toHaveTextContent("0 points");
+  expect(within(second).getAllByRole("link")).toHaveLength(2);
+});
+it("distinguishes skipped pairs from incorrect guesses in the results", async () => {
+  start();
+  await watch();
+  fireEvent.click(screen.getByRole("button", { name: "Give up this pair" }));
+  fireEvent.click(screen.getByRole("button", { name: "Next pair" }));
+  await watch();
+  fireEvent.click(screen.getByRole("button", { name: "Different places" }));
+  fireEvent.click(screen.getByRole("button", { name: "See results" }));
+  expect(screen.getByRole("region", { name: "Pair 1" })).toHaveTextContent("Skipped");
+  expect(screen.getByRole("region", { name: "Pair 2" })).toHaveTextContent("Correct");
+});

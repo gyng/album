@@ -1,3 +1,4 @@
+import { photoLocationDistance as distance } from "./photoLocationDistance";
 import { shuffleGamePhotos, type PhotoGamePhoto } from "./photoGames";
 import { exifDayKey } from "./exifTime";
 
@@ -19,19 +20,6 @@ const validLocation = (photo: PhotoGamePhoto) => {
     !(point.lat === 0 && point.lng === 0) &&
     exifDayKey(point.date)
   );
-};
-
-const distance = (
-  a: NonNullable<PhotoGamePhoto["location"]>,
-  b: NonNullable<PhotoGamePhoto["location"]>,
-) => {
-  const radians = Math.PI / 180;
-  const value =
-    Math.sin(((b.lat - a.lat) * radians) / 2) ** 2 +
-    Math.cos(a.lat * radians) *
-      Math.cos(b.lat * radians) *
-      Math.sin(((b.lng - a.lng) * radians) / 2) ** 2;
-  return 6371000 * 2 * Math.asin(Math.sqrt(Math.min(1, value)));
 };
 
 type Candidates = { sameRanked: DoubleTakePair[]; distantSorted: DoubleTakePair[] };

@@ -132,7 +132,8 @@ it("remembers discovery mode while returning to an unanswered lobby after remoun
   expect(screen.queryByRole("button", { name: "Yes" })).toBeNull();
 });
 
-it("defaults to discovery and lets number shortcuts answer and undo a question", () => {
+it("uses the remembered mode for number shortcuts and undo", () => {
+  localStorage.setItem("snapshots-fun-settings-v2:oracle", JSON.stringify({ mode: "discover" }));
   render(<PhotoOracle photos={photos} />);
   expect(screen.getByRole("button", { name: "Find me a photograph" })).toHaveAttribute(
     "aria-pressed",
@@ -149,7 +150,7 @@ it("defaults to discovery and lets number shortcuts answer and undo a question",
 
 it("keeps newest answers below the current question and removes an answer on undo", () => {
   render(<PhotoOracle photos={photos} />);
-  fireEvent.keyDown(window, { key: "n" });
+  fireEvent.click(screen.getByRole("button", { name: "Find me a photograph" }));
   const firstQuestion = screen.getByRole("status").textContent!;
   fireEvent.keyDown(window, { key: "3" });
   const secondQuestion = screen.getByRole("status").textContent!;
@@ -236,4 +237,32 @@ it("offers a search for photographs like the one revealed", () => {
   const similar = new URL(href, "https://example.org").searchParams.get("similar")!;
   expect(similar.startsWith("../albums/test-simple/")).toBe(true);
   expect(shown).toContain(similar.split("/").at(-1));
+});
+
+it("defaults to remembering a photo and reveals the chosen photo as a reversible hint without changing the question", () => {
+  render(<PhotoOracle photos={photos} />);
+  expect(screen.getByRole("button", { name: "Meet the oracle" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Meet the oracle" }));
+  fireEvent.click(screen.getByRole("button", { name: /Photograph 1$/ }));
+  const chosen = screen.getByRole("img").getAttribute("src");
+  fireEvent.click(screen.getByRole("button", { name: "I have my photograph" }));
+  const question = screen.getByRole("status").textContent;
+  expect(screen.queryByRole("img")).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Hint" }));
+  const reminder = screen.getByRole("region", { name: "Remembered photograph" });
+  expect(within(reminder).getByRole("img")).toHaveAttribute("src", chosen);
+  expect(screen.getByRole("status")).toHaveTextContent(question!);
+  expect(screen.getByRole("button", { name: "Back" })).toBeDisabled();
+  expect(readGameStats("oracle").played).toBe(0);
+  fireEvent.click(screen.getByRole("button", { name: "Hide photo" }));
+  expect(screen.queryByRole("region", { name: "Remembered photograph" })).toBeNull();
+  expect(screen.getByRole("status")).toHaveTextContent(question!);
+});
+it("does not offer a remembered-photo hint in discovery mode", () => {
+  render(<PhotoOracle photos={photos} />);
+  fireEvent.click(screen.getByRole("button", { name: "Find me a photograph" }));
+  expect(screen.queryByRole("button", { name: "Hint" })).toBeNull();
 });
