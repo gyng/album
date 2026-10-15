@@ -1821,6 +1821,18 @@ class TestCli(UsesTestexistsFixture, unittest.TestCase):
                 db.insert_metadata(
                     photo, (0.0, 0.0), "1999-01-01T00:00:00", {}, cur=cur
                 )
+            from media_embedding import MODEL_ID
+
+            from index import GEMMA_STAGE, embedding_pipeline_version
+
+            db.insert_embedding(photo, MODEL_ID, [1.0, 0.0])
+            db.upsert_pipeline_state(
+                photo,
+                GEMMA_STAGE,
+                "old-source",
+                embedding_pipeline_version(MODEL_ID),
+                MODEL_ID,
+            )
             db.con.close()
 
             result = CliRunner().invoke(update_gps, f"--dbpath {dbpath}".split())
@@ -1837,6 +1849,18 @@ class TestCli(UsesTestexistsFixture, unittest.TestCase):
             signature = con.execute(
                 "SELECT mtime, size FROM file_signatures WHERE path=?", (photo,)
             ).fetchone()
+            provenance = con.execute(
+                "SELECT source_sha256 FROM pipeline_state WHERE path=? AND stage=?",
+                (photo, GEMMA_STAGE),
+            ).fetchone()
+            self.assertEqual(provenance[0], file_content_sha256(photo))
+            self.assertEqual(
+                con.execute(
+                    "SELECT count(*) FROM embeddings WHERE path=? AND model_id=?",
+                    (photo, MODEL_ID),
+                ).fetchone()[0],
+                1,
+            )
             con.close()
 
             self.assertAlmostEqual(lat, 36.578858, places=3)

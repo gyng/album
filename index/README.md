@@ -270,7 +270,7 @@ as resumable and commits GPU hours to.
 
 ## Incremental stage model
 
-Core metadata/colours, captions, SigLIP v1, and SigLIP v2 are independent stages.
+Core metadata/colours, captions and EmbeddingGemma 2 embeddings are independent stages.
 A partial profile updates only the stages it owns. Each successful stage records
 the source SHA-256, pipeline version, model ID, pinned revision, and completion
 time in `pipeline_state`. Failed captions or unreadable embeddings do not receive

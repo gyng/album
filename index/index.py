@@ -6011,6 +6011,7 @@ def update_gps(dbpath: str, match: str | None, dry_run: bool):
     # index run re-captions the whole library for byte-identical output.
     existing_states = db.get_pipeline_states()
     embedding_paths = {
+        Gemma2Embedder.MODEL_ID: db.list_embedding_paths(Gemma2Embedder.MODEL_ID),
         SiglipEmbedder.MODEL_ID: db.list_embedding_paths(SiglipEmbedder.MODEL_ID),
         Siglip2Embedder.MODEL_ID: db.list_embedding_paths(Siglip2Embedder.MODEL_ID),
     }
@@ -6127,6 +6128,7 @@ def update_gps(dbpath: str, match: str | None, dry_run: bool):
                         cur,
                     )
                 for stage, model_id in (
+                    (GEMMA_STAGE, Gemma2Embedder.MODEL_ID),
                     (SIGLIP_V1_STAGE, SiglipEmbedder.MODEL_ID),
                     (SIGLIP_V2_STAGE, Siglip2Embedder.MODEL_ID),
                 ):
