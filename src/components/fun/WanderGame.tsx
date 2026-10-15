@@ -352,7 +352,7 @@ export const WanderGame = ({ linkedMode }: { linkedMode?: Mode }) => {
   if (round)
     return (
       <div className={styles.game}>
-        <div className={styles.actions}>
+        <div className={styles.toolbar}>
           <Button
             onClick={() => {
               completed.current = true;
@@ -369,7 +369,11 @@ export const WanderGame = ({ linkedMode }: { linkedMode?: Mode }) => {
             {round.mode === "roam" ? "End walk" : "Give up"}
           </Button>
         </div>
-        {hint ? <p role="status">{hint}</p> : null}
+        {hint ? (
+          <p className={styles.hint} role="status">
+            {hint}
+          </p>
+        ) : null}
         {round.goals.length ? (
           <ul className={styles.targets} aria-label="Quest targets">
             {round.goals.map((goal) => {

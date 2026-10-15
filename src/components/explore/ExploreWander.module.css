@@ -44,8 +44,7 @@
   grid-row: 2 / 4;
 }
 
-.here,
-.side {
+.here {
   display: grid;
   gap: var(--space-3);
   min-inline-size: 0;
@@ -189,21 +188,138 @@
   }
 }
 
-.sceneJumps {
-  display: grid;
-  gap: var(--space-2);
+.walkBar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-3);
 }
-
+.questLink {
+  margin-inline-start: auto;
+}
+.controls {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+  min-inline-size: 0;
+}
+.controlPanel,
+.escapePanel {
+  min-inline-size: 0;
+  border: var(--line-hairline) solid var(--c-border);
+  border-radius: var(--radius-panel);
+  padding: var(--space-4);
+  background: var(--c-surface);
+}
+.controlPanel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.panelTitle {
+  margin: 0;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  line-height: var(--lh-label);
+}
 .subjects {
   display: grid;
   gap: var(--space-2);
 }
+.subjectRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-3);
+  align-items: center;
+}
+.subjectName {
+  overflow-wrap: anywhere;
+  font-size: var(--fs-sm);
+}
+.subjectActions {
+  display: flex;
+  gap: var(--space-1);
+}
 .keywordForm {
   display: flex;
-  flex-wrap: wrap;
   gap: var(--space-2);
 }
 .keywordForm input {
-  flex: 1 1 10rem;
+  flex: 1;
   min-inline-size: 0;
+}
+.linked {
+  display: grid;
+  gap: var(--space-1);
+}
+.feedback {
+  margin: 0;
+  font-size: var(--fs-sm);
+}
+.escapePanel {
+  grid-column: 1 / -1;
+}
+.escapeHeader {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+.escapeStatus {
+  display: grid;
+  gap: var(--space-1);
+  flex: 1 1 12rem;
+}
+.scenePicker {
+  margin-block-start: var(--space-3);
+}
+.scenePicker summary {
+  cursor: pointer;
+  font-size: var(--fs-sm);
+  min-block-size: var(--compact-control-size);
+  align-content: center;
+}
+.scenePicker summary:focus-visible {
+  outline: var(--line-strong) solid var(--c-accent);
+  outline-offset: var(--line-strong);
+}
+.scenePicker[open] .actions {
+  margin-block-start: var(--space-2);
+}
+@media (max-width: 600px) {
+  .controls {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-3);
+  }
+  .controlPanel,
+  .escapePanel {
+    padding: var(--space-3);
+  }
+}
+
+@media (min-width: 1100px) {
+  .wander {
+    grid-template-columns: minmax(0, 1fr) minmax(18rem, 21rem);
+    column-gap: var(--space-5);
+    row-gap: var(--space-3);
+  }
+  .journey {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .walkBar {
+    grid-column: 1;
+    grid-row: 2;
+  }
+  .trail {
+    grid-column: 1;
+    grid-row: 3;
+  }
+  .controls {
+    grid-column: 2;
+    grid-row: 1 / 4;
+    grid-template-columns: minmax(0, 1fr);
+    align-content: start;
+    gap: var(--space-3);
+  }
 }

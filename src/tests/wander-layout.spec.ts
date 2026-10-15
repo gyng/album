@@ -38,6 +38,12 @@ test("Wander surrounds the current photograph and respects reduced motion", asyn
   expect(positions.some((p) => p.x >= main!.x + main!.width)).toBe(true);
   expect(positions.some((p) => p.bottom <= main!.y)).toBe(true);
   expect(positions.some((p) => p.y >= main!.y + main!.height)).toBe(true);
+  const keywordPanel = await page
+    .getByRole("region", { name: "Follow a keyword", exact: true })
+    .boundingBox();
+  expect(keywordPanel!.x).toBeGreaterThan(main!.x + main!.width);
+  expect(keywordPanel!.y).toBeLessThan(main!.y + main!.height);
+
   await page.emulateMedia({ reducedMotion: "reduce" });
   await ways.getByRole("button", { name: "closest", exact: true }).click();
   const current = page.getByRole("img", { name: "Scene 1", exact: true });
@@ -88,6 +94,8 @@ test("Wander escapes a closed city loop and offers fresh scene shortcuts after B
   await page.getByRole("button", { name: "Show Wander", exact: true }).click();
   const ways = page.getByRole("list", { name: "Ways on" });
   await expect(ways.getByRole("button", { name: "further afield", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Nature", exact: true })).toBeHidden();
+  await page.getByText("Change scene", { exact: true }).click();
   await page.getByRole("button", { name: "Nature", exact: true }).click();
   await expect(page.getByRole("img", { name: "Escape scene 3", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Back", exact: true }).click();

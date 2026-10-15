@@ -90,6 +90,9 @@ it("offers scene jumps and remembers explored photos after going back", async ()
     point("beach", ["sea", "beach"], [0]),
   ];
   await load(undefined, source);
+  const scenes = screen.getByText("Change scene", { selector: "summary" });
+  expect(scenes.parentElement).not.toHaveAttribute("open");
+  fireEvent.click(scenes);
   fireEvent.click(screen.getByRole("button", { name: "Nature" }));
   expect(here()).toHaveAttribute("href", "/album/walk#mountain.jpg");
   fireEvent.click(screen.getByRole("button", { name: "Back" }));
@@ -100,6 +103,7 @@ it("offers scene jumps and remembers explored photos after going back", async ()
       .getAllByRole("button")
       .every((button) => button.querySelector("img")?.getAttribute("src") !== source[3]!.src),
   ).toBe(true);
+  fireEvent.click(screen.getByText("Change scene", { selector: "summary" }));
   fireEvent.click(screen.getByRole("button", { name: "Water" }));
   expect(here()).toHaveAttribute("href", "/album/walk#beach.jpg");
   expect(new URLSearchParams(window.location.search).get("wander")).toBe(
@@ -169,6 +173,7 @@ it("keeps wider game jumps on cooldown and unlocks an escape at a dead end", asy
   render(<ExploreWander initialIndex={0} escapeInterval={3} />);
   await act(async () => {});
   expect(screen.getByRole("button", { name: "Take a leap" })).toBeDisabled();
+  fireEvent.click(screen.getByText("Change scene", { selector: "summary" }));
   expect(screen.getByRole("button", { name: "Nature" })).toBeDisabled();
   expect(
     within(screen.getByRole("list", { name: "Ways on" })).queryByRole("button", {

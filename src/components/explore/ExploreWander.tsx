@@ -228,127 +228,14 @@ export const ExploreWander: React.FC<{
           })}
         </ul>
       </div>
-      <div className={styles.side}>
-        <div className={styles.actions}>
-          <Button disabled={trail.length < 2} onClick={() => go(trail.slice(0, -1))}>
-            Back
-          </Button>
-          <Button
-            variant="accent"
-            disabled={!hasUnexplored || !canEscape}
-            onClick={() => {
-              const next = wanderJump(entries, current, visited);
-              if (next !== null) go([...trail, next], { x: 0, y: 20 });
-            }}
-          >
-            Take a leap
-          </Button>
-          {!hasUnexplored ? (
-            <Button
-              onClick={() => {
-                const next = entries.length > 1 ? (current + 1) % entries.length : current;
-                setExplored(new Set([next]));
-                setSteps(0);
-                setLocalSteps(0);
-                moved.current = true;
-                setTrail([next]);
-              }}
-            >
-              Start again
-            </Button>
-          ) : null}
-        </div>
-        {escapeInterval > 0 && hasUnexplored ? (
-          <Caption>
-            {canEscape
-              ? "Wider jumps ready"
-              : `Wider jumps in ${escapeInterval - localSteps} fresh local ${escapeInterval - localSteps === 1 ? "step" : "steps"} · dead ends unlock an escape.`}
-          </Caption>
-        ) : null}
-        <div className={styles.sceneJumps}>
-          <Caption>Follow a subject</Caption>
-          {subjects.length ? (
-            <div className={styles.subjects} role="group" aria-label="Steer by subject">
-              {subjects.map((subject) => (
-                <div className={styles.actions} key={subject}>
-                  <Button
-                    disabled={
-                      wanderKeyword(entries, current, visited, subject, true, travel) === null
-                    }
-                    onClick={() => steer(subject)}
-                  >
-                    More {readable(subject)}
-                  </Button>
-                  <Button
-                    disabled={
-                      wanderKeyword(entries, current, visited, subject, false, travel) === null
-                    }
-                    onClick={() => steer(subject, false)}
-                  >
-                    Less {readable(subject)}
-                  </Button>
-                </div>
-              ))}
-            </div>
-          ) : null}
-          <form
-            className={styles.keywordForm}
-            onSubmit={(event) => {
-              event.preventDefault();
-              steer(keyword);
-            }}
-          >
-            <Input
-              aria-label="Wander keyword"
-              placeholder="Keyword"
-              value={keyword}
-              onChange={(event) => setKeyword(event.target.value)}
-            />
-            <Button type="submit" disabled={!keyword.trim()}>
-              Follow keyword
-            </Button>
-          </form>
-          {linkedKeywords.length ? (
-            <div className={styles.actions} role="group" aria-label="Linked keywords">
-              {linkedKeywords.map((tag) => (
-                <Button
-                  key={tag}
-                  variant="quiet"
-                  onClick={() => {
-                    setKeyword(readable(tag));
-                    steer(tag);
-                  }}
-                >
-                  {readable(tag)}
-                </Button>
-              ))}
-            </div>
-          ) : null}
-          {keywordMessage ? <p role="status">{keywordMessage}</p> : null}
-        </div>
-        {scenes.length ? (
-          <div className={styles.sceneJumps}>
-            <Caption>Change scene</Caption>
-            <div className={styles.actions} role="group" aria-label="Change scene">
-              {scenes.map((scene) => (
-                <Button
-                  key={scene.id}
-                  disabled={!canEscape}
-                  onClick={() => {
-                    const next = wanderJump(entries, current, visited, Math.random, scene.id);
-                    if (next !== null) go([...trail, next], { x: 0, y: 20 });
-                  }}
-                >
-                  {scene.label}
-                </Button>
-              ))}
-            </div>
-          </div>
-        ) : null}
-        {!hasUnexplored ? <Caption>You’ve explored every photograph in this walk.</Caption> : null}
+      <div className={styles.walkBar}>
+        <Button variant="quiet" disabled={trail.length < 2} onClick={() => go(trail.slice(0, -1))}>
+          Back
+        </Button>
+        <Caption>{explored.size} explored</Caption>
         {questLink ? (
           <AppLink
-            className={[buttonStyles.base, buttonStyles.quiet].join(" ")}
+            className={[buttonStyles.base, buttonStyles.quiet, styles.questLink].join(" ")}
             href={`/fun/wander?${new URLSearchParams({ mode: "quest", play: "1", ...(wanderKey(here) ? { wander: wanderKey(here)! } : {}) })}`}
           >
             Give me a quest
@@ -380,6 +267,143 @@ export const ExploreWander: React.FC<{
           })}
         </ol>
       ) : null}
+      <div className={styles.controls}>
+        {subjects.length ? (
+          <section className={styles.controlPanel} aria-label="Steer by subject">
+            <h3 className={styles.panelTitle}>Steer the walk</h3>
+            <div className={styles.subjects} role="group" aria-label="Steer by subject">
+              {subjects.map((subject) => (
+                <div className={styles.subjectRow} key={subject}>
+                  <span className={styles.subjectName}>{readable(subject)}</span>
+                  <div className={styles.subjectActions}>
+                    <Button
+                      aria-label={`Less ${readable(subject)}`}
+                      disabled={
+                        wanderKeyword(entries, current, visited, subject, false, travel) === null
+                      }
+                      onClick={() => steer(subject, false)}
+                    >
+                      Less
+                    </Button>
+                    <Button
+                      aria-label={`More ${readable(subject)}`}
+                      disabled={
+                        wanderKeyword(entries, current, visited, subject, true, travel) === null
+                      }
+                      onClick={() => steer(subject)}
+                    >
+                      More
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        ) : null}
+        <section className={styles.controlPanel} aria-label="Follow a keyword">
+          <h3 className={styles.panelTitle}>Follow a keyword</h3>
+          <form
+            className={styles.keywordForm}
+            onSubmit={(event) => {
+              event.preventDefault();
+              steer(keyword);
+            }}
+          >
+            <Input
+              aria-label="Wander keyword"
+              placeholder="Find a subject…"
+              value={keyword}
+              onChange={(event) => setKeyword(event.target.value)}
+            />
+            <Button type="submit" disabled={!keyword.trim()} aria-label="Follow keyword">
+              Go
+            </Button>
+          </form>
+          {linkedKeywords.length ? (
+            <div className={styles.linked}>
+              <Caption>Linked subjects</Caption>
+              <div className={styles.actions} role="group" aria-label="Linked keywords">
+                {linkedKeywords.map((tag) => (
+                  <Button
+                    key={tag}
+                    variant="quiet"
+                    onClick={() => {
+                      setKeyword(readable(tag));
+                      steer(tag);
+                    }}
+                  >
+                    {readable(tag)}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          ) : null}
+          {keywordMessage ? (
+            <p className={styles.feedback} role="status">
+              {keywordMessage}
+            </p>
+          ) : null}
+        </section>
+        <section className={styles.escapePanel} aria-label="Wider jumps">
+          <div className={styles.escapeHeader}>
+            <div className={styles.escapeStatus}>
+              <h3 className={styles.panelTitle}>Wider jumps</h3>
+              {escapeInterval > 0 && hasUnexplored ? (
+                <Caption>
+                  {canEscape
+                    ? "Ready"
+                    : `${escapeInterval - localSteps} fresh local ${escapeInterval - localSteps === 1 ? "step" : "steps"} to recharge · free escape at dead ends`}
+                </Caption>
+              ) : null}
+              {!hasUnexplored ? (
+                <Caption>You’ve explored every photograph in this walk.</Caption>
+              ) : null}
+            </div>
+            <Button
+              disabled={!hasUnexplored || !canEscape}
+              onClick={() => {
+                const next = wanderJump(entries, current, visited);
+                if (next !== null) go([...trail, next], { x: 0, y: 20 });
+              }}
+            >
+              Take a leap
+            </Button>
+            {!hasUnexplored ? (
+              <Button
+                onClick={() => {
+                  const next = entries.length > 1 ? (current + 1) % entries.length : current;
+                  setExplored(new Set([next]));
+                  setSteps(0);
+                  setLocalSteps(0);
+                  moved.current = true;
+                  setTrail([next]);
+                }}
+              >
+                Start again
+              </Button>
+            ) : null}
+          </div>
+          {scenes.length ? (
+            <details className={styles.scenePicker}>
+              <summary>Change scene</summary>
+              <div className={styles.actions} role="group" aria-label="Change scene">
+                {scenes.map((scene) => (
+                  <Button
+                    key={scene.id}
+                    disabled={!canEscape}
+                    onClick={() => {
+                      const next = wanderJump(entries, current, visited, Math.random, scene.id);
+                      if (next !== null) go([...trail, next], { x: 0, y: 20 });
+                    }}
+                  >
+                    {scene.label}
+                  </Button>
+                ))}
+              </div>
+            </details>
+          ) : null}
+        </section>
+      </div>
     </div>
   );
 };

@@ -68,3 +68,22 @@
   block-size: 7rem;
   object-fit: contain;
 }
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  border-block-end: var(--line-hairline) solid var(--c-border);
+  padding-block-end: var(--space-3);
+}
+.toolbar > :nth-child(2) {
+  margin-inline-end: auto;
+}
+.hint {
+  margin: 0;
+  padding: var(--space-3);
+  border-inline-start: var(--line-strong) solid var(--c-accent);
+  background: var(--c-selected);
+  border-radius: var(--radius-preview);
+}
