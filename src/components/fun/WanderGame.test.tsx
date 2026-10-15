@@ -69,6 +69,7 @@ it("offers aimless free roaming and finishes the walk only when asked", async ()
   fireEvent.click(screen.getByRole("button", { name: "Start wandering" }));
   await act(async () => {});
   expect(screen.queryByRole("list", { name: "Quest targets" })).toBeNull();
+  expect(screen.getByRole("button", { name: "Take a leap" })).toBeEnabled();
   step();
   expect(screen.queryByRole("region", { name: "Wander result" })).toBeNull();
   expect(readGameStats("wander").played).toBe(0);

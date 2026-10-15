@@ -16,6 +16,40 @@ export type WanderEntry = Pick<
 
 export type WanderExit = { index: number; label: string };
 
+export type WanderTravel = { interval: number; localSteps: number };
+const localNeighbours = (entries: readonly WanderEntry[], current: number) =>
+  [...new Set([...(entries[current]?.near ?? []), ...(entries[current]?.around ?? [])])].filter(
+    (index) => index !== current && entries[index],
+  );
+
+/** Rescue immediately at a dead end; otherwise earn wider jumps by exploring locally. */
+export const wanderCanEscape = (
+  entries: readonly WanderEntry[],
+  current: number,
+  visited: ReadonlySet<number>,
+  travel?: WanderTravel,
+): boolean =>
+  !travel ||
+  travel.interval <= 0 ||
+  travel.localSteps >= travel.interval ||
+  !localNeighbours(entries, current).some((index) => !visited.has(index));
+
+export const wanderTravelAfter = (
+  entries: readonly WanderEntry[],
+  current: number,
+  next: number,
+  travel: WanderTravel,
+  fresh = true,
+): WanderTravel =>
+  !fresh
+    ? travel
+    : {
+        interval: travel.interval,
+        localSteps: localNeighbours(entries, current).includes(next)
+          ? Math.min(travel.interval, travel.localSteps + 1)
+          : 0,
+      };
+
 const URBAN =
   /\b(streets?|city|cityscape|urban|buildings?|architecture|apartments?|skyscrapers?|storefront|downtown|skyline)\b/i;
 export const WANDER_SCENES = [
@@ -152,6 +186,7 @@ export const wanderExits = (
   current: number,
   visited: ReadonlySet<number> = new Set(),
   count = 6,
+  travel?: WanderTravel,
 ): WanderExit[] => {
   const here = entries[current];
   if (!here || count < 1) return [];
@@ -160,7 +195,9 @@ export const wanderExits = (
       index !== current && entries[index] !== undefined && list.indexOf(index) === position,
   );
   const candidates = all.filter((index) => !visited.has(index));
-  const jump = wanderJump(entries, current, new Set([...visited, ...all]), () => 0);
+  const jump = wanderCanEscape(entries, current, visited, travel)
+    ? wanderJump(entries, current, new Set([...visited, ...all]), () => 0)
+    : null;
   const localLimit = count - Number(jump !== null);
   const exits: WanderExit[] = [];
   const used = new Set<string>();
@@ -271,20 +308,26 @@ export const wanderRoute = (
   start: number,
   target: (entry: WanderEntry) => boolean,
   explored: ReadonlySet<number> = new Set(),
+  travel?: WanderTravel,
 ): WanderExit[] | null => {
   if (!entries[start]) return null;
   if (target(entries[start]!)) return [];
-  const queue: { current: number; path: WanderExit[] }[] = [{ current: start, path: [] }];
-  const reached = new Set([start]);
+  const initialTravel = travel ?? { interval: 0, localSteps: 0 };
+  const queue: { current: number; path: WanderExit[]; state: WanderTravel }[] = [
+    { current: start, path: [], state: initialTravel },
+  ];
+  const reached = new Set([`${start}/${initialTravel.localSteps}`]);
   for (let head = 0; head < queue.length; head += 1) {
-    const { current, path } = queue[head]!;
+    const { current, path, state } = queue[head]!;
     const visited = new Set([...explored, start, ...path.map((step) => step.index)]);
-    for (const exit of wanderExits(entries, current, visited)) {
+    for (const exit of wanderExits(entries, current, visited, 6, state)) {
       const next = [...path, exit];
       if (target(entries[exit.index]!)) return next;
-      if (!reached.has(exit.index)) {
-        reached.add(exit.index);
-        queue.push({ current: exit.index, path: next });
+      const nextState = wanderTravelAfter(entries, current, exit.index, state);
+      const key = `${exit.index}/${nextState.localSteps}`;
+      if (!reached.has(key)) {
+        reached.add(key);
+        queue.push({ current: exit.index, path: next, state: nextState });
       }
     }
   }
@@ -293,11 +336,13 @@ export const wanderRoute = (
   const visited = new Set([...explored, start]);
   const path: WanderExit[] = [];
   let current = start;
+  let state = initialTravel;
   while (visited.size <= entries.length) {
-    const exit = wanderExits(entries, current, visited)[0];
+    const exit = wanderExits(entries, current, visited, 6, state)[0];
     if (!exit) return null;
     path.push(exit);
     if (target(entries[exit.index]!)) return path;
+    state = wanderTravelAfter(entries, current, exit.index, state);
     visited.add(exit.index);
     current = exit.index;
   }
@@ -311,6 +356,7 @@ export const wanderKeyword = (
   visited: ReadonlySet<number>,
   keyword: string,
   more = true,
+  travel?: WanderTravel,
 ): number | null => {
   const term = keyword.trim().toLowerCase().replaceAll("_", " ");
   const here = entries[current];
@@ -322,6 +368,7 @@ export const wanderKeyword = (
     subjectText(entries[index]!).toLowerCase().includes(term) === more;
   const nearby = neighbours.find((index) => entries[index] && matches(index));
   if (nearby !== undefined) return nearby;
+  if (!wanderCanEscape(entries, current, visited, travel)) return null;
   const own = new Set(here.tags ?? []);
   let best: number | null = null;
   let score = -1;

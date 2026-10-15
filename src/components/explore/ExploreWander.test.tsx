@@ -152,3 +152,67 @@ it("keeps the walk in place when no photo matches a keyword", async () => {
   expect(here()).toHaveAttribute("href", "/album/walk#start.jpg");
   expect(screen.getByRole("status")).toHaveTextContent("No unexplored photographs");
 });
+
+it("keeps wider game jumps on cooldown and unlocks an escape at a dead end", async () => {
+  const source = [
+    point("start", ["city"], [1]),
+    point("local", ["city"], [0]),
+    point("forest", ["forest"], []),
+  ];
+  window.history.replaceState(null, "", "/fun/wander");
+  jest.mocked(fetchEmbeddingSpaceOnce).mockResolvedValue({
+    points: source,
+    clusters: [],
+    axisScale: { x: 1, y: 1, z: 1 },
+    atlas: null,
+  });
+  render(<ExploreWander initialIndex={0} escapeInterval={3} />);
+  await act(async () => {});
+  expect(screen.getByRole("button", { name: "Take a leap" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Nature" })).toBeDisabled();
+  expect(
+    within(screen.getByRole("list", { name: "Ways on" })).queryByRole("button", {
+      name: "further afield",
+    }),
+  ).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "closest" }));
+  expect(screen.getByRole("button", { name: "Take a leap" })).toBeEnabled();
+  expect(
+    within(screen.getByRole("list", { name: "Ways on" })).getByRole("button", {
+      name: "further afield",
+    }),
+  ).toBeEnabled();
+  fireEvent.click(screen.getByRole("button", { name: "Back" }));
+  expect(screen.getByRole("button", { name: "Take a leap" })).toBeEnabled();
+});
+
+it("earns jumps from fresh local moves, without farming Back", async () => {
+  const source = [
+    point("start", ["city"], [1, 2]),
+    point("one", ["city"], [0, 2]),
+    point("two", ["city"], [3]),
+    point("three", ["city"], [2]),
+    point("forest", ["forest"], [5]),
+    point("lake", ["water"], [4]),
+  ];
+  window.history.replaceState(null, "", "/fun/wander");
+  jest.mocked(fetchEmbeddingSpaceOnce).mockResolvedValue({
+    points: source,
+    clusters: [],
+    axisScale: { x: 1, y: 1, z: 1 },
+    atlas: null,
+  });
+  render(<ExploreWander initialIndex={0} escapeInterval={2} />);
+  await act(async () => {});
+  fireEvent.click(screen.getByRole("button", { name: "closest" }));
+  fireEvent.click(screen.getByRole("button", { name: "Back" }));
+  expect(screen.getByRole("button", { name: "Take a leap" })).toBeDisabled();
+  fireEvent.click(screen.getByRole("button", { name: "closest" }));
+  expect(screen.getByRole("button", { name: "Take a leap" })).toBeEnabled();
+  fireEvent.click(
+    within(screen.getByRole("list", { name: "Ways on" })).getByRole("button", {
+      name: "further afield",
+    }),
+  );
+  expect(screen.getByRole("button", { name: "Take a leap" })).toBeDisabled();
+});

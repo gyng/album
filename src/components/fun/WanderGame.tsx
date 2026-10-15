@@ -9,6 +9,7 @@ import {
   type WanderEntry,
   type WanderExit,
   type WanderQuest,
+  type WanderTravel,
 } from "../../util/wander";
 import { ExploreWander } from "../explore/ExploreWander";
 import { useUrlSearchParams } from "../platform";
@@ -25,7 +26,13 @@ type Mode = GameSettingsRegistry["wander"]["mode"];
 type Goal = WanderQuest & { photo?: EmbeddingSpaceEntry };
 const matches = (entry: WanderEntry, goal: Goal) =>
   goal.photo ? entry.src === goal.photo.src : meetsQuest(entry, goal);
-type Round = { id: number; mode: Mode; goals: Goal[]; initialIndex: number };
+type Round = {
+  id: number;
+  mode: Mode;
+  goals: Goal[];
+  initialIndex: number;
+  escapeInterval: number;
+};
 type Find = { goal: Goal; photo: EmbeddingSpaceEntry };
 type Solution = { goal: Goal; from: EmbeddingSpaceEntry; route: WanderExit[] };
 type Result = {
@@ -55,7 +62,8 @@ export const WanderGame = ({ linkedMode }: { linkedMode?: Mode }) => {
   const [steps, setSteps] = useState(0);
   const [message, setMessage] = useState("");
   const [hint, setHint] = useState("");
-  const explored = useRef(new Set<number>());
+  const explored = useRef<ReadonlySet<number>>(new Set<number>());
+  const travel = useRef<WanderTravel>({ interval: 0, localSteps: 0 });
   const foundRef = useRef<Find[]>([]);
   const lastVisit = useRef<{ photo: EmbeddingSpaceEntry; steps: number } | null>(null);
   const completed = useRef(false),
@@ -141,7 +149,16 @@ export const WanderGame = ({ linkedMode }: { linkedMode?: Mode }) => {
     setSteps(0);
     setMessage("");
     setResult(null);
-    setRound({ id: sequence.current, mode: settings.mode, goals, initialIndex });
+    const escapeInterval =
+      settings.mode === "roam"
+        ? 0
+        : settings.difficulty === "easy"
+          ? 2
+          : settings.difficulty === "hard"
+            ? 4
+            : 3;
+    travel.current = { interval: escapeInterval, localSteps: 0 };
+    setRound({ id: sequence.current, mode: settings.mode, goals, initialIndex, escapeInterval });
   };
   useEffect(() => {
     if (
@@ -157,9 +174,14 @@ export const WanderGame = ({ linkedMode }: { linkedMode?: Mode }) => {
     start();
   });
   const onVisit = useCallback(
-    (photo: EmbeddingSpaceEntry, moves: number) => {
+    (
+      photo: EmbeddingSpaceEntry,
+      moves: number,
+      context: { explored: ReadonlySet<number>; travel: WanderTravel },
+    ) => {
       lastVisit.current = { photo, steps: moves };
-      if (entries) explored.current.add(entries.findIndex((entry) => entry.src === photo.src));
+      explored.current = context.explored;
+      travel.current = context.travel;
       setHint("");
       setSteps(moves);
       if (!round || completed.current || round.mode === "roam") return;
@@ -184,7 +206,7 @@ export const WanderGame = ({ linkedMode }: { linkedMode?: Mode }) => {
         });
       }
     },
-    [round, record, entries],
+    [round, record],
   );
   const showHint = () => {
     if (!round || !entries || !lastVisit.current) return;
@@ -192,7 +214,13 @@ export const WanderGame = ({ linkedMode }: { linkedMode?: Mode }) => {
     const routes = round.goals
       .filter((goal) => !foundRef.current.some((item) => goalKey(item.goal) === goalKey(goal)))
       .map((goal) =>
-        wanderRoute(entries, current, (entry) => matches(entry, goal), explored.current),
+        wanderRoute(
+          entries,
+          current,
+          (entry) => matches(entry, goal),
+          explored.current,
+          travel.current,
+        ),
       )
       .filter((route): route is WanderExit[] => !!route?.length)
       .sort((a, b) => a.length - b.length);
@@ -221,7 +249,13 @@ export const WanderGame = ({ linkedMode }: { linkedMode?: Mode }) => {
     const visited = new Set(explored.current);
     for (const goal of round.goals) {
       if (foundRef.current.some((item) => goalKey(item.goal) === goalKey(goal))) continue;
-      const route = wanderRoute(entries, current, (entry) => matches(entry, goal), visited);
+      const route = wanderRoute(
+        entries,
+        current,
+        (entry) => matches(entry, goal),
+        visited,
+        travel.current,
+      );
       if (!route) continue;
       solutions.push({ goal, from: entries[current]!, route });
     }
@@ -363,6 +397,7 @@ export const WanderGame = ({ linkedMode }: { linkedMode?: Mode }) => {
           initialIndex={round.initialIndex}
           questLink={false}
           photoLinks={false}
+          escapeInterval={round.escapeInterval}
           onVisit={onVisit}
         />
       </div>
@@ -423,6 +458,13 @@ export const WanderGame = ({ linkedMode }: { linkedMode?: Mode }) => {
               : settings.difficulty === "hard"
                 ? "Only one photograph fulfils the quest."
                 : "Up to five photographs can fulfil the quest."}
+          </Caption>
+        ) : null}
+        {settings.mode !== "roam" ? (
+          <Caption>
+            Wider jumps recharge after{" "}
+            {settings.difficulty === "easy" ? 2 : settings.difficulty === "hard" ? 4 : 3} fresh
+            local steps; dead ends unlock an escape.
           </Caption>
         ) : null}
         {!canStart && entries ? (

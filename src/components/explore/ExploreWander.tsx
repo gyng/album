@@ -9,6 +9,9 @@ import {
   wanderScenes,
   wanderKey,
   wanderKeyword,
+  wanderCanEscape,
+  wanderTravelAfter,
+  type WanderTravel,
 } from "../../util/wander";
 import styles from "./ExploreWander.module.css";
 
@@ -32,14 +35,31 @@ export const ExploreWander: React.FC<{
   initialIndex?: number;
   questLink?: boolean;
   photoLinks?: boolean;
-  onVisit?: (entry: EmbeddingSpaceEntry, steps: number) => void;
-}> = ({ onTrailChange, initialIndex, questLink = true, photoLinks = true, onVisit }) => {
+  escapeInterval?: number;
+  onVisit?: (
+    entry: EmbeddingSpaceEntry,
+    steps: number,
+    context: { explored: ReadonlySet<number>; travel: WanderTravel },
+  ) => void;
+}> = ({
+  onTrailChange,
+  initialIndex,
+  questLink = true,
+  photoLinks = true,
+  escapeInterval = 0,
+  onVisit,
+}) => {
   const { ready, searchParams, getSearchParam, replaceSearchParams } = useUrlSearchParams();
   const [entries, setEntries] = React.useState<EmbeddingSpaceEntry[] | null>(null);
   const [failed, setFailed] = React.useState(false);
   const [trail, setTrail] = React.useState<number[]>([]);
   const [explored, setExplored] = React.useState<Set<number>>(() => new Set());
   const [steps, setSteps] = React.useState(0);
+  const [localSteps, setLocalSteps] = React.useState(0);
+  const travel = React.useMemo(
+    () => ({ interval: escapeInterval, localSteps }),
+    [escapeInterval, localSteps],
+  );
   const [keyword, setKeyword] = React.useState("");
   const [keywordMessage, setKeywordMessage] = React.useState("");
   const currentRef = React.useRef<HTMLDivElement>(null);
@@ -80,8 +100,8 @@ export const ExploreWander: React.FC<{
   const here = entries && current !== null ? entries[current] : undefined;
 
   React.useEffect(() => {
-    if (here) onVisit?.(here, steps);
-  }, [here, steps, onVisit]);
+    if (here) onVisit?.(here, steps, { explored, travel });
+  }, [here, steps, onVisit, explored, travel]);
 
   React.useEffect(() => {
     if (!entries) return;
@@ -100,7 +120,11 @@ export const ExploreWander: React.FC<{
   }, [here, getSearchParam, searchParams, replaceSearchParams]);
 
   const go = (next: number[], direction = { x: 0, y: 12 }) => {
-    if (next.at(-1) !== current) setSteps((previous) => previous + 1);
+    const destination = next.at(-1);
+    if (destination !== current) setSteps((previous) => previous + 1);
+    if (entries && current !== null && destination !== undefined && !explored.has(destination)) {
+      setLocalSteps(wanderTravelAfter(entries, current, destination, travel).localSteps);
+    }
     setKeywordMessage("");
     setMotion(direction);
     moved.current = true;
@@ -110,8 +134,8 @@ export const ExploreWander: React.FC<{
   };
   const visited = explored;
   const exits = React.useMemo(
-    () => (entries && current !== null ? wanderExits(entries, current, visited) : []),
-    [entries, current, visited],
+    () => (entries && current !== null ? wanderExits(entries, current, visited, 6, travel) : []),
+    [entries, current, visited, travel],
   );
   const scenes = React.useMemo(
     () => (entries && current !== null ? wanderScenes(entries, current, visited) : []),
@@ -124,11 +148,12 @@ export const ExploreWander: React.FC<{
   if (!entries || !here || current === null)
     return <LoadingIndicator label="Loading photographs…" />;
 
+  const canEscape = wanderCanEscape(entries, current, visited, travel);
   const steer = (term: string, more = true) => {
-    const next = wanderKeyword(entries, current, visited, term, more);
+    const next = wanderKeyword(entries, current, visited, term, more, travel);
     if (next === null) {
       setKeywordMessage(
-        `No unexplored photographs ${more ? "with" : "without"} “${readable(term.trim())}”.`,
+        `No ${canEscape ? "unexplored" : "nearby unexplored"} photographs ${more ? "with" : "without"} “${readable(term.trim())}”.`,
       );
       return;
     }
@@ -210,7 +235,7 @@ export const ExploreWander: React.FC<{
           </Button>
           <Button
             variant="accent"
-            disabled={!hasUnexplored}
+            disabled={!hasUnexplored || !canEscape}
             onClick={() => {
               const next = wanderJump(entries, current, visited);
               if (next !== null) go([...trail, next], { x: 0, y: 20 });
@@ -224,6 +249,7 @@ export const ExploreWander: React.FC<{
                 const next = entries.length > 1 ? (current + 1) % entries.length : current;
                 setExplored(new Set([next]));
                 setSteps(0);
+                setLocalSteps(0);
                 moved.current = true;
                 setTrail([next]);
               }}
@@ -232,6 +258,13 @@ export const ExploreWander: React.FC<{
             </Button>
           ) : null}
         </div>
+        {escapeInterval > 0 && hasUnexplored ? (
+          <Caption>
+            {canEscape
+              ? "Wider jumps ready"
+              : `Wider jumps in ${escapeInterval - localSteps} fresh local ${escapeInterval - localSteps === 1 ? "step" : "steps"} · dead ends unlock an escape.`}
+          </Caption>
+        ) : null}
         <div className={styles.sceneJumps}>
           <Caption>Follow a subject</Caption>
           {subjects.length ? (
@@ -239,13 +272,17 @@ export const ExploreWander: React.FC<{
               {subjects.map((subject) => (
                 <div className={styles.actions} key={subject}>
                   <Button
-                    disabled={wanderKeyword(entries, current, visited, subject) === null}
+                    disabled={
+                      wanderKeyword(entries, current, visited, subject, true, travel) === null
+                    }
                     onClick={() => steer(subject)}
                   >
                     More {readable(subject)}
                   </Button>
                   <Button
-                    disabled={wanderKeyword(entries, current, visited, subject, false) === null}
+                    disabled={
+                      wanderKeyword(entries, current, visited, subject, false, travel) === null
+                    }
                     onClick={() => steer(subject, false)}
                   >
                     Less {readable(subject)}
@@ -296,6 +333,7 @@ export const ExploreWander: React.FC<{
               {scenes.map((scene) => (
                 <Button
                   key={scene.id}
+                  disabled={!canEscape}
                   onClick={() => {
                     const next = wanderJump(entries, current, visited, Math.random, scene.id);
                     if (next !== null) go([...trail, next], { x: 0, y: 20 });

@@ -133,6 +133,13 @@ test("Explore opens the Fun quest and Wander offers photo hunts and difficulty",
   await page.getByRole("link", { name: "Give me a quest", exact: true }).click();
   await expect(page).toHaveURL(/\/fun\/wander\?/);
   await expect(page.getByRole("list", { name: "Quest targets" })).toContainText("cat + stairs");
+  await expect(page.getByRole("button", { name: "Take a leap", exact: true })).toBeDisabled();
+  await expect(
+    page
+      .getByRole("list", { name: "Ways on" })
+      .getByRole("button", { name: "further afield", exact: true }),
+  ).toHaveCount(0);
+
   const currentPhoto = page.getByRole("img", { name: "Quest scene 0", exact: true });
   await expect(currentPhoto.locator("xpath=ancestor::a")).toHaveCount(0);
   await currentPhoto.click();

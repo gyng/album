@@ -6,6 +6,8 @@ import {
   wanderHunt,
   wanderRoute,
   wanderKeyword,
+  wanderCanEscape,
+  wanderTravelAfter,
   wanderQuest,
   type WanderEntry,
 } from "./wander";
@@ -182,4 +184,39 @@ it("steers towards or away from a keyword, preferring related unvisited photos",
   expect(wanderKeyword(entries, 0, new Set([0]), "window")).toBe(1);
   expect(wanderKeyword(entries, 0, new Set([0]), "unicorn")).toBeNull();
   expect(wanderKeyword(entries, 0, new Set([0]), " ")).toBeNull();
+});
+
+it("recharges game escapes through fresh local moves and always permits a dead-end rescue", () => {
+  const entries = [
+    entry("/album/a#0", ["city"], "", [1]),
+    entry("/album/a#1", ["city"], "", [2]),
+    entry("/album/a#2", ["city"], "", [0]),
+    entry("/album/a#3", ["forest"], ""),
+  ];
+  const travel = { interval: 3, localSteps: 0 };
+  expect(wanderCanEscape(entries, 0, new Set([0]), travel)).toBe(false);
+  expect(
+    wanderExits(entries, 0, new Set([0]), 6, travel).some(
+      (exit) => exit.label === "further afield",
+    ),
+  ).toBe(false);
+  expect(wanderKeyword(entries, 0, new Set([0]), "forest", true, travel)).toBeNull();
+  expect(wanderTravelAfter(entries, 0, 1, travel)).toEqual({ interval: 3, localSteps: 1 });
+  expect(wanderTravelAfter(entries, 0, 1, travel, false)).toEqual(travel);
+  const ready = { interval: 3, localSteps: 3 };
+  expect(wanderCanEscape(entries, 0, new Set([0]), ready)).toBe(true);
+  expect(wanderTravelAfter(entries, 0, 3, ready)).toEqual(travel);
+  expect(wanderCanEscape(entries, 2, new Set([0, 1, 2]), travel)).toBe(true);
+  expect(wanderCanEscape(entries, 0, new Set([0]))).toBe(true);
+  const visited = new Set([0]);
+  const route = wanderRoute(entries, 0, (photo) => photo === entries[3], visited, travel)!;
+  let current = 0,
+    state = travel;
+  for (const step of route) {
+    expect(wanderExits(entries, current, visited, 6, state)).toContainEqual(step);
+    state = wanderTravelAfter(entries, current, step.index, state);
+    visited.add(step.index);
+    current = step.index;
+  }
+  expect(current).toBe(3);
 });
