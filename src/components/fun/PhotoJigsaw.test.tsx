@@ -16,7 +16,7 @@ beforeEach(() => {
   global.Image = class {
     onload: (() => void) | null = null;
     onerror: (() => void) | null = null;
-    naturalWidth = 1200;
+    naturalWidth = 800;
     naturalHeight = 800;
     set src(_v: string) {
       queueMicrotask(() => this.onload?.());
@@ -100,6 +100,7 @@ it("offers a new photograph while keeping the current mode and size", async () =
   }));
   render(<PhotoJigsaw photos={source} />);
   fireEvent.click(screen.getByRole("button", { name: "Swap" }));
+  fireEvent.click(screen.getByRole("radio", { name: "Square grid" }));
   fireEvent.click(screen.getByRole("button", { name: "4 × 4" }));
   fireEvent.click(screen.getByRole("button", { name: "Start puzzle" }));
   fireEvent.click(screen.getByRole("button", { name: "Preview" }));
@@ -112,7 +113,7 @@ it("offers a new photograph while keeping the current mode and size", async () =
   expect(readGameStats("photo-jigsaw").played).toBe(0);
 });
 
-it("defaults to shaped pieces, rejects a non-fitting placement and filters for edge pieces", async () => {
+it("allows shaped pieces in any cell and filters for edge pieces", async () => {
   jest.mocked(dealJigsaw).mockReturnValue({
     tiles: Array(9).fill(-1),
     turns: Array(9).fill(0),
@@ -137,8 +138,9 @@ it("defaults to shaped pieces, rejects a non-fitting placement and filters for e
   await waitFor(() => expect(screen.getByRole("button", { name: "Pool piece 1" })).toBeEnabled());
   fireEvent.click(screen.getByRole("button", { name: "Pool piece 1" }));
   fireEvent.click(screen.getByRole("button", { name: "Empty cell at row 1, column 2" }));
-  expect(screen.getByRole("status")).toHaveTextContent(/does not fit/);
-  expect(screen.getAllByRole("button", { name: /Pool piece/ })).toHaveLength(9);
+  expect(screen.getByRole("button", { name: "Piece at row 1, column 2" })).toBeEnabled();
+  expect(screen.queryByRole("heading", { name: /Completed/ })).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Piece at row 1, column 2" }));
   fireEvent.click(screen.getByRole("button", { name: "Empty cell at row 1, column 1" }));
   expect(screen.getAllByRole("button", { name: /Pool piece/ })).toHaveLength(8);
   fireEvent.click(screen.getByRole("button", { name: "Edges only" }));
@@ -176,4 +178,84 @@ it("accepts custom grids beyond ten and rejects fractional or out-of-range sizes
   fireEvent.click(screen.getByRole("button", { name: "Start puzzle" }));
   expect(dealJigsaw).toHaveBeenLastCalledWith(12, "jigsaw");
   await waitFor(() => expect(screen.getByRole("button", { name: "Pool piece 1" })).toBeEnabled());
+});
+
+it("adapts the default grid to retain the full landscape photograph with square pieces", async () => {
+  global.Image = class {
+    onload: (() => void) | null = null;
+    onerror: (() => void) | null = null;
+    naturalWidth = 1200;
+    naturalHeight = 800;
+    set src(_value: string) {
+      queueMicrotask(() => this.onload?.());
+    }
+  } as unknown as typeof Image;
+  jest.mocked(dealJigsaw).mockImplementation((size, _mode, _random, rows = size) => ({
+    tiles: Array(size * rows).fill(-1),
+    turns: Array(size * rows).fill(0),
+    pool: Array.from({ length: size * rows }, (_, i) => i),
+    moves: 0,
+  }));
+  render(
+    <PhotoJigsaw
+      photos={[
+        {
+          path: "../albums/test-simple/wide.jpg",
+          href: "/album/test-simple",
+          caption: "Wide landscape",
+          tags: "",
+          vector: [],
+        },
+      ]}
+    />,
+  );
+  expect(screen.getByRole("radio", { name: "Square pieces" })).toHaveAttribute(
+    "aria-checked",
+    "true",
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Start puzzle" }));
+  await waitFor(() =>
+    expect(screen.getAllByRole("button", { name: /Pool piece/ })).toHaveLength(6),
+  );
+  expect(screen.getAllByRole("button", { name: /Empty cell/ })).toHaveLength(6);
+  expect(screen.getByText("3 × 2 · 6 pieces")).toBeInTheDocument();
+});
+it("rotates a selected piece with keyboard, touch buttons, right-click and wheel, keeping the turn after placement", async () => {
+  jest.mocked(dealJigsaw).mockReturnValue({
+    tiles: Array(9).fill(-1),
+    turns: Array(9).fill(0),
+    moves: 0,
+    pool: [0, 1, 2, 3, 4, 5, 6, 7, 8],
+  });
+  const { container } = render(
+    <PhotoJigsaw
+      photos={[
+        {
+          path: "../albums/test-simple/turn.jpg",
+          href: "/album/test-simple",
+          caption: "A scene",
+          tags: "",
+          vector: [],
+        },
+      ]}
+    />,
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Start puzzle" }));
+  const piece = screen.getByRole("button", { name: "Pool piece 1" });
+  await waitFor(() => expect(piece).toBeEnabled());
+  fireEvent.click(piece);
+  fireEvent.keyDown(piece, { key: "r" });
+  expect(piece.querySelector("svg g")).toHaveAttribute("transform", "rotate(90 50 50)");
+  fireEvent.click(screen.getByRole("button", { name: "Rotate right" }));
+  fireEvent.contextMenu(piece);
+  expect(piece.querySelector("svg g")).toHaveAttribute("transform", "rotate(270 50 50)");
+  fireEvent.keyDown(piece, { key: "q" });
+  fireEvent.wheel(container.firstElementChild!, { deltaY: 120 });
+  expect(piece.querySelector("svg g")).toHaveAttribute("transform", "rotate(270 50 50)");
+  fireEvent.click(screen.getByRole("button", { name: "Empty cell at row 1, column 2" }));
+  const placed = screen.getByRole("button", { name: "Piece at row 1, column 2" });
+  expect(placed.querySelector("svg g")).toHaveAttribute("transform", "rotate(270 50 50)");
+  fireEvent.click(placed);
+  fireEvent.click(screen.getByRole("button", { name: "Rotate left" }));
+  expect(placed.querySelector("svg g")).toHaveAttribute("transform", "rotate(180 50 50)");
 });

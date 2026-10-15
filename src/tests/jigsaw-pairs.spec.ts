@@ -67,6 +67,7 @@ test("jigsaw supports pool-to-grid dragging, rearranging, returning and keyboard
     "aria-pressed",
     "true",
   );
+  await page.getByRole("radio", { name: "Square grid", exact: true }).click();
   await page.getByRole("button", { name: "Rectangular pieces", exact: true }).click();
   await expect(page.getByRole("button", { name: "Start puzzle" })).toBeEnabled();
   await page.getByRole("button", { name: "Start puzzle" }).click();
@@ -131,6 +132,7 @@ test("touch dragging places a piece and cancellation leaves the board intact", a
   await page.setViewportSize({ width: 390, height: 844 });
   await fixture(page);
   await gotoHydrated(page, "/fun/photo-jigsaw");
+  await page.getByRole("radio", { name: "Square grid", exact: true }).click();
   await page.getByRole("button", { name: "Rectangular pieces", exact: true }).click();
   await expect(page.getByRole("button", { name: "Start puzzle" })).toBeEnabled();
   await page.getByRole("button", { name: "Start puzzle" }).click();
@@ -160,7 +162,7 @@ test("touch dragging places a piece and cancellation leaves the board intact", a
   await expect(page.getByText("1 move", { exact: true })).toBeVisible();
 });
 
-test("shaped jigsaw pieces fit their cells, filter edges and switch photographs", async ({
+test("shaped jigsaw pieces can occupy any cell, use square proportions and switch photographs", async ({
   page,
 }) => {
   await fixture(page);
@@ -176,21 +178,27 @@ test("shaped jigsaw pieces fit their cells, filter edges and switch photographs"
   const image = first.locator("svg image");
   const column = -Number(await image.getAttribute("x")) / 100;
   const row = -Number(await image.getAttribute("y")) / 100;
+  const columns = Number(await image.getAttribute("width")) / 100;
+  const rows = Number(await image.getAttribute("height")) / 100;
+  expect([columns, rows]).toEqual([3, 2]);
+  const wrong = (row * columns + column + 1) % (columns * rows);
   const target = page.getByRole("button", {
-    name: `Empty cell at row ${row + 1}, column ${column + 1}`,
+    name: `Empty cell at row ${Math.floor(wrong / columns) + 1}, column ${(wrong % columns) + 1}`,
     exact: true,
   });
+  const cell = (await target.boundingBox())!;
+  expect(cell.width / cell.height).toBeCloseTo(1, 1);
   await first.dragTo(target);
-  await expect(pool.getByRole("button", { name: /Pool piece/ })).toHaveCount(8);
+  await expect(pool.getByRole("button", { name: /Pool piece/ })).toHaveCount(columns * rows - 1);
   await expect(page.getByText("1 move", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Edges only" }).click();
   await expect(pool.getByRole("button", { name: /Pool piece/ })).toHaveCount(
-    row === 1 && column === 1 ? 8 : 7,
+    2 * columns + 2 * rows - 5,
   );
   await page.getByRole("button", { name: "Preview", exact: true }).click();
   const previous = await page.getByLabel("Photograph puzzle").getByRole("img").getAttribute("src");
   await page.getByRole("button", { name: "New photo", exact: true }).click();
-  await expect(pool.getByRole("button", { name: /Pool piece/ })).toHaveCount(9);
+  await expect(pool.getByRole("button", { name: /Pool piece/ })).toHaveCount(columns * rows);
   await page.getByRole("button", { name: "Preview", exact: true }).click();
   await expect(page.getByLabel("Photograph puzzle").getByRole("img")).not.toHaveAttribute(
     "src",
@@ -219,6 +227,7 @@ for (const width of [390, 1280])
     await page.setViewportSize({ width, height: 844 });
     await fixture(page);
     await gotoHydrated(page, "/fun/photo-jigsaw");
+    await page.getByRole("radio", { name: "Square grid", exact: true }).click();
     await expect(page.getByRole("button", { name: "10 × 10", exact: true })).toBeVisible();
     await page.getByRole("spinbutton", { name: "Custom grid size" }).fill("12");
     await page.reload();
@@ -232,3 +241,86 @@ for (const width of [390, 1280])
       width,
     );
   });
+
+test("shaped pieces rotate with wheel, right-click and keyboard before and after arbitrary placement", async ({
+  page,
+}) => {
+  await fixture(page);
+  await gotoHydrated(page, "/fun/photo-jigsaw");
+  await page.getByRole("button", { name: "Start puzzle" }).click();
+  const first = page
+    .getByRole("region", { name: "Piece pool" })
+    .getByRole("button", { name: "Pool piece 1", exact: true });
+  await expect(first).toBeEnabled();
+  await first.click();
+  await first.press("e");
+  await expect(first.locator("svg g")).toHaveAttribute("transform", "rotate(90 50 50)");
+  await first.click({ button: "right" });
+  await expect(first.locator("svg g")).toHaveAttribute("transform", "rotate(180 50 50)");
+  await first.hover();
+  await page.mouse.wheel(0, 120);
+  await expect(first.locator("svg g")).toHaveAttribute("transform", "rotate(270 50 50)");
+  await first.press("q");
+  await expect(first.locator("svg g")).toHaveAttribute("transform", "rotate(180 50 50)");
+  await first.dragTo(
+    page.getByRole("button", { name: "Empty cell at row 1, column 1", exact: true }),
+  );
+  const placed = page.getByRole("button", { name: "Piece at row 1, column 1", exact: true });
+  await expect(placed.locator("svg g")).toHaveAttribute("transform", "rotate(180 50 50)");
+  await placed.press("r");
+  await expect(placed.locator("svg g")).toHaveAttribute("transform", "rotate(270 50 50)");
+  await placed.press("Shift+R");
+  await expect(placed.locator("svg g")).toHaveAttribute("transform", "rotate(180 50 50)");
+});
+
+test("touch players can select, rotate and place a shaped piece", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await fixture(page);
+  await gotoHydrated(page, "/fun/photo-jigsaw");
+  await page.getByRole("button", { name: "Start puzzle" }).tap();
+  const first = page
+    .getByRole("region", { name: "Piece pool" })
+    .getByRole("button", { name: "Pool piece 1", exact: true });
+  await expect(first).toBeEnabled();
+  await first.tap();
+  await page.getByRole("button", { name: "Rotate right", exact: true }).tap();
+  await expect(first.locator("svg g")).toHaveAttribute("transform", "rotate(90 50 50)");
+  await page.getByRole("button", { name: "Empty cell at row 1, column 1", exact: true }).tap();
+  const placed = page.getByRole("button", { name: "Piece at row 1, column 1", exact: true });
+  await expect(placed.locator("svg g")).toHaveAttribute("transform", "rotate(90 50 50)");
+  await placed.tap();
+  await page.getByRole("button", { name: "Rotate left", exact: true }).tap();
+  await expect(placed.locator("svg g")).toHaveAttribute("transform", "rotate(0 50 50)");
+});
+
+test("matching size choices remain visibly active when switching options and returning to the menu", async ({
+  page,
+}) => {
+  await fixture(page);
+  await gotoHydrated(page, "/fun/photo-pairs");
+  const sizes = page.getByRole("group", { name: "Board size", exact: true });
+  for (const name of ["4×2", "4×4"]) {
+    const selected = sizes.getByRole("button", { name, exact: true });
+    await selected.click();
+    await page.mouse.move(0, 0);
+    await expect(selected).toHaveAttribute("aria-pressed", "true");
+    const background = await selected.evaluate(
+      (element) => getComputedStyle(element).backgroundColor,
+    );
+    const other = await sizes
+      .getByRole("button", { name: "4×3", exact: true })
+      .evaluate((element) => getComputedStyle(element).backgroundColor);
+    expect(background).not.toBe(other);
+  }
+  await page.getByRole("button", { name: "Start matching" }).click();
+  await page.getByRole("button", { name: "Menu", exact: true }).click();
+  await expect(sizes.getByRole("button", { name: "4×4", exact: true })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await page.reload();
+  await expect(sizes.getByRole("button", { name: "4×4", exact: true })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+});

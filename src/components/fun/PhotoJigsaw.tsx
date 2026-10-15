@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState, type CSSProperties, type KeyboardEvent } from "react";
 import { AppLink } from "../platform";
-import { Button, Caption, Heading, Input } from "../ui";
+import { Button, Caption, Heading, Input, KeyHint, SegmentedToggle } from "../ui";
 import { GameIntro } from "./GameIllustration";
 import { GameStatsLine } from "./GameRecord";
 import { useGameReadiness } from "./GameReadiness";
@@ -12,6 +12,8 @@ import { ResultNextSteps } from "./ResultNextSteps";
 import {
   dealJigsaw,
   jigsawSolved,
+  jigsawGrid,
+  rotateJigsawPiece,
   isJigsawSize,
   JIGSAW_MIN_SIZE,
   JIGSAW_MAX_SIZE,
@@ -27,12 +29,19 @@ import type { PhotoGamePhoto } from "../../util/photoGames";
 import { getResizedAlbumImageSrc } from "../../util/getResizedAlbumImageSrc";
 import styles from "./PhotoJigsaw.module.css";
 
-type Board = { photo: PhotoGamePhoto; size: number; mode: JigsawMode; state: JigsawState };
+type Board = {
+  photo: PhotoGamePhoto;
+  size: number;
+  rows: number;
+  requestedSize: number;
+  squarePieces: boolean;
+  mode: JigsawMode;
+  state: JigsawState;
+};
 export const PhotoJigsaw = ({ photos }: { photos: PhotoGamePhoto[] }) => {
   const [edgesOnly, setEdgesOnly] = useState(false);
   const [customSize, setCustomSize] = useState<string | null>(null);
   const customId = useId();
-  const [feedback, setFeedback] = useState("");
   const { loading } = useGameReadiness();
   const [settings, setSettings] = useGameSettings("jigsaw");
   const { stats, record } = useGameStats("photo-jigsaw");
@@ -51,8 +60,21 @@ export const PhotoJigsaw = ({ photos }: { photos: PhotoGamePhoto[] }) => {
     let cancelled = false;
     const img = new Image();
     img.onload = () => {
-      if (!cancelled)
-        setImage({ src, ratio: img.naturalWidth / img.naturalHeight || 1.5, failed: false });
+      if (cancelled) return;
+      const ratio = img.naturalWidth / img.naturalHeight || 1.5;
+      setBoard((previous) => {
+        if (!previous) return previous;
+        const grid = jigsawGrid(previous.requestedSize, ratio, previous.squarePieces);
+        return previous.size === grid.columns && previous.rows === grid.rows
+          ? previous
+          : {
+              ...previous,
+              size: grid.columns,
+              rows: grid.rows,
+              state: dealJigsaw(grid.columns, previous.mode, Math.random, grid.rows),
+            };
+      });
+      setImage({ src, ratio, failed: false });
     };
     img.onerror = () => {
       if (!cancelled) setImage({ src, ratio: 1.5, failed: true });
@@ -71,15 +93,22 @@ export const PhotoJigsaw = ({ photos }: { photos: PhotoGamePhoto[] }) => {
     const photo = available[Math.floor(Math.random() * available.length)]!;
     recorded.current = false;
     setEdgesOnly(false);
-    setFeedback("");
     setSelected(null);
     setPreview(false);
     setRotating(false);
+    const ratio = image?.src === getResizedAlbumImageSrc(photo.path) ? image.ratio : 1;
+    const grid = jigsawGrid(settings.size, ratio, settings.squarePieces);
     setBoard({
       photo,
-      size: settings.size,
+      size: grid.columns,
+      rows: grid.rows,
+      requestedSize: settings.size,
+      squarePieces: settings.squarePieces,
       mode: settings.mode,
-      state: dealJigsaw(settings.size, settings.mode),
+      state:
+        grid.columns === grid.rows
+          ? dealJigsaw(grid.columns, settings.mode)
+          : dealJigsaw(grid.columns, settings.mode, Math.random, grid.rows),
     });
   };
   const complete = !!board && jigsawSolved(board.state);
@@ -96,11 +125,6 @@ export const PhotoJigsaw = ({ photos }: { photos: PhotoGamePhoto[] }) => {
   };
   const place = (piece: number, target: number | "pool") => {
     if (!board || !loaded || complete || preview) return;
-    if (board.mode === "jigsaw" && target !== "pool" && target !== piece) {
-      setFeedback("That piece does not fit here.");
-      return;
-    }
-    setFeedback("");
     if (target === "pool") {
       if (board.mode === "pool" || board.mode === "jigsaw")
         update(returnJigsawPiece(board.state, piece));
@@ -113,7 +137,52 @@ export const PhotoJigsaw = ({ photos }: { photos: PhotoGamePhoto[] }) => {
     setSelected(null);
   };
   const gesture = useJigsawDrag(root, !!board && !!loaded && !preview && !complete, place);
+  const poolMode = board?.mode === "pool" || board?.mode === "jigsaw";
+  const canRotate =
+    !!board && (poolMode || board.mode === "rotate") && !!loaded && !complete && !preview;
+  const selectedPiece =
+    selected === null || !board
+      ? null
+      : poolMode
+        ? selected
+        : (board.state.tiles[selected] ?? null);
+  const turn = (piece: number, direction: 1 | -1) => {
+    if (!canRotate || !board || piece < 0) return;
+    update(
+      poolMode
+        ? rotateJigsawPiece(board.state, piece, direction)
+        : rotateJigsaw(board.state, board.state.tiles.indexOf(piece), direction),
+    );
+    setSelected(poolMode ? piece : board.state.tiles.indexOf(piece));
+  };
+  const wheel = useRef({ piece: -1, delta: 0, at: 0 });
+  useEffect(() => {
+    const element = root.current;
+    if (!element || !canRotate) return;
+    const rotate = (event: WheelEvent) => {
+      const piece = gesture.drag?.piece ?? selectedPiece;
+      if (piece === null || piece === undefined) return;
+      event.preventDefault();
+      const now = performance.now();
+      if (wheel.current.piece !== piece || now - wheel.current.at > 300)
+        wheel.current = { piece, delta: 0, at: now };
+      wheel.current.delta += event.deltaY * (event.deltaMode === 1 ? 16 : 1);
+      wheel.current.at = now;
+      if (Math.abs(wheel.current.delta) >= 40) {
+        turn(piece, wheel.current.delta > 0 ? 1 : -1);
+        wheel.current.delta = 0;
+      }
+    };
+    element.addEventListener("wheel", rotate, { passive: false });
+    return () => element.removeEventListener("wheel", rotate);
+  });
   const onPieceKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
+    const key = event.key.toLowerCase();
+    const piece = Number(event.currentTarget.dataset.jigsawPiece);
+    if (canRotate && Number.isInteger(piece) && ["q", "e", "r"].includes(key)) {
+      event.preventDefault();
+      turn(piece, key === "q" || (key === "r" && event.shiftKey) ? -1 : 1);
+    }
     if (event.key === "Escape") {
       setSelected(null);
       gesture.cancel();
@@ -159,10 +228,21 @@ export const PhotoJigsaw = ({ photos }: { photos: PhotoGamePhoto[] }) => {
                 setSettings((s) => ({ ...s, size }));
               }}
             >
-              {size} × {size}
+              {settings.squarePieces ? size : `${size} × ${size}`}
             </Button>
           ))}
         </div>
+        <SegmentedToggle
+          ariaLabel="Piece proportions"
+          value={settings.squarePieces ? "pieces" : "grid"}
+          options={[
+            { value: "pieces", label: "Square pieces" },
+            { value: "grid", label: "Square grid" },
+          ]}
+          onChange={(value) =>
+            setSettings((previous) => ({ ...previous, squarePieces: value === "pieces" }))
+          }
+        />
         <label className={styles.customSize} htmlFor={`${customId}-input`}>
           Custom grid size
           <Input
@@ -185,7 +265,9 @@ export const PhotoJigsaw = ({ photos }: { photos: PhotoGamePhoto[] }) => {
         </label>
         <Caption id={customId}>
           {validSize
-            ? `${settings.size * settings.size} pieces · ${JIGSAW_MIN_SIZE}–${JIGSAW_MAX_SIZE} per side`
+            ? settings.squarePieces
+              ? `${settings.size} on the longest side · full photograph`
+              : `${settings.size * settings.size} pieces · ${JIGSAW_MIN_SIZE}–${JIGSAW_MAX_SIZE} per side`
             : `Enter a whole number from ${JIGSAW_MIN_SIZE} to ${JIGSAW_MAX_SIZE}.`}
         </Caption>
         <div className={styles.variants} role="group" aria-label="Puzzle variant">
@@ -222,11 +304,10 @@ export const PhotoJigsaw = ({ photos }: { photos: PhotoGamePhoto[] }) => {
       </GameIntro>
     );
   const shaped = board.mode === "jigsaw";
-  const poolMode = board.mode === "pool" || board.mode === "jigsaw";
   const crop = (piece: number, turn = 0): CSSProperties => ({
     backgroundImage: `url("${src}")`,
-    backgroundSize: `${board.size * 100}% ${board.size * 100}%`,
-    backgroundPosition: `${((piece % board.size) * 100) / (board.size - 1)}% ${(Math.floor(piece / board.size) * 100) / (board.size - 1)}%`,
+    backgroundSize: `${board.size * 100}% ${board.rows * 100}%`,
+    backgroundPosition: `${((piece % board.size) * 100) / (board.size - 1)}% ${(Math.floor(piece / board.size) * 100) / (board.rows - 1)}%`,
     transform: `rotate(${turn * 90}deg)`,
   });
   const ratio = image?.src === src ? image.ratio : 1.5;
@@ -258,6 +339,9 @@ export const PhotoJigsaw = ({ photos }: { photos: PhotoGamePhoto[] }) => {
           New photo
         </Button>
         <Caption>
+          {board.size} × {board.rows} · {board.size * board.rows} pieces
+        </Caption>
+        <Caption>
           {board.state.moves} {board.state.moves === 1 ? "move" : "moves"}
         </Caption>
         <Button
@@ -271,6 +355,32 @@ export const PhotoJigsaw = ({ photos }: { photos: PhotoGamePhoto[] }) => {
         >
           Preview
         </Button>
+        {canRotate ? (
+          <div className={styles.actions} role="group" aria-label="Rotate selected piece">
+            <Button
+              aria-label="Rotate left"
+              disabled={selectedPiece === null}
+              onClick={() => {
+                if (selectedPiece !== null) turn(selectedPiece, -1);
+              }}
+              onKeyDown={onPieceKeyDown}
+              data-jigsaw-piece={selectedPiece ?? -1}
+            >
+              ↶<KeyHint aria-hidden="true">Q</KeyHint>
+            </Button>
+            <Button
+              aria-label="Rotate right"
+              disabled={selectedPiece === null}
+              onClick={() => {
+                if (selectedPiece !== null) turn(selectedPiece, 1);
+              }}
+              onKeyDown={onPieceKeyDown}
+              data-jigsaw-piece={selectedPiece ?? -1}
+            >
+              ↷<KeyHint aria-hidden="true">E</KeyHint>
+            </Button>
+          </div>
+        ) : null}
         {board.mode === "rotate" ? (
           <Button
             active={rotating}
@@ -328,6 +438,13 @@ export const PhotoJigsaw = ({ photos }: { photos: PhotoGamePhoto[] }) => {
                 data-jigsaw-target={index}
                 {...(piece < 0 ? { "data-empty": true } : {})}
                 {...(gesture.over === index ? { "data-drop-target": true } : {})}
+                {...(piece >= 0 ? { "data-jigsaw-piece": piece } : {})}
+                onContextMenu={(event) => {
+                  if (canRotate && piece >= 0) {
+                    event.preventDefault();
+                    turn(piece, 1);
+                  }
+                }}
                 onPointerDown={(event) => {
                   if (piece >= 0) gesture.begin(event, piece);
                 }}
@@ -338,11 +455,16 @@ export const PhotoJigsaw = ({ photos }: { photos: PhotoGamePhoto[] }) => {
                   <JigsawPiece
                     piece={piece >= 0 ? piece : index}
                     size={board.size}
+                    rows={board.rows}
+                    turn={piece >= 0 ? (board.state.turns[piece] ?? 0) : 0}
                     src={src!}
                     empty={piece < 0}
                   />
                 ) : piece >= 0 ? (
-                  <span className={styles.crop} style={crop(piece, board.state.turns[index]!)} />
+                  <span
+                    className={styles.crop}
+                    style={crop(piece, board.state.turns[poolMode ? piece : index]!)}
+                  />
                 ) : null}
               </button>
             ))
@@ -368,10 +490,14 @@ export const PhotoJigsaw = ({ photos }: { photos: PhotoGamePhoto[] }) => {
                 </Button>
               ) : null}
             </div>
-            <div className={styles.pool} style={{ "--piece-ratio": ratio } as CSSProperties}>
+            <div
+              className={styles.pool}
+              style={{ "--piece-ratio": (ratio * board.rows) / board.size } as CSSProperties}
+            >
               {board.state
                 .pool!.filter(
-                  (piece) => !edgesOnly || jigsawPieceEdges(piece, board.size).includes(0),
+                  (piece) =>
+                    !edgesOnly || jigsawPieceEdges(piece, board.size, board.rows).includes(0),
                 )
                 .map((piece, index) => (
                   <button
@@ -390,6 +516,13 @@ export const PhotoJigsaw = ({ photos }: { photos: PhotoGamePhoto[] }) => {
                     onKeyDown={onPieceKeyDown}
                     aria-pressed={selected === piece}
                     disabled={!loaded || preview}
+                    data-jigsaw-piece={piece}
+                    onContextMenu={(event) => {
+                      if (canRotate) {
+                        event.preventDefault();
+                        turn(piece, 1);
+                      }
+                    }}
                     onPointerDown={(event) => gesture.begin(event, piece)}
                     onClick={() => {
                       if (!gesture.ignoreClick())
@@ -397,9 +530,18 @@ export const PhotoJigsaw = ({ photos }: { photos: PhotoGamePhoto[] }) => {
                     }}
                   >
                     {shaped ? (
-                      <JigsawPiece piece={piece} size={board.size} src={src!} />
+                      <JigsawPiece
+                        piece={piece}
+                        size={board.size}
+                        rows={board.rows}
+                        turn={board.state.turns[piece] ?? 0}
+                        src={src!}
+                      />
                     ) : (
-                      <span className={styles.crop} style={crop(piece)} />
+                      <span
+                        className={styles.crop}
+                        style={crop(piece, board.state.turns[piece] ?? 0)}
+                      />
                     )}
                   </button>
                 ))}
@@ -423,22 +565,27 @@ export const PhotoJigsaw = ({ photos }: { photos: PhotoGamePhoto[] }) => {
         </>
       ) : (
         <p role="status">
-          {feedback ||
-            (preview
-              ? "Previewing the original photograph."
-              : poolMode
-                ? selected === null
-                  ? "Choose a piece."
-                  : "Choose a cell."
-                : rotating
-                  ? "Choose a piece to rotate it clockwise."
-                  : board.mode === "slide"
-                    ? "Choose a piece beside the empty space."
-                    : selected === null
-                      ? "Choose a piece."
-                      : "Choose a second piece to swap.")}
+          {preview
+            ? "Previewing the original photograph."
+            : poolMode
+              ? selected === null
+                ? "Choose a piece."
+                : "Choose a cell."
+              : rotating
+                ? "Choose a piece to rotate it clockwise."
+                : board.mode === "slide"
+                  ? "Choose a piece beside the empty space."
+                  : selected === null
+                    ? "Choose a piece."
+                    : "Choose a second piece to swap."}
         </p>
       )}
+      {canRotate ? (
+        <Caption>
+          Turn a selected piece with Q/E, R or the wheel; right-click turns any piece. On touch,
+          select a piece and use ↶ / ↷.
+        </Caption>
+      ) : null}
       {image?.src === src && image.failed ? (
         <Button onClick={start}>Another photograph</Button>
       ) : null}
@@ -455,13 +602,21 @@ export const PhotoJigsaw = ({ photos }: { photos: PhotoGamePhoto[] }) => {
           }}
         >
           {shaped ? (
-            <JigsawPiece piece={gesture.drag.piece} size={board.size} src={src!} />
+            <JigsawPiece
+              piece={gesture.drag.piece}
+              size={board.size}
+              rows={board.rows}
+              turn={board.state.turns[gesture.drag.piece] ?? 0}
+              src={src!}
+            />
           ) : (
             <span
               className={styles.crop}
               style={crop(
                 gesture.drag.piece,
-                board.state.turns[board.state.tiles.indexOf(gesture.drag.piece)] ?? 0,
+                board.state.turns[
+                  poolMode ? gesture.drag.piece : board.state.tiles.indexOf(gesture.drag.piece)
+                ] ?? 0,
               )}
             />
           )}

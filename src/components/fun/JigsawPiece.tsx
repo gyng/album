@@ -7,15 +7,19 @@ export const JigsawPiece = ({
   piece,
   size,
   src,
+  rows = size,
+  turn = 0,
   empty = false,
 }: {
   piece: number;
   size: number;
   src: string;
+  rows?: number;
+  turn?: number;
   empty?: boolean;
 }) => {
   const id = useId();
-  const path = jigsawPiecePath(piece, size);
+  const path = jigsawPiecePath(piece, size, rows);
   return (
     <svg
       className={styles.shape}
@@ -28,24 +32,26 @@ export const JigsawPiece = ({
           <path d={path} />
         </clipPath>
       </defs>
-      {empty ? null : (
-        <image
-          href={src}
-          x={-(piece % size) * 100}
-          y={-Math.floor(piece / size) * 100}
-          width={size * 100}
-          height={size * 100}
-          preserveAspectRatio="none"
-          clipPath={`url(#${id})`}
+      <g transform={`rotate(${turn * 90} 50 50)`}>
+        {empty ? null : (
+          <image
+            href={src}
+            x={-(piece % size) * 100}
+            y={-Math.floor(piece / size) * 100}
+            width={size * 100}
+            height={rows * 100}
+            preserveAspectRatio="none"
+            clipPath={`url(#${id})`}
+          />
+        )}
+        <path
+          d={path}
+          fill={empty ? "var(--c-bg)" : "none"}
+          stroke="var(--c-border)"
+          strokeWidth="1"
+          vectorEffect="non-scaling-stroke"
         />
-      )}
-      <path
-        d={path}
-        fill={empty ? "var(--c-bg)" : "none"}
-        stroke="var(--c-border)"
-        strokeWidth="1"
-        vectorEffect="non-scaling-stroke"
-      />
+      </g>
     </svg>
   );
 };

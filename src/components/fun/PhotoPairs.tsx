@@ -163,6 +163,7 @@ export const PhotoPairs = ({
           {BOARD_SIZES.map(({ pairs, label }) => (
             <Button
               key={pairs}
+              active={settings.pairs === pairs}
               aria-pressed={settings.pairs === pairs}
               onClick={() => setSettings((s) => ({ ...s, pairs }))}
             >

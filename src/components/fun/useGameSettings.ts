@@ -12,7 +12,11 @@ export type GameSettingsRegistry = {
     pairs: 4 | 6 | 8 | 12 | 18 | 24;
     twist: "classic" | "glimpse" | "moving";
   };
-  jigsaw: { size: number; mode: "jigsaw" | "pool" | "swap" | "rotate" | "slide" };
+  jigsaw: {
+    size: number;
+    squarePieces: boolean;
+    mode: "jigsaw" | "pool" | "swap" | "rotate" | "slide";
+  };
   cross: { mode: "visible" | "hidden"; prefill: 0 | 1 | 2 | 3 | 4; size: 3 | 4 | 5 };
   connections: {
     size: 4 | 5 | 6;
@@ -33,7 +37,7 @@ type Game = keyof GameSettingsRegistry;
 
 const defaults: GameSettingsRegistry = {
   pairs: { mode: "visual", matchSize: 2, pairs: 6, twist: "classic" },
-  jigsaw: { size: 3, mode: "jigsaw" },
+  jigsaw: { size: 3, squarePieces: true, mode: "jigsaw" },
   cross: { mode: "hidden", prefill: 0, size: 3 },
   connections: { size: 4, detail: "broad", hints: true, lives: null },
   sightLines: { size: 5, lineLength: 3 },
@@ -62,7 +66,11 @@ const validators: {
     pairs: oneOf(4, 6, 8, 12, 18, 24),
     twist: oneOf("classic", "glimpse", "moving"),
   },
-  jigsaw: { size: isJigsawSize, mode: oneOf("jigsaw", "pool", "swap", "rotate", "slide") },
+  jigsaw: {
+    size: isJigsawSize,
+    squarePieces: boolean,
+    mode: oneOf("jigsaw", "pool", "swap", "rotate", "slide"),
+  },
   cross: {
     mode: oneOf("visible", "hidden"),
     prefill: oneOf(0, 1, 2, 3, 4),

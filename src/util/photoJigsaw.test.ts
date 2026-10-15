@@ -1,11 +1,13 @@
 import {
   dealJigsaw,
+  jigsawGrid,
   jigsawPieceEdges,
   jigsawPiecePath,
   placeJigsawPiece,
   returnJigsawPiece,
   moveJigsaw,
   rotateJigsaw,
+  rotateJigsawPiece,
   jigsawSolved,
   type JigsawState,
 } from "./photoJigsaw";
@@ -107,4 +109,51 @@ it.each([2, 6, 8, 10, 12, 20, 50])(
 );
 it.each([1, 2.5, NaN, 51])("rejects unsupported jigsaw size %s", (size) => {
   expect(() => dealJigsaw(size, "jigsaw")).toThrow();
+});
+
+it.each([
+  [1.5, 6, 4],
+  [2 / 3, 4, 6],
+  [1, 6, 6],
+] as const)("adapts a six-piece longest side to aspect ratio %s", (ratio, columns, rows) => {
+  expect(jigsawGrid(6, ratio, true)).toEqual({ columns, rows });
+  expect(jigsawGrid(6, ratio, false)).toEqual({ columns: 6, rows: 6 });
+});
+it("cuts and deals rectangular grids with flat outer borders and complementary internal edges", () => {
+  const columns = 6,
+    rows = 4;
+  const state = dealJigsaw(columns, "jigsaw", () => 0.3, rows);
+  expect(state.tiles).toHaveLength(24);
+  expect(state.pool).toHaveLength(24);
+  for (let piece = 0; piece < columns * rows; piece++) {
+    const [top, right, bottom, left] = jigsawPieceEdges(piece, columns, rows);
+    if (piece < columns) expect(top).toBe(0);
+    else expect(top).toBe(-jigsawPieceEdges(piece - columns, columns, rows)[2]);
+    if (piece % columns === 0) expect(left).toBe(0);
+    else expect(left).toBe(-jigsawPieceEdges(piece - 1, columns, rows)[1]);
+    if (piece >= columns * (rows - 1)) expect(bottom).toBe(0);
+    if (piece % columns === columns - 1) expect(right).toBe(0);
+    expect(jigsawPiecePath(piece, columns, rows)).toMatch(/Z$/);
+  }
+});
+
+it("retains a piece's rotation through arbitrary placement, swapping and returning to the pool", () => {
+  let state = dealJigsaw(3, "jigsaw", () => 0.3);
+  state = rotateJigsawPiece(state, 0, 1);
+  expect(state.turns[0]).toBe(1);
+  state = placeJigsawPiece(state, 0, 5);
+  expect(state.tiles[5]).toBe(0);
+  expect(state.turns[0]).toBe(1);
+  state = placeJigsawPiece(state, 1, 5);
+  expect(state.pool).toContain(0);
+  expect(state.turns[0]).toBe(1);
+  state = placeJigsawPiece(state, 0, 0);
+  state = returnJigsawPiece(state, 0);
+  expect(state.turns[0]).toBe(1);
+  state = rotateJigsawPiece(state, 0, -1);
+  expect(state.turns[0]).toBe(0);
+  for (let i = 0; i < 9; i++) state = placeJigsawPiece(state, i, i);
+  expect(jigsawSolved(state)).toBe(true);
+  state = rotateJigsawPiece(state, 0, 1);
+  expect(jigsawSolved(state)).toBe(false);
 });

@@ -153,7 +153,7 @@ it("starts new jigsaws in the piece-pool mode and migrates the old default", () 
     JSON.stringify({ size: 4, mode: "swap" }),
   );
   const { result } = renderHook(() => useGameSettings("jigsaw"));
-  expect(result.current[0]).toEqual({ size: 4, mode: "jigsaw" });
+  expect(result.current[0]).toEqual({ size: 4, squarePieces: true, mode: "jigsaw" });
   act(() => result.current[1]({ ...result.current[0], mode: "swap" }));
   expect(JSON.parse(localStorage.getItem(gameSettingsStorageKey("jigsaw"))!).mode).toBe("swap");
 });
