@@ -262,9 +262,11 @@ export const SearchFacetPanel: React.FC<Props> = ({
           .filter(Boolean)
           .join(" ")}
       >
-        {isLoading ? <div className={styles.searchModeStatus}>Loading filters…</div> : null}
+        {isLoading && selectedCategory !== "tags" && selectedCategory !== "color" ? (
+          <div className={styles.searchModeStatus}>Loading filters…</div>
+        ) : null}
 
-        {!isLoading && selectedCategory === "tags" ? (
+        {selectedCategory === "tags" ? (
           <div className={styles.facetSection}>
             <div className={styles.tagsContainer}>
               {normalizedTags.map((tag) => {
@@ -285,9 +287,7 @@ export const SearchFacetPanel: React.FC<Props> = ({
                     count={visibleCount}
                     isActive={isActive}
                     disabled={isDisabled}
-                    onClick={() => {
-                      onToggleTag(tag.name, isActive);
-                    }}
+                    onClick={onToggleTag}
                   />
                 );
               })}

@@ -42,48 +42,55 @@ export const useNavPositionMotion = (
     },
     [ref, edge],
   );
-  useLayoutEffect(() => {
-    const node = ref.current;
-    const target = measure();
-    if (!node || !target) return;
-    let from = previous.current;
-    const carried = !from;
-    if (!from) {
-      from = lastPositions.get(region) ?? null;
-      try {
-        from ??= JSON.parse(
-          sessionStorage.getItem(`${STORAGE_KEY}:${region}`) ?? "null",
-        ) as Position | null;
-      } catch {
-        /* Storage is optional. */
+  const updatePosition = useCallback(
+    (restored = false) => {
+      const node = ref.current;
+      const target = measure();
+      if (!node || !target) return;
+      let from = restored ? null : previous.current;
+      const carried = !from;
+      if (!from) {
+        from = lastPositions.get(region) ?? null;
+        try {
+          const stored = JSON.parse(
+            sessionStorage.getItem(`${STORAGE_KEY}:${region}`) ?? "null",
+          ) as Position | null;
+          // Another document can update storage while this one is in the
+          // back/forward cache; its in-memory position is then older.
+          if (stored && (!from || stored.at >= from.at)) from = stored;
+        } catch {
+          /* Storage is optional. */
+        }
+        if (from && (!Number.isFinite(from.at) || target.at - from.at > 10000)) from = null;
       }
-      if (from && (!Number.isFinite(from.at) || target.at - from.at > 10000)) from = null;
-    }
-    // A resize or a rotated phone also re-renders the nav somewhere new, and
-    // gliding there from a desktop-width position slid it in from beyond the edge
-    // of a phone; a position from another width is never a starting point. Within
-    // one page a move is the page's own (Guess Where starting a round swaps in its
-    // map chrome); one carried from storage only counts after a navigation.
-    if (
-      from &&
-      (!Number.isFinite(from.x) ||
-        !Number.isFinite(from.y) ||
-        from.viewport !== target.viewport ||
-        (carried && from.path === target.path))
-    )
-      from = null;
-    previous.current = target;
-    if (!from || !node.animate || window.matchMedia("(prefers-reduced-motion: reduce)").matches)
-      return;
-    const dx = from.x - target.x,
-      dy = from.y - target.y;
-    if (Math.hypot(dx, dy) < 0.5) return;
-    animation.current?.cancel();
-    animation.current = node.animate(
-      [{ transform: `translate(${dx}px, ${dy}px)` }, { transform: "translate(0, 0)" }],
-      { duration: 180, easing: "cubic-bezier(0.22, 0.61, 0.36, 1)" },
-    );
-  });
+      // A resize or a rotated phone also re-renders the nav somewhere new, and
+      // gliding there from a desktop-width position slid it in from beyond the edge
+      // of a phone; a position from another width is never a starting point. Within
+      // one page a move is the page's own (Guess Where starting a round swaps in its
+      // map chrome); one carried from storage only counts after a navigation.
+      if (
+        from &&
+        (!Number.isFinite(from.x) ||
+          !Number.isFinite(from.y) ||
+          from.viewport !== target.viewport ||
+          (carried && from.path === target.path))
+      )
+        from = null;
+      previous.current = target;
+      if (!from || !node.animate || window.matchMedia("(prefers-reduced-motion: reduce)").matches)
+        return;
+      const dx = from.x - target.x,
+        dy = from.y - target.y;
+      if (Math.hypot(dx, dy) < 0.5) return;
+      animation.current?.cancel();
+      animation.current = node.animate(
+        [{ transform: `translate(${dx}px, ${dy}px)` }, { transform: "translate(0, 0)" }],
+        { duration: 180, easing: "cubic-bezier(0.22, 0.61, 0.36, 1)" },
+      );
+    },
+    [measure, ref, region],
+  );
+  useLayoutEffect(() => updatePosition());
   useLayoutEffect(() => {
     const save = () => {
       const measured = measure(true) ?? previous.current;
@@ -102,10 +109,15 @@ export const useNavPositionMotion = (
         /* Storage is optional. */
       }
     };
+    const restore = (event: PageTransitionEvent) => {
+      if (event.persisted) updatePosition(true);
+    };
     window.addEventListener("pagehide", save);
+    window.addEventListener("pageshow", restore);
     return () => {
       save();
       window.removeEventListener("pagehide", save);
+      window.removeEventListener("pageshow", restore);
     };
-  }, [measure, region]);
+  }, [measure, region, updatePosition]);
 };

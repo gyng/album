@@ -182,7 +182,7 @@ test("navigation moves between the map and regular pages in both directions", as
     .getByRole("combobox", { name: "Theme", exact: true })
     .filter({ visible: true })
     .boundingBox())!;
-  await page.getByRole("link", { name: "Fun!", exact: true }).click();
+  await page.goBack();
   await page.waitForURL(/\/fun/);
   await expect
     .poll(() =>
@@ -211,4 +211,18 @@ test("navigation moves between the map and regular pages in both directions", as
   const returningTheme = inward.find((event) => event.path === "/fun" && event.region === "right")!;
   expect(returningTheme.dx).toBeGreaterThan(0);
   expect(Math.abs(returningTheme.theme!.x - mapTheme.x)).toBeLessThanOrEqual(1);
+  await page.goForward();
+  await page.waitForURL(/\/map/);
+  await expect
+    .poll(() =>
+      page
+        .locator("html")
+        .evaluate(
+          (node) =>
+            JSON.parse(node.dataset.navMotions ?? "[]").filter(
+              (event: { path: string }) => event.path === "/map",
+            ).length,
+        ),
+    )
+    .toBeGreaterThanOrEqual(4);
 });

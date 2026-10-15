@@ -6,16 +6,16 @@ interface SearchTagProps {
   count: number;
   isActive?: boolean;
   disabled?: boolean;
-  onClick: (tag: string) => void;
+  onClick: (tag: string, isActive: boolean) => void;
 }
 
-export const SearchTag: React.FC<SearchTagProps> = ({
+export const SearchTag = React.memo(function SearchTag({
   tag,
   count,
   onClick,
   isActive,
   disabled,
-}) => {
+}: SearchTagProps) {
   const tagName = tag.toLocaleLowerCase();
   return (
     <SearchFilterPill
@@ -23,7 +23,7 @@ export const SearchTag: React.FC<SearchTagProps> = ({
       count={count}
       isActive={isActive}
       disabled={disabled}
-      onClick={() => onClick(tagName)}
+      onClick={() => onClick(tag, Boolean(isActive))}
     />
   );
-};
+});

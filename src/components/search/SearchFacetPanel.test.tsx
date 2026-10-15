@@ -229,16 +229,17 @@ describe("SearchFacetPanel", () => {
     expect(screen.queryByRole("heading", { name: "City" })).toBeNull();
   });
 
-  it("shows loading status instead of tag or facet options", () => {
-    render(
-      <SearchFacetPanel
-        {...baseProps()}
-        isLoading
-        normalizedTags={[{ name: "Hidden", count: 1 }]}
-      />,
-    );
+  it("keeps tag controls focused and usable while metadata facets refresh", () => {
+    const props = { ...baseProps(), normalizedTags: [{ name: "Forest", count: 4 }] };
+    const view = render(<SearchFacetPanel {...props} />);
+    const tag = screen.getByRole("button", { name: /forest/i });
+    tag.focus();
+    view.rerender(<SearchFacetPanel {...props} isLoading />);
+    expect(tag).toHaveFocus();
+    expect(tag).toBeEnabled();
+    expect(screen.queryByText("Loading filters…")).toBeNull();
+    view.rerender(<SearchFacetPanel {...props} isLoading selectedCategory="time" />);
     expect(screen.getByText("Loading filters…")).toBeInTheDocument();
-    expect(screen.queryByText("hidden")).toBeNull();
   });
 });
 

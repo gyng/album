@@ -1,3 +1,4 @@
+import { yieldToBrowser } from "../../util/yieldToBrowser";
 import { METADATA_FACETS, weatherFacetValue } from "../../util/metadataFacets";
 import { hashSeed, mulberry32 } from "../../util/seededRandom";
 import { weatherCondition } from "../../util/weather";
@@ -1377,8 +1378,10 @@ export const fetchRefinementTagCounts = async (opts: {
   activeTerms: string[];
   candidateTags: string[];
   selectedFacets?: SearchFacetSelection[];
+  signal?: AbortSignal;
 }): Promise<Record<string, number>> => {
-  const { database, activeTerms, candidateTags, selectedFacets = [] } = opts;
+  const { database, activeTerms, candidateTags, selectedFacets = [], signal } = opts;
+  if (signal?.aborted) return {};
   const normalizedActiveTerms = Array.from(
     new Set(activeTerms.map((term) => term.trim().toLowerCase()).filter(Boolean)),
   );
@@ -1403,6 +1406,7 @@ export const fetchRefinementTagCounts = async (opts: {
   const batchSize = 24;
 
   for (let idx = 0; idx < normalizedCandidateTags.length; idx += batchSize) {
+    if (signal?.aborted) return {};
     const batch = normalizedCandidateTags.slice(idx, idx + batchSize);
     const whereClause = [
       ...Array.from({ length: normalizedActiveTerms.length + 1 }, () => "images MATCH ?"),
@@ -1430,6 +1434,11 @@ export const fetchRefinementTagCounts = async (opts: {
     const result = await exec(database, sql, bind);
     for (const [tag, count] of result.data as unknown as Array<[string, number]>) {
       counts[String(tag)] = Number(count);
+    }
+    // Awaiting resolved database promises only queues microtasks. Yield a real
+    // browser task so typing can interrupt an obsolete refinement request.
+    if ((idx / batchSize + 1) % 2 === 0 && idx + batchSize < normalizedCandidateTags.length) {
+      await yieldToBrowser();
     }
   }
 

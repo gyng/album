@@ -53,9 +53,7 @@ export const SearchRefinementSection: React.FC<Props> = ({
               count={visibleCount}
               isActive={isActive}
               disabled={isDisabled}
-              onClick={() => {
-                onToggleTag(tag.name, isActive);
-              }}
+              onClick={onToggleTag}
             />
           );
         })}

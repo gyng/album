@@ -694,6 +694,7 @@ describe("Search", () => {
         activeTerms: ["harbor"],
         candidateTags: ["harbor", "night"],
         selectedFacets: [],
+        signal: expect.any(AbortSignal),
       });
     });
 

@@ -194,6 +194,11 @@ export const Search: React.FC<{
     [debouncedSearchQuery],
   );
   const normalizedTagNames = useMemo(() => normalizedTags.map((tag) => tag.name), [normalizedTags]);
+  const refinementRequest = useMemo(
+    () => ({ database, normalizedDebouncedSearchTerms, normalizedTagNames, selectedFacets }),
+    [database, normalizedDebouncedSearchTerms, normalizedTagNames, selectedFacets],
+  );
+  const [refinementsAnsweredFor, setRefinementsAnsweredFor] = useState<object | null>(null);
   const liveFacetQueryTerms = useMemo(
     () => (searchMode === "keyword" ? normalizedDebouncedSearchTerms : []),
     [searchMode, normalizedDebouncedSearchTerms],
@@ -422,6 +427,13 @@ export const Search: React.FC<{
     isSimilarMode ||
     isColorMode ||
     (normalizedDebouncedSearchTerms.length === 0 && selectedFacets.length === 0);
+  const refinementInputPending =
+    normalizedSearchTerms.length !== normalizedDebouncedSearchTerms.length ||
+    normalizedSearchTerms.some((term, index) => term !== normalizedDebouncedSearchTerms[index]);
+  const visibleRefinementCounts =
+    refinementsInactive || refinementInputPending || refinementsAnsweredFor !== refinementRequest
+      ? EMPTY_REFINEMENT_COUNTS
+      : refinementCounts;
   if (refinementsInactive && refinementCounts !== EMPTY_REFINEMENT_COUNTS)
     setRefinementCounts(EMPTY_REFINEMENT_COUNTS);
   useEffect(() => {
@@ -429,15 +441,19 @@ export const Search: React.FC<{
 
     let didCancel = false;
 
+    const request = refinementRequest;
+    const controller = new AbortController();
     fetchRefinementTagCounts({
       database,
       activeTerms: normalizedDebouncedSearchTerms,
       candidateTags: normalizedTagNames,
       selectedFacets,
+      signal: controller.signal,
     })
       .then((counts) => {
         if (!didCancel) {
           setRefinementCounts(counts);
+          setRefinementsAnsweredFor(request);
         }
       })
       .catch((err) => {
@@ -449,6 +465,7 @@ export const Search: React.FC<{
 
     return () => {
       didCancel = true;
+      controller.abort();
     };
   }, [
     database,
@@ -456,6 +473,7 @@ export const Search: React.FC<{
     normalizedDebouncedSearchTerms,
     normalizedTagNames,
     selectedFacets,
+    refinementRequest,
   ]);
 
   useSafeLayoutEffect(() => {
@@ -840,7 +858,7 @@ export const Search: React.FC<{
                 selectedFacets={selectedFacets}
                 normalizedSearchTerms={normalizedSearchTerms}
                 normalizedTags={normalizedTags}
-                refinementCounts={refinementCounts}
+                refinementCounts={visibleRefinementCounts}
                 tagCountsAreExact={tagCountsAreExact}
                 isLoading={isFacetSectionsLoading}
                 onSelectCategory={setSelectedFilterCategory}
@@ -862,7 +880,7 @@ export const Search: React.FC<{
               selectedFacets={selectedFacets}
               normalizedSearchTerms={normalizedSearchTerms}
               normalizedTags={normalizedTags}
-              refinementCounts={refinementCounts}
+              refinementCounts={visibleRefinementCounts}
               tagCountsAreExact={tagCountsAreExact}
               isLoading={isFacetSectionsLoading}
               onSelectCategory={setSelectedFilterCategory}

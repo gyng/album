@@ -94,3 +94,19 @@ describe("the metro on a themed basemap", () => {
     expect(contrast(line, ground)).toBeGreaterThan(2);
   });
 });
+
+it("ships matching normal and retina gallery sprite indices and images", async () => {
+  const sharp = require("sharp");
+  const root = path.join(__dirname, "../public/map-styles/gallery");
+  const normal = JSON.parse(fs.readFileSync(path.join(root, "sprite.json"), "utf8"));
+  const retina = JSON.parse(fs.readFileSync(path.join(root, "sprite@2x.json"), "utf8"));
+  expect(Object.keys(retina).sort()).toEqual(Object.keys(normal).sort());
+  const sheet = await sharp(path.join(root, "sprite@2x.png")).metadata();
+  for (const [name, icon] of Object.entries(retina)) {
+    expect(icon.pixelRatio).toBe(2);
+    expect(icon.x + icon.width).toBeLessThanOrEqual(sheet.width);
+    expect(icon.y + icon.height).toBeLessThanOrEqual(sheet.height);
+    expect(icon.width / icon.pixelRatio).toBe(normal[name].width);
+    expect(icon.height / icon.pixelRatio).toBe(normal[name].height);
+  }
+});

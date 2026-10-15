@@ -1,3 +1,5 @@
+import { yieldToBrowser } from "../../util/yieldToBrowser";
+jest.mock("../../util/yieldToBrowser", () => ({ yieldToBrowser: jest.fn(async () => {}) }));
 import {
   fetchColorSimilarResults,
   fetchMemoryCandidates,
@@ -2294,4 +2296,44 @@ describe("facet row sharing", () => {
     ]);
     expect(scans).toBe(2);
   });
+});
+
+it("stops superseded refinement work between batches", async () => {
+  const controller = new AbortController();
+  const pause = jest.mocked(yieldToBrowser).mockImplementationOnce(async () => {
+    controller.abort();
+  });
+  let scans = 0;
+  const database = {
+    exec: ({ sql, callback }: ExecArgs) => {
+      if (sql.includes("COUNT(*) AS count")) {
+        scans++;
+        callback(["tag", 1]);
+      }
+    },
+  };
+  const counts = await fetchRefinementTagCounts({
+    database: database as any,
+    activeTerms: ["cat"],
+    candidateTags: Array.from({ length: 100 }, (_, i) => `subject${i}`),
+    signal: controller.signal,
+  });
+  expect(yieldToBrowser).toHaveBeenCalled();
+  expect(scans).toBe(2);
+  expect(counts).toEqual({});
+  pause.mockClear();
+});
+it("does no database work for an already cancelled refinement", async () => {
+  const controller = new AbortController();
+  controller.abort();
+  const database = { exec: jest.fn() };
+  expect(
+    await fetchRefinementTagCounts({
+      database: database as any,
+      activeTerms: ["cat"],
+      candidateTags: ["forest"],
+      signal: controller.signal,
+    }),
+  ).toEqual({});
+  expect(database.exec).not.toHaveBeenCalled();
 });

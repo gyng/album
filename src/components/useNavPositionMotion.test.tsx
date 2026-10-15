@@ -221,3 +221,47 @@ describe("positions that are not a navigation", () => {
     expect(animate).not.toHaveBeenCalled();
   });
 });
+
+it("animates a restored history page from the latest other document's position", () => {
+  sessionStorage.clear();
+  history.replaceState(null, "", "/restored-search");
+  const animate = jest.fn(() => ({ cancel: jest.fn() }) as unknown as Animation);
+  Object.defineProperty(HTMLElement.prototype, "animate", { configurable: true, value: animate });
+  const match = jest
+    .spyOn(window, "matchMedia")
+    .mockReturnValue({ matches: false } as MediaQueryList);
+  const rect = jest.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({
+    x: 100,
+    y: 24,
+    left: 100,
+    right: 200,
+    top: 24,
+    bottom: 68,
+    width: 100,
+    height: 44,
+    toJSON: () => ({}),
+  });
+  const Region = () => {
+    const ref = useRef<HTMLDivElement>(null);
+    useNavPositionMotion(ref, "left");
+    return <div ref={ref} />;
+  };
+  const view = render(<Region />);
+  window.dispatchEvent(new PageTransitionEvent("pagehide", { persisted: true }));
+  animate.mockClear();
+  sessionStorage.setItem(
+    "gallery-nav-position:left",
+    JSON.stringify({ x: 24, y: 24, path: "/map", at: Date.now(), viewport: innerWidth }),
+  );
+  window.dispatchEvent(new PageTransitionEvent("pageshow", { persisted: true }));
+  expect(animate).toHaveBeenCalledWith(
+    [{ transform: "translate(-76px, 0px)" }, { transform: "translate(0, 0)" }],
+    expect.any(Object),
+  );
+  animate.mockClear();
+  window.dispatchEvent(new PageTransitionEvent("pageshow", { persisted: false }));
+  expect(animate).not.toHaveBeenCalled();
+  view.unmount();
+  rect.mockRestore();
+  match.mockRestore();
+});
