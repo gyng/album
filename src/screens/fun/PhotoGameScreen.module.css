@@ -22,3 +22,15 @@
     gap: var(--space-4);
   }
 }
+
+.playing {
+  box-sizing: border-box;
+  block-size: 100dvh;
+  min-block-size: 0;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  gap: var(--space-3);
+  padding-block: var(--space-2);
+}
+.playing .content {
+  min-block-size: 0;
+}

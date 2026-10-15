@@ -28,6 +28,7 @@ const EMPTY_PHOTOS: PhotoGamePhoto[] = [];
 
 export const PhotoGameScreen = ({ game }: { game: PhotoGameKind }) => {
   const [database, progress, , databaseError, retryDatabase] = useDatabase();
+  const [pairsActive, setPairsActive] = useState(false);
   const needsVectors =
     game === "photo-pairs" ||
     game === "relay" ||
@@ -83,7 +84,12 @@ export const PhotoGameScreen = ({ game }: { game: PhotoGameKind }) => {
     return () => window.clearTimeout(timer);
   }, [photos, loadError, request]);
   return (
-    <main id="main-content" className={styles.page}>
+    <main
+      id="main-content"
+      className={[styles.page, game === "photo-pairs" && pairsActive ? styles.playing : ""]
+        .filter(Boolean)
+        .join(" ")}
+    >
       <Seo
         title={formatPageTitle(definition.title)}
         description={definition.description}
@@ -118,7 +124,7 @@ export const PhotoGameScreen = ({ game }: { game: PhotoGameKind }) => {
               </AppLink>
             </div>
           ) : game === "photo-pairs" ? (
-            <PhotoPairs photos={availablePhotos} />
+            <PhotoPairs photos={availablePhotos} onActiveChange={setPairsActive} />
           ) : game === "photo-jigsaw" ? (
             <PhotoJigsaw photos={availablePhotos} />
           ) : game === "relay" ? (

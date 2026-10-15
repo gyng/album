@@ -40,9 +40,9 @@ it("keeps hidden captions out of the accessible tree, holds a miss, then records
   act(() => jest.advanceTimersByTime(1400));
   expect(within(board).queryAllByRole("img")).toHaveLength(0);
   for (let i = 0; i < 8; i++) fireEvent.click(card(i));
-  expect(screen.getByRole("heading", { name: "5 turns for 4 pairs" })).toBeInTheDocument();
+  expect(screen.getByRole("status")).toHaveTextContent("All pairs found in 5 turns.");
   expect(readGameStats("photo-pairs").played).toBe(1);
-  fireEvent.click(card(0));
+  expect(within(board).getAllByRole("link")).toHaveLength(8);
   expect(readGameStats("photo-pairs").played).toBe(1);
 });
 it("one glimpse shows the board once and then hides it", () => {
@@ -55,3 +55,27 @@ it("one glimpse shows the board once and then hides it", () => {
   act(() => jest.advanceTimersByTime(3000));
   expect(within(board).queryAllByRole("img")).toHaveLength(0);
 });
+
+it.each([
+  ["5×5", 12, 1],
+  ["6×6", 18, 0],
+  ["7×7", 24, 1],
+] as const)(
+  "starts a %s board with complete pairs and an empty centre when needed",
+  (label, pairs, blanks) => {
+    jest.mocked(buildPhotoPairs).mockImplementation((_photos, count) =>
+      Array.from({ length: count * 2 }, (_, i) => ({
+        photo: { ...photos[0]!, path: `large-${i}` },
+        pair: Math.floor(i / 2),
+      })),
+    );
+    render(<PhotoPairs photos={photos} />);
+    fireEvent.click(screen.getByRole("button", { name: label }));
+    fireEvent.click(screen.getByRole("button", { name: "Start matching" }));
+    const board = screen.getByLabelText("Matching cards");
+    expect(within(board).getAllByRole("button")).toHaveLength(pairs * 2);
+    expect(within(board).queryAllByLabelText("Empty centre square")).toHaveLength(blanks);
+    if (blanks) expect(board.children[pairs]).toHaveAttribute("aria-label", "Empty centre square");
+    expect(buildPhotoPairs).toHaveBeenCalledWith(photos, pairs, "visual");
+  },
+);

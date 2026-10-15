@@ -1,5 +1,7 @@
 import {
   dealJigsaw,
+  placeJigsawPiece,
+  returnJigsawPiece,
   moveJigsaw,
   rotateJigsaw,
   jigsawSolved,
@@ -39,4 +41,33 @@ it("a dealt sliding board is solvable by its inversion parity", () => {
       expect(size % 2 ? inversions % 2 : (inversions + row) % 2).toBe(size % 2 ? 0 : 1);
       expect(jigsawSolved(s)).toBe(false);
     }
+});
+
+it("deals an empty grid with every piece in a shuffled pool", () => {
+  const state = dealJigsaw(3, "pool", () => 0.3);
+  expect(state.tiles).toEqual(Array(9).fill(-1));
+  expect(state.pool?.toSorted((a, b) => a - b)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8]);
+  expect(jigsawSolved(state)).toBe(false);
+});
+it("places, displaces and returns pieces without losing any", () => {
+  let state = dealJigsaw(3, "pool", () => 0.3);
+  state = placeJigsawPiece(state, 0, 0);
+  expect(state.tiles[0]).toBe(0);
+  expect(state.pool).not.toContain(0);
+  state = placeJigsawPiece(state, 1, 0);
+  expect(state.tiles[0]).toBe(1);
+  expect(state.pool).toContain(0);
+  state = placeJigsawPiece(state, 1, 1);
+  expect(state.tiles[0]).toBe(-1);
+  expect(state.tiles[1]).toBe(1);
+  state = returnJigsawPiece(state, 1);
+  expect(state.tiles[1]).toBe(-1);
+  expect(state.pool).toContain(1);
+  expect(
+    [...state.tiles.filter((t) => t !== -1), ...state.pool!].toSorted((a, b) => a - b),
+  ).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8]);
+  for (let i = 0; i < 9; i++) state = placeJigsawPiece(state, i, i);
+  expect(jigsawSolved(state)).toBe(true);
+  expect(state.pool).toEqual([]);
+  expect(placeJigsawPiece(state, 0, 0)).toBe(state);
 });

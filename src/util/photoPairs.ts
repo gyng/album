@@ -30,7 +30,7 @@ export const buildPhotoPairs = (
   mode: PairMode,
   random = Math.random,
 ): PairCard[] | null => {
-  if (!Number.isInteger(count) || count < 2 || count > 12) return null;
+  if (!Number.isInteger(count) || count < 2 || count > 24) return null;
   const unique = [...new Map(photos.map((photo) => [photo.path, photo])).values()];
   const pairs: PairCard[] = [];
   const used = new Set<string>();

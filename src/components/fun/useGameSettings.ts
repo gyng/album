@@ -5,8 +5,12 @@ import type { CaptionBudget, CaptionMode } from "../../util/captionModes";
 import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 
 export type GameSettingsRegistry = {
-  pairs: { mode: "visual" | "semantic"; pairs: 4 | 6 | 8; twist: "classic" | "glimpse" | "moving" };
-  jigsaw: { size: 3 | 4 | 5; mode: "swap" | "rotate" | "slide" };
+  pairs: {
+    mode: "visual" | "semantic";
+    pairs: 4 | 6 | 8 | 12 | 18 | 24;
+    twist: "classic" | "glimpse" | "moving";
+  };
+  jigsaw: { size: 3 | 4 | 5; mode: "pool" | "swap" | "rotate" | "slide" };
   cross: { mode: "visible" | "hidden"; prefill: 0 | 1 | 2 | 3 | 4; size: 3 | 4 | 5 };
   connections: {
     size: 4 | 5 | 6;
@@ -27,7 +31,7 @@ type Game = keyof GameSettingsRegistry;
 
 const defaults: GameSettingsRegistry = {
   pairs: { mode: "visual", pairs: 6, twist: "classic" },
-  jigsaw: { size: 3, mode: "swap" },
+  jigsaw: { size: 3, mode: "pool" },
   cross: { mode: "hidden", prefill: 0, size: 3 },
   connections: { size: 4, detail: "broad", hints: true, lives: null },
   sightLines: { size: 5, lineLength: 3 },
@@ -52,10 +56,10 @@ const validators: {
 } = {
   pairs: {
     mode: oneOf("visual", "semantic"),
-    pairs: oneOf(4, 6, 8),
+    pairs: oneOf(4, 6, 8, 12, 18, 24),
     twist: oneOf("classic", "glimpse", "moving"),
   },
-  jigsaw: { size: oneOf(3, 4, 5), mode: oneOf("swap", "rotate", "slide") },
+  jigsaw: { size: oneOf(3, 4, 5), mode: oneOf("pool", "swap", "rotate", "slide") },
   cross: {
     mode: oneOf("visible", "hidden"),
     prefill: oneOf(0, 1, 2, 3, 4),
@@ -85,7 +89,8 @@ const validators: {
   },
 };
 
-export const gameSettingsStorageKey = (game: Game): string => `snapshots-fun-settings-v1:${game}`;
+export const gameSettingsStorageKey = (game: Game): string =>
+  `snapshots-fun-settings-${game === "jigsaw" ? "v2" : "v1"}:${game}`;
 
 const validFields = <G extends Game>(game: G, value: unknown): Partial<GameSettingsRegistry[G]> => {
   const fields: Partial<GameSettingsRegistry[G]> = {};
@@ -122,6 +127,17 @@ export const useGameSettings = <G extends Game>(
     try {
       const raw = window.localStorage.getItem(gameSettingsStorageKey(game));
       if (raw) saved = JSON.parse(raw);
+      else if (game === "jigsaw") {
+        const legacy = window.localStorage.getItem("snapshots-fun-settings-v1:jigsaw");
+        if (legacy) {
+          const previous: unknown = JSON.parse(legacy);
+          if (previous && typeof previous === "object" && !Array.isArray(previous)) {
+            const value = previous as Record<string, unknown>;
+            // The old default was saved even without a deliberate choice.
+            saved = { ...value, mode: value.mode === "swap" ? "pool" : value.mode };
+          }
+        }
+      }
     } catch {
       /* Preferences still work when storage is blocked or malformed. */
     }

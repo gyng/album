@@ -1,11 +1,54 @@
 import { shuffleGamePhotos } from "./photoGames";
-export type JigsawMode = "swap" | "rotate" | "slide";
-export type JigsawState = { tiles: number[]; turns: number[]; moves: number };
+export type JigsawMode = "pool" | "swap" | "rotate" | "slide";
+export type JigsawState = { tiles: number[]; turns: number[]; moves: number; pool?: number[] };
 export const jigsawSolved = (state: JigsawState): boolean =>
+  state.tiles.length > 0 &&
+  (!state.pool || state.pool.length === 0) &&
   state.tiles.every(
     (tile, i) =>
-      (tile === i || (tile === -1 && i === state.tiles.length - 1)) && state.turns[i] === 0,
+      (tile === i || (!state.pool && tile === -1 && i === state.tiles.length - 1)) &&
+      state.turns[i] === 0,
   );
+
+/** Move a piece from the pool or another cell; an occupied destination exchanges pieces. */
+export const placeJigsawPiece = (
+  state: JigsawState,
+  piece: number,
+  target: number,
+): JigsawState => {
+  if (
+    !state.pool ||
+    !Number.isInteger(piece) ||
+    piece < 0 ||
+    !Number.isInteger(target) ||
+    state.tiles[target] === undefined ||
+    state.tiles[target] === piece
+  )
+    return state;
+  const source = state.tiles.indexOf(piece);
+  if (source < 0 && !state.pool.includes(piece)) return state;
+  const tiles = [...state.tiles];
+  const displaced = tiles[target]!;
+  let pool = [...state.pool];
+  if (source >= 0) tiles[source] = displaced;
+  else {
+    pool = pool.filter((value) => value !== piece);
+    if (displaced >= 0) pool.push(displaced);
+  }
+  tiles[target] = piece;
+  return { ...state, tiles, pool, moves: state.moves + 1 };
+};
+
+export const returnJigsawPiece = (state: JigsawState, piece: number): JigsawState => {
+  const source = state.tiles.indexOf(piece);
+  if (!state.pool || piece < 0 || source < 0) return state;
+  return {
+    ...state,
+    tiles: state.tiles.map((tile, i) => (i === source ? -1 : tile)),
+    pool: [...state.pool, piece],
+    moves: state.moves + 1,
+  };
+};
 const neighbours = (a: number, b: number, size: number) =>
   Math.abs(Math.floor(a / size) - Math.floor(b / size)) + Math.abs((a % size) - (b % size)) === 1;
 export const moveJigsaw = (
@@ -29,7 +72,7 @@ export const moveJigsaw = (
   return { tiles, turns, moves: state.moves + 1 };
 };
 export const rotateJigsaw = (state: JigsawState, index: number): JigsawState =>
-  state.tiles[index] === undefined
+  state.tiles[index] === undefined || state.tiles[index]! < 0
     ? state
     : {
         ...state,
@@ -43,6 +86,12 @@ export const dealJigsaw = (size: number, mode: JigsawMode, random = Math.random)
     turns: Array<number>(size * size).fill(0),
     moves: 0,
   };
+  if (mode === "pool")
+    return {
+      ...state,
+      tiles: Array<number>(size * size).fill(-1),
+      pool: shuffleGamePhotos(state.tiles, random),
+    };
   if (mode === "slide") {
     state.tiles[state.tiles.length - 1] = -1;
     let previous = -1;

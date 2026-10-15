@@ -2,6 +2,9 @@
   display: grid;
   gap: var(--space-4);
   max-inline-size: 60rem;
+  block-size: 100%;
+  min-block-size: 0;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
 }
 .game p {
   margin: 0;
@@ -16,12 +19,14 @@
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: var(--space-2);
+  grid-auto-rows: minmax(0, 1fr);
+  min-block-size: 0;
 }
 .card {
   position: relative;
   display: grid;
   place-items: center;
-  aspect-ratio: 4 / 3;
+  min-block-size: 0;
   min-inline-size: 0;
   overflow: hidden;
   padding: 0;
@@ -39,6 +44,8 @@
   outline-offset: var(--line-strong);
 }
 .face {
+  position: absolute;
+  inset: 0;
   inline-size: 100%;
   block-size: 100%;
   object-fit: contain;
@@ -58,11 +65,14 @@
 
 @media (prefers-reduced-motion: reduce) {
   .face {
+    position: absolute;
+    inset: 0;
     animation: none;
   }
 }
 .back {
-  font-size: var(--fs-l);
+  font-size: min(var(--fs-l), 4dvh);
+  line-height: 1;
   color: var(--c-accent);
 }
 .match {
@@ -73,9 +83,10 @@
   background: var(--c-bg);
   font-size: var(--fs-s);
 }
-.results {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+.finish {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   gap: var(--space-2);
 }
 @media (max-width: 480px) {
@@ -85,4 +96,10 @@
   .match {
     font-size: var(--fs-xs);
   }
+}
+
+.sizes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
 }

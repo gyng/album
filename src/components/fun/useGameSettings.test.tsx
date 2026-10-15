@@ -146,3 +146,14 @@ it("migrates old Cross Exposure prefill labels to numeric counts", () => {
   localStorage.setItem(gameSettingsStorageKey("cross"), JSON.stringify({ prefill: "guided" }));
   expect(renderHook(() => useGameSettings("cross")).result.current[0].prefill).toBe(4);
 });
+
+it("starts new jigsaws in the piece-pool mode and migrates the old default", () => {
+  localStorage.setItem(
+    "snapshots-fun-settings-v1:jigsaw",
+    JSON.stringify({ size: 4, mode: "swap" }),
+  );
+  const { result } = renderHook(() => useGameSettings("jigsaw"));
+  expect(result.current[0]).toEqual({ size: 4, mode: "pool" });
+  act(() => result.current[1]({ ...result.current[0], mode: "swap" }));
+  expect(JSON.parse(localStorage.getItem(gameSettingsStorageKey("jigsaw"))!).mode).toBe("swap");
+});

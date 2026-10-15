@@ -1,5 +1,26 @@
 # Fun illustrations
 
+## Matching and jigsaw refinements — 16 October 2026
+
+Photo Pairs now has the bow-tied owl comparing two photographs while a smug
+cat sweeps the remaining cards off the table, revealing them all at once.
+Subjective review: absurdity 8, humour 8. Photo Jigsaw keeps the fox force-fitting
+a mountain photograph with garden shears; the penguin and its reference print
+are removed. Subjective review: absurdity 8, humour 8.
+
+Both are built-in imagegen results, encoded as transparent 960×640 AVIF,
+quality 85, effort 6. Existing asset URLs are retained.
+
+### Latest prompts (verbatim)
+
+#### `photo-jigsaw.avif`
+
+> Use case: precise-object-edit. Edit supplied Photo Jigsaw cartoon: REMOVE the penguin and its held reference photograph completely. Keep ONLY the exact sly fox using huge garden shears to trim the oversized mountain photograph jigsaw piece, flying offcuts, and almost-completed photographic jigsaw on floor. Preserve fox's expression, giant white-tipped tail and dark forepaws, visible shears and mountain piece, the absurd force-fitting joke. Re-centre the solo fox and puzzle into a compact landscape 3:2 vignette using freed space with generous transparent margins. Do not add another animal or object. Keep original loose lively black pen-and-ink and sparse crosshatching. Genuine transparent background and uninked interiors, no white paper backdrop, no opaque fills, no text, lettering, signatures, logos or watermark.
+
+#### `photo-pairs.avif`
+
+> Use case: illustration-story. New original comic illustration for a photographic memory matching game. TWO live animals only: bow-tied scholarly owl and stocky striped tabby cat with fluffy cheeks, half-lidded eyes and curled striped tail. At a SMALL ordinary low game table, owl sits left solemnly holding EXACTLY TWO photographic cards face-up, comparing them. On right the mischievous cat has just casually SWEPT ALL THE OTHER CARDS off the tabletop with one furry paw, exposing their photographic fronts as they tumble onto the floor. Cat has a smug expression of innocent helpfulness; owl glares at cat over its two permitted cards. Several cards in midair and a small clearly visible scatter of face-up photo cards on floor show the consequence. Remaining tabletop is conspicuously cleared except the owl's two held cards. Simple immediately readable cat mischief: instead of patiently turning over two cards, it reveals the whole lot. Photographs show clear simple pairs of flowers, birds and boats, no people. Strong two-character silhouette, diagonal falling cards, no glass table, no upside-down owl, no characters under table, no crowded board of food, no captions needed. Loose lively black pen-and-ink contours, expressive deadpan faces, restrained sparse crosshatching. Landscape 3:2 compact centred vignette, whole animals and feet visible, generous clear transparent margins. BLACK ink only on genuine TRANSPARENT BACKGROUND including uninked interiors, no white backdrop or opaque fills. No humans or human hands, text, letters, numerals, speech bubbles, signatures, logos, borders or watermark. Aim 8+ absurdity and humour with a clear visual action.
+
 ## Clarity and negative space refinements — 16 October 2026
 
 - Relay replaces the unreadable tail launcher with a simple handover: pigeon

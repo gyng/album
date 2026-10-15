@@ -64,3 +64,16 @@ it("matches only two different cards, blocks a third flip and settles misses exp
   expect(s.turns).toBe(2);
   expect(flipPairCard(s, 0, cards)).toBe(s);
 });
+
+it.each([12, 18, 24])("deals %i unambiguous pairs for larger boards", (count) => {
+  const source = Array.from({ length: count * 2 }, (_, i) => ({
+    ...photos[0]!,
+    path: `large-${i}`,
+    vector: Array.from({ length: count }, (_, axis) => (axis === Math.floor(i / 2) ? 1 : 0)),
+  }));
+  const cards = buildPhotoPairs(source, count, "visual", () => 0.3)!;
+  expect(cards).toHaveLength(count * 2);
+  expect(new Set(cards.map((card) => card.photo.path)).size).toBe(count * 2);
+  for (const pair of new Set(cards.map((card) => card.pair)))
+    expect(cards.filter((card) => card.pair === pair)).toHaveLength(2);
+});

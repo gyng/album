@@ -34,6 +34,10 @@
 .tile:disabled {
   cursor: default;
 }
+.tile[data-empty="true"] {
+  background: var(--c-surface);
+  border: var(--line-hairline) dashed var(--c-border);
+}
 .tile[aria-pressed="true"] {
   z-index: var(--z-raised);
   outline: var(--line-strong) solid var(--c-accent);
@@ -57,4 +61,68 @@
   inline-size: 100%;
   block-size: 100%;
   object-fit: contain;
+}
+.scene {
+  min-inline-size: 0;
+}
+.withPool {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  align-items: start;
+  gap: var(--space-4);
+}
+.variants {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.poolPanel {
+  display: grid;
+  min-inline-size: 0;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: var(--line-hairline) dashed var(--c-border);
+  border-radius: var(--radius-panel);
+}
+.pool {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+.poolPiece {
+  aspect-ratio: var(--piece-ratio, 1.5);
+  border-color: var(--c-border);
+  border-radius: var(--radius-preview);
+}
+.draggable {
+  touch-action: none;
+  user-select: none;
+  cursor: grab;
+}
+.dragging {
+  opacity: 0.35;
+}
+.tile[data-drop-target="true"],
+.poolPanel[data-drop-target="true"] {
+  outline: var(--line-strong) solid var(--c-accent);
+  outline-offset: calc(-1 * var(--line-strong));
+}
+.dragPreview {
+  position: fixed;
+  inset-block-start: 0;
+  inset-inline-start: 0;
+  z-index: var(--z-drawer-panel);
+  pointer-events: none;
+  border: var(--line-strong) solid var(--c-accent);
+  border-radius: var(--radius-preview);
+  background: var(--c-surface);
+  overflow: hidden;
+}
+@media (max-width: 720px) {
+  .withPool {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .pool {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
 }
