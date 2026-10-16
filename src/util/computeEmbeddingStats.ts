@@ -3,13 +3,17 @@ import { loadSemanticProjection } from "../services/embeddingProjection";
 import { clusterVectors } from "./semanticClusters";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import type { Content, PhotoBlock } from "../services/types";
+import type { Block, Content, PhotoBlock, Tags } from "../services/types";
 import { measureBuild } from "../services/buildTiming";
 import { rgbToString } from "./colorDistance";
-import { parseExifLocalDateTime } from "./exifTime";
+import { parseExifLocalDateTime, type ExifLocalDateTime } from "./exifTime";
 import { pairingLabel } from "./computeGearStats";
 import { CAMERA_FACET, LENS_FACET } from "./photoBuckets";
 import { distinctiveTag, nearestNeighbours, projectToThreeDimensions } from "./embeddingSpace";
+// The cloud joins a clip and a still the same way: by the album-relative path
+// the atlas, the search index and the embeddings payload all key them by.
+import { indexedPathFromSrc } from "./embeddingSpaceData";
+import { toVideoBlockEntry, type VideoBlockEntry } from "./videoBlockEntry";
 
 // A single shared model space prevents counting a photograph more than once.
 const PREFERRED_EMBEDDING_MODEL_ID = "google/embeddinggemma-2";
@@ -260,6 +264,45 @@ export const computeVisualSamenessFromVectors = (
   };
 };
 
+/**
+ * A clip as the cloud's lookups read one: its poster frame, the moment it was
+ * captured, and the clip's own row from the search index.
+ */
+type CloudVideoSource = {
+  /** The album-relative path the atlas, the search index and the embeddings all join on. */
+  indexedPath: string;
+  entry: VideoBlockEntry;
+  /** The clip's search-index row, the same shape a photograph carries. */
+  tags: Tags | undefined;
+};
+
+/**
+ * A video block as a cloud entry, or nothing when there is no frame to draw.
+ *
+ * `toVideoBlockEntry` is the one reader of a clip's build data, and it refuses
+ * a clip whose poster has not been extracted yet — a clip with no frame has
+ * nothing to show, so it is left out of the cloud rather than drawn as a hole
+ * in it.
+ *
+ * A clip joins the embeddings on its own album-relative path: the path its
+ * search-index row is keyed by, and the one its poster's URL is built from, so
+ * the two agree and neither is a second convention.
+ */
+const videoCloudSource = (block: Block): CloudVideoSource | null => {
+  const entry = toVideoBlockEntry(block);
+  if (!entry) {
+    return null;
+  }
+
+  const tags = entry.block._build?.tags;
+  const indexedPath = tags?.path ?? indexedPathFromSrc(entry.poster.src);
+  if (!indexedPath) {
+    return null;
+  }
+
+  return { indexedPath, entry, tags };
+};
+
 const buildPhotoLookup = (albums: Content[]): PhotoLookup => {
   const lookup: PhotoLookup = new Map();
 
@@ -269,6 +312,23 @@ const buildPhotoLookup = (albums: Content[]): PhotoLookup => {
     }
 
     album.blocks.forEach((block) => {
+      // A clip stands in the cloud as its poster frame, addressed by the anchor
+      // its album page already uses, so it reads as one more frame in the
+      // collection rather than as a second kind of point. Its swatch is the
+      // palette the poster's own search-index row carries.
+      const video = videoCloudSource(block);
+      if (video) {
+        const dominant = video.tags?.colors?.[0];
+        lookup.set(video.indexedPath, {
+          path: video.indexedPath,
+          src: video.entry.poster.src,
+          href: `/album/${album._build.slug}#${encodeURIComponent(video.entry.anchor)}`,
+          label: video.entry.anchor,
+          ...(dominant ? { swatch: rgbToString(dominant) } : {}),
+        });
+        return;
+      }
+
       if (block.kind !== "photo") {
         return;
       }
@@ -294,6 +354,28 @@ const buildPhotoLookup = (albums: Content[]): PhotoLookup => {
   return lookup;
 };
 
+/**
+ * The tag strings in a search-index row.
+ *
+ * In a real build `_build.tags` is the raw search-index row, whose `tags`
+ * column is a comma-separated string; the declared string[] shape only occurs
+ * in fixtures. Accept both.
+ */
+const parseTagList = (rawTags: unknown): string[] => {
+  if (Array.isArray(rawTags)) {
+    return rawTags.filter((tag): tag is string => typeof tag === "string");
+  }
+
+  if (typeof rawTags === "string") {
+    return rawTags
+      .split(",")
+      .map((tag) => tag.trim())
+      .filter(Boolean);
+  }
+
+  return [];
+};
+
 const buildPhotoTagLookup = (albums: Content[]): Map<string, string[]> => {
   const lookup = new Map<string, string[]>();
 
@@ -303,24 +385,25 @@ const buildPhotoTagLookup = (albums: Content[]): Map<string, string[]> => {
     }
 
     album.blocks.forEach((block) => {
+      // A clip's tags are its poster frame's own — the indexer captions the
+      // frame and keys the row by the clip's path, so the same column reads the
+      // same.
+      const video = videoCloudSource(block);
+      if (video) {
+        const tags = parseTagList(video.tags?.tags);
+        if (tags.length > 0) {
+          lookup.set(video.indexedPath, tags);
+        }
+        return;
+      }
+
       if (block.kind !== "photo") {
         return;
       }
 
       const photo = block as PhotoBlock;
       const indexedPath = photo._build.tags?.path;
-      // In a real build `_build.tags` is the raw search-index row, whose
-      // `tags` column is a comma-separated string; the declared string[]
-      // shape only occurs in fixtures. Accept both.
-      const rawTags = photo._build.tags?.tags as string[] | string | undefined;
-      const tags = Array.isArray(rawTags)
-        ? rawTags
-        : typeof rawTags === "string"
-          ? rawTags
-              .split(",")
-              .map((tag) => tag.trim())
-              .filter(Boolean)
-          : [];
+      const tags = parseTagList(photo._build.tags?.tags);
       if (indexedPath && tags.length > 0) {
         lookup.set(indexedPath, tags);
       }
@@ -331,11 +414,13 @@ const buildPhotoTagLookup = (albums: Content[]): Map<string, string[]> => {
 };
 
 /**
- * The shape of each photograph, as it is displayed.
+ * The shape of each frame, as it is displayed.
  *
  * EXIF rotation is applied here the way the album page applies it: a portrait
  * frame a camera turned in metadata is a portrait frame, and a sheet laid out
- * from the raw numbers would put it on its side.
+ * from the raw numbers would put it on its side. A clip's poster is a still
+ * that came out of the extractor upright, so its own width over height is the
+ * shape and there is no rotation left to apply.
  */
 const buildPhotoAspectLookup = (albums: Content[]): Map<string, number> => {
   const lookup = new Map<string, number>();
@@ -344,6 +429,15 @@ const buildPhotoAspectLookup = (albums: Content[]): Map<string, number> => {
     if (isTestAlbum(album)) return;
 
     album.blocks.forEach((block) => {
+      const video = videoCloudSource(block);
+      if (video) {
+        const aspect = video.entry.poster.width / video.entry.poster.height;
+        if (Number.isFinite(aspect) && aspect > 0) {
+          lookup.set(video.indexedPath, Number(aspect.toFixed(3)));
+        }
+        return;
+      }
+
       if (block.kind !== "photo") return;
 
       const photo = block as PhotoBlock;
@@ -428,6 +522,17 @@ const buildPhotoPlaceLookup = (albums: Content[]): Map<string, string> => {
   return lookup;
 };
 
+/** The wall-clock ordering key a dated frame is placed by. */
+const toPhotoDate = (parsed: ExifLocalDateTime): PhotoDate => ({
+  year: parsed.year,
+  sortKey:
+    parsed.year * 100000000 +
+    parsed.month * 1000000 +
+    parsed.day * 10000 +
+    parsed.hour * 100 +
+    parsed.minute,
+});
+
 const buildPhotoDateLookup = (albums: Content[]): PhotoDateLookup => {
   const lookup: PhotoDateLookup = new Map();
 
@@ -437,6 +542,17 @@ const buildPhotoDateLookup = (albums: Content[]): PhotoDateLookup => {
     }
 
     album.blocks.forEach((block) => {
+      // A clip's captured wall clock is the same camera-local reading EXIF
+      // carries, so a contact sheet can run a clip among its photographs.
+      const video = videoCloudSource(block);
+      if (video) {
+        const parsed = parseExifLocalDateTime(video.entry.capturedAtLocal);
+        if (parsed) {
+          lookup.set(video.indexedPath, toPhotoDate(parsed));
+        }
+        return;
+      }
+
       if (block.kind !== "photo") {
         return;
       }
@@ -450,15 +566,7 @@ const buildPhotoDateLookup = (albums: Content[]): PhotoDateLookup => {
 
       const parsed = parseExifLocalDateTime(raw);
       if (parsed) {
-        lookup.set(indexedPath, {
-          year: parsed.year,
-          sortKey:
-            parsed.year * 100000000 +
-            parsed.month * 1000000 +
-            parsed.day * 10000 +
-            parsed.hour * 100 +
-            parsed.minute,
-        });
+        lookup.set(indexedPath, toPhotoDate(parsed));
       }
     });
   });
@@ -507,7 +615,7 @@ const decodeEmbeddingRow = (row: EmbeddingRow): number[] | null => {
   }
 };
 
-/** Which album each indexed photograph came from, by its indexed path. */
+/** Which album each indexed frame came from, by its indexed path. */
 const buildPhotoAlbumLookup = (albums: Content[]): Map<string, string> => {
   const lookup = new Map<string, string>();
 
@@ -515,6 +623,12 @@ const buildPhotoAlbumLookup = (albums: Content[]): Map<string, string> => {
     if (isTestAlbum(album)) return;
     const name = album.title ?? album._build.slug;
     album.blocks.forEach((block) => {
+      const video = videoCloudSource(block);
+      if (video) {
+        lookup.set(video.indexedPath, name);
+        return;
+      }
+
       if (block.kind !== "photo") return;
       const indexedPath = (block as PhotoBlock)._build.tags?.path;
       if (indexedPath) lookup.set(indexedPath, name);
@@ -1106,7 +1220,7 @@ export type EmbeddingSpaceCluster = {
   count: number;
 };
 
-/** One photograph as a position in the collection's own embedding space. */
+/** One frame in the collection's own embedding space: a photograph, or a clip's poster. */
 export type EmbeddingSpacePoint = {
   camera?: string;
   lens?: string;
@@ -1116,6 +1230,11 @@ export type EmbeddingSpacePoint = {
   label: string;
   /** Which album it came from: a filename says nothing, and most labels are filenames. */
   album?: string;
+  /** Wall-clock sort key and year, where the frame carries a date. */
+  taken?: number;
+  year?: number;
+  /** Displayed width over height, EXIF rotation included — or the poster's own shape. */
+  aspect?: number;
   /** Its dominant colour, so the cloud is coloured by the photographs themselves. */
   swatch?: string;
   /** What the captioner said is in it, most telling first, at most a handful. */
@@ -1129,6 +1248,8 @@ export type EmbeddingSpacePoint = {
   near?: number[];
   /** The next nearest after `near`, closest first: where Wander can step besides. */
   around?: number[];
+  /** Which named clump it fell in, as an index into the clusters. */
+  cluster?: number;
   x: number;
   y: number;
   z: number;
@@ -1140,7 +1261,8 @@ export type EmbeddingSpacePoint = {
  * Done here rather than in the browser because the vectors are the expensive
  * part: 1,500 × 768 numbers is several megabytes of database and a second of
  * arithmetic, and the answer is the same for every reader. What ships is the
- * cloud — three numbers and a thumbnail per photograph.
+ * cloud — three numbers and a thumbnail per frame, a clip standing in it as the
+ * poster frame it was embedded from.
  */
 export const loadEmbeddingSpacePoints = async (
   albums: Content[],
@@ -1290,12 +1412,14 @@ export const loadEmbeddingSpacePoints = async (
         // The wall-clock sort key, so a contact sheet can run in the order the
         // photographs were taken rather than the order their files are named.
         const taken = dateLookup.get(entry.path);
+        const aspect = aspectLookup.get(entry.path);
+        const cluster = clusterOf.get(index);
         return {
           src: entry.photo.src,
           href: entry.photo.href,
           label: entry.photo.label,
           ...(taken ? { taken: taken.sortKey, year: taken.year } : {}),
-          ...(aspectLookup.has(entry.path) ? { aspect: aspectLookup.get(entry.path) } : {}),
+          ...(aspect !== undefined ? { aspect } : {}),
           ...(album ? { album } : {}),
           ...(gear?.[0] ? { camera: gear[0] } : {}),
           ...(gear?.[1] ? { lens: gear[1] } : {}),
@@ -1308,7 +1432,7 @@ export const loadEmbeddingSpacePoints = async (
           ...((neighbours[index]?.length ?? 0) > NEIGHBOURS_PER_PHOTO
             ? { around: neighbours[index]!.slice(NEIGHBOURS_PER_PHOTO) }
             : {}),
-          ...(clusterOf.has(index) ? { cluster: clusterOf.get(index) } : {}),
+          ...(cluster !== undefined ? { cluster } : {}),
           ...(semantic.has(entry.path) ? { umap: semantic.get(entry.path)! } : {}),
           x: Number(position.x.toFixed(4)),
           y: Number(position.y.toFixed(4)),

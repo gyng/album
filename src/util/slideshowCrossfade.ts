@@ -4,7 +4,17 @@
 // advance mid-fade reverses smoothly instead of jumping. The React wiring (rAF
 // reveal, decode tracking, transitionend removal) lives in pages/slideshow.
 
-export type SlideCell = { path: string; src: string };
+export type SlideCell = {
+  path: string;
+  src: string;
+  /**
+   * "video" when this cell is a clip that should play, in place of the still
+   * its `src` names. Absent for every photograph — and for a clip whose
+   * playback is switched off, whose slide is its poster frame exactly as it was
+   * before clips could play at all.
+   */
+  mediaKind?: "video";
+};
 
 export type SlideSnapshot = {
   // Whether the slide is a remix grid (more than one cell).
@@ -37,11 +47,18 @@ export const buildSlideSnapshot = (
   return { remix: valid.length > 1, cells: valid };
 };
 
-// Stable identity for a slide: its cell srcs joined. Changes on a normal
-// advance AND when a single photo gains async remix companions, so both push a
-// fresh layer and cross-fade.
+// One cell's part of a slide's identity. A playing clip is not the same slide
+// as its poster still even though both name the same URL, so the clip marker
+// rides along in the key: toggling clip playback cross-fades instead of reusing
+// an element of the wrong kind.
+const cellKeyOf = (cell: SlideCell): string =>
+  cell.mediaKind === "video" ? `${cell.src}#video` : cell.src;
+
+// Stable identity for a slide: its cell keys joined. Changes on a normal
+// advance, when a single photo gains async remix companions, and when a cell
+// swaps between a still and a clip — so all three push a fresh layer.
 export const slideKeyOf = (snapshot: SlideSnapshot | null): string | null =>
-  snapshot ? snapshot.cells.map((cell) => cell.src).join("|") : null;
+  snapshot ? snapshot.cells.map(cellKeyOf).join("|") : null;
 
 // Whether the incoming (top) slide has fully decoded and may be revealed. A
 // single slide gates on its one image; a remix grid gates on EVERY cell so the

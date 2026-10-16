@@ -4,8 +4,34 @@ const { existsSync } = require("node:fs");
 const path = require("node:path");
 const sharp = require("sharp");
 const { formatAspectRatio } = require("../util/formatAspectRatio.ts");
+const { clipPathOf } = require("../util/videoScenePath.ts");
+const { posterPathsFor, readVideoPosterSidecar } = require("../services/videoPoster.ts");
 
 const HEADER_READERS = 16;
+
+/** "Square"/"Portrait"/"Landscape" for a pair of upright pixel dimensions. */
+const orientationOf = (width, height) =>
+  width === height ? "Square" : width > height ? "Landscape" : "Portrait";
+
+/**
+ * Framing for a row with no image header of its own: a clip, indexed through
+ * the poster frame the video prepass extracted for it, or an external, which has
+ * no file in the album at all. That prepass records the frame's dimensions in
+ * the clip's sidecar, and those are the numbers `_build.poster.srcset` is
+ * derived from, so the aspect ratio survives even though the media file itself
+ * is opaque. A scene has no sidecar of its own, so it reads the clip's; anything
+ * without usable dimensions falls back to null.
+ */
+const posterFraming = (rowPath, publicAlbumsDir) => {
+  const sidecar = readVideoPosterSidecar(
+    posterPathsFor(clipPathOf(rowPath), publicAlbumsDir).sidecar,
+  );
+  const { width, height } = sidecar ?? {};
+  if (typeof width !== "number" || typeof height !== "number") return null;
+  const ratio = formatAspectRatio(width, height);
+  if (ratio === "—") return null;
+  return { ratio, orientation: orientationOf(width, height) };
+};
 
 async function prepareSearchFraming(databasePath) {
   if (!existsSync(databasePath)) return 0;
@@ -39,27 +65,37 @@ async function prepareSearchFraming(databasePath) {
       }
     };
     await Promise.all(Array.from({ length: HEADER_READERS }, readHeaders));
+    // The poster cache lives beside the database under public/, so a sidecar is
+    // found from the database path rather than from the album source layout.
+    const publicAlbumsDir = path.resolve(path.dirname(databasePath), "data", "albums");
     let count = 0;
     for (const [index, row] of rows.entries()) {
       const metadata = metadataByRow[index];
-      if (!metadata) continue;
-      try {
-        if (metadata.error) throw metadata.error;
-        let { width, height } = metadata;
-        if (!width || !height) continue;
-        if (metadata.orientation >= 5) [width, height] = [height, width];
-        const ratio = formatAspectRatio(width, height);
-        if (ratio === "—") continue;
-        update.run(
-          row.path,
-          ratio,
-          width === height ? "Square" : width > height ? "Landscape" : "Portrait",
-        );
-        count++;
-      } catch {
-        // Video paths and absent local sources have no photo framing to index.
-        update.run(row.path, null, null);
+      let framing = null;
+      if (metadata) {
+        try {
+          if (metadata.error) throw metadata.error;
+          let { width, height } = metadata;
+          if (!width || !height) continue;
+          if (metadata.orientation >= 5) [width, height] = [height, width];
+          const ratio = formatAspectRatio(width, height);
+          if (ratio === "—") continue;
+          framing = { ratio, orientation: orientationOf(width, height) };
+        } catch {
+          // Only a clip fails here, and its framing is the poster's, below.
+        }
       }
+      // A clip's own file holds no pixels sharp can read — and an external has no
+      // file in the album at all — so the poster the prepass recorded stands in.
+      framing ??= posterFraming(row.path, publicAlbumsDir);
+      if (!framing) {
+        // An absent local source gets no framing row; a file that is present but
+        // unreadable, with no cached poster, records that it has no framing.
+        if (metadata) update.run(row.path, null, null);
+        continue;
+      }
+      update.run(row.path, framing.ratio, framing.orientation);
+      count++;
     }
     return count;
   } finally {

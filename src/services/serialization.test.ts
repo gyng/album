@@ -155,6 +155,9 @@ describe("serialization", () => {
           src: "/data/albums/fixtures/.resized_videos/clip.mp4@1920.mp4",
           originalSrc: "test/fixtures/clip.mp4",
           mimeType: "video/mp4",
+          // A clip's own indexed row, normalised to an object when the fixture
+          // clip has no row — the contract a photo's `_build.tags` already has.
+          tags: {},
           originalTechnicalData: {
             originalDate: "2023-11-20T10:11:12.000Z",
             codec: "h264",

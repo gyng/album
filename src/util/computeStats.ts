@@ -1,5 +1,5 @@
 import { COLOUR_FAMILY_LABELS as COLOR_FAMILY_LABELS, isNeutralFamily } from "./colourFamilies";
-import type { Content, PhotoBlock } from "../services/types";
+import type { Content, PhotoBlock, VideoBlock } from "../services/types";
 import { computeGearStats, type GearStats } from "./computeGearStats";
 import { fillYearRange } from "./yearRange";
 import { rgbToString } from "./colorDistance";
@@ -29,6 +29,7 @@ import { getDegLatLngFromExif } from "./dms2deg";
 import { getDisplayDimensions } from "./photoDimensions";
 import { formatAspectRatio } from "./formatAspectRatio";
 import { WEATHER_FACETS } from "./metadataFacets";
+import { toVideoBlockEntry } from "./videoBlockEntry";
 
 export type BucketedStat = {
   label: string;
@@ -259,6 +260,20 @@ export type TechnicalRelationshipFilters = {
   byCamera: Record<string, ShootingScopeStats>;
   byLens: Record<string, ShootingScopeStats>;
   byCameraLens: Record<string, Record<string, ShootingScopeStats>>;
+};
+
+/**
+ * One piece of gallery media reduced to what the aggregations read.
+ *
+ * A clip is normalised into a photograph's shape before it reaches them (see
+ * `statsPhotoFromVideoBlock`); its coordinates are decoded here because a clip
+ * carries them as decimals rather than the EXIF rationals a still is read from.
+ */
+type StatsPhotoEntry = {
+  album: Content;
+  photo: PhotoBlock;
+  decLat: number | null;
+  decLng: number | null;
 };
 
 function computeNumericFacet(photos: PhotoBlock[], facet: PhotoFacet<number>): NumericFacetStat {
@@ -919,7 +934,7 @@ function computeColorStats(photos: PhotoBlock[]): {
   };
 }
 
-function computeRichColorStats(albums: Content[]): {
+function computeRichColorStats(photoEntries: StatsPhotoEntry[]): {
   colorStats: BucketedStat[];
   accentColorStats: BucketedStat[];
   colorCoverage: number;
@@ -929,16 +944,6 @@ function computeRichColorStats(albums: Content[]): {
   colorYearRibbons: PhotoStats["colorYearRibbons"];
   colorDrift: PhotoStats["colorDrift"];
 } {
-  const photoEntries = albums.flatMap((album) =>
-    album.blocks.flatMap((block) => {
-      if (block.kind !== "photo") {
-        return [];
-      }
-
-      const photo = block as PhotoBlock;
-      return [{ album, photo }];
-    }),
-  );
   const photos = photoEntries.map(({ photo }) => photo);
   const base = computeColorStats(photos);
   const exampleBuckets = new Map<
@@ -1450,31 +1455,26 @@ function computeDayOfYearMemories(photos: PhotoBlock[]): PhotoStats["dayOfYearMe
  */
 const TRIP_SUMMARY_PHOTOS = 0;
 
-function computeTripSummaries(albums: Content[]): TripSummary[] {
+function computeTripSummaries(photoEntries: StatsPhotoEntry[]): TripSummary[] {
   const trips = computeTrips(
-    albums.flatMap((album) =>
-      album.blocks
-        .filter((block): block is PhotoBlock => block.kind === "photo")
-        .map((photo) => {
-          const exif = photo._build.exif;
-          const { decLat, decLng } = getDegLatLngFromExif(exif);
-          const geocode = photo._build.tags?.geocode;
-          const dominant = photo._build.tags?.colors?.[0] as [number, number, number] | undefined;
-          return {
-            date: exif.DateTimeOriginal ?? null,
-            album: album._build.slug,
-            src: photoThumbSrc(photo),
-            href: getMapPhotoHref(album._build.slug, photo),
-            // Must not be undefined: getStaticProps cannot serialise it.
-            label: photo.data.title ?? photo.id ?? "",
-            city: getGeocodeCity(geocode),
-            country: getGeocodeCountry(geocode),
-            lat: typeof decLat === "number" ? decLat : null,
-            lng: typeof decLng === "number" ? decLng : null,
-            ...(dominant ? { swatch: rgbToString(dominant) } : {}),
-          };
-        }),
-    ),
+    photoEntries.map(({ album, photo, decLat, decLng }) => {
+      const exif = photo._build.exif;
+      const geocode = photo._build.tags?.geocode;
+      const dominant = photo._build.tags?.colors?.[0] as [number, number, number] | undefined;
+      return {
+        date: exif.DateTimeOriginal ?? null,
+        album: album._build.slug,
+        src: photoThumbSrc(photo),
+        href: getMapPhotoHref(album._build.slug, photo),
+        // Must not be undefined: getStaticProps cannot serialise it.
+        label: photo.data.title ?? photo.id ?? "",
+        city: getGeocodeCity(geocode),
+        country: getGeocodeCountry(geocode),
+        lat: typeof decLat === "number" ? decLat : null,
+        lng: typeof decLng === "number" ? decLng : null,
+        ...(dominant ? { swatch: rgbToString(dominant) } : {}),
+      };
+    }),
   );
 
   // Trim before this leaves the build: the day-by-day structure would ship every
@@ -1482,10 +1482,7 @@ function computeTripSummaries(albums: Content[]): TripSummary[] {
   return summariseTrips(trips, TRIP_SUMMARY_PHOTOS);
 }
 
-function computeWeatherFacets(albums: Content[]): StringFacetStat[] {
-  const entries = albums.flatMap((album) =>
-    album.blocks.flatMap((photo) => (photo.kind === "photo" ? [{ album, photo }] : [])),
-  );
+function computeWeatherFacets(entries: StatsPhotoEntry[]): StringFacetStat[] {
   return WEATHER_FACETS.map((spec) => {
     const counts = new Map<string, number>();
     const candidates = new Map<string, Array<{ src: string; href: string; label: string }>>();
@@ -1559,9 +1556,76 @@ function computeFramingFacets(photos: PhotoBlock[]): StringFacetStat[] {
   ];
 }
 
+/**
+ * A clip wearing a photograph's shape, so every aggregation below reads one
+ * input.
+ *
+ * The clip's poster frame supplies the pixels and the same `_build.tags` a
+ * photograph carries supplies its palette, tags, geocode, weather and derived
+ * zone; `toVideoBlockEntry` supplies the camera-local wall clock and the place.
+ * A clip records no camera EXIF, so anything that reads the camera itself —
+ * gear, lens type, framing — sees an empty exif and is left to stills. Returns
+ * null until the poster prepass has run, since without a frame there is nothing
+ * to count.
+ */
+const statsPhotoFromVideoBlock = (block: VideoBlock): PhotoBlock | null => {
+  const entry = toVideoBlockEntry(block);
+  const srcset = entry?.block._build?.poster?.srcset;
+  if (!entry || !srcset || srcset.length === 0) {
+    return null;
+  }
+
+  const tags = entry.block._build?.tags ?? {};
+
+  return {
+    kind: "photo",
+    id: entry.anchor,
+    // The album-page anchor, so hrefs and labels derived from this block match
+    // the timeline and map's own clip links.
+    data: { src: entry.anchor },
+    _build: {
+      width: entry.poster.width,
+      height: entry.poster.height,
+      exif: {
+        ...(entry.capturedAtLocal ? { DateTimeOriginal: entry.capturedAtLocal } : {}),
+        // A clip records no OffsetTime of its own; the zone the indexer derived
+        // for it is the same reading the map and timeline already prefer over a
+        // camera's own tag.
+        ...(tags.tz_offset ? { OffsetTime: tags.tz_offset } : {}),
+      },
+      tags,
+      srcset,
+    },
+  };
+};
+
 export function computePhotoStats(albums: Content[]): PhotoStats {
-  const photos = albums.flatMap((album) =>
-    album.blocks.filter((b): b is PhotoBlock => b.kind === "photo"),
+  // Every still and clip in the gallery as one list of statistics input.
+  const entries = albums.flatMap((album) =>
+    album.blocks.flatMap((block): StatsPhotoEntry[] => {
+      if (block.kind === "photo") {
+        const { decLat, decLng } = getDegLatLngFromExif(block._build.exif);
+        return [{ album, photo: block, decLat: decLat ?? null, decLng: decLng ?? null }];
+      }
+
+      if (block.kind !== "video") {
+        return [];
+      }
+
+      const photo = statsPhotoFromVideoBlock(block);
+      const entry = toVideoBlockEntry(block);
+      if (!photo || !entry) {
+        return [];
+      }
+
+      return [{ album, photo, decLat: entry.decLat, decLng: entry.decLng }];
+    }),
+  );
+  const photos = entries.map((entry) => entry.photo);
+  // Framing is measured from a still's own dimensions and orientation, which a
+  // clip's poster cannot stand in for, so that aggregation stays stills-only.
+  const stillPhotos = albums.flatMap((album) =>
+    album.blocks.filter((block): block is PhotoBlock => block.kind === "photo"),
   );
 
   let minYear = Infinity;
@@ -1580,20 +1644,16 @@ export function computePhotoStats(albums: Content[]): PhotoStats {
   const dateRange: [number, number] | null = minYear !== Infinity ? [minYear, maxYear] : null;
   const calendarStats = computeCalendarStats(photos);
   const recentTrendStats = computeRecentTrendStats(photos);
-  const colorStats = computeRichColorStats(albums);
+  const colorStats = computeRichColorStats(entries);
   const lensTypeStats = computeLensTypeStats(photos);
   const technicalRelationshipFilters = computeTechnicalRelationshipFilters(photos);
   const revisitedPlaces = computeRevisitedPlace(photos);
-  const mapPoints = photos.flatMap((photo) => {
-    const exif = photo._build.exif;
-    const { decLat, decLng } = getDegLatLngFromExif(exif);
-    return typeof decLat === "number" && typeof decLng === "number"
-      ? [{ lat: decLat, lng: decLng }]
-      : [];
-  });
+  const mapPoints = entries.flatMap(({ decLat, decLng }) =>
+    typeof decLat === "number" && typeof decLng === "number" ? [{ lat: decLat, lng: decLng }] : [],
+  );
 
   return {
-    trips: computeTripSummaries(albums),
+    trips: computeTripSummaries(entries),
     timezoneStats: computeTimezoneStats(photos),
     archiveGaps: computeArchiveGaps(photos),
     dayOfYearMemories: computeDayOfYearMemories(photos),
@@ -1603,8 +1663,8 @@ export function computePhotoStats(albums: Content[]): PhotoStats {
     numericFacets: NUMERIC_FACETS.map((f) => computeNumericFacet(photos, f as PhotoFacet<number>)),
     stringFacets: [
       ...STRING_FACETS.map((f) => computeStringFacet(photos, f as PhotoFacet<string>)),
-      ...computeFramingFacets(photos),
-      ...computeWeatherFacets(albums),
+      ...computeFramingFacets(stillPhotos),
+      ...computeWeatherFacets(entries),
     ],
     gearFlow: computeGearFlow(photos),
     gear: computeGearStats(albums),

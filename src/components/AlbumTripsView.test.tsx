@@ -3,7 +3,7 @@
  */
 
 import { render, screen } from "@testing-library/react";
-import type { Content, PhotoBlock } from "../services/types";
+import type { Content, PhotoBlock, VideoBlock } from "../services/types";
 import { AlbumTripsView } from "./AlbumTripsView";
 
 const photo = (id: string, date: string, over: Record<string, unknown> = {}): PhotoBlock =>
@@ -22,7 +22,19 @@ const photo = (id: string, date: string, over: Record<string, unknown> = {}): Ph
     },
   }) as unknown as PhotoBlock;
 
-const album = (blocks: PhotoBlock[]): Content =>
+const video = (id: string, capturedAtLocal: string): VideoBlock => ({
+  kind: "video",
+  id,
+  data: { type: "local", href: id },
+  _build: {
+    src: `/albums/trip/${id}@1920.mp4`,
+    mimeType: "video/mp4",
+    poster: { srcset: [{ src: `/r/${id}.avif`, width: 100, height: 100 }] },
+    capturedAtLocal,
+  },
+});
+
+const album = (blocks: Content["blocks"]): Content =>
   ({
     name: "trip",
     title: "trip",
@@ -78,5 +90,21 @@ describe("AlbumTripsView", () => {
     render(<AlbumTripsView album={album([photo("a.jpg", "")])} />);
 
     expect(screen.getByText(/no dated photographs/i)).toBeInTheDocument();
+  });
+
+  // A clip has a moment and a poster frame, so it belongs among the day's
+  // photographs exactly as one taken beside it would.
+  it("places a clip among the day's photographs", () => {
+    render(
+      <AlbumTripsView
+        album={album([
+          photo("a.jpg", "2016:11:13 10:00:00"),
+          video("clip.mov", "2016-11-13T18:00:00"),
+        ])}
+      />,
+    );
+
+    expect(screen.getByText("13 November 2016")).toBeInTheDocument();
+    expect(screen.getAllByRole("img")).toHaveLength(2);
   });
 });

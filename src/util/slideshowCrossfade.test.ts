@@ -48,6 +48,20 @@ describe("slideKeyOf", () => {
     // single → grid (async companions) yields a different key, forcing a fade.
     expect(slideKeyOf(snap("a.jpg"))).not.toBe(slideKeyOf(snap("a.jpg", "b.jpg")));
   });
+
+  it("changes when the same cell turns from a still into a clip", () => {
+    const still: SlideSnapshot = {
+      remix: false,
+      cells: [{ path: "clip.mov", src: "poster.avif" }],
+    };
+    const clip: SlideSnapshot = {
+      remix: false,
+      cells: [{ path: "clip.mov", src: "poster.avif", mediaKind: "video" }],
+    };
+    // Toggling clip playback must push a fresh layer, not reuse the element
+    // that is the wrong kind of thing.
+    expect(slideKeyOf(clip)).not.toBe(slideKeyOf(still));
+  });
 });
 
 describe("isIncomingReady", () => {

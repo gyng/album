@@ -1,22 +1,17 @@
-import type { PhotoBlock } from "../types";
 import {
   computeTrips,
   markFirstVisits,
   markLaterReturns,
   type Trip,
 } from "../../util/computeTrips";
-import { tripPhotoFromBlock } from "../../util/tripPhotoFromBlock";
+import { albumTripPhotos } from "../../util/videoBlockMedia";
 import { getAlbums } from "../album";
 
 export type TripsPageData = { trips: Trip[] };
 
 export const loadTripsPageData = async (): Promise<TripsPageData> => {
   const albums = await getAlbums();
-  const photos = albums.flatMap((album) =>
-    album.blocks
-      .filter((block): block is PhotoBlock => block.kind === "photo")
-      .map((photo) => tripPhotoFromBlock(album, photo)),
-  );
+  const photos = albums.flatMap((album) => albumTripPhotos(album));
 
   const trips = markLaterReturns(markFirstVisits(computeTrips(photos))).map((trip) => ({
     ...trip,

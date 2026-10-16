@@ -138,7 +138,9 @@ test.describe("Smoke Tests", () => {
     test.skip(browserName === "chromium", "Covered by the full Chromium slideshow suite");
     await gotoHydrated(page, "/slideshow");
     await expect(page).toHaveTitle("Slideshow | Snapshots");
-    await expect(page.locator('img[alt]:not([aria-hidden="true"])').first()).toBeVisible({
+    // The top slide is an <img> for a photo/poster or a <video> for a clip;
+    // both carry data-media-kind. The pool is unfiltered, so it may be either.
+    await expect(page.locator('[data-media-kind]:not([aria-hidden="true"])').first()).toBeVisible({
       timeout: 15_000,
     });
   });

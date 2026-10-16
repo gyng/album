@@ -158,8 +158,8 @@ const createE2eSearchDatabases = ({ outputPath, embeddingsOutputPath, force = fa
   const insertMetadata = db.prepare(`
   INSERT INTO metadata (
     path, lat_deg, lng_deg, iso8601, geo_city, geo_region, geo_subregion, geo_country,
-    media_kind, duration_seconds, tz_name, tz_offset
-  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    media_kind, duration_seconds, scene_seconds, scene_of, tz_name, tz_offset
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `);
   const { weatherFixture } = require("../test/fixtures/weather.ts");
   const updateWeather = db.prepare("UPDATE metadata SET weather_json = ? WHERE path = ?");
@@ -224,6 +224,9 @@ const createE2eSearchDatabases = ({ outputPath, embeddingsOutputPath, force = fa
       country,
       photo.mediaKind ?? "photo",
       photo.durationSeconds ?? null,
+      // Photos and the clip itself are not scenes, so they carry no offset.
+      null,
+      null,
       // The indexer derives these from the coordinates; the fixture states them
       // directly so the join has something real to return.
       country === "Japan" ? "Asia/Tokyo" : "Asia/Singapore",
@@ -242,6 +245,59 @@ const createE2eSearchDatabases = ({ outputPath, embeddingsOutputPath, force = fa
       encodedEmbedding.scale,
     );
   });
+
+  // One scene of the clip, so scene collapsing has a real row to reduce. The
+  // clip is shorter than a minute, so its own prepass extracts none; the fixture
+  // states one directly. A scene is embedding-only: it links into the clip at
+  // its offset and is ranked by vector alone, so its images row carries no
+  // filename, caption, tags, geocode or EXIF — just the link and an empty
+  // palette, which is what keeps a clip's minutes out of keyword results.
+  const scene = {
+    clipFilename: "DSCF0159.MOV",
+    offsetSeconds: 60,
+    durationSeconds: 13.013,
+    date: "2026-02-27T10:53:10",
+    location: [36.567263, 137.666282, "Ōmachi", "Nagano", "Ōmachi-shi", "Japan"],
+  };
+  const sceneClipPath = `../albums/test-simple/${scene.clipFilename}`;
+  const scenePath = `${sceneClipPath}@t${scene.offsetSeconds}`;
+  const [sceneLat, sceneLng, sceneCity, sceneRegion, sceneSubregion, sceneCountry] = scene.location;
+
+  insertImage.run(
+    scenePath,
+    `/album/test-simple?t=${scene.offsetSeconds}#${scene.clipFilename}`,
+    null,
+    null,
+    null,
+    null,
+    "[]",
+    null,
+    null,
+  );
+  insertMetadata.run(
+    scenePath,
+    sceneLat,
+    sceneLng,
+    scene.date,
+    sceneCity,
+    sceneRegion,
+    sceneSubregion,
+    sceneCountry,
+    "video",
+    scene.durationSeconds,
+    scene.offsetSeconds,
+    sceneClipPath,
+    sceneCountry === "Japan" ? "Asia/Tokyo" : "Asia/Singapore",
+    sceneCountry === "Japan" ? "+09:00" : "+08:00",
+  );
+  const encodedSceneEmbedding = encodeEmbedding([0.12, 0.22, 0.88]);
+  insertEmbedding.run(
+    scenePath,
+    "google/embeddinggemma-2",
+    3,
+    encodedSceneEmbedding.blob,
+    encodedSceneEmbedding.scale,
+  );
 
   const tagCounts = new Map();
   for (const photo of photos) {

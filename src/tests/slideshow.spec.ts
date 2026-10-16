@@ -1,16 +1,20 @@
 import { test, expect, type Page } from "@playwright/test";
 import { gotoHydrated, waitForHydration } from "./hydrated";
 
-/** Slideshow image — the only non-hidden img on the page. */
-const slideshowImg = 'img[alt]:not([aria-hidden="true"])';
+/* Slideshow slide — the top slide element: the single <img> that loads a photo
+ * (or a clip's poster frame), or the <video> that plays a clip. Every other
+ * layer (the outgoing backdrop and its cells, and the drag preview) carries
+ * aria-hidden="true" or no data-media-kind, so this matches exactly the visible
+ * slide, just as `img[alt]:not([aria-hidden="true"])` did before clips played. */
+const slideshowSlide = '[data-media-kind]:not([aria-hidden="true"])';
 
 const waitForImageChange = (page: Page, previousSrc: string) =>
   page.waitForFunction(
     ([selector, prev]) => {
-      const img = document.querySelector(selector);
-      return img?.getAttribute("src") !== prev;
+      const slide = document.querySelector(selector);
+      return slide?.getAttribute("src") !== prev;
     },
-    [slideshowImg, previousSrc] as const,
+    [slideshowSlide, previousSrc] as const,
   );
 
 const revealControls = async (page: Page) => {
@@ -35,7 +39,7 @@ const settleUi = (page: Page) =>
  *  page fails deterministically rather than passing on the next run. */
 const waitForSlideshow = async (page: Page) => {
   await expect(page).toHaveTitle("Slideshow | Snapshots", { timeout: 30_000 });
-  await expect(page.locator(slideshowImg).first()).toBeVisible();
+  await expect(page.locator(slideshowSlide).first()).toBeVisible();
 };
 
 // Disable wall-clock cadence alignment in every slideshow test so the auto-
@@ -73,7 +77,7 @@ test.describe("Slideshow", () => {
     await gotoHydrated(page, "/slideshow");
     await waitForSlideshow(page);
 
-    const image = page.locator(slideshowImg).first();
+    const image = page.locator(slideshowSlide).first();
     const firstSrc = await image.getAttribute("src");
 
     // Next
@@ -90,10 +94,16 @@ test.describe("Slideshow", () => {
   });
 
   test("switching playback mode keeps a photo on screen", async ({ page }) => {
-    await gotoHydrated(page, "/slideshow?mode=random&filter=test-simple");
+    // Pin the starting photo: the random pool now also contains a clip, which
+    // plays as a <video>, and this case asserts a still (an .avif) is carried
+    // across modes. A pinned frame is what makes that deterministic.
+    await gotoHydrated(
+      page,
+      `/slideshow?mode=random&filter=test-simple&photo=${encodeURIComponent("../albums/test-simple/DSCF2485-2.jpg")}`,
+    );
     await waitForSlideshow(page);
 
-    const image = page.locator(slideshowImg).first();
+    const image = page.locator(slideshowSlide).first();
     await expect(image).toHaveAttribute("src", /\.avif$/);
     const originalSrc = await image.getAttribute("src");
 
@@ -190,7 +200,7 @@ test.describe("Slideshow", () => {
     await gotoHydrated(page, "/slideshow?mode=random&filter=test-simple&delay=1");
     await waitForSlideshow(page);
 
-    const image = page.locator(slideshowImg).first();
+    const image = page.locator(slideshowSlide).first();
     const firstSrc = await image.getAttribute("src");
 
     // The cadence timer should advance with no user interaction.
@@ -204,7 +214,7 @@ test.describe("Slideshow", () => {
     await gotoHydrated(page, "/slideshow?mode=random&filter=test-simple&delay=1");
     await waitForSlideshow(page);
 
-    const image = page.locator(slideshowImg).first();
+    const image = page.locator(slideshowSlide).first();
 
     await revealControls(page);
     await page.locator('button:has-text("Pause")').click();
@@ -231,6 +241,66 @@ test.describe("Slideshow", () => {
     await expect(page.getByRole("button", { name: "Cycle details alignment" })).toContainText(
       "Right",
     );
+  });
+});
+
+test.describe("Slideshow clips", () => {
+  // The single real clip committed to the E2E search database. Address its row
+  // by path so these cases never depend on the shuffle landing on it, and pin
+  // remix off so the clip is the one single-slide element on screen.
+  const clipPath = "../albums/test-simple/DSCF0159.MOV";
+  const clipVideoSrc = "/data/albums/test-simple/.resized_videos/DSCF0159.MOV%401920.mp4";
+  const clipPosterSrc = "/data/albums/test-simple/.resized_images/DSCF0159.MOV%403200.avif";
+  const clipUrl = (extra = "") =>
+    `/slideshow?mode=random&filter=test-simple&remix=0&delay=86400&photo=${encodeURIComponent(clipPath)}${extra}`;
+
+  test("plays a clip as a muted, looping video whose time advances", async ({ page }) => {
+    await gotoHydrated(page, clipUrl());
+    await waitForSlideshow(page);
+
+    const slide = page.locator(slideshowSlide).first();
+    await expect(slide).toHaveAttribute("data-media-kind", "video");
+
+    // Read the media element's own account of itself: a <video> pointing at the
+    // transcoded clip, backed by the extracted poster frame.
+    const media = await slide.evaluate((element) => {
+      const video = element as HTMLVideoElement;
+      return {
+        tag: video.tagName,
+        src: video.getAttribute("src"),
+        poster: video.getAttribute("poster"),
+        muted: video.muted,
+        loop: video.loop,
+        playsInline: video.playsInline,
+        controls: video.controls,
+      };
+    });
+    expect(media.tag).toBe("VIDEO");
+    expect(media.src).toBe(clipVideoSrc);
+    expect(media.poster).toBe(clipPosterSrc);
+    expect(media.muted).toBe(true);
+    expect(media.loop).toBe(true);
+    expect(media.playsInline).toBe(true);
+    expect(media.controls).toBe(false);
+
+    // Proof it is actually playing, not merely a video element parked at 0.
+    // The cadence is 24h, so the slide cannot advance out from under this.
+    await expect
+      .poll(() => slide.evaluate((element) => (element as HTMLVideoElement).currentTime))
+      .toBeGreaterThan(0);
+  });
+
+  test("clips=0 shows the clip as its poster still with no video element", async ({ page }) => {
+    await gotoHydrated(page, clipUrl("&clips=0"));
+    await waitForSlideshow(page);
+
+    const slide = page.locator(slideshowSlide).first();
+    await expect(slide).toHaveAttribute("data-media-kind", "photo");
+    expect(await slide.evaluate((element) => element.tagName)).toBe("IMG");
+    await expect(slide).toHaveAttribute("src", clipPosterSrc);
+
+    // Nothing anywhere on the page plays the clip.
+    await expect(page.locator("video")).toHaveCount(0);
   });
 });
 
@@ -292,12 +362,12 @@ test.describe("Slideshow touch mode", () => {
         });
         el.dispatchEvent(ev);
       },
-      { type, x, y, selector: slideshowImg },
+      { type, x, y, selector: slideshowSlide },
     );
   };
 
   const imageCentre = async (page: Page) => {
-    const box = await page.locator(slideshowImg).first().boundingBox();
+    const box = await page.locator(slideshowSlide).first().boundingBox();
     if (!box) throw new Error("Slideshow image has no bounding box");
     return { x: box.x + box.width / 2, y: box.y + box.height / 2, box };
   };
@@ -321,7 +391,7 @@ test.describe("Slideshow touch mode", () => {
     await page.getByRole("button", { name: "Hide controls", exact: true }).click();
     await expect(page.locator("[data-paused]")).toHaveAttribute("data-controls-visible", "false");
 
-    const image = page.locator(slideshowImg).first();
+    const image = page.locator(slideshowSlide).first();
     const currentSrc = await image.getAttribute("src");
     const peek = page.locator("[data-drag-peek]");
     await expect(peek).toHaveCount(0);
@@ -371,7 +441,7 @@ test.describe("Slideshow touch mode", () => {
     await gotoHydrated(page, "/slideshow?mode=random&filter=test-simple");
     await waitForSlideshow(page);
 
-    const image = page.locator(slideshowImg).first();
+    const image = page.locator(slideshowSlide).first();
     const firstSrc = await image.getAttribute("src");
 
     // Swipe left past the 48px commit threshold → next photo.
@@ -385,7 +455,7 @@ test.describe("Slideshow touch mode", () => {
     await waitForSlideshow(page);
 
     const container = page.locator("[data-paused]");
-    const image = page.locator(slideshowImg).first();
+    const image = page.locator(slideshowSlide).first();
 
     // First pull-up hides the (initially visible) controls.
     await swipe(page, 0, -100, 10);
@@ -417,7 +487,7 @@ test.describe("Slideshow touch mode", () => {
           }),
         );
       },
-      { x, y, selector: slideshowImg },
+      { x, y, selector: slideshowSlide },
     );
   };
 
@@ -427,7 +497,7 @@ test.describe("Slideshow touch mode", () => {
     await gotoHydrated(page, "/slideshow?mode=random&filter=test-simple");
     await waitForSlideshow(page);
 
-    const image = page.locator(slideshowImg).first();
+    const image = page.locator(slideshowSlide).first();
     const firstSrc = await image.getAttribute("src");
 
     const { x, y } = await imageCentre(page);

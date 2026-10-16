@@ -71,11 +71,11 @@ describe("buildVideoPosterMetadata", () => {
     tags,
   });
 
-  // Cameras stamp QuickTime creation_time with a "Z" while writing the
-  // camera's own wall clock (the committed X-T5 fixture does exactly this).
-  // The whole pipeline stores camera-local wall time, so the zone marker is
-  // dropped rather than applied — the same rule EXIF timestamps follow.
-  it("keeps creation_time as camera-local wall clock", () => {
+  // A last resort for a clip whose own EXIF cannot be read. The reading is kept
+  // as written, because this tag is a wall clock on some cameras and an honest
+  // UTC instant on others (the committed X-T5 writes UTC here and its local
+  // time in EXIF, which is why the clip's own EXIF now outranks this).
+  it("falls back to creation_time, kept as written", () => {
     const metadata = buildVideoPosterMetadata({
       streams: [videoStream()],
       format: { tags: { creation_time: "2026-02-27T10:52:10.000000Z" }, duration: "13.013000" },
@@ -101,6 +101,50 @@ describe("buildVideoPosterMetadata", () => {
 
     expect(metadata.capturedAtLocal).toBe("2025-11-25T18:12:33");
     expect(metadata.timeSource).toBe("quicktime-creationdate");
+  });
+
+  // The tags above are not the camera's clock on every camera: an X-T5 writes a
+  // genuine UTC instant into creation_time (about 35s after its own first
+  // frame) and the wall clock into EXIF, so reading the former as local put the
+  // Tokyo City View clip at 11:16 in the morning.
+  it("prefers the clip's own EXIF wall clock over the QuickTime instant", () => {
+    const metadata = buildVideoPosterMetadata(
+      {
+        streams: [videoStream()],
+        format: { tags: { creation_time: "2025-12-01T11:16:23.000000Z" } },
+      },
+      { dateTimeOriginal: "2025-12-01T20:15:51", offsetTimeOriginal: "+09:00" },
+    );
+
+    expect(metadata.capturedAtLocal).toBe("2025-12-01T20:15:51");
+    expect(metadata.timeSource).toBe("movie-exif");
+  });
+
+  it("prefers the clip's own coordinates over an ISO6709 tag", () => {
+    const metadata = buildVideoPosterMetadata(
+      {
+        streams: [videoStream({ "com.apple.quicktime.location.ISO6709": "-33.8688+151.2093/" })],
+        format: { tags: {} },
+      },
+      { latDeg: 35.6601711, lngDeg: 139.7292303 },
+    );
+
+    expect(metadata.latDeg).toBeCloseTo(35.6601711, 6);
+    expect(metadata.lngDeg).toBeCloseTo(139.7292303, 6);
+  });
+
+  it("takes coordinates from a clip EXIF that could not supply a date", () => {
+    const metadata = buildVideoPosterMetadata(
+      {
+        streams: [videoStream()],
+        format: { tags: { creation_time: "2025-04-12T10:20:53.000000Z" } },
+      },
+      { latDeg: 1.2843289, lngDeg: 103.8429431 },
+    );
+
+    expect(metadata.capturedAtLocal).toBe("2025-04-12T10:20:53");
+    expect(metadata.timeSource).toBe("creation_time");
+    expect(metadata.latDeg).toBeCloseTo(1.2843289, 6);
   });
 
   it("reads coordinates from either the format or the stream location tag", () => {

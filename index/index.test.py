@@ -440,6 +440,60 @@ class TestMain(unittest.TestCase):
             )
             db.con.close()
 
+    def test_weather_enrichment_includes_clips_and_skips_incomplete_ones(self):
+        # A clip carries the same sidecar-derived coordinates and camera-local
+        # time a photo carries in EXIF, so weather must consider a placed, dated
+        # clip — and still skip one missing a location or a date, exactly as it
+        # skips a photo.
+        from datetime import UTC, datetime
+
+        from weather import VARIABLES, enrich_database
+
+        def response():
+            values = {variable: [0, 1] for variable in VARIABLES}
+            values["temperature_2m"] = [27, 28]
+            return {
+                "latitude": 1.25,
+                "longitude": 103.75,
+                "hourly": dict(time=["2024-01-01T23:00", "2024-01-02T00:00"], **values),
+            }
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            dbpath = os.path.join(tmpdir, "weather-clips.sqlite")
+            con = sqlite3.connect(dbpath)
+            con.execute(
+                "CREATE TABLE metadata(path TEXT PRIMARY KEY, lat_deg REAL, "
+                "lng_deg REAL, iso8601 TEXT, tz_offset TEXT, media_kind TEXT)"
+            )
+            con.executemany(
+                "INSERT INTO metadata VALUES (?,?,?,?,?,?)",
+                [
+                    ("clip.mp4", 1.3, 103.8, "2024-01-02T07:45:00", "+08:00", "video"),
+                    ("nogps.mp4", None, None, "2024-01-02T07:45:00", "+08:00", "video"),
+                    ("nodate.mp4", 1.3, 103.8, None, "+08:00", "video"),
+                ],
+            )
+            con.commit()
+            con.close()
+
+            report = enrich_database(
+                dbpath,
+                interval=0,
+                fetch=mock.Mock(return_value=response()),
+                now=datetime(2026, 10, 12, tzinfo=UTC),
+                log=lambda _: None,
+            )
+
+            con = sqlite3.connect(dbpath)
+            weather = dict(con.execute("SELECT path, weather_json FROM metadata"))
+            con.close()
+
+        self.assertEqual(report["updated"], 1)
+        self.assertEqual(report["skipped"], 2)
+        self.assertIsNotNone(weather["clip.mp4"])
+        self.assertIsNone(weather["nogps.mp4"])
+        self.assertIsNone(weather["nodate.mp4"])
+
     def test_insert_metadata_records_media_kind_and_duration(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             dbpath = os.path.join(tmpdir, "media-kind.sqlite")
@@ -619,11 +673,11 @@ class TestMain(unittest.TestCase):
         self.assertTrue(needs_caption_for("../albums/trip/clip.mov"))
         self.assertTrue(needs_caption_for("../albums/trip/a.jpg"))
 
-    def test_update_gps_leaves_videos_alone(self):
-        # update-gps re-reads EXIF from each indexed file. A video has none: its
-        # time and place come from the sidecar the poster prepass wrote, so
-        # re-reading it would blank exactly the fields this command exists to
-        # maintain.
+    def test_update_gps_leaves_a_clip_without_a_readable_sidecar_alone(self):
+        # A clip's place and time live in the sidecar the poster prepass wrote.
+        # With none on disk there is nothing to refresh from, so update-gps must
+        # leave the existing row exactly as it found it rather than blank the
+        # very fields it exists to maintain.
         with tempfile.TemporaryDirectory(dir=".") as root:
             album_dir, _poster_dir = self._make_media_album(root)
             video = os.path.join(album_dir, "clip.mov")
@@ -658,6 +712,85 @@ class TestMain(unittest.TestCase):
         self.assertAlmostEqual(35.6895, row[1], places=4)
         self.assertEqual("video", row[2])
         self.assertAlmostEqual(13.013, row[3], places=3)
+
+    def test_update_gps_refreshes_a_clip_and_its_scenes_from_the_sidecar(self):
+        # A clip has no EXIF: its place and camera-local time come from the
+        # sidecar the poster prepass wrote, and each scene takes the clip's place
+        # and start plus its own offset. update-gps must repair both — including
+        # a clip whose sidecar has only now gained coordinates it lacked — and do
+        # so idempotently.
+        with tempfile.TemporaryDirectory(dir=".") as root:
+            album_dir, poster_dir = self._make_media_album(root)
+            media_root = os.path.join(root, "src", "public", "data", "albums")
+            clip = os.path.join(album_dir, "clip.mov")
+            scene = clip + "@t90"
+            open(clip, "w").close()
+            with open(os.path.join(poster_dir, "clip.mov@poster.json"), "w") as fh:
+                json.dump(
+                    {
+                        "mediaKind": "video",
+                        "capturedAtLocal": "2026-02-27T10:52:10",
+                        "latDeg": 35.6895,
+                        "lngDeg": 139.6917,
+                        "durationSeconds": 13.013,
+                        "scenes": [90],
+                    },
+                    fh,
+                )
+
+            with tempfile.TemporaryDirectory() as dbdir:
+                dbpath = os.path.join(dbdir, "update-gps-clip.sqlite")
+                db = Sqlite3Client(dbpath)
+                db.setup_tables()
+                with db.transaction() as cur:
+                    db.upsert_image_fields(clip, {"filename": "clip.mov"}, cur=cur)
+                    db.upsert_image_fields(
+                        scene,
+                        {"album_relative_path": "/album/trip?t=90#clip.mov"},
+                        cur=cur,
+                    )
+                    # The clip's sidecar carried no coordinates when indexed.
+                    db.insert_metadata(
+                        clip, (None, None), None, cur=cur, media_kind="video"
+                    )
+                    db.insert_metadata(
+                        scene, (0.0, 0.0), "1999-01-01T00:00:00", cur=cur
+                    )
+
+                args = ["--dbpath", dbpath, "--media-root", media_root]
+                result = CliRunner().invoke(update_gps, args)
+                self.assertEqual(0, result.exit_code, result.output)
+                # A second run must be a no-op: the refresh is idempotent.
+                self.assertEqual(0, CliRunner().invoke(update_gps, args).exit_code)
+
+                with Sqlite3Client(dbpath, read_only=True).transaction() as cur:
+                    clip_row = cur.execute(
+                        "SELECT lat_deg, lng_deg, iso8601, duration_seconds, "
+                        "media_kind FROM metadata WHERE path = ?",
+                        (clip,),
+                    ).fetchone()
+                    scene_row = cur.execute(
+                        "SELECT lat_deg, lng_deg, iso8601, scene_seconds, scene_of "
+                        "FROM metadata WHERE path = ?",
+                        (scene,),
+                    ).fetchone()
+                    scene_geocode = cur.execute(
+                        "SELECT geocode FROM images WHERE path = ?", (scene,)
+                    ).fetchone()[0]
+
+        self.assertAlmostEqual(35.6895, clip_row[0], places=4)
+        self.assertAlmostEqual(139.6917, clip_row[1], places=4)
+        self.assertEqual("2026-02-27T10:52:10", clip_row[2])
+        self.assertAlmostEqual(13.013, clip_row[3], places=3)
+        self.assertEqual("video", clip_row[4])
+        # The scene keeps the clip's place and starts 90 seconds into it.
+        self.assertAlmostEqual(35.6895, scene_row[0], places=4)
+        self.assertAlmostEqual(139.6917, scene_row[1], places=4)
+        self.assertEqual("2026-02-27T10:53:40", scene_row[2])
+        self.assertEqual(90.0, scene_row[3])
+        self.assertEqual(clip, scene_row[4])
+        # Scenes are not searchable text, so no geocode lands on their row.
+        self.assertIsNone(scene_geocode)
 
     def test_insert_metadata_keeps_a_duration_a_later_write_does_not_carry(self):
         # Other writers (update-gps, backfills) call insert_metadata with only

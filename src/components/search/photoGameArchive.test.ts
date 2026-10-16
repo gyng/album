@@ -107,3 +107,82 @@ it("gives every game the coordinates that let a result offer Guess Where", async
   expect(photo).toMatchObject({ location: { lat: 35, lng: 139 } });
   expect(photo).not.toHaveProperty("takenAt");
 });
+
+// A clip's poster frame is a still like any photograph, so a game can deal it
+// in; its per-minute scenes are moments inside that clip, not pictures.
+const createArchiveWithClip = () => ({
+  exec: ({ sql, callback }: { sql: string; callback: (row: unknown[]) => void }) => {
+    if (sql.includes("pragma_table_info('metadata')") && sql.includes("media_kind")) {
+      callback([1]);
+      return;
+    }
+    if (sql.includes("SELECT path, media_kind, duration_seconds FROM metadata")) {
+      callback(["../albums/trip/clip.mp4", "video", 42.5]);
+      callback(["../albums/trip/clip.mp4@t60", "video", 42.5]);
+      callback(["../albums/trip/a.jpg", "photo", null]);
+      return;
+    }
+    if (sql.includes("FROM embeddings")) {
+      callback(["../albums/trip/clip.mp4", "google/embeddinggemma-2", 2, "[0,1]"]);
+      callback(["../albums/trip/clip.mp4@t60", "google/embeddinggemma-2", 2, "[0.5,0.5]"]);
+      callback(["../albums/trip/a.jpg", "google/embeddinggemma-2", 2, "[1,0]"]);
+      return;
+    }
+    if (sql.includes("FROM images")) {
+      callback([
+        "../albums/trip/clip.mp4",
+        "/album/trip#clip.mp4",
+        "clip.mp4",
+        "",
+        "",
+        "harbour",
+        "",
+        "A <b>harbour</b> at dusk.",
+        "",
+      ]);
+      callback([
+        "../albums/trip/clip.mp4@t60",
+        "/album/trip#clip.mp4",
+        "clip.mp4",
+        "",
+        "",
+        "harbour",
+        "",
+        "A later harbour moment.",
+        "",
+      ]);
+      callback([
+        "../albums/trip/a.jpg",
+        "/album/trip#a.jpg",
+        "a.jpg",
+        "",
+        "",
+        "harbour",
+        "",
+        "A quiet harbour.",
+        "",
+      ]);
+    }
+  },
+});
+
+it("deals a clip in like a photograph and still leaves its scenes out", async () => {
+  const photos = await fetchPhotoGameArchive({
+    database: createArchiveWithClip() as never,
+    game: "relay",
+  });
+
+  expect(photos.map((photo) => photo.path)).toEqual([
+    "../albums/trip/clip.mp4",
+    "../albums/trip/a.jpg",
+  ]);
+  expect(photos[0]).toMatchObject({
+    href: "/album/trip#clip.mp4",
+    caption: "A harbour at dusk.",
+    tags: "harbour",
+    vector: [0, 1],
+  });
+  // Every field a photograph carries, and no others: the games read the archive
+  // as pictures, whatever the row was indexed from.
+  expect(Object.keys(photos[0]!).sort()).toEqual(Object.keys(photos[1]!).sort());
+});

@@ -120,6 +120,14 @@ export interface VideoBlock extends IBlock {
     latDeg?: number;
     lngDeg?: number;
     durationSeconds?: number;
+    /**
+     * The clip's own row from the search index, keyed by the clip's path (or by
+     * its synthetic `<video id>.youtube` name) and built from the poster frame —
+     * exactly the shape a photo's `_build.tags` has, so a clip's colours, tags,
+     * alt text, geocode, weather and derived zone are read through the same keys
+     * as a photograph's.
+     */
+    tags?: Tags;
     originalTechnicalData?: {
       originalDate?: string;
       codec?: string;

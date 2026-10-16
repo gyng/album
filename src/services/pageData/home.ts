@@ -1,6 +1,7 @@
 import { getAlbums, getImageTimestampRange } from "../album";
-import type { Content, PhotoBlock } from "../types";
+import type { Content, PhotoBlock, Tags, VideoBlock } from "../types";
 import type { AlbumPreview, HomePageData } from "../../util/pageDataTypes";
+import { mediaBlockAsPhoto } from "../../util/videoBlockMedia";
 
 const compactHomePreviewPhoto = (photo: PhotoBlock): PhotoBlock => {
   const { DateTimeOriginal, Orientation } = photo._build.exif;
@@ -26,6 +27,30 @@ const compactHomePreviewPhoto = (photo: PhotoBlock): PhotoBlock => {
   };
 };
 
+const compactHomePreviewVideo = (video: VideoBlock): VideoBlock => {
+  const poster = video._build?.poster;
+  const { alt_text, colors }: Tags = video._build?.tags ?? {};
+  return {
+    kind: "video",
+    id: video.id,
+    data: video.data,
+    _build: {
+      src: video._build?.src ?? video.data.href,
+      mimeType: video._build?.mimeType ?? "",
+      ...(poster ? { poster: { srcset: poster.srcset } } : {}),
+      ...(video._build?.capturedAtLocal !== undefined
+        ? { capturedAtLocal: video._build.capturedAtLocal }
+        : {}),
+      // The card reads the same keys a photograph's preview keeps: the alt text
+      // and the palette that fills the cover before it loads.
+      tags: {
+        ...(alt_text !== undefined ? { alt_text } : {}),
+        ...(colors !== undefined ? { colors } : {}),
+      },
+    },
+  };
+};
+
 /** The order albums appear in on the home page, which album pages also step through. */
 export const sortAlbumsForHome = <T extends Content>(albums: readonly T[]): T[] =>
   [...albums]
@@ -38,22 +63,28 @@ export const sortAlbumsForHome = <T extends Content>(albums: readonly T[]): T[] 
     // Push test albums to the end.
     .sort((a, b) => (a.name.startsWith("test") ? 1 : 0) - (b.name.startsWith("test") ? 1 : 0));
 
-/** An album as a card: its covers plus the first photo, nothing else. */
+/** An album as a card: its covers plus the first piece of media, nothing else. */
 export const toAlbumPreview = (album: Content): AlbumPreview => {
-  // Keep only covers plus the first photo, deduplicating when the cover is
-  // also first. This limits the serialised payload.
+  // Keep only covers plus the first media item, deduplicating when the cover is
+  // also first. This limits the serialised payload. A clip joins a photograph
+  // here — counted like one and drawn through its poster frame.
   const coverBlocks = album.blocks.filter(
     (block): block is PhotoBlock => block.kind === "photo" && Boolean(block.formatting?.cover),
   );
-  const firstPhoto = album.blocks.find((block) => block.kind === "photo");
-  const previewBlocks: PhotoBlock[] =
-    firstPhoto && !coverBlocks.some((block) => block.id === firstPhoto.id)
-      ? [...coverBlocks, firstPhoto]
+  const firstMedia = album.blocks.find(
+    (block): block is PhotoBlock | VideoBlock => mediaBlockAsPhoto(block) !== null,
+  );
+  const previewBlocks: (PhotoBlock | VideoBlock)[] =
+    firstMedia && !coverBlocks.some((block) => block.id === firstMedia.id)
+      ? [...coverBlocks, firstMedia]
       : coverBlocks;
   return {
     ...album,
-    photoCount: album.blocks.filter((block) => block.kind === "photo").length,
-    blocks: previewBlocks.map(compactHomePreviewPhoto),
+    photoCount: album.blocks.filter((block) => block.kind === "photo" || block.kind === "video")
+      .length,
+    blocks: previewBlocks.map((block) =>
+      block.kind === "video" ? compactHomePreviewVideo(block) : compactHomePreviewPhoto(block),
+    ),
     _build: { ...album._build, timeRange: getImageTimestampRange(album) },
   };
 };

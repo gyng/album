@@ -31,18 +31,63 @@ describe("create-e2e-search-db", () => {
       expect(result.created).toBe(true);
 
       const database = new DatabaseSync(databasePath, { readOnly: true });
-      // Five photos plus the album's committed clip, indexed through its poster.
-      expect(database.prepare("SELECT COUNT(*) AS count FROM images").get().count).toBe(6);
+      const clipPath = "../albums/test-simple/DSCF0159.MOV";
+      const scenePath = `${clipPath}@t60`;
+      // Five photos, the album's committed clip indexed through its poster, and
+      // one scene of that clip so scene collapsing has a row to work with.
+      expect(database.prepare("SELECT COUNT(*) AS count FROM images").get().count).toBe(7);
       expect(
         database
           .prepare("SELECT media_kind, duration_seconds FROM metadata WHERE path LIKE '%.MOV'")
           .get(),
       ).toEqual({ media_kind: "video", duration_seconds: 13.013 });
+      // The clip and its scene are separate rows: the clip is not a scene, and
+      // the scene links back to the clip at the offset it came from.
+      expect(
+        database
+          .prepare("SELECT scene_seconds, scene_of FROM metadata WHERE path = ?")
+          .get(clipPath),
+      ).toEqual({ scene_seconds: null, scene_of: null });
+      expect(
+        database
+          .prepare(
+            "SELECT media_kind, duration_seconds, scene_seconds, scene_of FROM metadata WHERE path = ?",
+          )
+          .get(scenePath),
+      ).toEqual({
+        media_kind: "video",
+        duration_seconds: 13.013,
+        scene_seconds: 60,
+        scene_of: clipPath,
+      });
+      // A scene is embedding-only: its images row is the link alone, with no
+      // searchable text and an empty palette, so keyword search cannot answer
+      // with every minute of the clip.
+      expect(
+        database
+          .prepare(
+            "SELECT filename, album_relative_path, tags, alt_text, colors FROM images WHERE path = ?",
+          )
+          .get(scenePath),
+      ).toEqual({
+        filename: null,
+        album_relative_path: "/album/test-simple?t=60#DSCF0159.MOV",
+        tags: null,
+        alt_text: null,
+        colors: "[]",
+      });
       expect(
         database
           .prepare("SELECT COUNT(*) AS count FROM sqlite_master WHERE name = 'embeddings'")
           .get().count,
       ).toBe(0);
+      // The scene columns the readers collapse on stay part of the core schema.
+      expect(
+        database
+          .prepare("SELECT name FROM pragma_table_info('metadata')")
+          .all()
+          .map(({ name }) => name),
+      ).toEqual(expect.arrayContaining(["scene_seconds", "scene_of"]));
       expect(
         database.prepare("SELECT COUNT(*) AS count FROM images WHERE images MATCH 'japan'").get()
           .count,
@@ -56,9 +101,16 @@ describe("create-e2e-search-db", () => {
       database.close();
 
       const embeddingsDatabase = new DatabaseSync(embeddingsDatabasePath, { readOnly: true });
+      // The scene is ranked by vector alone, so it has an embedding even though
+      // it carries no searchable text.
       expect(
         embeddingsDatabase.prepare("SELECT COUNT(*) AS count FROM embeddings").get().count,
-      ).toBe(6);
+      ).toBe(7);
+      expect(
+        embeddingsDatabase
+          .prepare("SELECT COUNT(*) AS count FROM embeddings WHERE path = ?")
+          .get(scenePath).count,
+      ).toBe(1);
       expect(
         embeddingsDatabase
           .prepare("SELECT name FROM pragma_table_info('embeddings') ORDER BY cid")

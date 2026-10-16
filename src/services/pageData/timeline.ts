@@ -19,6 +19,7 @@ const videoTimelineEntries = (album: Awaited<ReturnType<typeof getAlbums>>[numbe
     const wallClock = parseExifLocalDateTime(video.capturedAtLocal);
     if (!wallClock) return [];
     const wallClockIso = formatExifWallClockIso(wallClock);
+    const primaryColor = video.block._build?.tags?.colors?.[0];
 
     return [
       {
@@ -35,9 +36,12 @@ const videoTimelineEntries = (album: Awaited<ReturnType<typeof getAlbums>>[numbe
         // the "find similar" link maps back to the source path the database
         // indexed this clip under.
         path: `/data/albums/${album._build.slug}/${video.anchor}`,
-        // A poster's own palette is not extracted at build time, so the tile
-        // falls back to the neutral placeholder photos use when uncoloured.
-        placeholderColor: "transparent",
+        // The clip's indexed row carries the poster's palette under the same
+        // `tags.colors` key a photograph's does, so the tile is filled the way a
+        // still's is and only falls back when the clip is unindexed.
+        placeholderColor: primaryColor
+          ? `rgba(${primaryColor[0]}, ${primaryColor[1]}, ${primaryColor[2]}, 1)`
+          : "transparent",
         placeholderWidth: video.poster.width,
         placeholderHeight: video.poster.height,
       },

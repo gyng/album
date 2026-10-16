@@ -1217,8 +1217,11 @@ export const fetchPhotoGameArchive = async (opts: {
       locations.set(path, { lat, lng, date, label: "" });
   }
   const vectors = new Map(embeddings.map((row) => [row.path, row.embedding]));
+  // A clip is dealt in like a photograph: it carries the same poster, caption
+  // and embedding, so every game can draw its still. Only its per-minute scenes
+  // stay out — a moment inside a clip is not a picture to play with.
   return rows
-    .filter((row) => row.mediaKind !== "video" && sceneSecondsOf(row.path) === undefined)
+    .filter((row) => sceneSecondsOf(row.path) === undefined)
     .map((row) => ({
       path: row.path,
       href: row.album_relative_path,

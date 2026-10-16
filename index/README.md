@@ -78,6 +78,16 @@ extractor all read, and a clip without one is reported and skipped rather than
 indexed blind. `--media-root` points at that cache (default
 `../src/public/data/albums`) and is shared by `index`, `prune` and `validate`.
 
+That wall clock and those coordinates are read from the clip's own embedded EXIF
+by `src/services/movieExif.ts`, because `ffprobe` cannot see inside a MOV's EXIF
+block: the QuickTime `creation_time` a camera writes is a UTC instant on an
+X-T5, so treating it as local puts a clip hours from when it was shot. A clip's
+sidecar is the only place its place and time live, so `weather` enrichment
+selects clip rows on the same terms as photos, and `update-gps --media-root`
+re-reads a clip (and its scenes, offset from the clip's own start) from that
+sidecar. A clip with no coordinates or no date stays unenriched, exactly like a
+photo.
+
 A clip longer than a minute also gets a frame per minute, indexed as scene rows
 named `clip.mov@t120`. Those are embedding-only — vectors and a locatable row,
 never a caption or a palette — so a long video becomes findable at the moment it

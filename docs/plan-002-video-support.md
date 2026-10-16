@@ -1,11 +1,18 @@
 # Plan: First-Class Video Support
 
-> **Status: implemented** — poster extraction and video presence across the
-> web app are live. The one deliberate gap is the *search index*: the Python
-> indexer still globs `*.jpg` only, so videos are not searchable. Parked until
-> a real (non-test) video exists in an album; the sketch is to feed one
-> ffmpeg-extracted frame through the existing Janus + SigLIP pipeline, with
-> ffprobe for creation time/GPS (video containers do not carry EXIF).
+> **Status: implemented, including the search index** — the Parked gap below
+> closed once real clips existed in albums: `find_files` in `index/index.py`
+> derives video globs from the photo glob, a clip is indexed through its poster
+> frame (captions, colours, core metadata) and embedded by EmbeddingGemma 2
+> **from the clip itself** — up to 24 frames plus 16 kHz mono audio per minute,
+> `index/media_embedding.py` — rather than from a still. The searches below for
+> Janus/SigLIP describe the model that was in place when this plan was written.
+> Two details this plan assumed away: a video container *does* carry EXIF, but
+> ffprobe cannot see it, so `src/services/movieExif.ts` reads a clip's wall clock
+> and coordinates out of the QuickTime `udta`/`MVTG` atom (QuickTime's
+> `creation_time` is a UTC instant on an X-T5, not the camera's local time); and
+> a clip's indexed row reaches the block as `_build.tags`, the same keys a
+> photograph's row uses.
 
 ## Context
 

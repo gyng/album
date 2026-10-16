@@ -15,6 +15,7 @@ const path = require("node:path");
 const imageOptimisationConfig = require("../services/imageOptimisationConfig.json");
 const { listAlbumFiles, runPool } = require("./prepare-optimised-images.cjs");
 const { ensureVideoPoster, posterPathsFor } = require("../services/videoPoster.ts");
+const { readMovieExif } = require("../services/movieExif.ts");
 const { ensureYoutubePoster } = require("../services/youtubeExternal.ts");
 
 const VIDEO_EXTENSIONS = new Set([".mp4", ".mov", ".m4v", ".webm", ".mkv", ".avi"]);
@@ -67,6 +68,10 @@ const prepareVideoPosters = async ({
       publicAlbumsDir,
       sizes: imageOptimisationConfig.sizes,
       avif: imageOptimisationConfig.avif,
+      // A clip's own wall clock and coordinates live in its embedded EXIF, which
+      // ffprobe does not expose; injected rather than imported because this
+      // module takes no relative runtime import.
+      readMovieExif,
     }),
   generateExternalPoster = (external, albumName) =>
     ensureYoutubePoster(external, {

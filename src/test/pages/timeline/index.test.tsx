@@ -54,6 +54,7 @@ describe("timeline page data fetching", () => {
               latDeg: 35.6,
               lngDeg: 139.7,
               durationSeconds: 13.013,
+              tags: { colors: [[200, 30, 40]] },
               poster: {
                 srcset: [{ src: "/clip.mov@800.avif", width: 300, height: 200 }],
               },
@@ -92,6 +93,9 @@ describe("timeline page data fetching", () => {
       href: "/album/kansai#clip.mov",
       path: "/data/albums/kansai/clip.mov",
       mediaKind: "video",
+      // The poster's own palette, read off the clip's indexed row, fills the tile
+      // the way a photograph's does.
+      placeholderColor: "rgba(200, 30, 40, 1)",
       src: { src: "/clip.mov@800.avif", width: 300, height: 200 },
     });
   });
@@ -135,6 +139,8 @@ describe("timeline page data fetching", () => {
       mediaKind: "video",
       dateTimeOriginal: "2025-12-01T22:00:00",
       href: "/album/kansai#ycyUWULJxdU.youtube",
+      // Unindexed clip: no palette to fill with, so the neutral placeholder stays.
+      placeholderColor: "transparent",
       src: { src: "/ycyUWULJxdU.youtube@800.avif", width: 800, height: 450 },
     });
   });

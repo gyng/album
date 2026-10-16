@@ -2,10 +2,12 @@ import fs from "node:fs";
 import os from "node:os";
 import nodePath from "node:path";
 import { DatabaseSync } from "node:sqlite";
+import type { Tags, VideoBlock } from "../services/types";
 import {
   computeVisualSamenessFromVectors,
   computeVisualSamenessStats,
   deriveEraLabel,
+  loadEmbeddingSpacePoints,
   selectEmbeddingModelId,
 } from "./computeEmbeddingStats";
 
@@ -530,5 +532,102 @@ describe("computeVisualSamenessFromVectors", () => {
     expect(stats?.samenessPercent).toBeGreaterThan(90);
     expect(stats?.repeatedMotifPercent).toBeGreaterThan(80);
     expect(stats?.distinctPercent).toBe(0);
+  });
+});
+
+describe("the cloud with clips", () => {
+  // Thirty stills, so a cloud exists at all (MIN_EMBEDDING_SAMPLE) and its one
+  // clump is big enough to be named (MIN_CLUSTER_SIZE). Every frame carries the
+  // same vector, which is what leaves exactly one clump to name.
+  const photoPaths = Array.from({ length: 30 }, (_, index) => `../albums/real/still-${index}.jpg`);
+  const CLIP_PATH = "../albums/real/clip.mov";
+  const CLIP_POSTER = "/data/albums/real/.resized_images/clip.mov@800.avif";
+  const VECTOR = [1, 1, 1];
+
+  /** The poster frame's own row from the search index, as a real build writes it. */
+  const CLIP_TAGS: Tags = {
+    path: CLIP_PATH,
+    tags: ["night", "street"],
+    colors: [[10, 20, 30]],
+  };
+
+  const makeClip = (
+    poster: { src: string; width: number; height: number } | null,
+    withIndexRow = true,
+  ): VideoBlock => ({
+    kind: "video",
+    id: "clip.mov",
+    data: { type: "local", href: "/data/albums/real/.resized_videos/clip.mov@1920.mp4" },
+    _build: {
+      src: "/data/albums/real/.resized_videos/clip.mov@1920.mp4",
+      mimeType: "video/mp4",
+      capturedAtLocal: "2024-05-06T07:08:09",
+      ...(withIndexRow ? { tags: CLIP_TAGS } : {}),
+      ...(poster ? { poster: { srcset: [poster] } } : {}),
+    },
+  });
+
+  const albumWithClip = (clip: VideoBlock) => {
+    const album = makeAlbum(photoPaths, () => ["night", "street"]);
+    album.blocks.push(clip);
+    return album;
+  };
+
+  const embeddingsFor = (extraPaths: string[]) =>
+    [...photoPaths, ...extraPaths].map((path) => ({
+      path,
+      model_id: V2_MODEL_ID,
+      json: JSON.stringify(VECTOR),
+    }));
+
+  const poster = { src: CLIP_POSTER, width: 1600, height: 900 };
+
+  it("gives a clip the point a photograph gets, drawn from its poster", async () => {
+    // A scene row is in the database — embedding-only — and must arrive as
+    // neither a frame of the cloud nor a second point for the clip.
+    const dbPath = await createEmbeddingsDb(embeddingsFor([CLIP_PATH, `${CLIP_PATH}@t60`]));
+
+    const space = await loadEmbeddingSpacePoints([albumWithClip(makeClip(poster))], dbPath);
+
+    expect(space.points).toHaveLength(photoPaths.length + 1);
+    expect(space.points.filter((point) => point.src === photoPaths[0])).toHaveLength(1);
+    const clip = space.points.find((point) => point.src === CLIP_POSTER);
+    expect(clip).toEqual(
+      expect.objectContaining({
+        src: CLIP_POSTER,
+        href: "/album/real-album#clip.mov",
+        label: "clip.mov",
+        album: "real-album",
+        aspect: 1.778,
+        swatch: "rgb(10, 20, 30)",
+        tags: ["night", "street"],
+        year: 2024,
+      }),
+    );
+    // The clip's own wall clock, as the contact sheet's ordering key.
+    expect(clip?.taken).toBe(202405060708);
+    expect(clip?.near).toHaveLength(3);
+    expect(clip?.around).toHaveLength(9);
+    expect(clip?.cluster).toBe(0);
+  });
+
+  it("skips a clip whose poster has not been extracted", async () => {
+    const dbPath = await createEmbeddingsDb(embeddingsFor([CLIP_PATH]));
+
+    const space = await loadEmbeddingSpacePoints([albumWithClip(makeClip(null))], dbPath);
+
+    expect(space.points).toHaveLength(photoPaths.length);
+    expect(space.points.some((point) => point.src === CLIP_POSTER)).toBe(false);
+  });
+
+  it("joins a clip on the path its poster URL is built from when its row is missing", async () => {
+    const dbPath = await createEmbeddingsDb(embeddingsFor([CLIP_PATH]));
+
+    const space = await loadEmbeddingSpacePoints([albumWithClip(makeClip(poster, false))], dbPath);
+
+    expect(space.points).toHaveLength(photoPaths.length + 1);
+    // No search-index row, so no tags travel with the poster's frame — the clip
+    // is still a frame of the cloud.
+    expect(space.points.find((point) => point.src === CLIP_POSTER)?.tags).toBeUndefined();
   });
 });

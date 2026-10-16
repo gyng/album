@@ -43,6 +43,18 @@
   object-fit: cover;
 }
 
+/* A clip's slide is a <video> carrying `.image` verbatim, so it inherits every
+   rule here and above — `.cover`, `.layerHidden`, `.layerSettling`,
+   `[data-pressed]` and the hold-to-pause brightness all reach it through the
+   same selectors, which is what keeps the cross-fade, the drag translate and
+   the tap acknowledgement identical to a photograph's. The one thing an img
+   does not share is the default display: a <video> is inline, which an
+   absolutely-positioned box does not care about today but would the moment a
+   layer stopped being positioned. */
+video.image {
+  display: block;
+}
+
 /* Cross-fade layer state. Every layer (.image or .remixGrid) defaults to
    opacity 1 with an opacity transition; .layerHidden drives the fade — a new
    top layer starts hidden and fades in once decoded, older layers fade out.

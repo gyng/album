@@ -25,6 +25,9 @@ describe("parseSlideshowSearchParams", () => {
     expect(p.mode).toBeNull();
     expect(p.initialPhotoPath).toBeNull();
     expect(p.randomSimilar).toBe(false);
+    expect(p.clips).toBeNull();
+    expect(p.muted).toBeNull();
+    expect(p.volume).toBeNull();
   });
 
   it("parses boolean-like truthy values case-insensitively", () => {
@@ -84,6 +87,26 @@ describe("parseSlideshowSearchParams", () => {
     expect(parse("align=middle").alignment).toBeNull();
   });
 
+  it("parses the clip settings, rejecting a volume outside 0..1", () => {
+    expect(parse("clips=1").clips).toBe(true);
+    expect(parse("clips=0").clips).toBe(false);
+    expect(parse("clips=").clips).toBe(false);
+    expect(parse("muted=1").muted).toBe(true);
+    expect(parse("muted=false").muted).toBe(false);
+
+    expect(parse("volume=0.25").volume).toBe(0.25);
+    expect(parse("volume=0").volume).toBe(0);
+    expect(parse("volume=1").volume).toBe(1);
+    // Out of range or unparseable is treated as ABSENT, not clamped: a caller
+    // that wrote 25% meant something, and silently getting full volume is not
+    // the same something.
+    expect(parse("volume=50").volume).toBeNull();
+    expect(parse("volume=2").volume).toBeNull();
+    expect(parse("volume=-1").volume).toBeNull();
+    expect(parse("volume=abc").volume).toBeNull();
+    expect(parse("volume=").volume).toBeNull();
+  });
+
   it("treats an empty filter as null", () => {
     expect(parse("filter=japan").filter).toBe("japan");
     expect(parse("filter=").filter).toBeNull();
@@ -111,6 +134,17 @@ describe("applySlideshowUrlState", () => {
     expect(u.searchParams.get("seed")).toBeNull();
     expect(u.searchParams.get("filter")).toBe("japan"); // preserved
     expect(u.searchParams.get("clock")).toBe("1"); // preserved
+  });
+
+  it("preserves the clip settings it does not own", () => {
+    const out = applySlideshowUrlState("https://x.test/slideshow?clips=0&muted=0&volume=0.25", {
+      mode: "random",
+      delayMs: 60000,
+    });
+    const u = new URL(out);
+    expect(u.searchParams.get("clips")).toBe("0");
+    expect(u.searchParams.get("muted")).toBe("0");
+    expect(u.searchParams.get("volume")).toBe("0.25");
   });
 
   it("preserves an existing topic param when topic is omitted", () => {
@@ -163,6 +197,49 @@ describe("buildSlideshowPermalink", () => {
       photoPath: "a/b.jpg",
     });
     expect(new URL(out).searchParams.has("filter")).toBe(false);
+  });
+
+  it("round-trips the clip settings when given, and stays silent otherwise", () => {
+    const shared = buildSlideshowPermalink({
+      origin: "https://x.test",
+      mode: "weighted",
+      photoPath: "../albums/japan/clip.mov",
+      clips: false,
+      muted: false,
+      volume: 0.25,
+    });
+    const sharedUrl = new URL(shared);
+    expect(sharedUrl.searchParams.get("clips")).toBe("0");
+    expect(sharedUrl.searchParams.get("muted")).toBe("0");
+    expect(sharedUrl.searchParams.get("volume")).toBe("0.25");
+    // The link is only useful if what it wrote is what the runtime reads back.
+    const parsed = parseSlideshowSearchParams(sharedUrl.search, "weighted");
+    expect(parsed.clips).toBe(false);
+    expect(parsed.muted).toBe(false);
+    expect(parsed.volume).toBe(0.25);
+
+    const on = new URL(
+      buildSlideshowPermalink({
+        origin: "https://x.test",
+        mode: "weighted",
+        photoPath: "../albums/japan/clip.mov",
+        clips: true,
+        muted: true,
+      }),
+    );
+    expect(on.searchParams.get("clips")).toBe("1");
+    expect(on.searchParams.get("muted")).toBe("1");
+
+    const bare = new URL(
+      buildSlideshowPermalink({
+        origin: "https://x.test",
+        mode: "weighted",
+        photoPath: "../albums/japan/clip.mov",
+      }),
+    );
+    expect(bare.searchParams.has("clips")).toBe(false);
+    expect(bare.searchParams.has("muted")).toBe(false);
+    expect(bare.searchParams.has("volume")).toBe(false);
   });
 
   it("includes the topic param when a topic is active, and omits it otherwise", () => {

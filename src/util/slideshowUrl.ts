@@ -26,6 +26,13 @@ export type ParsedSlideshowParams = {
   alignment: DetailsAlignment | null;
   delayMs: number | null;
   shuffleHistory: number | null;
+  // Play a clip's video in place of its poster frame. null when absent.
+  clips: boolean | null;
+  // Start clips muted. null when absent.
+  muted: boolean | null;
+  // Clip playback volume, 0..1 (an out-of-range or unparseable value is null,
+  // i.e. absent — leave the persisted volume alone). null when absent.
+  volume: number | null;
   // A free-text topic to seed the semantic similar-mode flow from. null when
   // the param is absent or blank.
   topic: string | null;
@@ -48,6 +55,17 @@ const isMode = (value: string | null): value is SlideshowMode =>
   value === "random" || value === "weighted" || value === "similar";
 
 const isTruthy = (value: string | null): boolean => TRUTHY.includes((value ?? "").toLowerCase());
+
+// A volume is a normalised 0..1, not an integer, so `parseNum` (which truncates
+// to an int) cannot be used here. Anything outside the range, or unparseable,
+// is treated as absent rather than clamped: a caller that meant 0.25 should not
+// get 1 because it typed "25".
+const parseVolume = (value: string | null): number | null => {
+  if (value === null || value.trim() === "") return null;
+  const volume = Number(value);
+  if (!Number.isFinite(volume) || volume < 0 || volume > 1) return null;
+  return volume;
+};
 
 export const parseSlideshowSearchParams = (
   search: string,
@@ -89,6 +107,9 @@ export const parseSlideshowSearchParams = (
     alignment,
     delayMs,
     shuffleHistory,
+    clips: parseBool(params.get("clips")),
+    muted: parseBool(params.get("muted")),
+    volume: parseVolume(params.get("volume")),
     topic: params.get("topic")?.trim() || null,
   };
 };
@@ -121,13 +142,18 @@ export const applySlideshowUrlState = (
 };
 
 // getCurrentPhotoLink: a persistent-shell permalink to a specific photo (no
-// delay; optional album filter).
+// delay; optional album filter). Its optional clip settings are written only
+// when given, so a caller that has none to say leaves the link silent and the
+// recipient's own persisted settings stand.
 export const buildSlideshowPermalink = (opts: {
   origin: string;
   mode: SlideshowMode;
   photoPath: string;
   filter?: string;
   topic?: string;
+  clips?: boolean;
+  muted?: boolean;
+  volume?: number;
 }): string => {
   const url = new URL("/slideshow/shell", opts.origin);
   url.searchParams.set("mode", opts.mode);
@@ -136,6 +162,15 @@ export const buildSlideshowPermalink = (opts: {
   }
   if (opts.topic) {
     url.searchParams.set("topic", opts.topic);
+  }
+  if (opts.clips !== undefined) {
+    url.searchParams.set("clips", opts.clips ? "1" : "0");
+  }
+  if (opts.muted !== undefined) {
+    url.searchParams.set("muted", opts.muted ? "1" : "0");
+  }
+  if (opts.volume !== undefined) {
+    url.searchParams.set("volume", String(opts.volume));
   }
   url.searchParams.set("photo", opts.photoPath);
   return url.toString();

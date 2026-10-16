@@ -70,6 +70,10 @@ const styles = mergeCssModuleStyles(
     "topicChipLabel",
     "topicDismiss",
     "topicError",
+    "volumeControl",
+    "volumeLabel",
+    "volumeSlider",
+    "volumeValue",
   ],
   ["toolbar"],
 );
@@ -110,6 +114,17 @@ export type SlideshowToolbarProps = {
   remixEnabled: boolean;
   onToggleRemix: () => void;
   onRemixNow: () => void;
+
+  // Clips. A clip's slide is its poster frame unless clips are playing. Mute is
+  // the persisted setting; the effective mute (clips off ⇒ silent) is the page's
+  // to compute, not the panel's.
+  playClips: boolean;
+  onTogglePlayClips: () => void;
+  clipMuted: boolean;
+  onToggleClipMuted: () => void;
+  // Clip playback volume, 0..1. The control is a percentage.
+  clipVolume: number;
+  onChangeClipVolume: (volume: number) => void;
   isPaused: boolean;
   onTogglePaused: () => void;
   canGoPrevious: boolean;
@@ -912,6 +927,74 @@ export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
               <Icon kind="pin" />{" "}
               {props.detailsAlignment.charAt(0).toUpperCase() + props.detailsAlignment.slice(1)}
             </button>
+          </div>
+        </div>
+
+        <div className={styles.controlGroup} role="group" aria-label="Clips">
+          <div className={styles.controlHeader}>
+            <span className={styles.controlLogo} aria-hidden="true">
+              <Icon kind="image" />
+            </span>
+            <span className={styles.controlCopy}>
+              <span className={styles.controlTitle}>Clips</span>
+            </span>
+          </div>
+
+          <div className={styles.controlButtons}>
+            <button
+              type="button"
+              className={[
+                props.playClips ? buttonStyles.active : "",
+                styles.playbackModifier,
+                buttonStyles.base,
+              ].join(" ")}
+              aria-pressed={props.playClips}
+              title="Play a video clip in place of its still frame"
+              onClick={props.onTogglePlayClips}
+            >
+              Play clips
+            </button>
+
+            <button
+              type="button"
+              className={[
+                props.clipMuted ? buttonStyles.active : "",
+                styles.playbackModifier,
+                buttonStyles.base,
+              ].join(" ")}
+              aria-pressed={props.clipMuted}
+              title={
+                props.clipMuted
+                  ? "Clips play silently. Press to play them with sound."
+                  : "Clips play with sound at the volume beside this button"
+              }
+              onClick={props.onToggleClipMuted}
+            >
+              Mute
+            </button>
+          </div>
+
+          <div className={styles.controlMeta}>
+            {/* There is no slider component in the repo, and a native range
+                input brings its own keyboard and screen-reader behaviour for
+                free. The value is a percentage because that is what a person
+                sets; the page turns it back into 0..1. */}
+            <label className={styles.volumeControl}>
+              <span className={styles.volumeLabel}>Volume</span>
+              <input
+                className={styles.volumeSlider}
+                type="range"
+                min={0}
+                max={100}
+                step={5}
+                value={Math.round(props.clipVolume * 100)}
+                aria-label="Clip volume"
+                onChange={(event) => {
+                  props.onChangeClipVolume(Number(event.target.value) / 100);
+                }}
+              />
+              <span className={styles.volumeValue}>{Math.round(props.clipVolume * 100)}%</span>
+            </label>
           </div>
         </div>
 

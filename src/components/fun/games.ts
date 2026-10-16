@@ -1,13 +1,5 @@
 export const FUN_GAMES = [
   {
-    id: "photo-hangman",
-    href: "/fun/photo-hangman",
-    title: "Photo Hangman",
-    illustration: "/fun/photo-hangman.avif",
-    description:
-      "Find the subject shared by eight photographs. Each wrong guess reveals another clue.",
-  },
-  {
     id: "guess",
     href: "/fun/guess",
     title: "Guess Where",
@@ -92,6 +84,14 @@ export const FUN_GAMES = [
     title: "Caption It",
     illustration: "/fun/caption-it.avif",
     description: "Caption a photograph so well it stands out from the whole archive.",
+  },
+  {
+    id: "photo-hangman",
+    href: "/fun/photo-hangman",
+    title: "Photo Hangman",
+    illustration: "/fun/photo-hangman.avif",
+    description:
+      "Find the subject shared by eight photographs. Each wrong guess reveals another clue.",
   },
   {
     id: "relay",

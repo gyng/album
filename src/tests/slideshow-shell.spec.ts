@@ -6,7 +6,11 @@ import { gotoHydrated } from "./hydrated";
 // The real service-worker/offline journey lives in pwa-slideshow.spec.ts.
 test.use({ serviceWorkers: "block" });
 
-const slideshowImage = 'img[alt]:not([aria-hidden="true"])';
+/* The top slide element inside the runtime frame: the <img> loading a photo (or
+ * a clip's poster) or the <video> playing a clip. Non-top layers carry
+ * aria-hidden="true", so this names the visible slide exactly as
+ * `img[alt]:not([aria-hidden="true"])` did before clips could play. */
+const slideshowSlide = '[data-media-kind]:not([aria-hidden="true"])';
 
 // Linux WebKit decodes AVIF on the main thread: a 3200px variant, which an iPad
 // viewport selects, blocks it for about half a second, and the slideshow keeps
@@ -179,7 +183,7 @@ test("the slideshow shell swaps code without releasing its wake lock", async ({ 
   await expect(diagnostics.getByText("Screen awake")).toBeVisible();
 
   const runtime = page.frameLocator('iframe[title="Slideshow"]');
-  const image = runtime.locator(slideshowImage).first();
+  const image = runtime.locator(slideshowSlide).first();
   await expect(image).toBeVisible({ timeout: 15_000 });
   const photoBeforeUpdate = await image.getAttribute("src");
   expect(
@@ -340,7 +344,7 @@ test("wake-lock failure never blocks the embedded slideshow", async ({ page }) =
   await expect(prompt).toBeVisible();
 
   const runtime = page.frameLocator('iframe[title="Slideshow"]');
-  await expect(runtime.locator(slideshowImage).first()).toBeVisible({ timeout: 15_000 });
+  await expect(runtime.locator(slideshowSlide).first()).toBeVisible({ timeout: 15_000 });
   await page.getByRole("button", { name: "Slideshow diagnostics" }).focus();
   await page.keyboard.press("Enter");
   await expect(page.getByText("Wake lock off")).toBeVisible();
@@ -349,7 +353,7 @@ test("wake-lock failure never blocks the embedded slideshow", async ({ page }) =
 test("slideshow exit controls leave the outer shell", async ({ page }) => {
   await gotoHydrated(page, "/slideshow/shell?mode=random&delay=86400");
   const runtime = page.frameLocator('iframe[title="Slideshow"]');
-  await expect(runtime.locator(slideshowImage).first()).toBeVisible({ timeout: 15_000 });
+  await expect(runtime.locator(slideshowSlide).first()).toBeVisible({ timeout: 15_000 });
   await runtime.getByRole("link", { name: /Snapshots Slideshow/ }).click();
 
   await expect(page).toHaveURL(/\/$/);
@@ -371,11 +375,51 @@ test("slideshow context links leave the outer shell", async ({ page }) => {
   );
   await gotoHydrated(page, updateTestUrl);
   const runtime = page.frameLocator('iframe[title="Slideshow"]');
-  await expect(runtime.locator(slideshowImage).first()).toBeVisible({ timeout: 15_000 });
+  await expect(runtime.locator(slideshowSlide).first()).toBeVisible({ timeout: 15_000 });
 
   const arrived = page.waitForURL(/\/album\/test-simple#/, { waitUntil: "domcontentloaded" });
   await runtime.getByRole("link", { name: / in / }).last().click();
   await arrived;
   await expect(page.locator('iframe[title="Slideshow"]')).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Album destination" })).toBeVisible();
+});
+
+test("the shell retains a clip's poster still while the runtime plays the clip", async ({
+  page,
+  browserName,
+}) => {
+  // The premise is that the clip actually plays: the runtime reveals a clip only
+  // once its first frame is available (readyState >= 2) and otherwise skips it
+  // rather than stalling, so a browser that cannot decode the transcoded H.264
+  // MP4 (Linux WebKit, as the album video work already notes) has no poster
+  // presenting to retain.
+  test.skip(browserName !== "chromium", "The clip's H.264 MP4 may not decode outside Chromium");
+  // The readiness deadline (a clip that never reaches readyState >= 2 must still
+  // not stall the show), plus the reveal, can take longer than a photo's; the
+  // clip plays only once its layer is revealed.
+  test.setTimeout(60_000);
+  // The one real clip in the E2E database, addressed by path so the shuffle
+  // cannot choose it, with remix off so it is the single slide on screen.
+  const clipPath = "../albums/test-simple/DSCF0159.MOV";
+  const clipVideoSrc = "/data/albums/test-simple/.resized_videos/DSCF0159.MOV%401920.mp4";
+  const clipPosterSrc = "/data/albums/test-simple/.resized_images/DSCF0159.MOV%403200.avif";
+  await gotoHydrated(
+    page,
+    `/slideshow/shell?mode=random&filter=test-simple&remix=0&delay=86400&photo=${encodeURIComponent(clipPath)}`,
+  );
+  const frame = page.locator('iframe[title="Slideshow"]');
+  await expect(frame).toHaveAttribute("data-ready", "true", { timeout: 40_000 });
+  await expect(frame).toHaveAttribute("data-retained", "true");
+
+  // The runtime renders the clip as a <video> pointing at the transcoded file…
+  const runtime = page.frameLocator('iframe[title="Slideshow"]');
+  const video = runtime.locator('video[data-media-kind="video"]:not([aria-hidden="true"])');
+  await expect(video).toHaveAttribute("src", clipVideoSrc);
+
+  // …while the shell itself keeps only a still: the poster frame, exactly as it
+  // would for a photograph. A playing <video> never replaces the retained image.
+  await expect(page.locator("video")).toHaveCount(0);
+  const retained = page.getByAltText("Last displayed photograph");
+  await expect(retained).toHaveAttribute("src", clipPosterSrc);
+  await expect(retained).toBeVisible();
 });

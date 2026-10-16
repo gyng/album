@@ -128,8 +128,12 @@ def enrich_database(
         "CREATE INDEX IF NOT EXISTS idx_weather_requests_time ON weather_requests(requested_at)"
     )
     con.commit()
+    # A clip carries the same sidecar-derived coordinates and camera-local wall
+    # clock a photo carries in EXIF, so it earns an estimate on identical terms:
+    # a row without a location or a time is skipped exactly as a photo's is.
     rows = con.execute(
-        "SELECT path,lat_deg,lng_deg,iso8601,tz_offset,weather_json FROM metadata WHERE media_kind = 'photo' ORDER BY path"
+        "SELECT path,lat_deg,lng_deg,iso8601,tz_offset,weather_json FROM metadata "
+        "WHERE media_kind IN ('photo', 'video') ORDER BY path"
     ).fetchall()
     report = {
         "updated": 0,
@@ -180,7 +184,7 @@ def enrich_database(
         else:
             if report["requests"] >= max_requests:
                 log(
-                    "Weather request budget reached; remaining photos can resume next run."
+                    "Weather request budget reached; remaining rows can resume next run."
                 )
                 break
             stamp = time.time()
@@ -194,7 +198,7 @@ def enrich_database(
                 >= limit
                 for period, limit in limits
             ):
-                log("Weather rate budget reached; leaving remaining photos pending.")
+                log("Weather rate budget reached; leaving remaining rows pending.")
                 break
             time.sleep(max(0, interval - (time.monotonic() - last_request)))
             con.execute("INSERT INTO weather_requests VALUES (?)", (time.time(),))

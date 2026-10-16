@@ -4,10 +4,11 @@
 
 import { screen } from "@testing-library/react";
 import { renderWithNextPlatform as render } from "../../renderWithNextPlatform";
-import type { Content, PhotoBlock } from "../../../services/types";
+import type { Content, PhotoBlock, VideoBlock } from "../../../services/types";
 
 const mockOn = jest.fn();
 const mockOff = jest.fn();
+const mockSeo = jest.fn();
 
 jest.mock("../../../services/album", () => ({
   getAlbumFromName: jest.fn(),
@@ -16,7 +17,12 @@ jest.mock("../../../services/album", () => ({
 jest.mock("next/router", () => ({
   useRouter: () => ({ events: { on: mockOn, off: mockOff } }),
 }));
-jest.mock("../../../components/Seo", () => ({ Seo: () => null }));
+jest.mock("../../../components/Seo", () => ({
+  Seo: (props: Record<string, unknown>) => {
+    mockSeo(props);
+    return null;
+  },
+}));
 jest.mock("../../../components/GlobalNav", () => ({
   GlobalNav: ({ themeAdjacentItem }: { themeAdjacentItem: React.ReactNode }) => (
     <nav>{themeAdjacentItem}</nav>
@@ -56,6 +62,18 @@ const album = (overrides: Partial<Content> = {}): Content => ({
   ...overrides,
 });
 
+const video = (): VideoBlock => ({
+  kind: "video",
+  id: "clip.mov",
+  data: { type: "local", href: "clip.mov" },
+  _build: {
+    src: "/clip.mov@1920.mp4",
+    mimeType: "video/mp4",
+    poster: { srcset: [{ src: "/clip-poster.avif", width: 1600, height: 900 }] },
+    capturedAtLocal: "2024-05-01T09:00:00",
+  },
+});
+
 describe("album page shell", () => {
   it("preserves reserved characters in album view filters", () => {
     const name = "A&B + #summer";
@@ -72,6 +90,7 @@ describe("album page shell", () => {
   beforeEach(() => {
     mockOn.mockClear();
     mockOff.mockClear();
+    mockSeo.mockClear();
     window.history.replaceState(null, "", "/album/trip");
     jest.spyOn(window, "requestAnimationFrame").mockImplementation((callback) => {
       callback(0);
@@ -146,6 +165,19 @@ describe("album page shell", () => {
     render(<AlbumPage album={album({ blocks: [photo()] })} />);
 
     expect(scrollIntoView).toHaveBeenCalledTimes(1);
+  });
+
+  // A clip is media too: the album's own description counts it, and its poster
+  // frame stands as the cover a card or a share preview draws.
+  it("counts a clip as album media and takes its poster as the cover", () => {
+    render(<AlbumPage album={album({ blocks: [video()] })} />);
+
+    expect(mockSeo).toHaveBeenCalledWith(
+      expect.objectContaining({
+        description: "Trip photo album: 1 clip",
+        image: "/clip-poster.avif",
+      }),
+    );
   });
 
   it("returns not-found when a build request has no album slug", async () => {

@@ -6,13 +6,13 @@ import {
 } from "../../components/platform";
 import { seekLinkedMoment } from "../../util/seekLinkedMoment";
 import React from "react";
-import type { PhotoBlock } from "../../services/types";
 import { AlbumNavigation } from "../../components/AlbumNavigation";
 import { GlobalNav } from "../../components/GlobalNav";
 import { PhotoAlbum } from "../../components/PhotoAlbum";
 import { AlbumTripsView } from "../../components/AlbumTripsView";
 import { AlbumNeighbours } from "../../components/AlbumNeighbours";
 import { getDisplayDimensions } from "../../util/photoDimensions";
+import { coverBlockOf, mediaBlockAsPhoto } from "../../util/videoBlockMedia";
 import { Footer, buttonStyles } from "../../components/ui";
 import commonStyles from "../../styles/common.module.css";
 import styles from "./AlbumScreen.module.css";
@@ -74,17 +74,31 @@ const AlbumScreen = ({ album }: AlbumScreenProps) => {
   // SEO/Meta tag generation
   const title = album.title ?? album.name ?? album._build.slug;
 
-  const imageCount = album.blocks.filter((b) => b.kind === "photo").length;
+  // A clip is media too: it belongs in the count shown to readers, and its
+  // poster frame can stand as the album's cover. An album of clips alone is
+  // described as clips rather than as zero photos.
+  const photoCount = album.blocks.filter((block) => block.kind === "photo").length;
+  const clipCount = album.blocks.filter((block) => block.kind === "video").length;
+  const mediaCount =
+    clipCount === 0
+      ? `${photoCount + clipCount} photos`
+      : [
+          photoCount > 0 ? `${photoCount} ${photoCount === 1 ? "photo" : "photos"}` : null,
+          `${clipCount} ${clipCount === 1 ? "clip" : "clips"}`,
+        ]
+          .filter(Boolean)
+          .join(" and ");
 
-  const cover =
-    album.blocks.find((b) => b.kind === "photo" && b.formatting?.cover) ??
-    album.blocks.find((b) => b.kind === "photo");
+  const cover = coverBlockOf(album.blocks);
 
   const albumName = album._build.slug;
-  // The neighbouring albums line up with the edges of the album's widest photograph.
+  // The neighbouring albums line up with the edges of the album's widest frame,
+  // a clip's poster included.
   const widest = album.blocks
-    .filter((block): block is PhotoBlock => block.kind === "photo")
-    .map(getDisplayDimensions)
+    .flatMap((block) => {
+      const media = mediaBlockAsPhoto(block);
+      return media ? [getDisplayDimensions(media)] : [];
+    })
     .reduce<{ width: number; height: number } | null>(
       (best, each) =>
         !best || each.width / Math.max(1, each.height) > best.width / Math.max(1, best.height)
@@ -93,14 +107,14 @@ const AlbumScreen = ({ album }: AlbumScreenProps) => {
       null,
     );
 
-  const coverImageSrc = (cover as PhotoBlock | undefined)?._build.srcset?.[0]?.src;
+  const coverImageSrc = cover?._build.srcset?.[0]?.src;
   const coverImageAbsolute = resolveAbsoluteUrl(coverImageSrc, siteOrigin);
 
   return (
     <>
       <Seo
         title={formatPageTitle(title)}
-        description={album.kicker ?? `${title} photo album: ${imageCount} photos`}
+        description={album.kicker ?? `${title} photo album: ${mediaCount}`}
         pathname={`/album/${album._build.slug}`}
         {...(coverImageSrc ? { image: coverImageSrc } : {})}
         type="article"
@@ -114,7 +128,7 @@ const AlbumScreen = ({ album }: AlbumScreenProps) => {
           buildCollectionPageJsonLd(
             {
               name: formatPageTitle(title),
-              description: album.kicker ?? `${title} photo album: ${imageCount} photos`,
+              description: album.kicker ?? `${title} photo album: ${mediaCount}`,
               pathname: `/album/${album._build.slug}`,
               ...(coverImageAbsolute ? { image: coverImageAbsolute } : {}),
             },

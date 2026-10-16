@@ -27,6 +27,7 @@ import styles from "../../components/slideshow/SlideshowShared.module.css";
 import commonStyles from "../../styles/common.module.css";
 import { ThemeToggle } from "../../components/ThemeToggle";
 import { useLocalStorage } from "usehooks-ts";
+import { getResizedAlbumVideoSrc } from "../../util/getResizedAlbumImageSrc";
 import { Seo } from "../../components/Seo";
 import { buildCollectionPageJsonLd, formatPageTitle } from "../../lib/seo";
 import { getPhotoAltText } from "../../lib/alt";
@@ -71,6 +72,7 @@ import {
   pushLayer,
   removeLayer,
   revealLayers,
+  SlideCell,
   slideKeyOf,
 } from "../../util/slideshowCrossfade";
 import {
@@ -612,6 +614,19 @@ export const Slideshow: React.FC<{
   const [remixEnabled, setRemixEnabled] = useLocalStorage("slideshow-remix", true, {
     initializeWithValue: false,
   });
+  // Clip playback. A clip's row in the pool is its poster frame like any other
+  // photo; these three decide what its slide does with it. Clips play by
+  // default, muted — an unmuted autoplay is refused by every modern browser
+  // anyway, so a kiosk that never touches these still shows a moving slide.
+  const [playClips, setPlayClips] = useLocalStorage("slideshow-play-clips", true, {
+    initializeWithValue: false,
+  });
+  const [clipMuted, setClipMuted] = useLocalStorage("slideshow-muted", true, {
+    initializeWithValue: false,
+  });
+  const [clipVolume, setClipVolume] = useLocalStorage("slideshow-volume", 0.5, {
+    initializeWithValue: false,
+  });
   const [poolStats, setPoolStats] = React.useState<PoolStats>(EMPTY_POOL_STATS);
   const [searchDbVersion, setSearchDbVersion] = React.useState<SearchDbVersion | null>(null);
   const [isCheckingSearchDbVersion, setIsCheckingSearchDbVersion] = React.useState(false);
@@ -888,6 +903,10 @@ export const Slideshow: React.FC<{
    *   - delay=<seconds>          Set slide duration in seconds (e.g., 60 = 60 seconds)
    *   - shuffle=<number>         Similar mode only: avoid repeating the last N photos
    *   - filter=<album-name>      Filter to specific album
+   *   - clips=1                  Play a clip's video in place of its poster frame (default on;
+   *                              clips=0 shows the still, which is what every slide did before)
+   *   - muted=1                  Start clips muted (default on; an unmuted autoplay is refused)
+   *   - volume=<0..1>            Clip playback volume (default 0.5)
    *
    * Examples:
    *   /?clock=1&details=1&map=1&delay=60              All features with 60-second slides
@@ -896,6 +915,7 @@ export const Slideshow: React.FC<{
    *   /?filter=japan&delay=45                         Japan album, 45-second slides in a shuffled pass
    *   /?mode=weighted&filter=japan                    Recent-biased weighted shuffle for one album
    *   /?mode=similar&filter=japan&shuffle=50          Similar mode, avoid the last 50 photos
+   *   /?clips=0                                       Stills only, as if the archive had no clips
    */
   // Parse URL search params to configure slideshow. The pure parser lives in
   // util/slideshowUrl; this effect just fans the parsed values out to the
@@ -952,6 +972,15 @@ export const Slideshow: React.FC<{
     if (parsed.shuffleHistory !== null) {
       setShuffleHistorySize(parsed.shuffleHistory);
     }
+    if (parsed.clips !== null) {
+      setPlayClips(parsed.clips);
+    }
+    if (parsed.muted !== null) {
+      setClipMuted(parsed.muted);
+    }
+    if (parsed.volume !== null) {
+      setClipVolume(parsed.volume);
+    }
 
     setHasParsedInitialUrl(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- slideshowMode is only read as a fallback on mount
@@ -967,6 +996,9 @@ export const Slideshow: React.FC<{
     setTimeAware,
     setRemixEnabled,
     setAlignCadence,
+    setPlayClips,
+    setClipMuted,
+    setClipVolume,
   ]);
 
   // The advance cadence (nextChangeAt timer, pause/resume, countdown + clock
@@ -2543,8 +2575,12 @@ export const Slideshow: React.FC<{
       photoPath,
       ...(filter ? { filter } : {}),
       ...(topic ? { topic } : {}),
+      // The link reproduces what the sender was watching, clips included.
+      clips: playClips,
+      muted: clipMuted,
+      volume: clipVolume,
     });
-  }, [filter, slideshowMode, topic]);
+  }, [filter, slideshowMode, topic, playClips, clipMuted, clipVolume]);
 
   const copyCurrentPhotoLink = useCallback(async () => {
     const photoLink = getCurrentPhotoLink();
@@ -2598,14 +2634,24 @@ export const Slideshow: React.FC<{
   }, [copyCurrentPhotoLink, getCurrentPhotoLink]);
 
   // Long-press the Context icon to dump info about the currently-displayed
-  // image — URL, decoded dimensions, byte size. Mostly a debug affordance
+  // media — URL, decoded dimensions, byte size. Mostly a debug affordance
   // for verifying the resized-image variant being served on real devices
-  // (e.g. confirming whether the iPad PWA is loading @3200 vs @1600).
+  // (e.g. confirming whether the iPad PWA is loading @3200 vs @1600). A clip's
+  // slide is a <video>, so the same dump has to read a media element of either
+  // kind rather than the <img> it used to assume.
   const inspectCurrentImage = useCallback(async () => {
-    const img = document.querySelector('img[alt]:not([aria-hidden="true"])') as HTMLImageElement;
-    const src = img.currentSrc || img.src;
-    const decoded = `${img.naturalWidth}×${img.naturalHeight}`;
-    const displayed = `${Math.round(img.getBoundingClientRect().width)}×${Math.round(img.getBoundingClientRect().height)}`;
+    const element = document.querySelector('[data-media-kind]:not([aria-hidden="true"])') as
+      | HTMLImageElement
+      | HTMLVideoElement
+      | null;
+    if (!element) return;
+    const src = element.currentSrc || element.src;
+    const isVideo = element instanceof HTMLVideoElement;
+    const decoded = isVideo
+      ? `${element.videoWidth}×${element.videoHeight}`
+      : `${element.naturalWidth}×${element.naturalHeight}`;
+    const box = element.getBoundingClientRect();
+    const displayed = `${Math.round(box.width)}×${Math.round(box.height)}`;
     let sizeKb: string | null = null;
     try {
       const head = await fetch(src, { method: "HEAD", cache: "no-store" });
@@ -2629,18 +2675,32 @@ export const Slideshow: React.FC<{
   const activePhotoSrc = getSlideshowPhotoSrc(currentPhotoPath);
   const isRemix = remixCompanions.length > 0;
 
+  // Effective mute: an unmuted autoplay is refused by every modern browser, so
+  // with clips off there is nothing to unmute either way.
+  const effectiveClipMuted = clipMuted || !playClips;
+
   // The cells of the slide on screen: seed first, then remix companions.
-  // `path` keys the remix-grid reveal hook; `src` is what each <img> loads.
+  // `path` keys the remix-grid reveal hook; `src` is what each cell loads (a
+  // clip's poster frame, always). A cell is marked "video" only when its row is
+  // a clip AND clips are playing — so with `clips=0` the slide is the poster
+  // still, exactly as it was before a clip could play at all. Remix companions
+  // keep their kind for the slide key, but a remix grid is always rendered as
+  // stills: a grid of playing videos would fight its all-at-once reveal (see
+  // the layer render below).
   const currentCells = React.useMemo(() => {
     if (!currentPhotoPath || !activePhotoSrc) return [];
+    const toCell = (row: RandomPhotoRow, src: string): SlideCell => {
+      const cell: SlideCell = { path: row.path, src };
+      if (playClips && row.mediaKind === "video") {
+        cell.mediaKind = "video";
+      }
+      return cell;
+    };
     return [
-      { path: currentPhotoPath.path, src: activePhotoSrc },
-      ...remixCompanions.map((companion) => ({
-        path: companion.path,
-        src: getSlideshowPhotoSrc(companion)!,
-      })),
+      toCell(currentPhotoPath, activePhotoSrc),
+      ...remixCompanions.map((companion) => toCell(companion, getSlideshowPhotoSrc(companion)!)),
     ];
-  }, [currentPhotoPath, activePhotoSrc, remixCompanions]);
+  }, [currentPhotoPath, activePhotoSrc, remixCompanions, playClips]);
 
   const currentSnapshot = React.useMemo(() => buildSlideSnapshot(currentCells), [currentCells]);
   // Identity of the slide on screen. Changes on a normal advance AND when a
@@ -2664,6 +2724,20 @@ export const Slideshow: React.FC<{
       setDecodedPresentationKey(key);
     }
   }, []);
+  // A clip's readiness: a <video> has no decode() promise, so its first frame
+  // being available — readyState >= 2 (HAVE_CURRENT_DATA/HAVE_FUTURE_DATA) — is
+  // the equivalent signal. It feeds the very same markDecoded path, so the
+  // `presentation` message is posted only once the clip can actually be seen,
+  // and a clip that never gets there is skipped by the existing
+  // hung-replacement timer rather than stalling the show.
+  const markVideoReady = useCallback(
+    (element: HTMLVideoElement, key: string, src: string) => {
+      if (topKeyRef.current !== key || element.readyState < 2) return;
+      markDecoded(key, src, [src]);
+      setImageLoaded(true);
+    },
+    [markDecoded],
+  );
   useEffect(() => {
     if (!slideKey || !currentSnapshot) {
       topKeyRef.current = null;
@@ -2694,13 +2768,22 @@ export const Slideshow: React.FC<{
     companionPaths: remixCompanionPaths,
   });
 
-  // A reversed cross-fade reuses its existing <img>, so the browser need not
-  // fire load again. Revalidate completed images in the incoming DOM layer;
-  // this also covers images that finished before hydration attached handlers.
+  // A reversed cross-fade reuses its existing element, so the browser need not
+  // fire load/loadeddata again. Revalidate what already completed in the
+  // incoming DOM layer; this also covers an image or clip that finished before
+  // hydration attached handlers.
   useEffect(() => {
     if (!slideKey || !currentSnapshot || decodedPresentationKey === slideKey) return;
     const element = topLayerElementRef.current;
     if (!element) return;
+    if (element instanceof HTMLVideoElement) {
+      // A re-shown clip keeps its decoded first frame without firing
+      // loadeddata again — or has none yet, and the hung-replacement timer
+      // remains in charge.
+      const cell = currentSnapshot.cells[0];
+      if (cell) markVideoReady(element, slideKey, cell.src);
+      return;
+    }
     const images =
       element instanceof HTMLImageElement ? [element] : Array.from(element.querySelectorAll("img"));
     const sources = currentSnapshot.cells.map((cell) => cell.src);
@@ -2730,6 +2813,7 @@ export const Slideshow: React.FC<{
     decodedPresentationKey,
     layers,
     markDecoded,
+    markVideoReady,
     markRemixCellLoaded,
     scheduleImageErrorRetry,
   ]);
@@ -2813,6 +2897,56 @@ export const Slideshow: React.FC<{
     showCover,
     reportPresented,
   ]);
+
+  // Clip playback lifecycle.
+  //
+  // A clip's <video> is never left to the autoplay attribute: the runtime plays
+  // it itself, so it can be paused again. Exactly one element plays — the one
+  // that is the revealed top layer — and every other one (the outgoing layer
+  // fading out beneath, a clip waiting under a remix grid, one being replaced)
+  // is paused, so a cross-fade does not leave the old clip running on behind
+  // the new slide. `isPaused` (the Pause button and the hold-to-pause gesture)
+  // holds it too, as does a hidden document, where there is nothing on screen
+  // to move. Playback simply starts again from wherever it got to: a re-shown
+  // clip needs no seek, since it loops.
+  //
+  // play() is called through `.catch()`: a refused autoplay (or a source that
+  // has gone) must leave the poster frame showing and must NEVER stall the
+  // advance. The cadence is untouched, and a clip whose first frame never
+  // arrives is skipped by the hung-replacement timer above like any other
+  // slide.
+  const videoElementsRef = React.useRef(new Map<string, HTMLVideoElement>());
+  const registerVideoElement = useCallback((key: string, element: HTMLVideoElement | null) => {
+    if (element) {
+      videoElementsRef.current.set(key, element);
+    } else {
+      videoElementsRef.current.delete(key);
+    }
+  }, []);
+  useEffect(() => {
+    const applyPlayback = () => {
+      const visible = document.visibilityState === "visible";
+      for (const [key, element] of videoElementsRef.current) {
+        // React does not reliably manage a media element's volume property, so
+        // it is written here through the element ref: both the playing clip and
+        // one still fading out carry the setting while they are on screen.
+        element.volume = clipVolume;
+        const isRevealedTop =
+          key === slideKey && layers.some((layer) => layer.key === key && layer.loaded);
+        if (isRevealedTop && !isPaused && visible) {
+          element.play().catch(() => {
+            // Autoplay refused, or the clip cannot be played: the poster/first
+            // frame stays visible and the cadence advances normally.
+          });
+        } else {
+          element.pause();
+        }
+      }
+    };
+    applyPlayback();
+    document.addEventListener("visibilitychange", applyPlayback);
+    return () => document.removeEventListener("visibilitychange", applyPlayback);
+  }, [layers, slideKey, isPaused, clipVolume]);
 
   // A hung replacement must not erase the last good photograph. Skip/retry it
   // instead of fabricating a successful decode after the deadline.
@@ -2917,9 +3051,9 @@ export const Slideshow: React.FC<{
     },
   };
 
-  // A clip's slide is the poster frame extracted from it. It is shown as a still
-  // — the kiosk has no controls and no sound — so the only honest cue that this
-  // one is a video is its accessible name.
+  // A clip's slide plays the clip itself — muted by default and with no
+  // controls, but with sound when the settings ask for it — so its accessible
+  // name is the one place that says plainly which slides are video.
   const photoAltText = getPhotoAltText(
     photoBlock,
     currentPhotoPath?.mediaKind === "video" ? "Slideshow video" : "Slideshow photo",
@@ -3100,6 +3234,12 @@ export const Slideshow: React.FC<{
           onToggleTimeAware={() => setTimeAware(!timeAware)}
           remixEnabled={remixEnabled}
           onToggleRemix={() => setRemixEnabled(!remixEnabled)}
+          playClips={playClips}
+          onTogglePlayClips={() => setPlayClips(!playClips)}
+          clipMuted={clipMuted}
+          onToggleClipMuted={() => setClipMuted(!clipMuted)}
+          clipVolume={clipVolume}
+          onChangeClipVolume={setClipVolume}
           onRemixNow={() => {
             forceRemixRef.current = true;
             advanceToNextPhoto();
@@ -3321,6 +3461,11 @@ export const Slideshow: React.FC<{
                       <img
                         className={styles.remixImage}
                         src={cell.src}
+                        // A remix grid is always stills, even when a cell's row
+                        // is a clip: a grid of playing videos would fight the
+                        // all-at-once grid reveal, and the clip's own slide (a
+                        // lone cell) plays instead.
+                        data-media-kind="photo"
                         alt={isTop && isSeed ? photoAltText : ""}
                         aria-hidden={isTop && isSeed ? undefined : true}
                         decoding="async"
@@ -3363,6 +3508,77 @@ export const Slideshow: React.FC<{
             );
           }
 
+          // invariant: every slide has at least a seed cell
+          const seedCell = layer.slide.cells[0]!;
+          const layerClasses = [
+            styles.image,
+            hidden,
+            settlingClass,
+            showCover ? styles.cover : "",
+            isTop ? "" : styles.backdropLayer,
+          ]
+            .filter(Boolean)
+            .join(" ");
+
+          // A clip plays in place of its poster frame. Everything about the
+          // element is the <img> path verbatim — the same classes and `.cover`
+          // geometry, the same inline motion style, the same tap-ack and drag
+          // handlers, the same layer refs — so the cross-fade, the drag
+          // translate and the tap acknowledgement are unchanged; only the thing
+          // being faded is moving. Its `poster` is the URL the `presentation`
+          // message already names, so the shell's retained still is the same
+          // frame the slide starts from.
+          if (seedCell.mediaKind === "video") {
+            return (
+              // A gallery clip is the reader's own footage: there is no caption
+              // track to attach, and an empty one would claim captions exist.
+              // It starts muted, and unmuting with sound is a deliberate
+              // choice, so the rule's muted exemption cannot be seen here.
+              // oxlint-disable-next-line jsx-a11y/media-has-caption
+              <video
+                key={layer.key}
+                ref={(element) => {
+                  registerVideoElement(layer.key, element);
+                  if (isTop) topLayerElementRef.current = element;
+                }}
+                className={layerClasses}
+                data-media-kind="video"
+                // The only client-safe way to address the transcoded clip; a
+                // scene path normalises to its clip inside the helper.
+                src={getResizedAlbumVideoSrc(seedCell.path)}
+                poster={seedCell.src}
+                muted={effectiveClipMuted}
+                playsInline
+                loop
+                preload="auto"
+                style={motionStyle}
+                onTransitionEnd={onFadeEnd}
+                {...tapAckProps}
+                {...(isTop
+                  ? {
+                      ...topImageHandlers,
+                      // A <video> has no `alt`: the accessible name is the
+                      // element's own label. No controls either — the kiosk has
+                      // none, and playback is the runtime's job (see the
+                      // playback effect).
+                      "aria-label": photoAltText,
+                      // A clip has no decode() promise. The honest readiness
+                      // signal is its first frame being available — readyState
+                      // >= 2 — and it goes through the very same
+                      // markDecoded/decodedPresentationKey path the <img>
+                      // onLoad uses, so `presentation` still fires only once
+                      // the slide can actually be seen.
+                      onLoadedData: (e: React.SyntheticEvent<HTMLVideoElement>) =>
+                        markVideoReady(e.currentTarget, layer.key, seedCell.src),
+                      onCanPlay: (e: React.SyntheticEvent<HTMLVideoElement>) =>
+                        markVideoReady(e.currentTarget, layer.key, seedCell.src),
+                      onError: () => scheduleImageErrorRetry(),
+                    }
+                  : { "aria-hidden": true })}
+              />
+            );
+          }
+
           return (
             <img
               key={layer.key}
@@ -3373,17 +3589,9 @@ export const Slideshow: React.FC<{
                     }
                   : null
               }
-              className={[
-                styles.image,
-                hidden,
-                settlingClass,
-                showCover ? styles.cover : "",
-                isTop ? "" : styles.backdropLayer,
-              ]
-                .filter(Boolean)
-                .join(" ")}
-              // invariant: every slide has at least a seed cell
-              src={layer.slide.cells[0]!.src}
+              className={layerClasses}
+              data-media-kind="photo"
+              src={seedCell.src}
               alt={isTop ? photoAltText : ""}
               decoding="async"
               style={motionStyle}
@@ -3398,9 +3606,7 @@ export const Slideshow: React.FC<{
                         .decode()
                         .then(() => {
                           if (topKeyRef.current !== layer.key) return;
-                          markDecoded(layer.key, layer.slide.cells[0]!.src, [
-                            layer.slide.cells[0]!.src,
-                          ]);
+                          markDecoded(layer.key, seedCell.src, [seedCell.src]);
                           setImageLoaded(true);
                         })
                         .catch(() => {

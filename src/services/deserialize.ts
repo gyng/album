@@ -108,9 +108,19 @@ export const deserializeVideoBlock = async (
       // and writes the same sidecar a local clip gets. Without that on the
       // block, an external is invisible to everything outside its album page.
       const videoId = parseYoutubeVideoId(serialized.data.href);
-      const poster = videoId
-        ? readVideoPoster(path.join(options.dirname, youtubeMediaFilename(videoId)))
-        : null;
+      const indexedName = videoId ? youtubeMediaFilename(videoId) : undefined;
+      const poster = indexedName ? readVideoPoster(path.join(options.dirname, indexedName)) : null;
+      // An external is indexed under the synthetic name its poster cache uses.
+      let tags: PhotoBlock["_build"]["tags"] = {};
+      try {
+        if (indexedName) {
+          tags =
+            (await getPhotoDetailsFromSearchIndex(path.join(options.dirname, indexedName)))?.[0] ??
+            {};
+        }
+      } catch (err) {
+        console.info("Failed to get details from index, skipping", err);
+      }
 
       return {
         ...serialized,
@@ -119,6 +129,7 @@ export const deserializeVideoBlock = async (
               _build: {
                 src: serialized.data.href,
                 mimeType: "video/youtube",
+                tags,
                 poster: { srcset: poster.srcset },
                 ...(poster.capturedAtLocal !== undefined
                   ? { capturedAtLocal: poster.capturedAtLocal }
@@ -133,6 +144,16 @@ export const deserializeVideoBlock = async (
     const optimised = await optimiseVideo(localFilepath, "public/data/albums");
     const originalTechnicalData = await getOriginalVideoTechnicalData(localFilepath);
     const poster = readVideoPoster(localFilepath);
+    // The indexer keys a clip by the clip's own path, exactly as it keys a
+    // photo, so a clip's colours, tags, alt text, geocode, weather and derived
+    // zone are one lookup away — the same one a photo makes. Without it every
+    // consumer of `_build.tags` silently saw a clip as having none.
+    let tags: PhotoBlock["_build"]["tags"] = {};
+    try {
+      tags = (await getPhotoDetailsFromSearchIndex(localFilepath))?.[0] ?? {};
+    } catch (err) {
+      console.info("Failed to get details from index, skipping", err);
+    }
     // The poster sidecar's reading is camera-local wall clock, the same as
     // every EXIF timestamp in the pipeline; originalTechnicalData.originalDate
     // is a UTC instant kept for the technical panel, so it is only the last
@@ -154,6 +175,7 @@ export const deserializeVideoBlock = async (
         originalSrc: serialized.data.href,
         mimeType: optimised.mimeType,
         originalTechnicalData,
+        tags,
         ...(poster
           ? {
               poster: { srcset: poster.srcset },

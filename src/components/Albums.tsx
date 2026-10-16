@@ -6,6 +6,7 @@ import { Picture } from "./Photo";
 import { Caption, Heading } from "./ui";
 import { parseExifLocalDateTime } from "../util/exifTime";
 import { prefetchImageSrcSet } from "../util/prefetchImage";
+import { coverBlockOf, mediaBlockAsPhoto } from "../util/videoBlockMedia";
 import styles from "./Album.module.css";
 
 /**
@@ -29,14 +30,15 @@ const albumSummary = (album: AlbumPreview): string => {
       ? timeRange.join("–")
       : timeRange[0] || null;
   const photoCount =
-    album.photoCount ?? album.blocks.filter((block) => block.kind === "photo").length;
+    album.photoCount ??
+    album.blocks.filter((block) => block.kind === "photo" || block.kind === "video").length;
   const countLabel = `${photoCount.toLocaleString("en-GB")} ${photoCount === 1 ? "snap" : "snaps"}`;
   return years ? `${years} · ${countLabel}` : countLabel;
 };
 
 export const Albums: React.FC<HomePageData> = (props) => {
   const firstCoveredAlbumIndex = props.albums.findIndex((album) =>
-    album.blocks.some((block) => block.kind === "photo"),
+    album.blocks.some((block) => mediaBlockAsPhoto(block) !== null),
   );
   const intentRef = React.useRef<number | undefined>(undefined);
   React.useEffect(
@@ -49,18 +51,19 @@ export const Albums: React.FC<HomePageData> = (props) => {
   return (
     <ul className={styles.list}>
       {props.albums.map((album, i) => {
-        const firstPhoto = album.blocks.find((b) => b.kind === "photo");
-        const cover =
-          album.blocks.find((b) => b.kind === "photo" && b.formatting?.cover) ?? firstPhoto;
+        const cover = coverBlockOf(album.blocks);
+        const firstMedia = album.blocks
+          .map(mediaBlockAsPhoto)
+          .find((block): block is PhotoBlock => block !== null);
 
-        // The album's first photograph, fetched while the reader is still
-        // deciding. The router prefetches the page; nothing prefetches what the
-        // page is *for*, so the largest image on it began loading only once the
-        // navigation had finished. `100vw` is that page's own sizes for it, so
-        // the browser picks the same candidate and the fetch lands in cache
-        // under the URL it will ask for.
-        const prefetchFirstPhoto = firstPhoto
-          ? () => prefetchImageSrcSet((firstPhoto as PhotoBlock)._build.srcset, "auto, 100vw")
+        // The album's first piece of media — a photograph or a clip's poster —
+        // fetched while the reader is still deciding. The router prefetches the
+        // page; nothing prefetches what the page is *for*, so the largest image
+        // on it began loading only once the navigation had finished. `100vw` is
+        // that page's own sizes for it, so the browser picks the same candidate
+        // and the fetch lands in cache under the URL it will ask for.
+        const prefetchFirstPhoto = firstMedia
+          ? () => prefetchImageSrcSet(firstMedia._build.srcset, "auto, 100vw")
           : undefined;
 
         return (
@@ -86,7 +89,7 @@ export const Albums: React.FC<HomePageData> = (props) => {
             >
               {cover ? (
                 <Picture
-                  block={cover as PhotoBlock}
+                  block={cover}
                   thumb
                   lazy={i !== firstCoveredAlbumIndex}
                   label={`Album cover for ${album._build.slug}`}

@@ -5,7 +5,7 @@ import {
   type AlbumNeighbours as Neighbours,
 } from "../util/albumNeighbours";
 import type { AlbumPreview } from "../util/pageDataTypes";
-import type { PhotoBlock } from "../services/types";
+import { coverBlockOf } from "../util/videoBlockMedia";
 import { rgbToString } from "../util/colorDistance";
 import { AppLink } from "./platform";
 import { Caption, Thumb } from "./ui";
@@ -13,14 +13,10 @@ import { ALBUM_STEP_ATTRIBUTE } from "./useAlbumStepping";
 import photoStyles from "./Photo.module.css";
 import styles from "./AlbumNeighbours.module.css";
 
-const coverOf = (album: AlbumPreview) =>
-  (album.blocks.find((block) => block.kind === "photo" && block.formatting?.cover) ??
-    album.blocks.find((block) => block.kind === "photo")) as PhotoBlock | undefined;
-
 // The same tile as a search result: a square thumbnail with a line or two
 // under it. Full-size covers here read as more of the album's photographs.
 const Neighbour = ({ album, side }: { album: AlbumPreview; side: "previous" | "next" }) => {
-  const cover = coverOf(album);
+  const cover = coverBlockOf(album.blocks);
   const src = cover?._build.srcset[0]?.src;
   const colour = cover?._build.tags.colors?.[0];
   return (

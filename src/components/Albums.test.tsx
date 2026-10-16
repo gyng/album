@@ -3,7 +3,7 @@
  */
 
 import { act, fireEvent, render, screen } from "@testing-library/react";
-import { Content, PhotoBlock, TextBlock } from "../services/types";
+import { Content, PhotoBlock, TextBlock, VideoBlock } from "../services/types";
 import { Albums } from "./Albums";
 import { resetPrefetchedImages } from "../util/prefetchImage";
 
@@ -31,6 +31,18 @@ const text = (id: string): TextBlock => ({
   kind: "text",
   id,
   data: { title: "Introduction" },
+});
+
+const video = (id: string): VideoBlock => ({
+  kind: "video",
+  id,
+  data: { type: "local", href: id },
+  _build: {
+    src: `${id}@1920.mp4`,
+    mimeType: "video/mp4",
+    poster: { srcset: [{ src: `${id}.avif`, width: 100, height: 100 }] },
+    capturedAtLocal: "2024-05-01T09:00:00",
+  },
 });
 
 const album = (
@@ -129,6 +141,18 @@ describe("Albums", () => {
       "loading",
       "lazy",
     );
+  });
+
+  // A clip is media on a card too: its poster frame is the cover and it is
+  // counted, so an album of clips alone is not an album with nothing in it.
+  it("draws a clip's poster frame as the cover and counts the clip", () => {
+    render(<Albums albums={[album("clips", { blocks: [video("sunset.mov")] })]} />);
+
+    expect(screen.getByRole("img", { name: "Album cover for clips" })).toHaveAttribute(
+      "src",
+      "sunset.mov",
+    );
+    expect(screen.getByText("1 snap")).toBeTruthy();
   });
 
   // The router prefetches the page; nothing prefetched the photograph the page

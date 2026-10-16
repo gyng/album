@@ -14,7 +14,9 @@ the trail, quests and shared photograph URLs retain their existing behaviour.
 
 The cloud groups topics in the full image embedding space. Its build-time
 projection, contact sheet and payload are described in `AGENTS.md`; visual rules
-live in [the design system](design-system.md#explore).
+live in [the design system](design-system.md#explore). An item is a photograph or
+a local clip — a clip appears as the poster frame it was embedded from and takes
+the same point, neighbours and clump — so "photograph" below means either.
 
 ## Views and filters
 
@@ -40,14 +42,14 @@ measures, not evidence that every visible distance is exact.
 
 ## Wander
 
-The section after the cloud walks the archive one photograph at a time
+The section after the cloud walks the archive one item at a time
 (`components/explore/ExploreWander.tsx`, logic in `util/wander.ts`). The build
-computes twelve neighbours per photograph in the full space: the first three
+computes twelve neighbours per item in the full space: the first three
 stay `near` (the drawn web), the other nine ship as `around`. Exits come from
 both: the closest always leads, and each other exit must bring something the
-others do not — a tag the current photograph lacks, or a named colour shift
+others do not — a tag the current item lacks, or a named colour shift
 (lighter/darker, warmer/cooler, more colourful/quieter, 0.15 in the swatch's
-HSL terms). Never place or date. Unwalked photographs are preferred.
+HSL terms). Never place or date. Unwalked items are preferred.
 
 The walk is drawn through the cloud (its `trail` prop), and the URL carries
 `wander=<indexed path>` once the reader takes a step, so a photo page links in

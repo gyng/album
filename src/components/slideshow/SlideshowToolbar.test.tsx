@@ -30,6 +30,12 @@ const makeProps = (overrides: Partial<SlideshowToolbarProps> = {}): SlideshowToo
   onToggleTimeAware: noop,
   remixEnabled: false,
   onToggleRemix: noop,
+  playClips: true,
+  onTogglePlayClips: noop,
+  clipMuted: true,
+  onToggleClipMuted: noop,
+  clipVolume: 0.5,
+  onChangeClipVolume: noop,
   onRemixNow: noop,
   isPaused: false,
   onTogglePaused: noop,
@@ -469,6 +475,61 @@ describe("SlideshowToolbar", () => {
     expect(screen.getByRole("button", { name: "Cycle details alignment" })).toHaveTextContent(
       "Right",
     );
+  });
+
+  it("offers the clip controls in the More settings disclosure and reports every change", () => {
+    const onTogglePlayClips = jest.fn();
+    const onToggleClipMuted = jest.fn();
+    const onChangeClipVolume = jest.fn();
+    const { rerender } = render(
+      <SlideshowToolbar
+        {...makeProps({
+          playClips: true,
+          clipMuted: true,
+          clipVolume: 0.25,
+          onTogglePlayClips,
+          onToggleClipMuted,
+          onChangeClipVolume,
+        })}
+      />,
+    );
+
+    const clips = screen.getByRole("group", { name: "Clips" });
+    // The panel's rarely-used groups live behind the disclosure; the clip
+    // controls belong with them.
+    const more = screen.getByRole("button", { name: /more settings/i });
+    const region = document.getElementById(more.getAttribute("aria-controls") ?? "");
+    expect(region?.contains(clips)).toBe(true);
+
+    const play = within(clips).getByRole("button", { name: "Play clips" });
+    const mute = within(clips).getByRole("button", { name: "Mute" });
+    expect(play.getAttribute("aria-pressed")).toBe("true");
+    expect(play.getAttribute("title")).toMatch(/still frame/i);
+    expect(mute.getAttribute("aria-pressed")).toBe("true");
+    expect(mute.getAttribute("title")).toMatch(/silently/i);
+
+    const volume = within(clips).getByRole("slider", { name: "Clip volume" });
+    expect((volume as HTMLInputElement).value).toBe("25");
+    // The readout says the same thing as the slider.
+    expect(within(clips).getByText("25%")).toBeTruthy();
+
+    fireEvent.click(play);
+    fireEvent.click(mute);
+    fireEvent.change(volume, { target: { value: "80" } });
+    expect(onTogglePlayClips).toHaveBeenCalledTimes(1);
+    expect(onToggleClipMuted).toHaveBeenCalledTimes(1);
+    expect(onChangeClipVolume).toHaveBeenCalledWith(0.8);
+
+    const offSettings = { playClips: false, clipMuted: false, clipVolume: 0.8 };
+    rerender(<SlideshowToolbar {...makeProps(offSettings)} />);
+    const off = within(clips);
+    expect(off.getByRole("button", { name: "Play clips" })).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
+    expect(off.getByRole("button", { name: "Mute" })).toHaveAttribute("aria-pressed", "false");
+    expect(off.getByRole("slider", { name: "Clip volume" })).toHaveValue("80");
+    expect(off.getByText("80%")).toBeTruthy();
   });
 
   it("submits a trimmed topic and shows a busy state while it encodes", () => {

@@ -1,5 +1,5 @@
 import { computePhotoStats } from "./computeStats";
-import { Content, PhotoBlock } from "../services/types";
+import { Block, Content, PhotoBlock, VideoBlock } from "../services/types";
 import { weatherFixture } from "../test/fixtures/weather";
 
 const makePhoto = (overrides: Partial<PhotoBlock["_build"]> = {}): PhotoBlock => ({
@@ -17,12 +17,26 @@ const makePhoto = (overrides: Partial<PhotoBlock["_build"]> = {}): PhotoBlock =>
   },
 });
 
-const makeAlbum = (photos: PhotoBlock[], name = "test-album"): Content => ({
+const makeAlbum = (blocks: Block[], name = "test-album"): Content => ({
   name,
   title: name,
-  blocks: photos,
+  blocks,
   formatting: {},
   _build: { slug: name, srcdir: `../albums/${name}` },
+});
+
+type VideoBuild = NonNullable<VideoBlock["_build"]>;
+
+const makeVideo = (overrides: Partial<VideoBuild> = {}): VideoBlock => ({
+  kind: "video",
+  id: "clip.mov",
+  data: { type: "local", href: "/clip.mov" },
+  _build: {
+    src: "/data/albums/test-album/.resized_videos/clip.mov@1920.mp4",
+    mimeType: "video/mp4",
+    poster: { srcset: [{ src: "/clip.mov@800.avif", width: 800, height: 450 }] },
+    ...overrides,
+  },
 });
 
 describe("computePhotoStats", () => {
@@ -1339,5 +1353,133 @@ describe("day of year memories", () => {
     expect(new Set(years).size).toBe(years.length);
     expect(years.length).toBeLessThanOrEqual(4);
     expect(years[0]).toBe(2024);
+  });
+});
+
+describe("clips beside photographs", () => {
+  const geocode = "35.6812\n139.7671\nChiyoda\nTokyo\nChiyoda\nJP\nJapan";
+
+  const clip = makeVideo({
+    capturedAtLocal: "2023-07-04T10:00:00",
+    latDeg: 35.6812,
+    lngDeg: 139.7671,
+    tags: {
+      colors: [[200, 30, 40]],
+      geocode,
+      tz_name: "Asia/Tokyo",
+      tz_offset: "+09:00",
+      weather: weatherFixture,
+    },
+  });
+
+  const photo = makePhoto({
+    exif: { DateTimeOriginal: "2024:03:22 18:30:00" },
+    tags: { colors: [[10, 20, 30]] },
+  });
+
+  const stats = computePhotoStats([makeAlbum([photo, clip])]);
+
+  // A clip is a piece of gallery media like any other, so it is counted in the
+  // totals its breakdowns are measured against.
+  it("counts a clip in the media total", () => {
+    expect(stats.totalPhotos).toBe(2);
+    expect(stats.dateRange).toEqual([2023, 2024]);
+  });
+
+  // The clip's sidecar recorded the place it was shot, so it stands on the map
+  // beside the photographs taken there.
+  it("puts a geotagged clip on the map", () => {
+    expect(stats.mapPoints).toEqual([{ lat: 35.6812, lng: 139.7671 }]);
+  });
+
+  // Its poster is indexed like a photograph's frame, so its colours count in
+  // the families and in the examples that stand for each family.
+  it("counts the poster's colours in the colour families", () => {
+    expect(stats.colorCoverage).toBe(1);
+    expect(stats.colorStats.find((bucket) => bucket.label === "Red")).toEqual({
+      label: "Red",
+      count: 1,
+    });
+    expect(stats.colorStats.find((bucket) => bucket.label === "Dark neutrals")).toEqual({
+      label: "Dark neutrals",
+      count: 1,
+    });
+    expect(
+      stats.colorFamilyExamples.find((bucket) => bucket.label === "Red")?.photos[0],
+    ).toMatchObject({
+      src: "/clip.mov@800.avif",
+      href: "/album/test-album#clip.mov",
+      swatch: "rgb(200, 30, 40)",
+    });
+  });
+
+  // The moment comes from the clip's own EXIF, so it appears in the calendar and
+  // in "this day in other years" through its poster frame.
+  it("dates a clip from its recorded moment", () => {
+    expect(stats.calendarCoverage).toBe(1);
+    expect(stats.monthStats.find((month) => month.label === "Jul")).toEqual({
+      label: "Jul",
+      count: 1,
+    });
+    expect(stats.dayOfYearMemories.find((entry) => entry.monthDay === "07-04")?.photos[0]).toEqual(
+      expect.objectContaining({
+        year: 2023,
+        src: "/clip.mov@800.avif",
+        label: "clip.mov",
+        swatch: "rgb(200, 30, 40)",
+      }),
+    );
+  });
+
+  // Zone, place and weather ride on the clip's indexed row under the same keys a
+  // photograph's do, so they fill the same facets.
+  it("reads a clip's zone, geocode and weather off its indexed row", () => {
+    expect(stats.timezoneStats.coverage).toBe(0.5);
+    expect(stats.timezoneStats.zones[0]).toEqual({
+      name: "Asia/Tokyo",
+      offsets: ["+09:00"],
+      count: 1,
+      sharePercent: 100,
+    });
+    expect(stats.stringFacets.find((facet) => facet.facetId === "location")).toMatchObject({
+      coverage: 0.5,
+      data: [{ label: "Japan", count: 1 }],
+    });
+    expect(stats.stringFacets.find((facet) => facet.facetId === "weather-condition")).toMatchObject(
+      { coverage: 0.5 },
+    );
+  });
+
+  // A clip records no camera or lens of its own, so the camera-led statistics
+  // are left to stills — except the lens split, which is a partition of all
+  // media and so counts the clip where a lensless photograph would land.
+  it("leaves camera statistics to photographs", () => {
+    const withCamera = computePhotoStats([
+      makeAlbum([
+        makePhoto({ exif: { Make: "FUJIFILM", Model: "X-T5", LensModel: "XF 23mm F1.4" } }),
+        makeVideo({ capturedAtLocal: "2024-01-01T00:00:00" }),
+      ]),
+    ]);
+
+    expect(
+      withCamera.gearFlow.nodes.filter((node) => node.depth === 0).map((node) => node.label),
+    ).toEqual(["FUJIFILM X-T5"]);
+    expect(withCamera.lensTypeStats).toEqual({ prime: 1, zoom: 0, unknown: 1 });
+  });
+
+  // A poster cannot prove how the clip was framed, so framing keeps its own
+  // coverage over stills rather than inventing dimensions for the clip.
+  it("does not let a poster stand in for a still's framing", () => {
+    const framed = computePhotoStats([
+      makeAlbum([
+        makePhoto({ width: 6000, height: 4000 }),
+        makeVideo({ capturedAtLocal: "2024-01-01T00:00:00" }),
+      ]),
+    ]);
+
+    expect(framed.stringFacets.find((facet) => facet.facetId === "aspect-ratio")).toMatchObject({
+      coverage: 1,
+      data: [{ label: "3:2", count: 1 }],
+    });
   });
 });

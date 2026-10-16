@@ -25,6 +25,9 @@ import type { Buffer } from "node:buffer";
 import ffmpegPath from "ffmpeg-static";
 import ffprobeStatic from "ffprobe-static";
 import sharp from "sharp";
+// Type-only, and therefore erased: this module keeps no runtime relative import
+// (see the header). The reader itself is injected by the caller.
+import type { MovieExif } from "./movieExif";
 
 export const RESIZED_IMAGE_DIR = ".resized_images";
 export const RESIZED_VIDEO_DIR = ".resized_videos";
@@ -39,10 +42,15 @@ export const POSTER_SOURCE_WIDTH = 3200;
  * and the most informative frame wins.
  */
 export const POSTER_CANDIDATE_FRACTIONS = [0.1, 0.3, 0.5, 0.7];
+/**
+ * Bump when the sidecar's *readings* change meaning. 2: a clip's wall clock and
+ * coordinates come from its own EXIF, not from the QuickTime UTC instant.
+ */
+export const POSTER_METADATA_VERSION = 2;
 
 export type VideoPosterMetadata = {
   capturedAtLocal?: string;
-  timeSource?: "quicktime-creationdate" | "creation_time";
+  timeSource?: "movie-exif" | "quicktime-creationdate" | "creation_time";
   latDeg?: number;
   lngDeg?: number;
   durationSeconds?: number;
@@ -52,6 +60,14 @@ export type VideoPosterMetadata = {
 
 export type VideoPosterSidecar = VideoPosterMetadata & {
   mediaKind: "video";
+  /**
+   * Which reading of a clip's metadata produced this sidecar. A cached sidecar
+   * is reused on source size and mtime alone, so a change to *how* the clip is
+   * read — the wall clock now coming from the clip's own EXIF rather than the
+   * QuickTime instant, say — would otherwise leave every existing sidecar on
+   * disk asserting the old, wrong reading forever.
+   */
+  metadataVersion?: number;
   /** Offsets, in seconds, of the per-minute frames extracted from this clip. */
   scenes?: number[];
   /**
@@ -131,10 +147,12 @@ export const parseIso6709Location = (
 };
 
 // Camera-local wall clock with no zone, matching how EXIF timestamps are stored
-// end to end. QuickTime's `creation_time` is stamped "Z" by cameras that are in
-// fact writing local time (the committed X-T5 fixture does), and Apple's own tag
-// carries an offset that only names the zone its wall clock is already in — so
-// in both cases the reading is kept as written and the zone marker dropped.
+// end to end. Used for the fallbacks only: an Apple clip's own creation date
+// carries an offset that names the zone its wall clock is already in, so the
+// reading is kept as written and the offset dropped. QuickTime's `creation_time`
+// is kept as written too — some cameras do stamp a local reading with a "Z", and
+// from the tag alone there is no telling one from an honest UTC instant, which
+// is why a clip's own EXIF (read in movieExif.ts) is what this now prefers.
 const toNaiveLocalIso = (raw: string | undefined): string | undefined => {
   if (!raw) {
     return undefined;
@@ -156,7 +174,10 @@ const readRotation = (stream: FfprobeStream): number => {
   return Number.isFinite(rotation) ? (rotation as number) : 0;
 };
 
-export const buildVideoPosterMetadata = (probe: FfprobePayload): VideoPosterMetadata => {
+export const buildVideoPosterMetadata = (
+  probe: FfprobePayload,
+  movieExif?: MovieExif | null,
+): VideoPosterMetadata => {
   const streams = probe.streams ?? [];
   const videoStream = streams.find((stream) => stream.codec_type === "video") ?? {};
   const formatTags = probe.format?.tags ?? {};
@@ -167,12 +188,17 @@ export const buildVideoPosterMetadata = (probe: FfprobePayload): VideoPosterMeta
       streamTags["com.apple.quicktime.creationdate"],
   );
   const creationTime = toNaiveLocalIso(formatTags.creation_time ?? streamTags.creation_time);
-  const capturedAtLocal = quickTimeDate ?? creationTime;
-  const timeSource = quickTimeDate
-    ? ("quicktime-creationdate" as const)
-    : creationTime
-      ? ("creation_time" as const)
-      : undefined;
+  // The clip's own EXIF wins: it is the camera's wall clock, the same reading
+  // every photo is dated from. `creation_time` is a UTC instant, so treating it
+  // as local is what put clips in the wrong hour of the day (see movieExif.ts).
+  const capturedAtLocal = movieExif?.dateTimeOriginal ?? quickTimeDate ?? creationTime;
+  const timeSource = movieExif?.dateTimeOriginal
+    ? ("movie-exif" as const)
+    : quickTimeDate
+      ? ("quicktime-creationdate" as const)
+      : creationTime
+        ? ("creation_time" as const)
+        : undefined;
 
   const location = parseIso6709Location(
     formatTags.location ??
@@ -180,6 +206,10 @@ export const buildVideoPosterMetadata = (probe: FfprobePayload): VideoPosterMeta
       streamTags.location ??
       streamTags["com.apple.quicktime.location.ISO6709"],
   );
+  const coordinates =
+    movieExif?.latDeg !== undefined && movieExif.lngDeg !== undefined
+      ? { latDeg: movieExif.latDeg, lngDeg: movieExif.lngDeg }
+      : location;
 
   const durationRaw = videoStream.duration ?? probe.format?.duration;
   const durationSeconds =
@@ -196,8 +226,8 @@ export const buildVideoPosterMetadata = (probe: FfprobePayload): VideoPosterMeta
   return omitUndefined({
     capturedAtLocal,
     timeSource,
-    latDeg: location?.latDeg,
-    lngDeg: location?.lngDeg,
+    latDeg: coordinates?.latDeg,
+    lngDeg: coordinates?.lngDeg,
     durationSeconds,
     width,
     height,
@@ -489,6 +519,8 @@ export type EnsurePosterOptions = {
   sceneInterval?: number;
   /** Ceiling on scenes per clip, past which the interval stretches. */
   sceneMax?: number;
+  /** Reads the clip's own EXIF; injected because this module takes no relative runtime import. */
+  readMovieExif?: (videoPath: string) => MovieExif | null;
 };
 
 export type EnsurePosterResult = {
@@ -560,7 +592,8 @@ export const ensureVideoPoster = async (
   const sourceUnchanged =
     !options.force &&
     cachedSidecar?.source?.size === stat.size &&
-    cachedSidecar?.source?.mtimeMs === Math.round(stat.mtimeMs);
+    cachedSidecar?.source?.mtimeMs === Math.round(stat.mtimeMs) &&
+    cachedSidecar?.metadataVersion === POSTER_METADATA_VERSION;
 
   const posterUsable = sourceUnchanged && (await isDecodableFile(paths.posterSource));
 
@@ -569,7 +602,7 @@ export const ensureVideoPoster = async (
 
   if (!posterUsable) {
     const probe = await probeVideo(videoPath);
-    const metadata = buildVideoPosterMetadata(probe);
+    const metadata = buildVideoPosterMetadata(probe, options.readMovieExif?.(videoPath) ?? null);
 
     fs.mkdirSync(path.dirname(paths.posterSource), { recursive: true });
 
@@ -630,6 +663,7 @@ export const ensureVideoPoster = async (
 
     sidecar = {
       mediaKind: "video",
+      metadataVersion: POSTER_METADATA_VERSION,
       // Album-relative, never the build machine's path: this file lives inside
       // public/ and is served at a guessable URL, so an absolute path would
       // publish the operator's username and directory layout to anyone who

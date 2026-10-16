@@ -3,7 +3,7 @@
  */
 
 import { render, screen } from "@testing-library/react";
-import type { Content, PhotoBlock, TextBlock } from "../../services/types";
+import type { Content, PhotoBlock, TextBlock, VideoBlock } from "../../services/types";
 
 const getTimestampRange = (album: Content): [string | null, string | null] => {
   const ranges: Record<string, [string | null, string | null]> = {
@@ -58,6 +58,18 @@ const text = (id: string): TextBlock => ({
   kind: "text",
   id,
   data: { title: id },
+});
+
+const video = (id: string): VideoBlock => ({
+  kind: "video",
+  id,
+  data: { type: "local", href: id },
+  _build: {
+    src: `${id}@1920.mp4`,
+    mimeType: "video/mp4",
+    poster: { srcset: [{ src: `${id}.avif`, width: 100, height: 100 }] },
+    capturedAtLocal: "2024-05-01T09:00:00",
+  },
 });
 
 const album = (name: string, blocks: Content["blocks"], order?: number): Content => ({
@@ -136,5 +148,29 @@ describe("home page", () => {
       },
       srcset: [],
     });
+  });
+
+  // A clip is media too: it counts, and its poster frame is what the card
+  // draws, so an album of clips alone lands on the page with a cover.
+  it("counts a clip and keeps its poster as the album's preview media", async () => {
+    mockGetAlbums.mockResolvedValue([album("clips", [video("clip.mov")])]);
+
+    const result = await loadHomePageData();
+
+    expect(result.albums[0]?.photoCount).toBe(1);
+    expect(result.albums[0]?.blocks).toEqual([
+      {
+        kind: "video",
+        id: "clip.mov",
+        data: { type: "local", href: "clip.mov" },
+        _build: {
+          src: "clip.mov@1920.mp4",
+          mimeType: "video/mp4",
+          poster: { srcset: [{ src: "clip.mov.avif", width: 100, height: 100 }] },
+          capturedAtLocal: "2024-05-01T09:00:00",
+          tags: {},
+        },
+      },
+    ]);
   });
 });

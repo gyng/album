@@ -1,7 +1,12 @@
 import { expect, test } from "@playwright/test";
 
 const photoPath = "../albums/test-simple/DSCF0506-2.jpg";
-const slideshowImage = 'img[alt]:not([aria-hidden="true"])';
+/* The visible slide inside the runtime frame: the <img> loading a photo (or a
+ * clip's poster frame) or the <video> playing a clip. */
+const slideshowSlide = '[data-media-kind]:not([aria-hidden="true"])';
+/* The same slide restricted to the still <img> — for the checks that need a
+ * decoded image's naturalWidth. */
+const slideshowPhoto = 'img[data-media-kind]:not([aria-hidden="true"])';
 
 test("the installed slideshow shell and runtime restart offline with its configured URL", async ({
   context,
@@ -13,7 +18,10 @@ test("the installed slideshow shell and runtime restart offline with its configu
     "Offline service-worker lifecycle coverage runs once in Chromium",
   );
 
-  const configuredUrl = `/slideshow/shell?mode=random&filter=test-simple&delay=86400&photo=${encodeURIComponent(photoPath)}`;
+  // clips=0 keeps this offline journey on photographs: the pool also contains a
+  // clip, which would otherwise render as a <video> on a random advance and
+  // make the still-only assertions below non-deterministic.
+  const configuredUrl = `/slideshow/shell?mode=random&filter=test-simple&delay=86400&clips=0&photo=${encodeURIComponent(photoPath)}`;
   await page.goto(configuredUrl, { waitUntil: "domcontentloaded" });
   const runtime = page.frameLocator('iframe[title="Slideshow"]');
 
@@ -29,7 +37,7 @@ test("the installed slideshow shell and runtime restart offline with its configu
   // runtime are stored by the same paths production uses.
   await page.goto(configuredUrl, { waitUntil: "domcontentloaded" });
   await expect(page).toHaveTitle("Slideshow | Snapshots", { timeout: 15_000 });
-  await expect(runtime.locator(slideshowImage).first()).toBeVisible({ timeout: 15_000 });
+  await expect(runtime.locator(slideshowSlide).first()).toBeVisible({ timeout: 15_000 });
   await expect.poll(() => page.evaluate(() => caches.has("snapshots-pwa-images"))).toBe(false);
   await expect
     .poll(() =>
@@ -65,21 +73,21 @@ test("the installed slideshow shell and runtime restart offline with its configu
     await expect
       .poll(() =>
         runtime
-          .locator(slideshowImage)
+          .locator(slideshowPhoto)
           .first()
           .evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0),
       )
       .toBe(true);
-    const before = await runtime.locator(slideshowImage).first().getAttribute("src");
+    const before = await runtime.locator(slideshowSlide).first().getAttribute("src");
     await page.mouse.move(100, 10);
     await runtime.getByRole("button", { name: "Next", exact: true }).click();
     await expect
-      .poll(() => runtime.locator(slideshowImage).last().getAttribute("src"))
+      .poll(() => runtime.locator(slideshowSlide).last().getAttribute("src"))
       .not.toBe(before);
     await expect
       .poll(() =>
         runtime
-          .locator(slideshowImage)
+          .locator(slideshowPhoto)
           .last()
           .evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0),
       )

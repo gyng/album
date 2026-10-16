@@ -151,6 +151,40 @@ describe("deserialisation adapter boundaries", () => {
     expect(result.data).not.toHaveProperty("date");
   });
 
+  // A clip's row in the search index is keyed by the clip's own path — the same
+  // way a photo's is — and `_build.tags` is what every consumer reads its
+  // colours, tags, geocode, weather and derived zone from. Keying it wrongly is
+  // silent: the lookup simply misses and the clip reports no palette.
+  it("attaches the clip's own indexed row, keyed by the clip's path", async () => {
+    const result = await deserializeVideoBlock(localVideo(), { dirname: "../albums/trip" });
+
+    expect(result._build?.tags).toEqual({ colors: [[1, 2, 3]] });
+    expect(db.rows).toHaveBeenCalledWith(expect.stringContaining("FROM images"), [
+      "../albums/trip/clip.mp4",
+    ]);
+  });
+
+  it("looks a YouTube external up under the synthetic name it is indexed by", async () => {
+    (readVideoPoster as jest.Mock).mockReturnValue({
+      srcset: [{ src: "/ycyUWULJxdU.youtube@800.avif", width: 800, height: 450 }],
+    });
+
+    const block = await deserializeVideoBlock(
+      {
+        kind: "video",
+        id: "ycyUWULJxdU.youtube",
+        data: { type: "youtube", href: "https://youtu.be/ycyUWULJxdU" },
+      },
+      { dirname: "../albums/trip" },
+    );
+
+    expect(db.rows).toHaveBeenCalledWith(expect.stringContaining("FROM images"), [
+      "../albums/trip/ycyUWULJxdU.youtube",
+    ]);
+    expect(block._build?.tags).toEqual({ colors: [[1, 2, 3]] });
+    (readVideoPoster as jest.Mock).mockReturnValue(null);
+  });
+
   it("requires a directory for local media and rejects unknown block kinds", async () => {
     await expect(deserializeBlock(photo())).rejects.toThrow("Need dirname for photoblock deser");
     await expect(deserializeBlock(localVideo())).rejects.toThrow(

@@ -871,7 +871,10 @@ export const SlideshowShellScreen = () => {
           data-ready={String(runtimeVisible)}
           data-retained={String(presentation !== null)}
           aria-hidden={!runtimeVisible && presentation !== null}
-          allow="fullscreen"
+          // `autoplay` lets the runtime play a clip with sound where the
+          // platform permits it; its slides start muted regardless, because a
+          // kiosk has no gesture to unlock audio with.
+          allow="fullscreen autoplay"
           allowFullScreen
         />
       ) : null}

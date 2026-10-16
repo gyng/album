@@ -5977,19 +5977,34 @@ def backfill(dbpath: str, dry_run: bool):
     help="Only refresh indexed paths containing this substring (e.g. an album name).",
 )
 @click.option(
+    "--media-root",
+    default=DEFAULT_MEDIA_ROOT,
+    show_default=True,
+    help="Public album cache holding video poster frames and their sidecars.",
+)
+@click.option(
     "--dry-run",
     is_flag=True,
     default=False,
     help="Report what would change without writing.",
 )
-def update_gps(dbpath: str, match: str | None, dry_run: bool):
+def update_gps(dbpath: str, match: str | None, media_root: str, dry_run: bool):
     """Refresh GPS coordinates, timestamp and geocode for already-indexed photos
-    from their CURRENT EXIF, without re-running the caption/SigLIP models.
+    and clips from their CURRENT source, without re-running the caption/SigLIP
+    models.
+
+    For a photo the source is its EXIF. For a clip it is the sidecar the poster
+    prepass wrote beside its poster frame — the same sidecar the index run reads:
+    a clip takes its place and camera-local time from it, and a scene takes its
+    clip's place and start time advanced by its offset.
 
     Use this after the geotag companion tool writes GPS into originals: it reads
-    each indexed file's EXIF and updates metadata (lat/lng/iso8601/geo_*) plus the
-    searchable geocode blob, then bumps the change-detection signature so a later
-    full ``index`` run won't needlessly re-run the GPU models for these files.
+    each indexed file's EXIF (or the clip's sidecar) and updates metadata
+    (lat/lng/iso8601/geo_*) plus the searchable geocode blob, then re-stamps a
+    photo's change-detection signature so a later full ``index`` run won't
+    needlessly re-run the GPU models for it. A clip's provenance records are left
+    as the index wrote them, since they are pinned to the poster frame rather
+    than to the clip file this command reads.
 
     Paths come from the index itself (stored album-relative), so files are read
     relative to the index/ working directory exactly as at index time. This is
@@ -5997,6 +6012,7 @@ def update_gps(dbpath: str, match: str | None, dry_run: bool):
     fields, without the hours of GPU re-derivation of unchanged tags/embeddings.
     Photos whose GPS was removed have stale coordinates, searchable geocode, and
     geocode tags cleared."""
+    set_media_root(media_root)
     if not dry_run:
         lock_fd = acquire_single_instance_lock(dbpath)
     db = Sqlite3Client(dbpath, read_only=dry_run)
@@ -6024,54 +6040,80 @@ def update_gps(dbpath: str, match: str | None, dry_run: bool):
     with db.transaction() as cur:
         tags_changed = False
         for path in paths:
-            if is_media_path(path):
-                # A video carries no EXIF: its time and place come from the
-                # sidecar the poster prepass wrote. Re-reading it here would
-                # blank exactly the fields this command exists to maintain.
-                skipped_media += 1
-                continue
-
-            if not os.path.exists(path):
-                missing += 1
-                continue
-
-            with open(path, "rb") as fh:
-                exif_full = get_exif(fh)
-            exif = {k: v for k, v in exif_full.items() if not isinstance(v, bytes)}
-
-            lat = exif.get("GPS GPSLatitude")
-            lng = exif.get("GPS GPSLongitude")
-            lat_ref = exif.get("GPS GPSLatitudeRef")
-            lng_ref = exif.get("GPS GPSLongitudeRef")
-
+            media = is_media_path(path)
             lat_deg = None
             lng_deg = None
             geo: Mapping = {}
-            if lat and lng and lat_ref and lng_ref:
-                try:
-                    lat_deg = convert_to_degress(lat, lat_ref)
-                    lng_deg = convert_to_degress(lng, lng_ref)
+            duration_seconds = None
+            if media:
+                # A clip carries no EXIF: its place and camera-local time come
+                # from the sidecar the poster prepass wrote. Re-read it here so a
+                # clip whose sidecar gained (or lost) coordinates is refreshed
+                # exactly as a photo's EXIF would be.
+                sidecar = read_poster_sidecar(path)
+                if sidecar is None:
+                    # Nothing to re-read from. A missing or corrupt sidecar is a
+                    # prepass state, not evidence the clip has no place, so the
+                    # existing row is left alone rather than blanked.
+                    skipped_media += 1
+                    continue
+                lat_deg = sidecar_number(sidecar.get("latDeg"))
+                lng_deg = sidecar_number(sidecar.get("lngDeg"))
+                if lat_deg is not None and lng_deg is not None:
                     geo = get_image_geocode(lat_deg, lng_deg)
-                except (
-                    ZeroDivisionError,
-                    ValueError,
-                    TypeError,
-                    IndexError,
-                    AttributeError,
-                ) as err:
-                    log(f"Ignoring malformed GPS coordinates for {path}: {err}")
+                else:
                     lat_deg = None
                     lng_deg = None
-                    geo = {}
+                duration_seconds = sidecar_number(sidecar.get("durationSeconds"))
+                # A scene sits `scene_seconds` into its clip, so its wall clock
+                # is the clip's start advanced by that offset — the same rule the
+                # index run applies, keeping scene rows consistent with the clip.
+                iso8601_local = shift_naive_iso(
+                    sidecar_wall_clock(sidecar.get("capturedAtLocal")),
+                    split_scene_path(path)[1],
+                )
+            else:
+                if not os.path.exists(path):
+                    missing += 1
+                    continue
+
+                with open(path, "rb") as fh:
+                    exif_full = get_exif(fh)
+                exif = {
+                    k: v for k, v in exif_full.items() if not isinstance(v, bytes)
+                }
+
+                lat = exif.get("GPS GPSLatitude")
+                lng = exif.get("GPS GPSLongitude")
+                lat_ref = exif.get("GPS GPSLatitudeRef")
+                lng_ref = exif.get("GPS GPSLongitudeRef")
+
+                if lat and lng and lat_ref and lng_ref:
+                    try:
+                        lat_deg = convert_to_degress(lat, lat_ref)
+                        lng_deg = convert_to_degress(lng, lng_ref)
+                        geo = get_image_geocode(lat_deg, lng_deg)
+                    except (
+                        ZeroDivisionError,
+                        ValueError,
+                        TypeError,
+                        IndexError,
+                        AttributeError,
+                    ) as err:
+                        log(f"Ignoring malformed GPS coordinates for {path}: {err}")
+                        lat_deg = None
+                        lng_deg = None
+                        geo = {}
+
+                iso8601_local = (
+                    str(exif_full.get("EXIF DateTimeOriginal", ""))
+                    .replace(":", "-", 2)
+                    .replace(" ", "T", 1)
+                ) or None
 
             if lat_deg is not None and lng_deg is not None:
                 geotagged += 1
 
-            iso8601_local = (
-                str(exif_full.get("EXIF DateTimeOriginal", ""))
-                .replace(":", "-", 2)
-                .replace(" ", "T", 1)
-            ) or None
             blob, geo_cols = build_geocode_fields(geo)
 
             if dry_run:
@@ -6084,28 +6126,43 @@ def update_gps(dbpath: str, match: str | None, dry_run: bool):
                 iso8601_local,
                 geo_cols,
                 cur=cur,
+                duration_seconds=duration_seconds,
                 tz_name=tz_name,
                 tz_offset=tz_offset,
             )
-            if blob is not None:
-                db.upsert_image_fields(path, {"geocode": blob}, cur=cur)
-            else:
-                db.upsert_image_fields(path, {"geocode": None}, cur=cur)
-            db.replace_tags_for_source(
-                path,
-                [
-                    value
-                    for value in (
-                        geo.get("country"),
-                        geo.get("city"),
-                        geo.get("country_code"),
-                    )
-                    if value
-                ],
-                "geocode",
-                cur,
-            )
-            tags_changed = True
+            # A scene row is deliberately not searchable text, so it carries no
+            # filename and no geocode: only the clip's own row does. Its metadata
+            # (place and time) is still refreshed above.
+            if not is_scene_path(path):
+                if blob is not None:
+                    db.upsert_image_fields(path, {"geocode": blob}, cur=cur)
+                else:
+                    db.upsert_image_fields(path, {"geocode": None}, cur=cur)
+                db.replace_tags_for_source(
+                    path,
+                    [
+                        value
+                        for value in (
+                            geo.get("country"),
+                            geo.get("city"),
+                            geo.get("country_code"),
+                        )
+                        if value
+                    ],
+                    "geocode",
+                    cur,
+                )
+                tags_changed = True
+            if media:
+                # A clip's provenance digest is taken from its poster frame —
+                # and, for the multimodal stage, from the clip's own bytes — not
+                # from a single file this command re-hashes. Writing a plain file
+                # digest here would make the next index run see every clip as
+                # stale and re-derive the vectors this refresh exists to avoid
+                # touching, so the index's own provenance rows are left as they
+                # are. The clip's pixels did not change; only its sidecar did.
+                updated += 1
+                continue
             digest = file_content_sha256(path)
             if digest is not None:
                 db.upsert_pipeline_state(
@@ -6163,8 +6220,8 @@ def update_gps(dbpath: str, match: str | None, dry_run: bool):
     log(
         f"update-gps: {'would refresh' if dry_run else 'refreshed'} "
         f"{len(paths) - missing - skipped_media if dry_run else updated} path(s), "
-        f"{geotagged} with GPS, {missing} missing, {skipped_media} video(s) left to "
-        f"their sidecars (match={match!r}), in {dbpath}"
+        f"{geotagged} with GPS, {missing} missing, {skipped_media} video(s) "
+        f"without a readable sidecar (match={match!r}), in {dbpath}"
     )
     if not dry_run:
         os.close(lock_fd)
