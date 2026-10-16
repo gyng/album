@@ -31,7 +31,7 @@ import { Seo } from "../../components/Seo";
 import { buildCollectionPageJsonLd, formatPageTitle } from "../../lib/seo";
 import { getPhotoAltText } from "../../lib/alt";
 import { navigateTo, reloadCurrentPage } from "../../util/navigate";
-import { scheduleSlideshowFrame } from "../../util/slideshowFrame";
+import { finishStalledSlideshowReveal, scheduleSlideshowFrame } from "../../util/slideshowFrame";
 import {
   chooseRecentSlideshowPhoto,
   readRecentSlideshowUrls,
@@ -2781,8 +2781,10 @@ export const Slideshow: React.FC<{
       return;
     }
     let cancelFrame = () => {};
+    const revealStartedAt = performance.now();
     const reportWhenPresented = () => {
       const element = topLayerElementRef.current;
+      if (element) finishStalledSlideshowReveal(element, performance.now() - revealStartedAt);
       if (!element || Number(getComputedStyle(element).opacity) < 0.999) {
         cancelFrame = scheduleSlideshowFrame(reportWhenPresented);
         return;

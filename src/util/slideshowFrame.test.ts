@@ -1,5 +1,5 @@
 /** @jest-environment jsdom */
-import { scheduleSlideshowFrame } from "./slideshowFrame";
+import { finishStalledSlideshowReveal, scheduleSlideshowFrame } from "./slideshowFrame";
 
 beforeEach(() => jest.useFakeTimers());
 afterEach(() => jest.restoreAllMocks());
@@ -39,4 +39,35 @@ it("runs only once when animation frames and the fallback both become available"
   frame(16);
   jest.advanceTimersByTime(1000);
   expect(reveal).toHaveBeenCalledTimes(1);
+});
+
+it("finishes an unstarted opacity transition only after its full duration and grace period", () => {
+  const finish = jest.fn();
+  const element = {
+    getAnimations: () => [
+      {
+        transitionProperty: "opacity",
+        pending: true,
+        currentTime: 0,
+        effect: { getComputedTiming: () => ({ endTime: 300 }) },
+        finish,
+      },
+    ],
+  } as unknown as Element;
+  finishStalledSlideshowReveal(element, 399);
+  expect(finish).not.toHaveBeenCalled();
+  finishStalledSlideshowReveal(element, 400);
+  expect(finish).toHaveBeenCalledTimes(1);
+});
+
+it("leaves progressing transitions and other animations alone", () => {
+  const finish = jest.fn();
+  const element = {
+    getAnimations: () => [
+      { transitionProperty: "opacity", pending: false, currentTime: 10, finish },
+      { transitionProperty: "transform", pending: true, currentTime: 0, finish },
+    ],
+  } as unknown as Element;
+  finishStalledSlideshowReveal(element, 1000);
+  expect(finish).not.toHaveBeenCalled();
 });

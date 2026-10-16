@@ -190,6 +190,17 @@ test("the slideshow shell swaps code without releasing its wake lock", async ({ 
   ).toBe(0);
   await expect(runtime.getByRole("button", { name: "Screen stays awake" })).toBeVisible();
 
+  // Serve a new build identity at the script boundary, retaining the real
+  // runtime's decode/reveal acknowledgement and its genuine message source.
+  const originalVersion = (await (await page.request.get("/version.json")).json())
+    .buildVersion as string;
+  await page.route("**/_next/static/**/*.js", async (route) => {
+    const response = await route.fetch();
+    await route.fulfill({
+      response,
+      body: (await response.text()).replaceAll(originalVersion, "future-build"),
+    });
+  });
   await page.route("**/version.json", async (route) => {
     await route.fulfill({
       contentType: "application/json",
@@ -204,24 +215,7 @@ test("the slideshow shell swaps code without releasing its wake lock", async ({ 
   );
   await expect(image).toBeVisible({ timeout: 15_000 });
   await expect(image).toHaveAttribute("src", String(photoBeforeUpdate));
-  await runtime.locator("body").evaluate(() => {
-    window.parent.postMessage(
-      {
-        type: "snapshots:slideshow-ready",
-        buildVersion: "future-build",
-        search: window.location.search,
-        presentation: {
-          sources: [
-            document
-              .querySelector<HTMLImageElement>('img[alt]:not([aria-hidden="true"])')!
-              .getAttribute("src")!,
-          ],
-          cover: false,
-        },
-      },
-      window.location.origin,
-    );
-  });
+  await expect(page.locator('iframe[title="Slideshow"]')).toHaveAttribute("data-ready", "true");
   await expect(diagnostics).toHaveAttribute("data-code-status", "current");
   expect(
     await page.evaluate(
