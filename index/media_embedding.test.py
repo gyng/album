@@ -39,6 +39,7 @@ class DecoderTests(unittest.TestCase):
         from unittest.mock import patch
 
         import numpy as np
+
         from media_embedding import FRAME_EDGE, decode_segment
 
         frames = np.zeros((2, FRAME_EDGE, FRAME_EDGE, 3), dtype=np.uint8).tobytes()

@@ -38,11 +38,21 @@
   font-size: var(--fs-sm);
   color: var(--c-danger);
 }
-.buttonRow,
+.buttonRow {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  align-items: start;
+  gap: var(--space-2);
+  inline-size: 100%;
+}
 .dailyAction {
   display: grid;
   justify-items: start;
   gap: var(--space-2);
+  min-inline-size: 0;
+}
+.buttonRow > button {
+  align-self: start;
 }
 .dailyDescription {
   line-height: var(--lh-caption);

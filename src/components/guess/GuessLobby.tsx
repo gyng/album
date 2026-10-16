@@ -217,11 +217,11 @@ export const GuessLobby: React.FC<GuessLobbyProps> = ({
           </p>
         ) : null}
 
-        <Button variant="primary" onClick={handleStart}>
-          Play
-          <KeyHint>Enter</KeyHint>
-        </Button>
         <div className={styles.buttonRow}>
+          <Button variant="primary" onClick={handleStart}>
+            Play
+            <KeyHint>Enter</KeyHint>
+          </Button>
           {todaysDaily ? (
             // Today's daily is done: its result is shared, not replayed.
             <div className={styles.dailyAction}>

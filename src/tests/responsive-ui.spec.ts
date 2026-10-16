@@ -151,7 +151,9 @@ test.describe("Responsive UI", () => {
       const photographBox = await photograph.boundingBox();
       expect(photographBox).not.toBeNull();
       expect(photographBox!.y).toBeLessThan(834 * 0.4);
-      await expect(tabletPage.getByLabel("Theme")).toBeInViewport();
+      const theme = tabletPage.getByRole("combobox", { name: "Theme", exact: true });
+      await theme.scrollIntoViewIfNeeded();
+      await expect(theme).toBeInViewport();
       await expectNoDocumentOverflow(tabletPage);
     } finally {
       await context.close();

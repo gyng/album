@@ -47,6 +47,7 @@ test("Hindsight orders photographs with the keyboard and reveals when each was t
   page,
 }) => {
   await gotoHydrated(page, "/fun/hindsight");
+  await page.getByRole("button", { name: "Across the years", exact: true }).click();
   const startButton = page.getByRole("button", { name: /Start Hindsight/ });
   await expect(startButton).toBeEnabled();
   await startButton.focus();

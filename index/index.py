@@ -36,9 +36,10 @@ import exifread
 import fast_colorthief
 import numpy as np
 import reverse_geocode
+from PIL import Image, ImageOps
+
 from media_embedding import PIPELINE_VERSION as GEMMA_EMBEDDING_VERSION
 from media_embedding import Gemma2Embedder
-from PIL import Image, ImageOps
 
 _MODEL_RUNTIME_AVAILABLE = True
 

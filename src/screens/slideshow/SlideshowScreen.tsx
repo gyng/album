@@ -31,6 +31,7 @@ import { Seo } from "../../components/Seo";
 import { buildCollectionPageJsonLd, formatPageTitle } from "../../lib/seo";
 import { getPhotoAltText } from "../../lib/alt";
 import { navigateTo, reloadCurrentPage } from "../../util/navigate";
+import { scheduleSlideshowFrame } from "../../util/slideshowFrame";
 import {
   chooseRecentSlideshowPhoto,
   readRecentSlideshowUrls,
@@ -2743,18 +2744,18 @@ export const Slideshow: React.FC<{
   });
 
   // Reveal the top layer once decoded: it fades in while every other layer
-  // fades out — the cross-fade. The double rAF guarantees the layer's opacity:0
-  // start state is painted first, so an already-decoded (preloaded) photo fades
-  // in instead of hard-cutting.
+  // fades out — the cross-fade. Normally two animation frames paint opacity:0
+  // first, so preloaded photos still fade in. A visible iframe whose frames
+  // stall can continue through the scheduler's timer fallback.
   useEffect(() => {
     if (!incomingReady || !slideKey) return;
-    let inner = 0;
-    const outer = requestAnimationFrame(() => {
-      inner = requestAnimationFrame(() => setLayers((prev) => revealLayers(prev, slideKey)));
+    let cancelInner = () => {};
+    const cancelOuter = scheduleSlideshowFrame(() => {
+      cancelInner = scheduleSlideshowFrame(() => setLayers((prev) => revealLayers(prev, slideKey)));
     });
     return () => {
-      cancelAnimationFrame(outer);
-      cancelAnimationFrame(inner);
+      cancelOuter();
+      cancelInner();
     };
   }, [incomingReady, slideKey]);
 
@@ -2779,11 +2780,11 @@ export const Slideshow: React.FC<{
     ) {
       return;
     }
-    let frame = 0;
+    let cancelFrame = () => {};
     const reportWhenPresented = () => {
       const element = topLayerElementRef.current;
       if (!element || Number(getComputedStyle(element).opacity) < 0.999) {
-        frame = requestAnimationFrame(reportWhenPresented);
+        cancelFrame = scheduleSlideshowFrame(reportWhenPresented);
         return;
       }
       window.parent.postMessage(
@@ -2799,8 +2800,8 @@ export const Slideshow: React.FC<{
       );
       reportPresented(slideKey);
     };
-    frame = requestAnimationFrame(reportWhenPresented);
-    return () => cancelAnimationFrame(frame);
+    cancelFrame = scheduleSlideshowFrame(reportWhenPresented);
+    return () => cancelFrame();
   }, [
     props.managedCodeReload,
     currentSnapshot,

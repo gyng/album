@@ -1821,9 +1821,8 @@ class TestCli(UsesTestexistsFixture, unittest.TestCase):
                 db.insert_metadata(
                     photo, (0.0, 0.0), "1999-01-01T00:00:00", {}, cur=cur
                 )
-            from media_embedding import MODEL_ID
-
             from index import GEMMA_STAGE, embedding_pipeline_version
+            from media_embedding import MODEL_ID
 
             db.insert_embedding(photo, MODEL_ID, [1.0, 0.0])
             db.upsert_pipeline_state(

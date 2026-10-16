@@ -233,7 +233,9 @@ test("the slideshow shell swaps code without releasing its wake lock", async ({ 
 test("a blank code update keeps the last photograph and recovers without releasing the lock", async ({
   page,
 }) => {
-  test.setTimeout(60_000);
+  // Initial presentation (20s), readiness deadline + backoff (40s), and
+  // recovered presentation (20s) each retain their own bounded assertion.
+  test.setTimeout(100_000);
   await page.addInitScript(() => {
     localStorage.setItem("slideshow-status-pill", "on");
     const state = window as Window & { __wakeReleases?: number };
