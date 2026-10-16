@@ -174,7 +174,8 @@ test("the slideshow shell swaps code without releasing its wake lock", async ({ 
   const diagnostics = page.getByRole("group", { name: "Slideshow diagnostics" });
   // Readiness now includes database/image decode, not just mounting JavaScript.
   await expect(diagnostics).toHaveAttribute("data-code-status", "current", { timeout: 20_000 });
-  await page.getByRole("button", { name: "Slideshow diagnostics" }).click();
+  await page.getByRole("button", { name: "Slideshow diagnostics" }).focus();
+  await page.keyboard.press("Enter");
   await expect(diagnostics.getByText("Screen awake")).toBeVisible();
 
   const runtime = page.frameLocator('iframe[title="Slideshow"]');
@@ -207,7 +208,10 @@ test("the slideshow shell swaps code without releasing its wake lock", async ({ 
       body: JSON.stringify({ buildVersion: "future-build" }),
     });
   });
-  await diagnostics.getByRole("button", { name: "Check for code update" }).click();
+  // WebKit can stop delivering the two frames Playwright's pointer stability
+  // check requires. Keyboard activation still exercises the native button.
+  await diagnostics.getByRole("button", { name: "Check for code update" }).focus();
+  await page.keyboard.press("Enter");
 
   await expect(page.locator('iframe[title="Slideshow"]')).toHaveAttribute(
     "src",
@@ -276,8 +280,10 @@ test("a blank code update keeps the last photograph and recovers without releasi
     </script></body></html>`,
     });
   });
-  await page.getByRole("button", { name: "Slideshow diagnostics" }).click();
-  await diagnostics.getByRole("button", { name: "Check for code update" }).click();
+  await page.getByRole("button", { name: "Slideshow diagnostics" }).focus();
+  await page.keyboard.press("Enter");
+  await diagnostics.getByRole("button", { name: "Check for code update" }).focus();
+  await page.keyboard.press("Enter");
   await expect(frame).toHaveAttribute("src", /shellVersion=synthetic-update/);
   await expect(frame).toHaveAttribute("data-ready", "false");
   await expect(frame).toHaveCSS("opacity", "0");
@@ -301,7 +307,8 @@ test("a blank code update keeps the last photograph and recovers without releasi
 
   broken = false;
   advertisedVersion = originalVersion;
-  await diagnostics.getByRole("button", { name: "Check for code update" }).click();
+  await diagnostics.getByRole("button", { name: "Check for code update" }).focus();
+  await page.keyboard.press("Enter");
   await expect(frame).toHaveAttribute("data-ready", "true", { timeout: 20_000 });
   await expect(diagnostics).toHaveAttribute("data-code-status", "current");
   expect(
@@ -334,7 +341,8 @@ test("wake-lock failure never blocks the embedded slideshow", async ({ page }) =
 
   const runtime = page.frameLocator('iframe[title="Slideshow"]');
   await expect(runtime.locator(slideshowImage).first()).toBeVisible({ timeout: 15_000 });
-  await page.getByRole("button", { name: "Slideshow diagnostics" }).click();
+  await page.getByRole("button", { name: "Slideshow diagnostics" }).focus();
+  await page.keyboard.press("Enter");
   await expect(page.getByText("Wake lock off")).toBeVisible();
 });
 
