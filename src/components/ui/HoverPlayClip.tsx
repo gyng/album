@@ -22,7 +22,7 @@ type HoverPlayClipProps = {
  * and the element does not exist until then.
  */
 export const HoverPlayClip = ({ clipPath, className, children }: HoverPlayClipProps) => {
-  const { shouldRenderVideo, videoRef, handlers } = useHoverPlayClip(clipPath);
+  const { shouldRenderVideo, isActive, videoRef, handlers } = useHoverPlayClip(clipPath);
 
   // Arming implies a playable, non-null path, but only the compiler needs to be
   // told: this is the check that narrows `clipPath` for the URL builder.
@@ -41,6 +41,7 @@ export const HoverPlayClip = ({ clipPath, className, children }: HoverPlayClipPr
           disablePictureInPicture
           aria-hidden="true"
           tabIndex={-1}
+          hidden={!isActive}
         />
       ) : null}
     </span>

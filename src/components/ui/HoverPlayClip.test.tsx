@@ -2,7 +2,7 @@
  * @jest-environment jsdom
  */
 
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { HoverPlayClip } from "./HoverPlayClip";
 
 const CLIP_PATH = "../albums/trip/clip.mp4";
@@ -215,6 +215,50 @@ describe("HoverPlayClip", () => {
     // Reusing the element is what makes the second hover instant: a re-mount
     // would be a second request for the same file.
     expect(loadSpy).not.toHaveBeenCalled();
+  });
+
+  // A paused preview left over the poster froze the tile on whatever frame the
+  // pointer happened to leave on.
+  it("gives the tile back to its poster when the pointer leaves", () => {
+    const { container } = renderTile();
+    const tile = wrapper();
+
+    fireEvent.pointerOver(tile);
+    expect(previewOf(container)).toBeVisible();
+
+    fireEvent.pointerOut(tile);
+    expect(previewOf(container)).not.toBeVisible();
+
+    fireEvent.pointerOver(tile);
+    expect(previewOf(container)).toBeVisible();
+  });
+
+  it("stops and hides a playing preview when the reader asks for reduced motion", () => {
+    let reduced = false;
+    const listeners = new Set<() => void>();
+    Object.defineProperty(window, "matchMedia", {
+      configurable: true,
+      writable: true,
+      value: (query: string) => ({
+        get matches() {
+          return query.includes("prefers-reduced-motion") ? reduced : false;
+        },
+        media: query,
+        addEventListener: (_type: string, listener: () => void) => listeners.add(listener),
+        removeEventListener: (_type: string, listener: () => void) => listeners.delete(listener),
+      }),
+    });
+    const { container } = renderTile();
+
+    fireEvent.pointerOver(wrapper());
+    expect(playSpy).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      reduced = true;
+      for (const listener of listeners) listener();
+    });
+
+    expect(container.querySelector("video")).toBeNull();
   });
 
   it("pauses when the gesture is cancelled", () => {

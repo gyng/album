@@ -61,6 +61,8 @@ export const useHoverPlayClip = (
   isPlayable: boolean;
   /** False until the first qualifying pointerenter — the element must not exist before it. */
   shouldRenderVideo: boolean;
+  /** True while a pointer is on the tile; otherwise the poster is what shows. */
+  isActive: boolean;
   videoRef: React.RefObject<HTMLVideoElement | null>;
   /** Spread on the wrapper element the consumer already renders. */
   handlers: HoverPlayClipHandlers;
@@ -81,6 +83,7 @@ export const useHoverPlayClip = (
 
   const videoRef = React.useRef<HTMLVideoElement | null>(null);
   const [shouldRenderVideo, setShouldRenderVideo] = React.useState(false);
+  const [isActive, setIsActive] = React.useState(false);
   // Where the pointer is, kept in a ref: a visibility change reads it when it
   // happens, and a state copy would be stale by then.
   const pointerInsideRef = React.useRef(false);
@@ -123,6 +126,7 @@ export const useHoverPlayClip = (
       if (!isPlayable || event.pointerType === "touch") return;
       pointerInsideRef.current = true;
       setShouldRenderVideo(true);
+      setIsActive(true);
       const video = videoRef.current;
       // On the first enter there is no element yet; the mount effect plays it.
       // A hidden tab starts nothing — the visibility listener resumes instead.
@@ -130,10 +134,12 @@ export const useHoverPlayClip = (
     },
     onPointerLeave: () => {
       pointerInsideRef.current = false;
+      setIsActive(false);
       videoRef.current?.pause();
     },
     onPointerCancel: () => {
       pointerInsideRef.current = false;
+      setIsActive(false);
       videoRef.current?.pause();
     },
     onBlur: () => {
@@ -141,5 +147,14 @@ export const useHoverPlayClip = (
     },
   };
 
-  return { isPlayable, shouldRenderVideo, videoRef, handlers };
+  return {
+    isPlayable,
+    // The element goes once the preview may no longer play (reduced motion
+    // asked for mid-hover), and a media element removed from the document is
+    // paused by the browser, so nothing is left playing over the poster.
+    shouldRenderVideo: shouldRenderVideo && isPlayable,
+    isActive,
+    videoRef,
+    handlers,
+  };
 };

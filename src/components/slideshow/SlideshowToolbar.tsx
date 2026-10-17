@@ -989,6 +989,7 @@ export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
                 step={5}
                 value={Math.round(props.clipVolume * 100)}
                 aria-label="Clip volume"
+                disabled={!props.playClips || props.clipMuted}
                 onChange={(event) => {
                   props.onChangeClipVolume(Number(event.target.value) / 100);
                 }}

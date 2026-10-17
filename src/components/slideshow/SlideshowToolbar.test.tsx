@@ -485,7 +485,7 @@ describe("SlideshowToolbar", () => {
       <SlideshowToolbar
         {...makeProps({
           playClips: true,
-          clipMuted: true,
+          clipMuted: false,
           clipVolume: 0.25,
           onTogglePlayClips,
           onToggleClipMuted,
@@ -505,8 +505,8 @@ describe("SlideshowToolbar", () => {
     const mute = within(clips).getByRole("button", { name: "Mute" });
     expect(play.getAttribute("aria-pressed")).toBe("true");
     expect(play.getAttribute("title")).toMatch(/still frame/i);
-    expect(mute.getAttribute("aria-pressed")).toBe("true");
-    expect(mute.getAttribute("title")).toMatch(/silently/i);
+    expect(mute.getAttribute("aria-pressed")).toBe("false");
+    expect(mute.getAttribute("title")).toMatch(/with sound/i);
 
     const volume = within(clips).getByRole("slider", { name: "Clip volume" });
     expect((volume as HTMLInputElement).value).toBe("25");
@@ -520,16 +520,35 @@ describe("SlideshowToolbar", () => {
     expect(onToggleClipMuted).toHaveBeenCalledTimes(1);
     expect(onChangeClipVolume).toHaveBeenCalledWith(0.8);
 
-    const offSettings = { playClips: false, clipMuted: false, clipVolume: 0.8 };
+    const offSettings = { playClips: false, clipMuted: true, clipVolume: 0.8 };
     rerender(<SlideshowToolbar {...makeProps(offSettings)} />);
     const off = within(clips);
     expect(off.getByRole("button", { name: "Play clips" })).toHaveAttribute(
       "aria-pressed",
       "false",
     );
-    expect(off.getByRole("button", { name: "Mute" })).toHaveAttribute("aria-pressed", "false");
+    expect(off.getByRole("button", { name: "Mute" })).toHaveAttribute("aria-pressed", "true");
+    expect(off.getByRole("button", { name: "Mute" }).getAttribute("title")).toMatch(/silently/i);
     expect(off.getByRole("slider", { name: "Clip volume" })).toHaveValue("80");
     expect(off.getByText("80%")).toBeTruthy();
+  });
+
+  // A slider that moves while nothing can be heard looks like it does nothing.
+  it("disables the volume while clips are muted or not playing", () => {
+    const { rerender } = render(
+      <SlideshowToolbar {...makeProps({ playClips: true, clipMuted: true })} />,
+    );
+    const slider = () =>
+      within(screen.getByRole("group", { name: "Clips" })).getByRole("slider", {
+        name: "Clip volume",
+      });
+    expect(slider()).toBeDisabled();
+
+    rerender(<SlideshowToolbar {...makeProps({ playClips: false, clipMuted: false })} />);
+    expect(slider()).toBeDisabled();
+
+    rerender(<SlideshowToolbar {...makeProps({ playClips: true, clipMuted: false })} />);
+    expect(slider()).toBeEnabled();
   });
 
   it("submits a trimmed topic and shows a busy state while it encodes", () => {
