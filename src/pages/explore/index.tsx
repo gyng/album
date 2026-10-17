@@ -6,8 +6,8 @@ import { packExploreStats } from "../../util/explorePageData";
 
 export const getStaticProps: GetStaticProps<ExploreScreenProps> = async () =>
   measureBuild("page./explore.getStaticProps", async () => {
-    const { stats, visualSameness } = await loadExplorePageData();
-    return { props: { packedStats: packExploreStats(stats), visualSameness } };
+    const { stats, visualSameness, clips } = await loadExplorePageData();
+    return { props: { packedStats: packExploreStats(stats), visualSameness, clips } };
   });
 
 export default ExploreScreen;

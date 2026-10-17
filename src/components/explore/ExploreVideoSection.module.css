@@ -1,0 +1,54 @@
+/* Styles owned by ExploreVideoSection. Shared layout remains in ExploreShared.module.css. */
+
+/* Fixed-width tracks rather than a fraction, so the grid reflows by wrapping
+   instead of shrinking: at 390px this is two 150px tiles inside the group's
+   padding, which cannot overflow the viewport. Every tile is the same square as
+   the `Thumb` it holds. */
+.videoGrid {
+  --video-thumb-size: var(--thumb-size);
+  display: grid;
+  grid-template-columns: repeat(auto-fill, var(--video-thumb-size));
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.videoTile {
+  display: grid;
+  gap: var(--space-2);
+  align-content: start;
+  min-inline-size: 0;
+}
+
+/* Positioning context for the duration badge; the poster's own square, outline
+   and placeholder colour all come from the shared `Thumb`. */
+.videoThumbLink {
+  position: relative;
+  display: block;
+  inline-size: var(--video-thumb-size);
+  text-decoration: none;
+}
+
+/* The same dark-glass pill the search tiles and the timeline grid use. */
+.videoBadge {
+  position: absolute;
+  inset-block-start: var(--space-1);
+  inset-inline-start: var(--space-1);
+  z-index: var(--z-raised);
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  border-radius: var(--radius-pill);
+  background-color: var(--c-overlay-dark);
+  color: var(--c-white);
+  font-size: var(--fs-xs);
+  line-height: 1;
+  padding: var(--space-1) var(--space-2);
+}
+
+.videoMeta {
+  inline-size: var(--video-thumb-size);
+  color: var(--c-bg-contrast-light);
+  overflow-wrap: anywhere;
+}

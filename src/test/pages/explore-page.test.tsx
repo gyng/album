@@ -519,8 +519,31 @@ describe("explore page", () => {
     expect(screen.getByText("Yearly representative sets")).toBeInTheDocument();
   });
 
+  it("renders the Video group only when the archive has clips", () => {
+    const clip = {
+      id: "clip.mov",
+      album: "kansai",
+      href: "/album/kansai#clip.mov",
+      src: { src: "/clip.mov@800.avif", width: 800, height: 450 },
+      capturedAtLocal: "2024-05-01T09:00:00",
+      year: 2024,
+      durationSeconds: 13,
+      label: "Kansai festival",
+    };
+    const { unmount } = render(
+      <ExplorePage stats={makeStats() as never} visualSameness={null} clips={[]} />,
+    );
+    expect(screen.queryByRole("region", { name: "Video" })).toBeNull();
+    unmount();
+
+    render(<ExplorePage stats={makeStats() as never} visualSameness={null} clips={[clip]} />);
+    const video = within(screen.getByRole("region", { name: "Video" }));
+    expect(video.getByRole("img", { name: "Kansai festival" })).toBeTruthy();
+    expect(video.getByLabelText("Video, 0:13")).toBeTruthy();
+  });
+
   it("loads build-time stats and degrades gracefully when visual stats fail", async () => {
-    const albums = [{ name: "trip" }];
+    const albums = [{ name: "trip", blocks: [] }];
     const stats = makeStats();
     getAlbums.mockResolvedValue(albums);
     computePhotoStats.mockReturnValue(stats);
@@ -529,11 +552,17 @@ describe("explore page", () => {
     await expect(loadExplorePageData()).resolves.toEqual({
       stats,
       visualSameness: makeVisualSameness(),
+      // The album fixture has no blocks, so the archive has no clips to show.
+      clips: [],
     });
 
     const error = jest.spyOn(console, "error").mockImplementation(() => {});
     computeVisualSamenessStats.mockRejectedValueOnce(new Error("corrupt database"));
-    await expect(loadExplorePageData()).resolves.toEqual({ stats, visualSameness: null });
+    await expect(loadExplorePageData()).resolves.toEqual({
+      stats,
+      visualSameness: null,
+      clips: [],
+    });
     expect(error).toHaveBeenCalledWith(
       "Failed to compute visual sameness stats",
       expect.any(Error),

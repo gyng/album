@@ -45,3 +45,22 @@ export type TimelineEntry = {
   placeholderWidth: number;
   placeholderHeight: number;
 };
+
+/** Render-ready clip data shared by the build loader and the explore video grid. */
+export type ExploreClipRow = {
+  /** Clip filename, the album page's own anchor. */
+  id: string;
+  /** Album slug. */
+  album: string;
+  href: string;
+  /** Poster frame — the `@800`-scale variant of `_build.poster.srcset`. */
+  src: OptimisedPhoto;
+  /** Naive camera-local wall clock; never built via UTC. */
+  capturedAtLocal: string;
+  year: number;
+  durationSeconds?: number;
+  /** The indexed row's `alt_text`, else the filename. */
+  label: string;
+  /** `rgb(r, g, b)` from the indexed row's first colour. */
+  swatch?: string;
+};

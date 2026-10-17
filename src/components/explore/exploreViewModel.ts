@@ -46,6 +46,7 @@ export const EXPLORE_SECTION_LINKS = [
   { href: "#what-you-shoot-with", label: "Cameras and lenses" },
   { href: "#framing", label: "Framing" },
   { href: "#weather", label: "Weather" },
+  { href: "#video", label: "Video" },
   { href: "#colour", label: "Colour" },
 ] as const;
 

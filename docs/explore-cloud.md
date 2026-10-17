@@ -18,6 +18,15 @@ live in [the design system](design-system.md#explore). An item is a photograph o
 a local clip — a clip appears as the poster frame it was embedded from and takes
 the same point, neighbours and clump — so "photograph" below means either.
 
+## Video
+
+The clips are also listed as their own section, newest first, as poster tiles
+carrying the length and the album: a photograph and a clip are the same kind of
+thing to look at, and the archive's clips are few enough to show all of them.
+Each tile opens the album at that clip. A clip whose poster has not been
+extracted is left out rather than drawn as a hole, and an archive with no clips
+has no section and no jump-nav entry.
+
 ## Views and filters
 
 Similar photos uses a cached three-dimensional UMAP layout; Overview retains the

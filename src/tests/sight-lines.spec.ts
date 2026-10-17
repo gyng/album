@@ -302,6 +302,12 @@ test("Connections auto-checks and translates matching photographs into their sol
 }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
   await gotoHydrated(page, "/fun/connections");
+  // Chromium's scroll anchoring nudges `scrollY` when content above the
+  // viewport changes height — which is exactly what the solved row does here —
+  // and a two-pixel scroll is a two-pixel difference between the rects this
+  // test compares. The claim is about where the tile *was*, so the page is held
+  // still while it is measured.
+  await page.addStyleTag({ content: "html { overflow-anchor: none; }" });
   await page.getByRole("button", { name: "Start connecting" }).click();
   const board = page.getByRole("group", { name: "Photographs", exact: true });
   await expect(board.getByRole("button")).toHaveCount(16);

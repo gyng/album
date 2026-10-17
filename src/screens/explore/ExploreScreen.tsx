@@ -58,16 +58,20 @@ import {
 import { ExplorePairExamples } from "../../components/explore/ExplorePairExamples";
 import { ExploreLookYearPhotos } from "../../components/explore/ExploreLookYearPhotos";
 import { ExploreColourSection } from "../../components/explore/ExploreColourSection";
+import { ExploreVideoSection } from "../../components/explore/ExploreVideoSection";
 import { ExploreGearSection } from "../../components/explore/ExploreGearSection";
 import { EmbeddingSpaceDeferred } from "../../components/EmbeddingSpaceDeferred";
 import { formatPageTitle } from "../../lib/seo";
 import { unpackExploreStats, type PackedExploreStats } from "../../util/explorePageData";
+import type { ExploreClipRow } from "../../util/pageDataTypes";
 
 export type ExploreScreenProps = (
   | { stats: PhotoStats; packedStats?: never }
   | { packedStats: PackedExploreStats; stats?: never }
 ) & {
   visualSameness: VisualSamenessStats | null;
+  /** The archive's playable clips, newest first. */
+  clips?: ExploreClipRow[];
 };
 
 /**
@@ -89,6 +93,7 @@ const ExploreScreen = ({
   stats: suppliedStats,
   packedStats,
   visualSameness,
+  clips = [],
 }: ExploreScreenProps) => {
   const stats = useMemo(
     () => suppliedStats ?? unpackExploreStats(packedStats!),
@@ -633,6 +638,11 @@ const ExploreScreen = ({
               </section>
             </StatGroup>
           ) : null}
+
+          {/* The only moving image in the archive: a clip is a piece of media
+              in its own right, so it gets a group of its own rather than being
+              folded into the photographic counts. */}
+          {clips.length > 0 ? <ExploreVideoSection clips={clips} /> : null}
 
           <ExploreThisDaySection memories={stats.dayOfYearMemories} />
 
