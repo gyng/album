@@ -23,6 +23,7 @@ uv run --extra inference python index.py index \
   --model-profile gemma2-hybrid --embedding-batch-size 4
 uv run python index.py prune --glob "$GLOB" --dbpath "$STAGING_DB"
 uv run python index.py weather --dbpath "$STAGING_DB" || echo "Weather enrichment unavailable; retaining indexed photo data."
+uv run --extra inference python index.py timeline --dbpath "$STAGING_DB" || echo "Clip timelines unavailable; retaining indexed clip data."
 uv run python index.py validate \
   --glob "$GLOB" \
   --dbpath "$STAGING_DB" \

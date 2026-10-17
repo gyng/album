@@ -3171,12 +3171,19 @@ class TestDb(UsesTestexistsFixture, unittest.TestCase):
                     "colors",
                     "alt_text",
                     "subject",
+                    # What happens and what is said in a clip, searchable
+                    # (clip_timeline.py).
+                    "timeline",
                 ],
             )
             row = db.con.execute(
                 "SELECT path, tags, alt_text, subject FROM images"
             ).fetchone()
             self.assertEqual(row, ("a.jpg", "cat", "A cat", "cat"))
+            metadata_columns = {
+                row[1] for row in db.con.execute("PRAGMA table_info(metadata)")
+            }
+            self.assertIn("timeline_json", metadata_columns)
 
     def test_rewrite_default_caption_provenance_names_current_default(self):
         # The pure rewrite must reconstruct exactly what caption_pipeline_version

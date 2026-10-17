@@ -19,6 +19,7 @@ import {
 import { incrementBuildCounter, measureBuild } from "./buildTiming";
 import { parseColorPalette } from "../util/colorDistance";
 import { parseWeatherMetadata } from "../util/weather";
+import { parseClipTimeline, type ClipTimelineSegment } from "../util/clipTimeline";
 // Node's own SQLite, not the native `sqlite3` addon: the driver is compiled
 // into the runtime, so there is no per-platform binary to fetch, no ABI to
 // track, and nothing linked against a glibc other than this machine's. It is
@@ -149,8 +150,10 @@ export const deserializeVideoBlock = async (
     // zone are one lookup away — the same one a photo makes. Without it every
     // consumer of `_build.tags` silently saw a clip as having none.
     let tags: PhotoBlock["_build"]["tags"] = {};
+    let timeline: ClipTimelineSegment[] | undefined;
     try {
       tags = (await getPhotoDetailsFromSearchIndex(localFilepath))?.[0] ?? {};
+      timeline = getClipTimelineFromSearchIndex(localFilepath);
     } catch (err) {
       console.info("Failed to get details from index, skipping", err);
     }
@@ -193,6 +196,7 @@ export const deserializeVideoBlock = async (
               ...(poster.camera !== undefined ? { camera: poster.camera } : {}),
             }
           : {}),
+        ...(timeline !== undefined ? { timeline } : {}),
       },
     };
 
@@ -258,6 +262,34 @@ let weatherColumnMissing = false;
 const isMissingZoneColumns = (err: unknown) =>
   err instanceof Error && /no such column/i.test(err.message);
 
+let timelineColumnMissing = false;
+
+/**
+ * A clip's timeline (index/clip_timeline.py), in its own small lookup so the
+ * photo details query and its fallbacks stay as they are. A database from
+ * before timelines has no column, and every clip then simply has none.
+ */
+const getClipTimelineFromSearchIndex = (
+  clipPath: string,
+  dbPath = getConfiguredSearchDbPath(),
+): ClipTimelineSegment[] | undefined => {
+  if (timelineColumnMissing) return undefined;
+  const db = getSearchDb(dbPath);
+  if (!db) return undefined;
+  try {
+    const row = db
+      .prepare("SELECT timeline_json FROM metadata WHERE path = ? LIMIT 1;")
+      .get(clipPath) as { timeline_json?: string | null } | undefined;
+    return parseClipTimeline(row?.timeline_json);
+  } catch (err) {
+    if (isMissingZoneColumns(err)) {
+      timelineColumnMissing = true;
+      return undefined;
+    }
+    throw err;
+  }
+};
+
 const getPhotoDetailsFromSearchIndex = async (
   path: string,
   dbPath = getConfiguredSearchDbPath(),
@@ -321,6 +353,9 @@ const getPhotoDetailsFromSearchIndex = async (
         const weather = parseWeatherMetadata(row.weather_json);
         if (weather) row.weather = weather;
         delete row.weather_json;
+        // The searchable text of a clip's timeline; the album page reads the
+        // structured timeline instead (getClipTimelineFromSearchIndex).
+        delete row.timeline;
       }
 
       if (!row) {
@@ -476,6 +511,7 @@ export const deserializeInternals = {
     photoSearchIndexCache.clear();
     zoneColumnsMissing = false;
     weatherColumnMissing = false;
+    timelineColumnMissing = false;
     resetSearchIndexKeyMismatchWarning();
     await closeSearchDb();
   },

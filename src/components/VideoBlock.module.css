@@ -38,3 +38,45 @@
 .similarPhotosWrap {
   margin: 0 0 var(--m-l);
 }
+
+.timeline {
+  display: grid;
+  gap: var(--space-2);
+  margin-block-end: var(--space-5);
+}
+
+.timelineHeading {
+  margin: 0;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+}
+
+/* An hour of footage is a long list; it scrolls inside the pane. */
+.timelineList {
+  display: grid;
+  gap: var(--space-2);
+  max-block-size: var(--size-460);
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+  /* The size of the details table above it, which it continues. */
+  font-size: var(--fs-s);
+  line-height: var(--lh-body);
+}
+
+.timelineSegment {
+  display: grid;
+  grid-template-columns: var(--size-48) minmax(0, 1fr);
+  gap: var(--space-3);
+}
+
+.timelineMoment {
+  font-variant-numeric: tabular-nums;
+}
+
+.timelineSpeech {
+  display: block;
+  margin-block-start: var(--space-1);
+  color: var(--c-bg-contrast-light);
+}

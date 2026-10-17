@@ -13,6 +13,48 @@ import { ExifTable, type ExifTableRow } from "./Photo";
 import { PhotoSimilarPhotosDeferred } from "./PhotoSimilarPhotosDeferred";
 import { PhotoWeatherDetails } from "./PhotoWeatherDetails";
 import { AppLink } from "./platform";
+import { seekLinkedMoment } from "../util/seekLinkedMoment";
+import type { ClipTimelineSegment } from "../util/clipTimeline";
+
+/**
+ * What happens in the clip and what is said, window by window, each moment a
+ * link to itself: choosing one seeks the clip there and keeps the moment in the
+ * URL, so it can be shared. Speech appears only where two independent readings
+ * agreed (index/clip_timeline.py); the descriptions are the model's, as the
+ * photo pane's are.
+ */
+const ClipTimeline: React.FC<{ id: string; timeline: ClipTimelineSegment[] }> = ({
+  id,
+  timeline,
+}) => (
+  <section className={styles.timeline}>
+    <h3 className={styles.timelineHeading}>Timeline (AI)</h3>
+    <ol aria-label="Timeline" className={styles.timelineList}>
+      {timeline.map((segment) => {
+        const moment = `?t=${Math.round(segment.start)}#${encodeURIComponent(id)}`;
+        return (
+          <li key={segment.start} className={styles.timelineSegment}>
+            <a
+              href={moment}
+              className={styles.timelineMoment}
+              onClick={(event) => {
+                event.preventDefault();
+                window.history.replaceState(window.history.state, "", moment);
+                seekLinkedMoment((name) => (name === "t" ? String(segment.start) : null), `#${id}`);
+              }}
+            >
+              {formatDuration(segment.start) ?? "0:00"}
+            </a>
+            <div>
+              {segment.description ? <span>{segment.description}</span> : null}
+              {segment.speech ? <q className={styles.timelineSpeech}>{segment.speech}</q> : null}
+            </div>
+          </li>
+        );
+      })}
+    </ol>
+  </section>
+);
 
 /** What a local clip knows about itself beyond its encoding. */
 export type ClipReading = Pick<
@@ -24,6 +66,7 @@ export type ClipReading = Pick<
   | "durationSeconds"
   | "camera"
   | "tags"
+  | "timeline"
 >;
 
 // A decimal coordinate in the shape EXIF stores one, so the photo pane's
@@ -324,6 +367,9 @@ const VideoDetailsPanel: React.FC<{
                 {/* What a reader opens the pane for comes first; the encoding,
                     which only says how the clip is served, folds away below. */}
                 {isOpen ? <ExifTable rows={clipRows(props.reading)} /> : null}
+                {isOpen && props.reading.timeline?.length ? (
+                  <ClipTimeline id={props.id ?? props.src} timeline={props.reading.timeline} />
+                ) : null}
                 {isOpen && indexedPath ? (
                   <div className={styles.similarPhotosWrap}>
                     <PhotoSimilarPhotosDeferred path={indexedPath} />

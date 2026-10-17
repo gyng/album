@@ -164,6 +164,41 @@ describe("deserialisation adapter boundaries", () => {
     ]);
   });
 
+  // A clip's timeline is read beside its row; the row's flat search text is
+  // not page data and is left behind.
+  it("attaches a clip's timeline, and not the timeline's search text", async () => {
+    db.rows.mockImplementation((sql: string) =>
+      sql.includes("timeline_json")
+        ? {
+            timeline_json: JSON.stringify([
+              { start: 0, end: 15, description: "A bus.", speech: "Mind the gap." },
+            ]),
+          }
+        : { alt_text: "A street", timeline: "A bus.\nMind the gap." },
+    );
+
+    const result = await deserializeVideoBlock(localVideo(), { dirname: "../albums/trip" });
+
+    expect(result._build?.timeline).toEqual([
+      { start: 0, end: 15, description: "A bus.", speech: "Mind the gap." },
+    ]);
+    expect(result._build?.tags).toEqual({ alt_text: "A street" });
+  });
+
+  // An index from before timelines has no column: the clip has no timeline,
+  // and keeps everything else its row says.
+  it("keeps a clip's details when the index has no timelines", async () => {
+    db.rows.mockImplementation((sql: string) => {
+      if (sql.includes("timeline_json")) throw new Error("no such column: timeline_json");
+      return { alt_text: "A street" };
+    });
+
+    const result = await deserializeVideoBlock(localVideo(), { dirname: "../albums/trip" });
+
+    expect(result._build?.timeline).toBeUndefined();
+    expect(result._build?.tags).toEqual({ alt_text: "A street" });
+  });
+
   it("looks a YouTube external up under the synthetic name it is indexed by", async () => {
     (readVideoPoster as jest.Mock).mockReturnValue({
       srcset: [{ src: "/ycyUWULJxdU.youtube@800.avif", width: 800, height: 450 }],

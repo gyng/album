@@ -88,6 +88,11 @@ re-reads a clip (and its scenes, offset from the clip's own start) from that
 sidecar. A clip with no coordinates or no date stays unenriched, exactly like a
 photo.
 
+Each local clip also gets a timeline — a description and any speech per 15-second
+window, with timestamps — from `uv run --extra inference python index.py timeline
+--dbpath <db>` (run by `do-full-index.sh`). Speech is kept only where two
+independently phrased readings agree; see `clip_timeline.py` for why.
+
 A clip longer than a minute also gets a frame per minute, indexed as scene rows
 named `clip.mov@t120`. Those are embedding-only — vectors and a locatable row,
 never a caption or a palette — so a long video becomes findable at the moment it

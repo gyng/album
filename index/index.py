@@ -2295,7 +2295,7 @@ class Sqlite3Client:
         )
         images_existed = self.table_exists("images")
         cur.execute(
-            "CREATE VIRTUAL TABLE IF NOT EXISTS images USING fts5(path, album_relative_path, filename, geocode, exif, tags, colors, alt_text, subject, tokenize='porter trigram')"
+            "CREATE VIRTUAL TABLE IF NOT EXISTS images USING fts5(path, album_relative_path, filename, geocode, exif, tags, colors, alt_text, subject, timeline, tokenize='porter trigram')"
         )
         desired_image_columns = [
             "path",
@@ -2307,6 +2307,8 @@ class Sqlite3Client:
             "colors",
             "alt_text",
             "subject",
+            # A clip's described moments and transcribed speech (clip_timeline.py).
+            "timeline",
         ]
         existing_image_columns = [
             row[1] for row in cur.execute("PRAGMA table_info(images)").fetchall()
@@ -2318,7 +2320,7 @@ class Sqlite3Client:
             cur.execute(
                 "CREATE VIRTUAL TABLE images_migrating USING fts5("
                 "path, album_relative_path, filename, geocode, exif, tags, colors, "
-                "alt_text, subject, tokenize='porter trigram')"
+                "alt_text, subject, timeline, tokenize='porter trigram')"
             )
             select_fields = [
                 column if column in existing_image_columns else f"NULL AS {column}"
@@ -2358,6 +2360,10 @@ class Sqlite3Client:
         for column in ("tz_name", "tz_offset"):
             if column not in metadata_columns:
                 cur.execute(f"ALTER TABLE metadata ADD COLUMN {column} TEXT")
+        # A clip's timeline — its windows, what each shows, what is said in it
+        # — as JSON for the album page (clip_timeline.py).
+        if "timeline_json" not in metadata_columns:
+            cur.execute("ALTER TABLE metadata ADD COLUMN timeline_json TEXT")
         if "weather_json" not in metadata_columns:
             cur.execute("ALTER TABLE metadata ADD COLUMN weather_json TEXT")
         # Videos are indexed through an extracted poster frame and are otherwise
@@ -7436,6 +7442,80 @@ def weather_update(dbpath, interval, max_requests):
         db.con.close()
         enrich_database(dbpath, interval=interval, max_requests=max_requests, log=log)
     finally:
+        os.close(lock_fd)
+
+
+@cli.command("timeline")
+@click.option("--dbpath", required=True, help="Index database to give clip timelines.")
+@click.option(
+    "--model-id",
+    default=DEFAULT_GEMMA4_GGUF_MODEL_ID,
+    show_default=True,
+    help="The captioner's Gemma 4 GGUF: a repo tag, or a local .gguf.",
+)
+@click.option(
+    "--quantization",
+    default=None,
+    help="mmproj path for a local .gguf (defaults to a sibling mmproj-BF16.gguf).",
+)
+@click.option("--force", is_flag=True, help="Rebuild every clip's timeline.")
+def timeline_update(dbpath, model_id, quantization, force):
+    """Describe and transcribe each local clip, window by window, with timestamps.
+
+    Its own pass with its own provenance, like weather: re-running it never
+    re-captions or re-embeds anything. See clip_timeline.py."""
+    from clip_timeline import (
+        TIMELINE_PIPELINE_VERSION,
+        completion_text,
+        enrich_database,
+        window_asker,
+    )
+
+    lock_fd = acquire_single_instance_lock(dbpath)
+    classifier = Gemma4GgufClassifier(model_id=model_id, quantization=quantization)
+    try:
+        db = Sqlite3Client(dbpath)
+        db.setup_tables()
+        db.con.close()
+        classifier.init_model()
+
+        def complete(content, schema):
+            body = {
+                "messages": [{"role": "user", "content": content}],
+                "max_tokens": 700,
+                "temperature": 0,
+                # As for captions: thinking spends the whole budget and returns
+                # an empty message (see Gemma4GgufClassifier._build_request_body).
+                "chat_template_kwargs": {"enable_thinking": False},
+            }
+            if schema is not None:
+                body["response_format"] = {
+                    "type": "json_schema",
+                    "json_schema": {"name": "window", "strict": True, "schema": schema},
+                }
+            request = urllib.request.Request(
+                f"{classifier._base_url}/v1/chat/completions",
+                data=json.dumps(body).encode("utf-8"),
+                headers={"Content-Type": "application/json"},
+            )
+            with urllib.request.urlopen(
+                request, timeout=DEFAULT_GEMMA4_GGUF_REQUEST_TIMEOUT
+            ) as response:
+                return completion_text(json.load(response))
+
+        with tempfile.TemporaryDirectory(prefix="clip-timeline-") as workdir:
+            report = enrich_database(
+                dbpath,
+                lambda path: window_asker(
+                    path, complete, tempfile.mkdtemp(dir=workdir)
+                ),
+                log=log,
+                version=f"{TIMELINE_PIPELINE_VERSION}:{model_id}",
+                force=force,
+            )
+        log(f"timeline: {report}")
+    finally:
+        classifier.release()
         os.close(lock_fd)
 
 

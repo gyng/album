@@ -193,3 +193,46 @@ it("keeps a clip's indexed moments out of facet counts and facet browsing", asyn
     sqlite.close();
   }
 });
+
+// What is said in a clip, and what happens in it, is in the search index
+// (index/clip_timeline.py): a phrase finds the clip it was said in.
+it("finds a clip by what is said in it", async () => {
+  const sqlite = new DatabaseSync(":memory:");
+  sqlite.exec(
+    "CREATE VIRTUAL TABLE images USING fts5(path, album_relative_path, filename, geocode, exif, tags, colors, alt_text, subject, timeline, tokenize='porter trigram'); CREATE TABLE metadata(path TEXT, iso8601 TEXT)",
+  );
+  sqlite
+    .prepare("INSERT INTO images VALUES (?, '', ?, '', '', '', '', ?, '', ?)")
+    .run(
+      "../albums/trip/clip.mov",
+      "clip.mov",
+      "A street at night.",
+      "A bus pulls in.\nMind the gap.",
+    );
+  sqlite
+    .prepare("INSERT INTO images VALUES (?, '', ?, '', '', '', '', ?, '', '')")
+    .run("../albums/trip/a.jpg", "a.jpg", "A street at night.");
+  const database = {
+    exec: ({
+      sql,
+      bind = [],
+      callback,
+    }: {
+      sql: string;
+      bind?: (string | number)[];
+      callback?: (row: unknown[]) => void;
+    }) => {
+      const statement = sqlite.prepare(sql);
+      statement.setReturnArrays(true);
+      const rows = statement.all(...bind) as unknown as unknown[][];
+      for (const row of rows) callback?.(row);
+      return rows;
+    },
+  } as unknown as Database;
+  try {
+    const found = await fetchResults({ database, query: "mind the gap", pageSize: 10, page: 0 });
+    expect(found.data.map((row) => row.path)).toEqual(["../albums/trip/clip.mov"]);
+  } finally {
+    sqlite.close();
+  }
+});

@@ -1,4 +1,5 @@
 import type { WeatherMetadata } from "../util/weather";
+import type { ClipTimelineSegment } from "../util/clipTimeline";
 
 export interface Exif {
   CreateDate?: string;
@@ -149,6 +150,8 @@ export interface VideoBlock extends IBlock {
     durationSeconds?: number;
     /** Camera, lens and exposure from the clip's own EXIF, keyed as a photo's are. */
     camera?: VideoCamera;
+    /** What happens and what is said, window by window (index/clip_timeline.py). */
+    timeline?: ClipTimelineSegment[];
     /**
      * The clip's own row from the search index, keyed by the clip's path (or by
      * its synthetic `<video id>.youtube` name) and built from the poster frame —

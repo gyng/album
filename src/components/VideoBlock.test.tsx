@@ -3,7 +3,7 @@
  */
 
 import { act } from "react";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { LocalVideoBlockEl, YoutubeBlockEl } from "./VideoBlock";
 import { weatherFixture } from "../test/fixtures/weather";
 
@@ -193,6 +193,41 @@ describe("LocalVideoBlockEl details", () => {
     });
 
     expect(screen.getByText("From DSCF7490.JPG, 4 minutes before")).toBeTruthy();
+  });
+
+  // What happens and what is said, window by window, each linked to its moment.
+  it("lays out the clip's timeline, each moment linked and speech quoted", () => {
+    open({
+      reading: {
+        ...reading,
+        timeline: [
+          { start: 0, end: 15, description: "Traffic passes a lit crossing." },
+          { start: 15, end: 30, description: "A bus pulls in.", speech: "Mind the gap." },
+        ],
+      },
+    });
+
+    const timeline = screen.getByRole("list", { name: "Timeline" });
+    const moments = within(timeline).getAllByRole("link");
+    expect(moments.map((link) => link.textContent)).toEqual(["0:00", "0:15"]);
+    expect(moments[1]).toHaveAttribute("href", "?t=15#DSCF7497.MOV");
+    expect(within(timeline).getByText("A bus pulls in.")).toBeTruthy();
+    expect(within(timeline).getByText("Mind the gap.").tagName).toBe("Q");
+  });
+
+  it("seeks the clip to a moment chosen in its timeline, and keeps the moment in the URL", () => {
+    open({
+      reading: { ...reading, timeline: [{ start: 15, end: 30, description: "A bus pulls in." }] },
+    });
+    const video = document.querySelector("video")!;
+    Object.defineProperty(video, "readyState", { configurable: true, value: 1 });
+    Object.defineProperty(video, "duration", { configurable: true, value: 60 });
+
+    fireEvent.click(within(screen.getByRole("list", { name: "Timeline" })).getByRole("link"));
+
+    expect(video.currentTime).toBe(15);
+    expect(window.location.search).toBe("?t=15");
+    expect(window.location.hash).toBe("#DSCF7497.MOV");
   });
 
   it("shows no location row for a clip that has none", () => {
