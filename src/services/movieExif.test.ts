@@ -177,6 +177,59 @@ describe("readMovieExif", () => {
     expect(exif?.camera?.FocalLength).toBeUndefined();
   });
 
+  // A manual lens cannot tell the camera what it is, so its name is written
+  // into the clip afterwards, as Camera Raw writes it into a photograph:
+  // `exiftool -XMP-aux:Lens="Helios 44-2 58mm f/2" clip.MOV` puts it in the
+  // XMP_ atom beside Fuji's MVTG. A written name is the lens; the camera's
+  // adapter preset is not.
+  it("takes the lens a clip's XMP names, over what the camera could not know", () => {
+    const xmp = (body: string) =>
+      atom(
+        "XMP_",
+        Buffer.from(
+          `<x:xmpmeta xmlns:x="adobe:ns:meta/"><rdf:RDF><rdf:Description ${body}</rdf:Description></rdf:RDF></x:xmpmeta>`,
+          "utf-8",
+        ),
+      );
+    const attribute = writeMovie(
+      "named.MOV",
+      Buffer.concat([
+        atom("MVTG", tagPayload(TOKYO, 16)),
+        xmp('aux:Lens="Helios 44-2 58mm f/2" xmp:Rating="3">'),
+      ]),
+    );
+    expect(readMovieExif(attribute)?.camera?.LensModel).toBe("Helios 44-2 58mm f/2");
+    expect(readMovieExif(attribute)?.dateTimeOriginal).toBe("2025-12-01T20:15:51");
+
+    const element = writeMovie(
+      "element.MOV",
+      xmp(">\n<exifEX:LensModel>Pentax SMC Takumar 50mm f/1.4 &amp; adapter</exifEX:LensModel>"),
+    );
+    // The camera's lens readings described another lens — on a Fuji, the
+    // adapter preset or whatever was mounted last — so the name replaces them.
+    const primeBlock = Buffer.concat([
+      Buffer.alloc(16),
+      ifd([entry(0x8769, 4, 1, 2 + 12 + 4)]),
+      ifd([entry(0xa432, 5, 4, 2 + 12 + 4 + 2 + 12 + 4)]),
+      rational(23, 1),
+      rational(23, 1),
+      rational(14, 10),
+      rational(14, 10),
+    ]);
+    const renamed = readMovieExif(
+      writeMovie(
+        "renamed.MOV",
+        Buffer.concat([atom("MVTG", primeBlock), xmp('aux:Lens="Helios 44-2 58mm f/2">')]),
+      ),
+    );
+    expect(renamed?.camera).toEqual({ LensModel: "Helios 44-2 58mm f/2" });
+
+    // A clip with no Fuji block of its own still gets the name.
+    expect(readMovieExif(element)?.camera).toEqual({
+      LensModel: "Pentax SMC Takumar 50mm f/1.4 & adapter",
+    });
+  });
+
   // The X-T5 writes a genuine UTC instant into creation_time (~35s after the
   // first frame) and the camera-local wall clock into EXIF, so reading the
   // former as local placed every clip hours from where it was taken.

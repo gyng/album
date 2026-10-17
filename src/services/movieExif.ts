@@ -62,6 +62,10 @@ const MAX_ATOMS_VISITED = 4096;
 /** Fuji's atom is ~12 KB; the cap only stops a bogus size reading the file in. */
 const MAX_TAG_ATOM_BYTES = 4 * 1024 * 1024;
 const TAG_ATOM = "MVTG";
+/** Where exiftool and Adobe write a movie's XMP: `moov/udta/XMP_`. */
+const XMP_ATOM = "XMP_";
+/** XMP is a few KB; the cap only stops a bogus size reading the file in. */
+const MAX_XMP_ATOM_BYTES = 1024 * 1024;
 /** Header of Fuji's payload, and therefore where its IFD offsets are counted from. */
 const TAG_PAYLOAD_HEADER_BYTES = 16;
 
@@ -452,10 +456,11 @@ const readAtomHeader = (handle: number, position: number, fileSize: number): Ato
   return { type: header.toString("latin1", 4, 8), payloadOffset, payloadEnd };
 };
 
-const findTagAtomWithin = (
+const findAtomWithin = (
   handle: number,
   start: number,
   end: number,
+  type: string,
   depth: number,
   visited: { count: number },
 ): AtomHeader | null => {
@@ -466,14 +471,15 @@ const findTagAtomWithin = (
     if (!atom) {
       return null;
     }
-    if (atom.type === TAG_ATOM) {
+    if (atom.type === type) {
       return atom;
     }
     if (CONTAINER_ATOMS[atom.type] === true && depth < MAX_CONTAINER_DEPTH) {
-      const inner = findTagAtomWithin(
+      const inner = findAtomWithin(
         handle,
         atom.payloadOffset,
         atom.payloadEnd,
+        type,
         depth + 1,
         visited,
       );
@@ -484,6 +490,50 @@ const findTagAtomWithin = (
     position = atom.payloadEnd;
   }
   return null;
+};
+
+const readAtomPayload = (handle: number, atom: AtomHeader, cap: number): Buffer | null => {
+  const length = Math.min(atom.payloadEnd - atom.payloadOffset, cap);
+  const buffer = Buffer.alloc(length);
+  const read = fs.readSync(handle, buffer, 0, length, atom.payloadOffset);
+  if (read <= 0) {
+    return null;
+  }
+  return read === length ? buffer : buffer.subarray(0, read);
+};
+
+const XML_ENTITIES: Record<string, string> = {
+  amp: "&",
+  lt: "<",
+  gt: ">",
+  quot: '"',
+  apos: "'",
+};
+
+/** One XMP property, written either as an attribute or as an element. */
+const readXmpProperty = (xmp: string, name: string): string | undefined => {
+  const match =
+    new RegExp(`${name}="([^"]*)"`).exec(xmp) ?? new RegExp(`<${name}>([^<]*)</${name}>`).exec(xmp);
+  const value = match?.[1]
+    ?.replace(/&(amp|lt|gt|quot|apos);/g, (_entity, key: string) => XML_ENTITIES[key]!)
+    .trim();
+  return value ? value : undefined;
+};
+
+/**
+ * The lens a clip's XMP names. A manual lens cannot tell the camera what it is
+ * — a Fuji then records only its adapter preset — so the name is written into
+ * the file afterwards, the way Camera Raw writes it into a photograph
+ * (`exiftool -XMP-aux:Lens="Helios 44-2 58mm f/2" clip.MOV`).
+ */
+const parseXmpLens = (buffer: Buffer): Pick<MovieCamera, "LensMake" | "LensModel"> => {
+  const xmp = buffer.toString("utf-8");
+  const model = readXmpProperty(xmp, "exifEX:LensModel") ?? readXmpProperty(xmp, "aux:Lens");
+  const make = readXmpProperty(xmp, "exifEX:LensMake");
+  return {
+    ...(model !== undefined ? { LensModel: model } : {}),
+    ...(make !== undefined ? { LensMake: make } : {}),
+  };
 };
 
 /**
@@ -500,17 +550,29 @@ export const readMovieExif = (filePath: string): MovieExif | null => {
   }
   try {
     const fileSize = fs.fstatSync(handle).size;
-    const atom = findTagAtomWithin(handle, 0, fileSize, 0, { count: 0 });
-    if (!atom) {
-      return null;
+    const tagAtom = findAtomWithin(handle, 0, fileSize, TAG_ATOM, 0, { count: 0 });
+    const tagPayload = tagAtom ? readAtomPayload(handle, tagAtom, MAX_TAG_ATOM_BYTES) : null;
+    const exif = tagPayload ? parseTagPayload(tagPayload) : null;
+
+    const xmpAtom = findAtomWithin(handle, 0, fileSize, XMP_ATOM, 0, { count: 0 });
+    const xmpPayload = xmpAtom ? readAtomPayload(handle, xmpAtom, MAX_XMP_ATOM_BYTES) : null;
+    const lens = xmpPayload ? parseXmpLens(xmpPayload) : {};
+    if (Object.keys(lens).length === 0) {
+      return exif;
     }
-    const length = Math.min(atom.payloadEnd - atom.payloadOffset, MAX_TAG_ATOM_BYTES);
-    const buffer = Buffer.alloc(length);
-    const read = fs.readSync(handle, buffer, 0, length, atom.payloadOffset);
-    if (read <= 0) {
-      return null;
-    }
-    return parseTagPayload(read === length ? buffer : buffer.subarray(0, read));
+    // A written name is the lens. What the camera recorded about a lens was
+    // about another one — on a Fuji, the adapter preset or whatever was mounted
+    // before — so its range and the focal length drawn from it go; the
+    // exposure the camera measured stays.
+    const {
+      LensInfo: _lensInfo,
+      FocalLength: _focalLength,
+      FocalLengthIn35mmFormat: _focalLength35,
+      LensMake: _lensMake,
+      LensModel: _lensModel,
+      ...measured
+    } = exif?.camera ?? {};
+    return { ...exif, camera: { ...measured, ...lens } };
   } catch {
     return null;
   } finally {
