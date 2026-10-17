@@ -1,7 +1,31 @@
+/* How tall a cloud is: tall enough on a desktop to be a place rather than a
+   strip, and still a sensible fraction of a phone. Written once, here, because
+   it is asked for twice — by the stage, and by the box
+   `EmbeddingSpaceDeferred` reserves before the cloud mounts. */
+.reservedBox,
+.space {
+  --cloud-stage-block-size: clamp(var(--size-420), 68vh, var(--size-760));
+}
+
+/* The cloud is a client-only component, so until the browser fetches it the
+   page has nothing to put where it will be. The box it will fill is reserved
+   here from the first paint, so its arrival cannot move the sections below. */
+.reservedBox {
+  block-size: var(--cloud-stage-block-size);
+}
+
 .space {
   display: grid;
   gap: var(--m-s);
   margin: 0;
+}
+
+/* Inside that box the cloud fits rather than adding height to it: the filters
+   take what they need and the stage has the rest, so the box is the same height
+   before and after the cloud lands in it. */
+.reservedBox .space {
+  block-size: 100%;
+  grid-template-rows: auto minmax(0, 1fr);
 }
 
 /* The cloud is drawn in the photographs' own colours, so it wants a ground
@@ -11,9 +35,7 @@
    solid colour rather than a gradient. */
 .stage {
   position: relative;
-  /* Tall enough on a desktop to be a place rather than a strip, and still a
-     sensible fraction of a phone. */
-  block-size: clamp(var(--size-420), 68vh, var(--size-760));
+  block-size: var(--cloud-stage-block-size);
   border: solid var(--line-hairline) var(--c-border);
   border-radius: var(--radius-panel);
   background:
@@ -24,6 +46,14 @@
     ),
     color-mix(in oklch, var(--c-bg-contrast-dark) 92%, var(--c-bg));
   overflow: hidden;
+}
+
+/* Filling the reserved box: the stage sits in a grid area that already has the
+   height the filters leave it, so it takes that rather than asking for the clamp
+   a second time on top of them. This stays above `:fullscreen` below, whose rule
+   is equally specific and has to win when the reader asks for the whole screen. */
+.reservedBox .stage {
+  block-size: 100%;
 }
 
 .canvas {

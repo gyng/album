@@ -77,15 +77,15 @@
   line-height: 1.55;
 }
 
-/* Only rendered on narrow viewports, where each group starts collapsed. */
-.groupToggle {
-  justify-self: start;
-}
-
-.groupDeferredPlaceholder {
-  min-block-size: var(--size-320);
-  border-radius: var(--radius-card);
-  background: color-mix(in oklch, var(--c-bg-contrast-light) 4%, transparent);
+/* The group collapse is a stylesheet decision, so the server already renders
+   every group's content and nothing moves on hydration: above the narrow
+   breakpoint a group is always expanded, so its summary and the Show/Hide
+   control are hidden while both stay in the DOM. Their counterparts are the
+   `data-opened`/`data-linked` rules in the `@media (max-width: 720px)` block
+   below — keep these in step with the collapse contract in ExplorePrimitives.tsx. */
+.group .groupDeferredSummary,
+.group .groupToggle {
+  display: none;
 }
 
 .visualThumbWrap {
@@ -124,6 +124,10 @@
   }
 }
 
+/* Below this breakpoint a group starts collapsed and the stylesheet decides
+   whether its content shows, from the `data-opened`/`data-linked` attributes the
+   component sets. Keep this breakpoint in step with the collapse contract in
+   ExplorePrimitives.tsx. */
 @media (max-width: 720px) {
   .groupGrid {
     grid-template-columns: 1fr;
@@ -132,5 +136,28 @@
   .groupActions {
     inline-size: 100%;
     min-inline-size: 0;
+  }
+
+  .group .groupDeferredSummary {
+    display: block;
+  }
+
+  .group .groupToggle {
+    display: inline-flex;
+    justify-self: start;
+  }
+
+  /* A collapsed group shows its summary, not its content, and offers no scope
+     filters or view switches — those act on content that is not on screen. */
+  .group:not([data-opened="true"]):not([data-linked="true"]) .groupDeferredContent,
+  .group:not([data-opened="true"]):not([data-linked="true"]) .groupActions {
+    display: none;
+  }
+
+  /* Once the reader opens the group — by the control or by following its hash —
+     the content takes the summary's place. */
+  .group[data-opened="true"] .groupDeferredSummary,
+  .group[data-linked="true"] .groupDeferredSummary {
+    display: none;
   }
 }

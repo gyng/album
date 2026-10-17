@@ -21,9 +21,9 @@ const videoBadgePattern = /^Video, 0:1/;
 const clipVideoSrc = "/data/albums/test-simple/.resized_videos/DSCF0159.MOV%401920.mp4";
 
 /**
- * The video group's content is deferred until the reader reaches it, so a tile
- * assertion has to scroll first and then wait on the tile itself rather than on
- * a timer.
+ * The video group's content is in the DOM at every width — the collapse is a
+ * stylesheet decision — so a tile assertion only has to scroll the section into
+ * view and then wait on the tile itself rather than on a timer.
  */
 const scrollToVideoSection = async (page: Page) => {
   const section = page.locator("section#video");

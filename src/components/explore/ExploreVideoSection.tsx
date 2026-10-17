@@ -26,7 +26,6 @@ export const ExploreVideoSection = ({ clips }: { clips: ExploreClipRow[] }) => {
     <ExploreStatGroup
       id="video"
       title="Video"
-      deferContent
       deferredSummary={`${clips.length} ${clips.length === 1 ? "clip" : "clips"}`}
     >
       <section className={`${styles.section} ${styles.sectionWide}`}>

@@ -373,7 +373,6 @@ const ExploreScreen = ({
           <StatGroup
             id="embedding-space"
             title="Cloud"
-            deferContent
             deferredSummary="Every photograph, placed by what it is of — or by when it happened."
           >
             <section className={`${styles.section} ${styles.sectionWide}`}>
@@ -385,7 +384,6 @@ const ExploreScreen = ({
             <StatGroup
               id="visual-sameness"
               title="Visual sameness"
-              deferContent
               deferredSummary={`${visualSameness.samenessPercent}% average nearest-neighbour similarity across ${visualSameness.sampleSize.toLocaleString("en")} embedded photos; ${visualSameness.repeatedMotifPercent}% have a repeated visual motif and ${visualSameness.distinctPercent}% are distinct frames.`}
             >
               <section className={`${styles.section} ${styles.sectionWide}`}>
@@ -646,15 +644,14 @@ const ExploreScreen = ({
 
           <ExploreThisDaySection memories={stats.dayOfYearMemories} />
 
-          <ExploreFunStatsSection cards={funStats} overviewStats={overviewCards} deferContent />
-          <ExploreRecentTrendsSection data={stats.recentYearStats} deferContent />
-          <ExploreRevisitedPlacesSection places={stats.revisitedPlaces} deferContent />
+          <ExploreFunStatsSection cards={funStats} overviewStats={overviewCards} />
+          <ExploreRecentTrendsSection data={stats.recentYearStats} />
+          <ExploreRevisitedPlacesSection places={stats.revisitedPlaces} />
 
           <StatGroup
             id="when-you-shoot"
             title="Time"
             actions={renderScopeFilterControls("Time")}
-            deferContent
             deferredSummary={[
               formatCoverage(activeCalendarCoverage),
               "Time relationships and archive cadence summarise when photos were made.",
@@ -701,7 +698,6 @@ const ExploreScreen = ({
             id="how-you-shoot"
             title="Shooting settings"
             actions={renderScopeFilterControls("Settings")}
-            deferContent
             deferredSummary={`Camera settings span ${activeTechnicalFacets.length.toLocaleString("en")} technical facets${filteredTechnicalRelationships ? `; settings relationships cover ${filteredTechnicalRelationships.total.toLocaleString("en")} photos` : ""}.`}
           >
             {activeTechnicalFacets.map(renderNumericFacet)}
@@ -724,7 +720,6 @@ const ExploreScreen = ({
           <StatGroup
             id="where-you-shoot"
             title="Places"
-            deferContent
             deferredSummary={`${stats.mapPoints.length.toLocaleString("en")} mapped photo locations are available as a map, location flow, and searchable place bars.`}
             actions={
               <div className={styles.groupActionsStack}>
@@ -779,7 +774,6 @@ const ExploreScreen = ({
           <StatGroup
             id="what-you-shoot-with"
             title="Cameras and lenses"
-            deferContent
             deferredSummary={`Camera and lens relationships are summarised across ${gearFacets.length.toLocaleString("en")} searchable gear facets.`}
           >
             {/* What is done with the kit comes first; the inventory of it is
@@ -824,7 +818,6 @@ const ExploreScreen = ({
           <StatGroup
             id="framing"
             title="Framing"
-            deferContent
             deferredSummary={
               findStringFacet(stats, "orientation")
                 ?.data.map(
@@ -843,7 +836,6 @@ const ExploreScreen = ({
               id="weather"
               title="Weather"
               description="Estimated hourly conditions near each photograph."
-              deferContent
               deferredSummary={formatCoverage(weatherCoverage)}
             >
               {weatherFacets.map(renderStringFacet)}
@@ -857,7 +849,7 @@ const ExploreScreen = ({
               </section>
             </StatGroup>
           ) : null}
-          <ExploreColourSection stats={stats} deferContent />
+          <ExploreColourSection stats={stats} />
         </div>
       </main>
       <Footer />

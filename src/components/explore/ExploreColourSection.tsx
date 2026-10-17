@@ -54,13 +54,7 @@ const styles = mergeCssModuleStyles(
   ["colourPanel"],
 );
 
-export const ExploreColourSection = ({
-  stats,
-  deferContent = false,
-}: {
-  stats: PhotoStats;
-  deferContent?: boolean;
-}) => {
+export const ExploreColourSection = ({ stats }: { stats: PhotoStats }) => {
   // Which colour-over-time segment is pointed at, if any. Only that one's photo
   // is fetched; see the tooltip below for why.
   const [activePreview, setActivePreview] = React.useState<string | null>(null);
@@ -117,12 +111,7 @@ export const ExploreColourSection = ({
     .join(" ");
 
   return (
-    <ExploreStatGroup
-      id="colour"
-      title="Colour"
-      deferContent={deferContent}
-      deferredSummary={deferredSummary}
-    >
+    <ExploreStatGroup id="colour" title="Colour" deferredSummary={deferredSummary}>
       <section className={`${styles.section} ${styles.sectionWide}`}>
         <div className={styles.colourSectionGrid}>
           <section className={styles.colourPanel}>

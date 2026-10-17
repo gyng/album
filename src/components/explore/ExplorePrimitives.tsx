@@ -7,7 +7,6 @@ import { Caption, Heading, OverlayButtonLink, PillButton, Thumb } from "../ui";
 import sharedStyles from "./ExploreShared.module.css";
 import localStyles from "./ExplorePrimitives.module.css";
 import { formatCoverage } from "./exploreViewModel";
-import { useIntersectionObserverMissing } from "../useNearViewport";
 
 const styles = mergeCssModuleStyles(
   sharedStyles,
@@ -19,7 +18,6 @@ const styles = mergeCssModuleStyles(
     "groupAnchorMark",
     "groupDescription",
     "groupDeferredContent",
-    "groupDeferredPlaceholder",
     "groupDeferredSummary",
     "groupGrid",
     "groupHeader",
@@ -30,9 +28,6 @@ const styles = mergeCssModuleStyles(
   ],
   ["visualThumbSearchButton"],
 );
-
-// Matches the breakpoint the explore grid and ChartTooltip already switch on.
-const NARROW_VIEWPORT_QUERY = "(max-width: 720px)";
 
 export const ExploreStatSection: React.FC<{
   facetId: string;
@@ -61,35 +56,24 @@ export const ExploreStatGroup: React.FC<{
   description?: string;
   actions?: React.ReactNode;
   children: React.ReactNode;
-  deferContent?: boolean;
+  /** Shown in place of `children` while the group is collapsed on a narrow
+      viewport; hidden above the narrow breakpoint, where content always shows. */
   deferredSummary?: React.ReactNode;
-}> = ({ id, title, description, actions, children, deferContent = false, deferredSummary }) => {
-  const deferredContentRef = React.useRef<HTMLDivElement | null>(null);
-  const [isDeferredContentVisible, setIsDeferredContentVisible] = React.useState(!deferContent);
-  // Every group expanded makes the page ~61 screens tall on a 390px phone, so a
-  // reader has to scroll the whole archive analysis to reach any one part of
-  // it. Narrow viewports get the summary and a control instead.
+}> = ({ id, title, description, actions, children, deferredSummary }) => {
+  // The collapse is a stylesheet decision, not a mount decision: the content is
+  // always in the DOM, and `@media (max-width: 720px)` in
+  // ExplorePrimitives.module.css hides it unless the section carries
+  // `data-opened` or `data-linked`. So the server HTML already holds every
+  // group's content and the first client render matches it exactly — nothing
+  // moves after hydration, and the two reasons a narrow group is open are
+  // attributes rather than state.
   //
-  // The collapse is applied from an effect rather than during render, so the
-  // first client render matches the server's and hydration stays clean. (The
-  // server sends no group content either way — every group on this page sets
-  // `deferContent`, so its HTML is the summary and a placeholder.)
-  const [isNarrowViewport, setIsNarrowViewport] = React.useState(false);
+  // Why collapse at all: every group expanded makes the page ~61 screens tall
+  // on a 390px phone, so a reader would have to scroll the whole archive
+  // analysis to reach any one part of it. Narrow viewports get the summary and
+  // a control instead.
   const [isOpenedByReader, setIsOpenedByReader] = React.useState(false);
   const [isLinkedTarget, setIsLinkedTarget] = React.useState(false);
-
-  React.useEffect(() => {
-    if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
-      return;
-    }
-
-    const query = window.matchMedia(NARROW_VIEWPORT_QUERY);
-    const sync = () => setIsNarrowViewport(query.matches);
-    sync();
-
-    query.addEventListener?.("change", sync);
-    return () => query.removeEventListener?.("change", sync);
-  }, []);
 
   // A group the URL points at must never be collapsed, or the "Jump to" nav
   // would land the reader on a closed section and read as a broken link. The
@@ -100,50 +84,21 @@ export const ExploreStatGroup: React.FC<{
       return;
     }
 
-    const sync = () => {
-      const linked = window.location.hash === `#${id}`;
-      setIsLinkedTarget(linked);
-      // A group the reader was sent to shows its content at once, and keeps it.
-      if (linked) setIsDeferredContentVisible(true);
-    };
+    const sync = () => setIsLinkedTarget(window.location.hash === `#${id}`);
     sync();
     window.addEventListener("hashchange", sync);
     return () => window.removeEventListener("hashchange", sync);
   }, [id]);
 
-  const isCollapsed = isNarrowViewport && !isOpenedByReader && !isLinkedTarget;
-  // Without an observer there is no way to defer, so the content shows at once.
-  const unobservable = useIntersectionObserverMissing();
-  const showDeferredContent = isDeferredContentVisible || (deferContent && unobservable);
-
-  React.useEffect(() => {
-    // `isCollapsed` is a dependency because the observed element only exists
-    // once the group is open: while collapsed the ref is null, so without this
-    // the observer never attaches and an expanded group would sit on its
-    // placeholder forever.
-    if (!deferContent || showDeferredContent || isCollapsed) {
-      return;
-    }
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries.some((entry) => entry.isIntersecting)) {
-          observer.disconnect();
-          setIsDeferredContentVisible(true);
-        }
-      },
-      { rootMargin: "600px 0px" },
-    );
-
-    if (deferredContentRef.current) {
-      observer.observe(deferredContentRef.current);
-    }
-
-    return () => observer.disconnect();
-  }, [deferContent, showDeferredContent, isCollapsed]);
+  const isOpened = isOpenedByReader || isLinkedTarget;
 
   return (
-    <section id={id} className={styles.group}>
+    <section
+      id={id}
+      className={styles.group}
+      data-opened={isOpenedByReader ? "true" : "false"}
+      data-linked={isLinkedTarget ? "true" : "false"}
+    >
       <div className={styles.groupHeader}>
         <div className={styles.groupTitleRow}>
           <Heading level={1}>
@@ -158,52 +113,32 @@ export const ExploreStatGroup: React.FC<{
               title
             )}
           </Heading>
-          {/* Scope filters and view switches act on the group's content, so a
-              collapsed group must not offer them. */}
-          {actions && !isCollapsed ? <div className={styles.groupActions}>{actions}</div> : null}
+          {/* Scope filters and view switches act on the group's content, so the
+              stylesheet hides them as well while a group is collapsed. */}
+          {actions ? <div className={styles.groupActions}>{actions}</div> : null}
         </div>
         {description ? <p className={styles.groupDescription}>{description}</p> : null}
       </div>
-      {(isCollapsed || (deferContent && !showDeferredContent)) && deferredSummary ? (
+      {deferredSummary ? (
         <div className={styles.groupDeferredSummary}>{deferredSummary}</div>
       ) : null}
-      {isNarrowViewport ? (
-        <PillButton
-          size="compact"
-          className={styles.groupToggle}
-          aria-expanded={!isCollapsed}
-          {
-            /* Only while the content is actually in the DOM — a collapsed group
-              renders nothing, and pointing at a missing id is worse than
-              leaving `aria-expanded` to speak for itself. */ ...(id && !isCollapsed
-              ? { "aria-controls": `${id}-content` }
-              : {})
-          }
-          onClick={() => setIsOpenedByReader((open) => !open)}
-        >
-          <span>
-            {isCollapsed ? "Show" : "Hide"} {title}
-          </span>
-        </PillButton>
-      ) : null}
-      {isCollapsed ? null : deferContent ? (
-        <div
-          ref={deferredContentRef}
-          {...(id ? { id: `${id}-content` } : {})}
-          className={styles.groupDeferredContent}
-          aria-busy={!showDeferredContent}
-        >
-          {showDeferredContent ? (
-            <div className={styles.groupGrid}>{children}</div>
-          ) : (
-            <div className={styles.groupDeferredPlaceholder} aria-hidden="true" />
-          )}
-        </div>
-      ) : (
-        <div {...(id ? { id: `${id}-content` } : {})} className={styles.groupGrid}>
-          {children}
-        </div>
-      )}
+      {/* Rendered at every width so no element appears after hydration; the
+          stylesheet hides it above the breakpoint, and toggling only changes
+          its label and `aria-expanded`, never whether it is there. */}
+      <PillButton
+        size="compact"
+        className={styles.groupToggle}
+        aria-expanded={isOpened}
+        {...(id ? { "aria-controls": `${id}-content` } : {})}
+        onClick={() => setIsOpenedByReader((open) => !open)}
+      >
+        <span>
+          {isOpened ? "Hide" : "Show"} {title}
+        </span>
+      </PillButton>
+      <div {...(id ? { id: `${id}-content` } : {})} className={styles.groupDeferredContent}>
+        <div className={styles.groupGrid}>{children}</div>
+      </div>
     </section>
   );
 };

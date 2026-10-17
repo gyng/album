@@ -43,16 +43,13 @@ const styles = mergeCssModuleStyles(
 export const ExploreFunStatsSection = ({
   cards,
   overviewStats = [],
-  deferContent = false,
 }: {
   cards: FunStatCard[];
   overviewStats?: OverviewCard[];
-  deferContent?: boolean;
 }) => (
   <ExploreStatGroup
     id="fun-stats"
     title="Fun stats"
-    deferContent={deferContent}
     deferredSummary={cards
       .slice(0, 4)
       .map((card) => `${card.label}: ${card.value}`)
@@ -107,18 +104,11 @@ export const ExploreFunStatsSection = ({
   </ExploreStatGroup>
 );
 
-export const ExploreRecentTrendsSection = ({
-  data,
-  deferContent = false,
-}: {
-  data: PhotoStats["recentYearStats"];
-  deferContent?: boolean;
-}) =>
+export const ExploreRecentTrendsSection = ({ data }: { data: PhotoStats["recentYearStats"] }) =>
   data.length > 0 ? (
     <ExploreStatGroup
       id="recent-trends"
       title="Recent trends"
-      deferContent={deferContent}
       deferredSummary={`Recent-year trends cover ${data.map((item) => item.label).join(", ")}.`}
       actions={
         <Link href="/explore/timeline" className={`${pillStyles.base} ${pillStyles.ghost}`}>
@@ -137,17 +127,14 @@ export const ExploreRecentTrendsSection = ({
 
 export const ExploreRevisitedPlacesSection = ({
   places,
-  deferContent = false,
 }: {
   places: PhotoStats["revisitedPlaces"];
-  deferContent?: boolean;
 }) => {
   const [visible, setVisible] = useState(4);
   return places.length > 0 ? (
     <ExploreStatGroup
       id="revisited-places"
       title="Revisited places"
-      deferContent={deferContent}
       deferredSummary={places
         .slice(0, 4)
         .map(

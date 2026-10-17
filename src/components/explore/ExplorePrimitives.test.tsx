@@ -6,109 +6,92 @@ import { act, render, screen } from "@testing-library/react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { ExploreStatGroup, ExploreStatSection, VisualSimilarityThumb } from "./ExplorePrimitives";
 
+const groupSection = (container: HTMLElement): HTMLElement => {
+  const section = container.querySelector("section");
+  if (!section) {
+    throw new Error("ExploreStatGroup rendered no section element");
+  }
+  return section;
+};
+
 describe("Explore primitives", () => {
-  it("loads a desktop deferred group when its section link is followed", () => {
-    const originalObserver = globalThis.IntersectionObserver;
-    Object.defineProperty(globalThis, "IntersectionObserver", {
-      configurable: true,
-      value: jest.fn(() => ({ observe: jest.fn(), disconnect: jest.fn() })),
-    });
-    const view = render(
-      <ExploreStatGroup id="colour" title="Colour" deferContent>
-        <p>Linked content</p>
-      </ExploreStatGroup>,
-    );
-    try {
-      expect(screen.queryByText("Linked content")).toBeNull();
-      act(() => {
-        window.location.hash = "#colour";
-        window.dispatchEvent(new HashChangeEvent("hashchange"));
-      });
-      expect(screen.getByText("Linked content")).toBeInTheDocument();
-    } finally {
-      view.unmount();
-      window.location.hash = "";
-      Object.defineProperty(globalThis, "IntersectionObserver", {
-        configurable: true,
-        value: originalObserver,
-      });
-    }
-  });
-  it("keeps a meaningful summary in server-rendered HTML while deferring heavy content", () => {
+  it("renders group content into the server HTML, not a placeholder", () => {
     const markup = renderToStaticMarkup(
       <ExploreStatGroup
-        id="deferred-summary"
-        title="Deferred summary"
-        deferContent
+        id="colour"
+        title="Colour"
         deferredSummary={<p>42 photos across 3 years</p>}
       >
         <p>Expensive interactive chart</p>
       </ExploreStatGroup>,
     );
 
+    // The collapse is a CSS decision, so the content is already in the first
+    // paint at every width and there is nothing for hydration to shift.
     expect(markup).toContain("42 photos across 3 years");
-    expect(markup).not.toContain("Expensive interactive chart");
+    expect(markup).toContain("Expensive interactive chart");
+    expect(markup).not.toContain("aria-busy");
   });
 
-  it("defers expensive group content until the group nears the viewport", () => {
-    let intersectionCallback!: IntersectionObserverCallback;
-    const disconnect = jest.fn();
-    const observe = jest.fn();
-    const unobserve = jest.fn();
-    const originalObserver = globalThis.IntersectionObserver;
-    Object.defineProperty(globalThis, "IntersectionObserver", {
-      configurable: true,
-      value: jest.fn((callback: IntersectionObserverCallback) => {
-        intersectionCallback = callback;
-        return { disconnect, observe, unobserve };
-      }),
-    });
-
+  it("renders the content, summary and control in the first client render", () => {
     const view = render(
-      <ExploreStatGroup id="deferred" title="Deferred" deferContent>
+      <ExploreStatGroup id="colour" title="Colour" deferredSummary={<p>Ten years</p>}>
         <p>Expensive chart</p>
       </ExploreStatGroup>,
     );
 
-    expect(screen.getByRole("heading", { name: /deferred/i })).toBeInTheDocument();
-    expect(screen.queryByText("Expensive chart")).toBeNull();
-    expect(observe).toHaveBeenCalledTimes(1);
-
-    act(() => {
-      intersectionCallback(
-        [{ target: observe.mock.calls[0]![0], isIntersecting: true } as IntersectionObserverEntry],
-        {} as IntersectionObserver,
-      );
-    });
-
     expect(screen.getByText("Expensive chart")).toBeInTheDocument();
-    expect(disconnect).toHaveBeenCalled();
-    view.unmount();
+    expect(screen.getByText("Ten years")).toBeInTheDocument();
+    expect(view.container.querySelector("[aria-busy]")).toBeNull();
 
-    Object.defineProperty(globalThis, "IntersectionObserver", {
-      configurable: true,
-      value: originalObserver,
-    });
+    const section = groupSection(view.container);
+    expect(section).toHaveAttribute("data-opened", "false");
+    expect(section).toHaveAttribute("data-linked", "false");
   });
 
-  // At 390px the whole page is ~61 screens tall with every group expanded, so a
-  // phone reader has to scroll the entire archive analysis to reach anything.
-  // Narrow viewports get the summary plus a control instead.
-  describe("on a narrow viewport", () => {
-    const setViewport = (isNarrow: boolean) => {
-      jest.spyOn(window, "matchMedia").mockReturnValue({
-        matches: isNarrow,
-        addEventListener: jest.fn(),
-        removeEventListener: jest.fn(),
-      } as unknown as MediaQueryList);
-    };
+  it("names the collapse control after its group", () => {
+    render(
+      <ExploreStatGroup id="when" title="When you shoot" deferredSummary={<p>Ten years</p>}>
+        <p>Expensive chart</p>
+      </ExploreStatGroup>,
+    );
 
+    const toggle = screen.getByRole("button", { name: "Show When you shoot" });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(toggle).toHaveAttribute("aria-controls", "when-content");
+    expect(screen.getByText("Expensive chart").closest("#when-content")).not.toBeNull();
+  });
+
+  it("opens and closes a group the reader toggles", () => {
+    const view = render(
+      <ExploreStatGroup id="when" title="When you shoot" deferredSummary={<p>Ten years</p>}>
+        <p>Expensive chart</p>
+      </ExploreStatGroup>,
+    );
+
+    act(() => screen.getByRole("button", { name: "Show When you shoot" }).click());
+
+    // `data-opened` is the whole reason a narrow group is open — the stylesheet
+    // reads it, this component does not branch on a viewport.
+    expect(groupSection(view.container)).toHaveAttribute("data-opened", "true");
+    const opened = screen.getByRole("button", { name: "Hide When you shoot" });
+    expect(opened).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByText("Expensive chart")).toBeInTheDocument();
+
+    act(() => opened.click());
+    expect(groupSection(view.container)).toHaveAttribute("data-opened", "false");
+    expect(screen.getByRole("button", { name: "Show When you shoot" })).toBeInTheDocument();
+  });
+
+  // The collapse itself is a stylesheet decision — these pin the DOM contract
+  // it reads, so the narrow-viewport summary, control, and hash-open behaviour
+  // survive a refactor of the CSS.
+  describe("the narrow-viewport collapse contract", () => {
     afterEach(() => {
-      jest.restoreAllMocks();
+      window.location.hash = "";
     });
 
-    it("collapses a group behind its summary until the reader opens it", () => {
-      setViewport(true);
+    it("keeps the summary, the control, the actions and the content in the DOM", () => {
       render(
         <ExploreStatGroup
           id="when"
@@ -120,112 +103,66 @@ describe("Explore primitives", () => {
         </ExploreStatGroup>,
       );
 
+      // What a collapsed group must not show is hidden by the stylesheet; the
+      // component renders all of it so the first paint is already the server's.
       expect(screen.getByText("Ten years")).toBeInTheDocument();
-      expect(screen.queryByText("Expensive chart")).toBeNull();
-      // Scope filters act on content that is not on screen.
-      expect(screen.queryByText("Filter by camera")).toBeNull();
-
-      act(() => {
-        screen.getByRole("button", { name: /when you shoot/i }).click();
-      });
       expect(screen.getByText("Expensive chart")).toBeInTheDocument();
+      expect(screen.getByText("Filter by camera")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Show When you shoot" })).toBeInTheDocument();
     });
 
-    it("leaves wide viewports expanded, with no control to press", () => {
-      setViewport(false);
-      render(
+    it("opens a group the URL hash points at, on arrival", () => {
+      window.location.hash = "#when";
+      const view = render(
         <ExploreStatGroup id="when" title="When you shoot" deferredSummary={<p>Ten years</p>}>
           <p>Expensive chart</p>
         </ExploreStatGroup>,
       );
 
-      expect(screen.getByText("Expensive chart")).toBeInTheDocument();
-      expect(screen.queryByRole("button", { name: /when you shoot/i })).toBeNull();
-    });
-
-    // The observed element only exists once the group is open, so opening one
-    // has to (re)attach the intersection observer. Without that, a deferred
-    // group opened by hand sits on its placeholder for good.
-    it("fills in a deferred group that the reader opens", () => {
-      setViewport(true);
-      let intersectionCallback!: IntersectionObserverCallback;
-      const observe = jest.fn();
-      const originalObserver = globalThis.IntersectionObserver;
-      Object.defineProperty(globalThis, "IntersectionObserver", {
-        configurable: true,
-        value: jest.fn((callback: IntersectionObserverCallback) => {
-          intersectionCallback = callback;
-          return { disconnect: jest.fn(), observe, unobserve: jest.fn() };
-        }),
-      });
-
-      render(
-        <ExploreStatGroup
-          id="colour"
-          title="Colour"
-          deferContent
-          deferredSummary={<p>Ten years</p>}
-        >
-          <p>Expensive chart</p>
-        </ExploreStatGroup>,
+      expect(groupSection(view.container)).toHaveAttribute("data-linked", "true");
+      expect(screen.getByRole("button", { name: "Hide When you shoot" })).toHaveAttribute(
+        "aria-expanded",
+        "true",
       );
-      // The group renders open first so server HTML keeps the content, then
-      // collapses once the media query resolves — which unmounts the node the
-      // observer was watching.
-      const observedBeforeCollapse = observe.mock.calls.length;
-      expect(screen.queryByText("Expensive chart")).toBeNull();
-
-      act(() => {
-        screen.getByRole("button", { name: /colour/i }).click();
-      });
-      expect(observe.mock.calls.length).toBeGreaterThan(observedBeforeCollapse);
-
-      act(() => {
-        intersectionCallback(
-          [{ isIntersecting: true } as IntersectionObserverEntry],
-          {} as IntersectionObserver,
-        );
-      });
-      expect(screen.getByText("Expensive chart")).toBeInTheDocument();
-
-      Object.defineProperty(globalThis, "IntersectionObserver", {
-        configurable: true,
-        value: originalObserver,
-      });
     });
 
     // The "Jump to" nav is same-page links, so the hash almost always changes
     // after mount. Reading it once left every jump landing on a closed group.
     it("opens a group when the reader jumps to it", () => {
-      setViewport(true);
-      render(
+      const view = render(
         <ExploreStatGroup id="colour" title="Colour" deferredSummary={<p>Ten years</p>}>
           <p>Expensive chart</p>
         </ExploreStatGroup>,
       );
-      expect(screen.queryByText("Expensive chart")).toBeNull();
+      expect(groupSection(view.container)).toHaveAttribute("data-linked", "false");
 
       act(() => {
         window.location.hash = "#colour";
         window.dispatchEvent(new HashChangeEvent("hashchange"));
       });
+
+      expect(groupSection(view.container)).toHaveAttribute("data-linked", "true");
       expect(screen.getByText("Expensive chart")).toBeInTheDocument();
-      window.location.hash = "";
     });
 
-    // The "Jump to" nav links straight at a group; arriving there collapsed
-    // would make the link look broken.
-    it("opens a group that the URL points at", () => {
-      setViewport(true);
-      window.location.hash = "#when";
-      render(
-        <ExploreStatGroup id="when" title="When you shoot" deferredSummary={<p>Ten years</p>}>
+    // A "Jump to" link must never land on a closed section, so the hash keeps
+    // the group open even after the reader presses the control.
+    it("keeps a hash-linked group open when the reader presses its control", () => {
+      window.location.hash = "#colour";
+      const view = render(
+        <ExploreStatGroup id="colour" title="Colour" deferredSummary={<p>Ten years</p>}>
           <p>Expensive chart</p>
         </ExploreStatGroup>,
       );
 
-      expect(screen.getByText("Expensive chart")).toBeInTheDocument();
-      window.location.hash = "";
+      act(() => screen.getByRole("button", { name: "Hide Colour" }).click());
+      act(() => screen.getByRole("button", { name: "Hide Colour" }).click());
+
+      expect(groupSection(view.container)).toHaveAttribute("data-opened", "false");
+      expect(screen.getByRole("button", { name: "Hide Colour" })).toHaveAttribute(
+        "aria-expanded",
+        "true",
+      );
     });
   });
 

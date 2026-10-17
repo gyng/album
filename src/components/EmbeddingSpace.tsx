@@ -45,9 +45,11 @@ import styles from "./EmbeddingSpace.module.css";
 export type EmbeddingSpaceProps = {
   className?: string;
   /**
-   * Height of the viewer, in pixels. Left unset the stylesheet decides, which
-   * gives a desktop most of the window and a phone a sensible fraction of it —
-   * a cloud wants room, and how much room there is is a CSS question.
+   * Height of the box the cloud is given, in pixels. Left unset the stylesheet
+   * decides, which gives a desktop most of the window and a phone a sensible
+   * fraction of it — a cloud wants room, and how much room there is is a CSS
+   * question. The deferred wrapper reserves the same box, so its arrival in the
+   * page cannot move everything below it.
    */
   height?: number;
   /**
@@ -1736,8 +1738,15 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
     selected.length > 0 ? (selected[Math.floor(selected.length / 2)] as EmbeddingSpaceEntry) : null;
   const medoidPath = medoid ? indexedPathFromSrc(medoid.src) : null;
 
+  // An explicit height sizes the box the stage sits in: one measurement for both,
+  // so the stylesheet and the caller cannot disagree about how tall a cloud is.
   return (
-    <figure className={[styles.space, className].filter(Boolean).join(" ")}>
+    <figure
+      className={[styles.space, className].filter(Boolean).join(" ")}
+      {...(height === undefined
+        ? {}
+        : { style: { ["--cloud-stage-block-size" as string]: `${height}px` } })}
+    >
       <div className={styles.filters}>
         <div className={styles.filterRow}>
           <div className={styles.filterControls}>
@@ -1815,7 +1824,6 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
         onBlurCapture={(event) => {
           if (!event.currentTarget.contains(event.relatedTarget)) wheelActiveRef.current = false;
         }}
-        {...(height === undefined ? {} : { style: { blockSize: `${height}px` } })}
       >
         {entries && !count ? (
           <p className={styles.empty} role="status">
