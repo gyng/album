@@ -4,7 +4,7 @@
 
 export {};
 
-const { unpackTimelineEntry } =
+const { summariseTimelineGeocode, unpackTimelineEntry } =
   require("../../../util/pageDataRows") as typeof import("../../../util/pageDataRows");
 
 const getAlbums = jest.fn();
@@ -54,7 +54,11 @@ describe("timeline page data fetching", () => {
               latDeg: 35.6,
               lngDeg: 139.7,
               durationSeconds: 13.013,
-              tags: { colors: [[200, 30, 40]] },
+              tags: {
+                colors: [[200, 30, 40]],
+                geocode: "35.6\n139.7\nShibuya\nTokyo\nShibuya\nJP\nJapan",
+                tz_offset: "+09:00",
+              },
               poster: {
                 srcset: [{ src: "/clip.mov@800.avif", width: 300, height: 200 }],
               },
@@ -97,7 +101,14 @@ describe("timeline page data fetching", () => {
       // the way a photograph's does.
       placeholderColor: "rgba(200, 30, 40, 1)",
       src: { src: "/clip.mov@800.avif", width: 300, height: 200 },
+      // The indexer geocodes a clip and derives its zone as it does a
+      // photograph's, so the day's place summary counts it too.
+      dateOffset: "+09:00",
     });
+    expect(entries[0]?.geocode).toBe(
+      summariseTimelineGeocode("35.6\n139.7\nShibuya\nTokyo\nShibuya\nJP\nJapan"),
+    );
+    expect(entries[0]?.geocode).toEqual(expect.stringContaining("Shibuya"));
   });
 
   // An external is a video in the album with a date and, since the poster

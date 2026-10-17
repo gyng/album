@@ -1,4 +1,4 @@
-import { decideRemixPlan, mapVectorRemixResult } from "./slideshowRemix";
+import { decideRemixPlan, mapVectorRemixResult, toSimilarQueueRows } from "./slideshowRemix";
 import type { RandomPhotoRow } from "../components/search/api";
 
 const base = {
@@ -144,6 +144,21 @@ describe("mapVectorRemixResult", () => {
     expect(out.companions.map((p) => p.path)).toEqual(["c", "a"]);
   });
 
+  // A long clip is indexed a minute at a time, and its best match is often one
+  // of those moments; the pool holds the clip itself, so the clip was dropped.
+  it("brings a clip back from its matched moment, once", () => {
+    const out = mapVectorRemixResult({
+      resultData: [
+        { path: "../albums/a/clip.mov@t120", similarity: 0.9 },
+        { path: "../albums/a/clip.mov@t60", similarity: 0.8 },
+        { path: "b", similarity: 0.7 },
+      ],
+      pool: [...pool, row("../albums/a/clip.mov")],
+      desiredCount: 3,
+    });
+    expect(out.companions.map((p) => p.path)).toEqual(["../albums/a/clip.mov", "b"]);
+  });
+
   it("skips result paths that aren't in the pool", () => {
     const out = mapVectorRemixResult({
       resultData: [
@@ -175,5 +190,47 @@ describe("mapVectorRemixResult", () => {
     const out = mapVectorRemixResult({ resultData: [], pool, desiredCount: 3 });
     expect(out.companions).toEqual([]);
     expect(out.topSimilarity).toBeNull();
+  });
+});
+
+describe("toSimilarQueueRows", () => {
+  const row = (path: string, extra: Partial<RandomPhotoRow> = {}): RandomPhotoRow => ({
+    path,
+    exif: "",
+    geocode: "",
+    ...extra,
+  });
+
+  // Similar mode queued result rows as they came: a minute of a long clip
+  // became a slide of its own, and every row lost its media kind, so a clip
+  // never played there.
+  it("queues a clip once for its matched moments, from its own row, playable", () => {
+    const clip = row("../albums/a/clip.mov", { geocode: "Tokyo", mediaKind: "video", colors: "c" });
+    const queue = toSimilarQueueRows({
+      results: [
+        { path: "../albums/a/clip.mov@t60", exif: "", geocode: "", mediaKind: "video" },
+        { path: "../albums/a/clip.mov@t120", exif: "", geocode: "", mediaKind: "video" },
+        { path: "../albums/a/1.jpg", exif: "e", geocode: "g", colors: "p" },
+      ],
+      pool: [clip],
+      filter: null,
+      recent: [],
+    });
+
+    expect(queue).toEqual([
+      clip,
+      { path: "../albums/a/1.jpg", exif: "e", geocode: "g", colors: "p" },
+    ]);
+  });
+
+  it("keeps the album filter and leaves out what was shown recently", () => {
+    const queue = toSimilarQueueRows({
+      results: [row("../albums/a/1.jpg"), row("../albums/b/2.jpg"), row("../albums/a/3.jpg")],
+      pool: [],
+      filter: "a",
+      recent: ["../albums/a/1.jpg"],
+    });
+
+    expect(queue.map((item) => item.path)).toEqual(["../albums/a/3.jpg"]);
   });
 });

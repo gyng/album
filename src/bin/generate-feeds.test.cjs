@@ -210,6 +210,30 @@ describe("static feed generation", () => {
     fs.rmSync(root, { recursive: true, force: true });
   });
 
+  // A YouTube clip has an anchor of its own on the album page — the synthetic
+  // "<id>.youtube" name it is indexed and postered under — so a feed item can
+  // open at the clip rather than at the top of the album.
+  it("links a YouTube clip to its own place in the album", () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "album-feeds-youtube-"));
+    const albumPath = path.join(root, "trip");
+    writeJson(path.join(albumPath, "manifest.json"), {
+      blocks: [{ kind: "video", data: { type: "youtube", href: "https://youtu.be/ycyUWULJxdU" } }],
+    });
+    writeJson(path.join(albumPath, "album.json"), {
+      externals: [{ type: "youtube", href: "https://www.youtube.com/embed/9bw3IL444Uo" }],
+    });
+
+    const links = getAlbumFeedItems("trip", albumPath, { title: "Trip" }, "2025-01-01").map(
+      (item) => item.link,
+    );
+
+    expect(links.sort()).toEqual([
+      "/album/trip#9bw3IL444Uo.youtube",
+      "/album/trip#ycyUWULJxdU.youtube",
+    ]);
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
   it("uses the console logger by default and handles an absent stale-feed root", () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "album-feeds-console-"));
     const albumsDirectory = path.join(root, "albums");

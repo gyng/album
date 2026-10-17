@@ -15,6 +15,7 @@ import { isSupportedMediaFile } from "./albumMedia";
 import { siteConfig } from "../lib/siteConfig";
 import { parseYoutubeVideoId, youtubeMediaFilename } from "./youtubeExternal";
 import { incrementBuildCounter, measureBuild } from "./buildTiming";
+import { toVideoBlockEntry } from "../util/videoBlockEntry";
 import {
   exifWallClockTimestamp,
   normaliseExifWallClockIso,
@@ -111,12 +112,21 @@ const sortBlocksByDate = (
   );
 };
 
+/** An album's media: its photographs and the clips that have a poster to show. */
+const isAlbumMedia = (block: Block): boolean =>
+  block.kind === "photo" || toVideoBlockEntry(block) !== null;
+
 export const getImageTimestampRange = (album: Content): [string | null, string | null] => {
   let earliest: string | null = null;
   let latest: string | null = null;
   for (const block of album.blocks) {
-    if (block.kind !== "photo") continue;
-    const dt = normaliseExifWallClockIso(block._build?.exif?.DateTimeOriginal);
+    // A clip is dated by its own wall clock, the same reading a photograph's
+    // EXIF gives; the home card already counts and dates albums by both.
+    const raw =
+      block.kind === "photo"
+        ? block._build?.exif?.DateTimeOriginal
+        : toVideoBlockEntry(block)?.capturedAtLocal;
+    const dt = normaliseExifWallClockIso(raw);
     if (!dt) continue;
     if (earliest === null || dt < earliest) earliest = dt;
     if (latest === null || dt > latest) latest = dt;
@@ -323,7 +333,7 @@ const applyTitleKickerDefaults = (manifest: Content): void => {
   }
 
   const [earliest, latest] = getImageTimestampRange(manifest);
-  const photoCount = manifest.blocks.filter((block) => block.kind === "photo").length;
+  const photoCount = manifest.blocks.filter(isAlbumMedia).length;
   const count = `${photoCount.toLocaleString("en-GB")} ${photoCount === 1 ? "snap" : "snaps"}`;
   if (earliest == null || latest == null) {
     title.data.kicker = title.data.kicker ? `${title.data.kicker} · ${count}` : count;

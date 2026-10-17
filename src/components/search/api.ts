@@ -1849,11 +1849,16 @@ export const fetchMemoryCandidates = async (opts: {
 }): Promise<Array<SearchResultRow & { isoDate: string }>> => {
   const { database, todayDate } = opts;
   const excludeYear = todayDate.slice(0, 4);
+  // Which rows are clips comes with the query, not a second lookup: the
+  // candidates are the whole dated archive, past any IN-list one could bind.
+  const media = hasMediaColumns(database);
 
   try {
     const result = await exec(
       database,
-      `SELECT ${IMAGE_COLUMN_SELECTS.join(", ")}, ${NORMALIZED_IMAGE_DATE_SQL} AS isoDate
+      `SELECT ${IMAGE_COLUMN_SELECTS.join(", ")}, ${NORMALIZED_IMAGE_DATE_SQL} AS isoDate${
+        media ? ", m.media_kind, m.duration_seconds" : ""
+      }
         FROM images
         LEFT JOIN metadata m ON m.path = images.path
         WHERE ${NORMALIZED_IMAGE_DATE_SQL} != ''
@@ -1871,10 +1876,18 @@ export const fetchMemoryCandidates = async (opts: {
         });
 
         const isoDate = String(row[IMAGE_COLUMNS.length] ?? "");
+        const mediaKind = media ? row[IMAGE_COLUMNS.length + 1] : null;
+        const durationSeconds = media ? row[IMAGE_COLUMNS.length + 2] : null;
         return {
           ...(resolved as SearchResultRow),
           isoDate,
           snippet: resolved.alt_text || resolved.subject || resolved.tags || resolved.filename,
+          ...(mediaKind === MEDIA_KIND_VIDEO
+            ? {
+                mediaKind: MEDIA_KIND_VIDEO,
+                ...(typeof durationSeconds === "number" ? { durationSeconds } : {}),
+              }
+            : {}),
         };
       }),
     );
@@ -1927,6 +1940,9 @@ export type RandomPhotoRow = {
   /** "video" for a clip, whose slide is the poster frame extracted from it. */
   mediaKind?: string | undefined;
   durationSeconds?: number | undefined;
+  /** Where it was taken, from `metadata`: a clip has no GPS in its EXIF text. */
+  latDeg?: number | undefined;
+  lngDeg?: number | undefined;
 };
 
 export const fetchSlideshowPhotos = async (opts: {
@@ -2008,7 +2024,7 @@ export const fetchGuessRegions = async (opts: {
   try {
     const result = await exec(
       opts.database,
-      `SELECT geocode FROM images WHERE exif LIKE '%GPSLatitude%'`,
+      `SELECT images.geocode ${GUESS_FROM} WHERE ${guessPlacedWhere(opts.database)}`,
       [],
     );
     const counts = new Map<string, number>();
@@ -2027,6 +2043,33 @@ export const fetchGuessRegions = async (opts: {
   }
 };
 
+// A Guess round is a photograph or a clip with a place. A photograph's place is
+// in its EXIF text; a clip's is only in `metadata` (its EXIF text is "{}"), so
+// drawing by EXIF alone never dealt a clip. A clip's minute moments carry its
+// place but are not rounds of their own.
+const GUESS_FROM = "FROM images LEFT JOIN metadata m ON m.path = images.path";
+const GUESS_COLUMNS = "images.path, images.exif, images.geocode, m.lat_deg, m.lng_deg";
+const guessPlacedWhere = (database: Database): string =>
+  [
+    "(images.exif LIKE '%GPSLatitude%' OR m.lat_deg IS NOT NULL)",
+    notSceneSql(searchMetadataColumns(database)),
+  ]
+    .filter(Boolean)
+    .join(" AND ");
+
+const asText = (value: unknown): string => (typeof value === "string" ? value : "");
+
+const toGuessRow = (row: unknown[]): RandomPhotoRow => {
+  const latDeg = row[3];
+  const lngDeg = row[4];
+  return {
+    path: asText(row[0]),
+    exif: asText(row[1]),
+    geocode: asText(row[2]),
+    ...(typeof latDeg === "number" && typeof lngDeg === "number" ? { latDeg, lngDeg } : {}),
+  };
+};
+
 /** Rows for the given paths, in that order; unknown paths are skipped. */
 const fetchGuessRowsByPaths = async (
   database: Database,
@@ -2035,14 +2078,11 @@ const fetchGuessRowsByPaths = async (
   if (paths.length === 0) return [];
   const result = await exec(
     database,
-    `SELECT path, exif, geocode FROM images WHERE path IN (${paths.map(() => "?").join(",")})`,
+    `SELECT ${GUESS_COLUMNS} ${GUESS_FROM} WHERE images.path IN (${paths.map(() => "?").join(",")})`,
     [...paths],
   );
   const rowMap = new Map(
-    (result.data as unknown as string[][]).map((row) => [
-      row[0] ?? "",
-      { path: row[0] ?? "", exif: row[1] ?? "", geocode: row[2] ?? "" },
-    ]),
+    (result.data as unknown as unknown[][]).map((row) => [asText(row[0]), toGuessRow(row)]),
   );
   return paths.flatMap((p) => {
     const row = rowMap.get(p);
@@ -2062,9 +2102,9 @@ export const fetchGuessPhotos = async (opts: {
   const { database, count, filter = "%", region, seed, paths } = opts;
   if (paths) return fetchGuessRowsByPaths(database, paths.slice(0, count));
 
-  const baseWhere = `path LIKE ? AND exif LIKE '%GPSLatitude%'`;
+  const baseWhere = `images.path LIKE ? AND ${guessPlacedWhere(database)}`;
   const regionClause = region
-    ? ` AND (geocode LIKE '%\n' || ? OR geocode LIKE '%\n' || ? || '\n%')`
+    ? ` AND (images.geocode LIKE '%\n' || ? OR images.geocode LIKE '%\n' || ? || '\n%')`
     : "";
   const baseParams: (string | number)[] = [`../albums/${filter}/%`];
   if (region) {
@@ -2075,23 +2115,19 @@ export const fetchGuessPhotos = async (opts: {
     if (!seed) {
       const result = await exec(
         database,
-        `SELECT path, exif, geocode FROM images
+        `SELECT ${GUESS_COLUMNS} ${GUESS_FROM}
          WHERE ${baseWhere}${regionClause}
          ORDER BY RANDOM() LIMIT ?`,
         [...baseParams, count],
       );
-      return (result.data as unknown as string[][]).map((row) => ({
-        path: row[0] ?? "",
-        exif: row[1] ?? "",
-        geocode: row[2] ?? "",
-      }));
+      return (result.data as unknown as unknown[][]).map(toGuessRow);
     }
 
     // Seeded: fetch all matching paths, shuffle deterministically, then
     // fetch full rows for the selected subset.
     const allResult = await exec(
       database,
-      `SELECT path FROM images WHERE ${baseWhere}${regionClause}`,
+      `SELECT images.path ${GUESS_FROM} WHERE ${baseWhere}${regionClause}`,
       baseParams,
     );
     const allPaths = (allResult.data as unknown as string[][])

@@ -71,6 +71,19 @@ const makeVideo = (date?: string): VideoBlock => ({
   },
 });
 
+// A local clip as the build sees it once its poster prepass has run.
+const makeClip = (capturedAtLocal: string): VideoBlock => ({
+  kind: "video",
+  id: "clip.mov",
+  data: { type: "local", href: "/clip.mov" },
+  _build: {
+    src: "/clip.mov@1920.mp4",
+    mimeType: "video/mp4",
+    poster: { srcset: [{ src: "/clip.mov@800.avif", width: 800, height: 450 }] },
+    capturedAtLocal,
+  },
+});
+
 const mockDeserialize = jest.mocked(deserializeContentBlock);
 
 describe("getBlockDate", () => {
@@ -119,6 +132,16 @@ describe("getImageTimestampRange", () => {
       null,
       null,
     ]);
+  });
+
+  // The home card counts clips and dates its album by them; the album's own
+  // title did neither, so an album of clips showed no years at all.
+  it("reaches as far as the album's clips do", () => {
+    expect(
+      getImageTimestampRange(
+        makeContent([makePhoto("2024:03:10 08:00:00"), makeClip("2025-12-01T20:15:51")]),
+      ),
+    ).toEqual(["2024-03-10T08:00:00", "2025-12-01T20:15:51"]);
   });
 
   it("returns the same timestamp for both ends when there is one photo", () => {
@@ -522,6 +545,21 @@ describe("getAlbum", () => {
       const title = result.blocks[0];
       expect(title?.kind).toBe("text");
       if (title?.kind === "text") expect(title.data.kicker).toBe(expected);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("counts and dates the album's clips in its title, as its home card does", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "album-kicker-clips-test-"));
+    mockDeserialize.mockResolvedValueOnce(
+      makeContent([makeText(), makePhoto("2023-01-01T00:00:00"), makeClip("2025-12-01T20:15:51")]),
+    );
+
+    try {
+      const title = (await getAlbum(root)).blocks[0];
+      if (title?.kind === "text") expect(title.data.kicker).toBe("2023–2025 · 2 snaps");
+      expect(title?.kind).toBe("text");
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
     }

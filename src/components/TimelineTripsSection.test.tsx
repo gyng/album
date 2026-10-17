@@ -29,6 +29,22 @@ describe("TimelineTripsSection", () => {
     entry("2016-11-15T10:00:00"),
   ];
 
+  // A clip is geocoded like a photograph now, and /trips counts it, so the
+  // timeline does too — leaving clips out made the two pages disagree.
+  it("counts a clip in the journey it was shot on", () => {
+    render(
+      <TimelineTripsSection
+        entries={[
+          ...journey,
+          entry("2016-11-14T12:00:00", { mediaKind: "video", path: "../albums/kansai/clip.mov" }),
+        ]}
+        onSelectDate={() => {}}
+      />,
+    );
+
+    expect(screen.getByText(/3 days · 4 photos/)).toBeInTheDocument();
+  });
+
   it("lists the journeys the entries contain", () => {
     render(<TimelineTripsSection entries={journey} onSelectDate={() => {}} />);
 

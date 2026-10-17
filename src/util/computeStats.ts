@@ -1,5 +1,5 @@
 import { COLOUR_FAMILY_LABELS as COLOR_FAMILY_LABELS, isNeutralFamily } from "./colourFamilies";
-import type { Content, PhotoBlock, VideoBlock } from "../services/types";
+import type { Content, PhotoBlock } from "../services/types";
 import { computeGearStats, type GearStats } from "./computeGearStats";
 import { fillYearRange } from "./yearRange";
 import { rgbToString } from "./colorDistance";
@@ -31,6 +31,7 @@ import { getDisplayDimensions } from "./photoDimensions";
 import { formatAspectRatio } from "./formatAspectRatio";
 import { WEATHER_FACETS } from "./metadataFacets";
 import { toVideoBlockEntry } from "./videoBlockEntry";
+import { videoBlockAsPhotoBlock } from "./videoBlockMedia";
 
 export type BucketedStat = {
   label: string;
@@ -1566,52 +1567,6 @@ function computeFramingFacets(photos: PhotoBlock[]): StringFacetStat[] {
   ];
 }
 
-/**
- * A clip wearing a photograph's shape, so every aggregation below reads one
- * input.
- *
- * The clip's poster frame supplies the pixels and the same `_build.tags` a
- * photograph carries supplies its palette, tags, geocode, weather and derived
- * zone; `toVideoBlockEntry` supplies the camera-local wall clock and the place.
- * A clip records no camera EXIF, so anything that reads the camera itself —
- * gear, lens type, framing — sees an empty exif and is left to stills. Returns
- * null until the poster prepass has run, since without a frame there is nothing
- * to count.
- */
-const statsPhotoFromVideoBlock = (block: VideoBlock): PhotoBlock | null => {
-  const entry = toVideoBlockEntry(block);
-  const srcset = entry?.block._build?.poster?.srcset;
-  if (!entry || !srcset || srcset.length === 0) {
-    return null;
-  }
-
-  const tags = entry.block._build?.tags ?? {};
-
-  return {
-    kind: "photo",
-    id: entry.anchor,
-    // The album-page anchor, so hrefs and labels derived from this block match
-    // the timeline and map's own clip links.
-    data: { src: entry.anchor },
-    _build: {
-      width: entry.poster.width,
-      height: entry.poster.height,
-      exif: {
-        // The camera and exposure, when the clip's own EXIF recorded them, are
-        // keyed as a photograph's are.
-        ...entry.block._build?.camera,
-        ...(entry.capturedAtLocal ? { DateTimeOriginal: entry.capturedAtLocal } : {}),
-        // A clip records no OffsetTime of its own; the zone the indexer derived
-        // for it is the same reading the map and timeline already prefer over a
-        // camera's own tag.
-        ...(tags.tz_offset ? { OffsetTime: tags.tz_offset } : {}),
-      },
-      tags,
-      srcset,
-    },
-  };
-};
-
 /** Facets read from what the camera records about an exposure. */
 const CAMERA_FACET_IDS = new Set([
   FOCAL_LENGTH_35MM_FACET.id,
@@ -1643,7 +1598,7 @@ export function computePhotoStats(albums: Content[]): PhotoStats {
         return [];
       }
 
-      const photo = statsPhotoFromVideoBlock(block);
+      const photo = videoBlockAsPhotoBlock(block);
       const entry = toVideoBlockEntry(block);
       if (!photo || !entry) {
         return [];

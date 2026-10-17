@@ -228,6 +228,37 @@ describe("GuessGame", () => {
     expect(screen.getByTestId("summary")).toHaveAttribute("data-seed", "i");
   });
 
+  // A clip's place comes from the index's metadata, not its EXIF text, which
+  // holds no GPS: rounds from clips used to be thrown away as unplaceable.
+  it("plays a round from a clip, revealed where it was shot", async () => {
+    fetchGuessPhotosMock.mockResolvedValue([
+      {
+        path: "../albums/tokyo/clip.mov",
+        exif: "{}",
+        geocode: "JP\nJapan",
+        latDeg: 35.66,
+        lngDeg: 139.73,
+      },
+      {
+        path: "../albums/tokyo/other.mov",
+        exif: "{}",
+        geocode: "JP\nJapan",
+        latDeg: 35.66,
+        lngDeg: 139.73,
+      },
+    ]);
+    render(<GuessGame database={database} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Start mocked game" }));
+    await screen.findByTestId("round");
+    fireEvent.click(screen.getByRole("button", { name: "Reveal mocked round" }));
+
+    expect(screen.getByTestId("guess-map")).toHaveAttribute(
+      "data-reveal",
+      JSON.stringify({ lat: 35.66, lng: 139.73 }),
+    );
+  });
+
   it("replays the same settings and can return to the lobby", async () => {
     render(
       <GuessGame

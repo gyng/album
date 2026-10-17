@@ -1,4 +1,4 @@
-import type { Content, PhotoBlock } from "../services/types";
+import type { Content, PhotoBlock, VideoBlock } from "../services/types";
 import { computeGearStats } from "./computeGearStats";
 
 type PhotoSpec = {
@@ -35,7 +35,7 @@ const photo = (id: string, spec: PhotoSpec): PhotoBlock =>
     },
   }) as unknown as PhotoBlock;
 
-const album = (blocks: PhotoBlock[]): Content =>
+const album = (blocks: Array<PhotoBlock | VideoBlock>): Content =>
   ({ _build: { slug: "test" }, blocks }) as unknown as Content;
 
 describe("computeGearStats", () => {
@@ -69,6 +69,32 @@ describe("computeGearStats", () => {
       },
     ]);
     expect(stats.frames).toHaveLength(6);
+  });
+
+  // A clip names its camera in its own EXIF now, and the camera facets count
+  // it, so the gear section does too.
+  it("counts a clip that recorded its camera", () => {
+    const clip = {
+      kind: "video",
+      id: "clip.mov",
+      data: { type: "local", href: "/clip.mov" },
+      _build: {
+        src: "/clip.mov@1920.mp4",
+        mimeType: "video/mp4",
+        poster: { srcset: [{ src: "/clip.mov@800.avif", width: 800, height: 450 }] },
+        capturedAtLocal: "2024-06-02T10:00:00",
+        camera: { Make: "FUJIFILM", Model: "X-T5" },
+        tags: { path: "../albums/test/clip.mov" },
+      },
+    } as VideoBlock;
+    const stats = computeGearStats([
+      album([photo("a", { camera: "X-T5", taken: "2024-02-02T10:00:00" }), clip]),
+    ]);
+
+    expect(stats.cameraYears).toEqual([
+      { label: "2024", total: 2, cameras: [{ camera: "FUJIFILM X-T5", count: 2, share: 100 }] },
+    ]);
+    expect(stats.frames).toHaveLength(2);
   });
 
   // A stacked bar says a year was two thirds one body; only the frames say the

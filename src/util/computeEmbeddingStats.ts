@@ -14,6 +14,7 @@ import { distinctiveTag, nearestNeighbours, projectToThreeDimensions } from "./e
 // the atlas, the search index and the embeddings payload all key them by.
 import { indexedPathFromSrc } from "./embeddingSpaceData";
 import { toVideoBlockEntry, type VideoBlockEntry } from "./videoBlockEntry";
+import { mediaBlockAsPhoto } from "./videoBlockMedia";
 
 // A single shared model space prevents counting a photograph more than once.
 const PREFERRED_EMBEDDING_MODEL_ID = "google/embeddinggemma-2";
@@ -470,9 +471,9 @@ const buildPhotoCameraLookup = (albums: Content[]): Map<string, string[]> => {
     if (isTestAlbum(album)) return;
 
     album.blocks.forEach((block) => {
-      if (block.kind !== "photo") return;
-
-      const photo = block as PhotoBlock;
+      // A clip as its poster, read through the same keys a photograph's are.
+      const photo = mediaBlockAsPhoto(block);
+      if (!photo) return;
       const indexedPath = photo._build.tags?.path;
       const exif = photo._build.exif;
       const camera = exif ? CAMERA_FACET.extract(exif, photo._build.tags ?? undefined) : null;
@@ -500,9 +501,9 @@ const buildPhotoPlaceLookup = (albums: Content[]): Map<string, string> => {
     if (isTestAlbum(album)) return;
 
     album.blocks.forEach((block) => {
-      if (block.kind !== "photo") return;
-
-      const photo = block as PhotoBlock;
+      // A clip as its poster, read through the same keys a photograph's are.
+      const photo = mediaBlockAsPhoto(block);
+      if (!photo) return;
       const indexedPath = photo._build.tags?.path;
       const geocode = photo._build.tags?.geocode;
       if (!indexedPath || typeof geocode !== "string") return;
@@ -669,7 +670,11 @@ export const computeVisualSamenessStats = async (
     const candidatePaths = albums
       .filter((album) => !isTestAlbum(album))
       .flatMap((album) => album.blocks)
-      .filter((block): block is PhotoBlock => block.kind === "photo")
+      // Clips as their posters: the lookups above already hold them.
+      .flatMap((block) => {
+        const photo = mediaBlockAsPhoto(block);
+        return photo ? [photo] : [];
+      })
       .map((photo) => photo._build.tags?.path)
       .filter((value): value is string => typeof value === "string" && value.length > 0);
 

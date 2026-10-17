@@ -9,6 +9,7 @@ import {
   ISO_FACET,
   LENS_FACET,
 } from "./photoBuckets";
+import { mediaBlockAsPhoto } from "./videoBlockMedia";
 
 /**
  * What the gear section knows beyond an inventory.
@@ -308,9 +309,13 @@ export const computeGearStats = (albums: Content[]): GearStats => {
   const entries = albums
     .filter((album) => !isTestAlbum(album))
     .flatMap((album) =>
-      album.blocks
-        .filter((block): block is PhotoBlock => block.kind === "photo")
-        .map((photo) => ({ album, photo })),
+      // Photographs, and clips as their posters: a clip's camera is read from
+      // its own EXIF under a photograph's keys, so it counts where the camera
+      // facets count it.
+      album.blocks.flatMap((block) => {
+        const photo = mediaBlockAsPhoto(block);
+        return photo ? [{ album, photo }] : [];
+      }),
     );
 
   const byCamera = new Map<string, CameraFrames>();

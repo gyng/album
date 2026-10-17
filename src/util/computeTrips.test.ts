@@ -23,6 +23,25 @@ describe("computeTrips", () => {
     expect(trips[0]?.photoCount).toBe(3);
   });
 
+  // A photograph's date is EXIF's ("2025:03:30 21:42:44") and a clip's is the
+  // sidecar's ISO ("2025-03-30T21:42:44"). Sorted as strings, "-" comes before
+  // ":", so every clip led its day whatever the hour, and the day's start, end
+  // and route were wrong.
+  it("orders a day's photographs and clips by time, whichever form their dates take", () => {
+    const [trip] = computeTrips([
+      photo("2025:03:30 20:55:31", { label: "first photo" }),
+      photo("2025-03-30T21:42:44", { label: "clip" }),
+      photo("2025:03:30 21:47:58", { label: "last photo" }),
+    ]);
+
+    expect(trip?.days[0]?.photos.map((item) => item.label)).toEqual([
+      "first photo",
+      "clip",
+      "last photo",
+    ]);
+    expect(trip?.days[0]).toMatchObject({ from: "20:55", to: "21:47" });
+  });
+
   // A journey survives a day without photographs; a fortnight later is a different trip.
   it("bridges a gap of up to three days and breaks on a longer one", () => {
     const bridged = computeTrips([photo("2024-05-01T10:00:00"), photo("2024-05-04T10:00:00")]);

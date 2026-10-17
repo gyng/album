@@ -58,6 +58,20 @@ describe("mapTopicSeedResults", () => {
     expect(seeded[0]!.colors).toBe("colors:../albums/b/3.jpg");
   });
 
+  // A topic's best match inside a long clip is one of its minute moments; the
+  // pool holds the clip, so the clip was silently missing from topic mode.
+  it("seeds a clip from its matched moment, once", () => {
+    const seeded = mapTopicSeedResults({
+      resultData: [
+        { path: "../albums/a/clip.mov@t60" },
+        { path: "../albums/a/clip.mov@t120" },
+        { path: "../albums/a/1.jpg" },
+      ],
+      pool: [...pool, row("../albums/a/clip.mov")],
+    });
+    expect(seeded.map((r) => r.path)).toEqual(["../albums/a/clip.mov", "../albums/a/1.jpg"]);
+  });
+
   it("drops results that are not present in the current pool", () => {
     const seeded = mapTopicSeedResults({
       resultData: [{ path: "../albums/missing/9.jpg" }, { path: "../albums/a/2.jpg" }],

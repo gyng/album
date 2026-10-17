@@ -240,6 +240,7 @@ describe("map page boundaries", () => {
               latDeg: 35.6,
               lngDeg: 139.7,
               poster: { srcset: [{ src: "/clip.mov@800.avif", width: 20, height: 10 }] },
+              tags: { colors: [[200, 30, 40]], tz_offset: "+09:00" },
             },
           },
           {
@@ -270,6 +271,9 @@ describe("map page boundaries", () => {
         decLng: 139.7,
         date: "2024-01-02T03:04:05",
         href: "/album/trip#clip.mov",
+        // Its poster's own colour and its derived zone, as a photograph's pin has.
+        placeholderColor: "rgba(200, 30, 40, 1)",
+        dateOffset: "+09:00",
       }),
     );
   });

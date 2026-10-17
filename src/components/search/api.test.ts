@@ -1466,7 +1466,7 @@ describe("guess-game queries", () => {
 
     const seededDatabase = {
       exec: ({ sql, callback }: ExecArgs) => {
-        if (sql.includes("SELECT path FROM images")) {
+        if (sql.includes("SELECT images.path FROM images")) {
           callback(["a.jpg"]);
           callback(["b.jpg"]);
           callback(["c.jpg"]);

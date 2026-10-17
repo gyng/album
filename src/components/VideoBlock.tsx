@@ -336,6 +336,15 @@ const VideoDetailsPanel: React.FC<{
           </AppLink>
         </>
       ) : null}
+      {props.type === "local" ? (
+        // As a photograph's pane links the sizes it is served at.
+        <>
+          &nbsp;&middot;&nbsp;
+          <a target="_blank" href={props.src} rel="noreferrer">
+            View 1920px
+          </a>
+        </>
+      ) : null}
       {props.type === "youtube" ? (
         <>
           &nbsp;&middot;&nbsp;Open <a href={props.src}>embed source</a>
@@ -547,6 +556,9 @@ export const LocalVideoBlockEl: React.FC<LocalVideoBlockElProps> = (props) => {
           preload="metadata"
           src={props.src}
           {...(props.posterSrc ? { poster: props.posterSrc } : {})}
+          // A <video> has no alt: it is named for what it shows, as a
+          // photograph is by its alt text.
+          aria-label={props.reading?.tags?.alt_text ?? props.id ?? "Video"}
         />
       </div>
 

@@ -92,7 +92,11 @@ import {
   type DragPeek,
 } from "../../components/slideshow/SlideshowDragPreview";
 import { decideBuildUpdate, decideDbUpdateAction } from "../../util/kioskRefresh";
-import { decideRemixPlan, mapVectorRemixResult } from "../../util/slideshowRemix";
+import {
+  decideRemixPlan,
+  mapVectorRemixResult,
+  toSimilarQueueRows,
+} from "../../util/slideshowRemix";
 import {
   HOLD_TO_PAUSE_MS,
   TAP_MAX_DRIFT_PX,
@@ -1822,23 +1826,12 @@ export const Slideshow: React.FC<{
         page: 0,
         pageSize: Math.max(shuffleHistorySize, 100),
       });
-      const filteredResults = result.data
-        .filter((candidate) => {
-          const matchesAlbumFilter = filter
-            ? candidate.path.startsWith(`../albums/${filter}/`)
-            : true;
-          const isRecent = recentPhotoPathsRef.current.includes(candidate.path);
-          return matchesAlbumFilter && !isRecent;
-        })
-        .map((candidate) => ({
-          path: candidate.path,
-          exif: candidate.exif,
-          geocode: candidate.geocode,
-          // Carry colours through: the next slide's remix uses the dominant
-          // colour of its seed, so dropping this silently disabled the
-          // dominant-colour remix strategy in similar mode.
-          colors: candidate.colors,
-        }));
+      const filteredResults = toSimilarQueueRows({
+        results: result.data,
+        pool: randomPhotoPoolRef.current,
+        filter,
+        recent: recentPhotoPathsRef.current,
+      });
 
       const nextQueue = shufflePhotos(filteredResults, similarQueueLastPathRef.current);
 

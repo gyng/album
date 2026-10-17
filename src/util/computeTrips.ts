@@ -1,4 +1,4 @@
-import { exifDayKey, parseExifLocalDateTime } from "./exifTime";
+import { exifDayKey, normaliseExifWallClockIso, parseExifLocalDateTime } from "./exifTime";
 
 /**
  * The least a photo has to say about itself to be placed in a trip.
@@ -319,8 +319,12 @@ const distinctiveTags = (
 export function computeTrips(photos: TripPhoto[]): Trip[] {
   // Sorted up front so nothing downstream depends on the caller's order: the
   // same archive must group identically whichever page asks.
+  // Compared as wall clocks: a photograph's date is EXIF's colon form and a
+  // clip's is ISO, and as raw strings every clip sorted ahead of its day.
   const ordered = [...photos].sort((left, right) =>
-    (left.date ?? "").localeCompare(right.date ?? ""),
+    (normaliseExifWallClockIso(left.date) ?? "").localeCompare(
+      normaliseExifWallClockIso(right.date) ?? "",
+    ),
   );
   const byDay = new Map<string, TripPhoto[]>();
   for (const photo of ordered) {

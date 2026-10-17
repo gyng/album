@@ -16,7 +16,7 @@ import { tripPhotoFromBlock } from "./tripPhotoFromBlock";
  * photograph's are. Returns null until the poster prepass has run, matching the
  * entry: without a frame there is nothing to draw.
  */
-const videoBlockAsPhotoBlock = (block: Block): PhotoBlock | null => {
+export const videoBlockAsPhotoBlock = (block: Block): PhotoBlock | null => {
   const entry = toVideoBlockEntry(block);
   const srcset = entry?.block._build?.poster?.srcset;
   if (!entry || !srcset || srcset.length === 0) return null;
@@ -30,7 +30,18 @@ const videoBlockAsPhotoBlock = (block: Block): PhotoBlock | null => {
     _build: {
       width: entry.poster.width,
       height: entry.poster.height,
-      exif: {},
+      exif: {
+        // The camera and exposure, when the clip's own EXIF recorded them,
+        // under the keys a photograph's EXIF uses.
+        ...entry.block._build?.camera,
+        // The clip's own wall clock, the reading a photograph is dated by.
+        ...(entry.capturedAtLocal ? { DateTimeOriginal: entry.capturedAtLocal } : {}),
+        // A clip records no OffsetTime of its own; the zone the indexer derived
+        // for it is the reading the map and timeline prefer over a camera's tag.
+        ...(entry.block._build?.tags?.tz_offset
+          ? { OffsetTime: entry.block._build.tags.tz_offset }
+          : {}),
+      },
       tags: entry.block._build?.tags ?? {},
       srcset,
     },

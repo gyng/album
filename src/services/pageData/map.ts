@@ -14,6 +14,8 @@ const videoMapEntries = (album: Awaited<ReturnType<typeof getAlbums>>[number]) =
   album.blocks.flatMap((block): MapWorldEntry[] => {
     const video = toVideoBlockEntry(block);
     if (!video || video.decLat === null || video.decLng === null) return [];
+    const tags = video.block._build?.tags;
+    const color = tags?.colors?.[0];
 
     return [
       {
@@ -23,8 +25,11 @@ const videoMapEntries = (album: Awaited<ReturnType<typeof getAlbums>>[number]) =
         decLng: video.decLng,
         decLat: video.decLat,
         date: video.capturedAtLocal,
+        // The zone the indexer derived for the clip, as a photograph's pin has.
+        dateOffset: tags?.tz_offset ?? null,
         href: `/album/${album._build.slug}#${encodeURIComponent(video.anchor)}`,
-        placeholderColor: "transparent",
+        // The poster's own colour from the clip's indexed row, as a photograph's.
+        placeholderColor: color ? `rgba(${color[0]}, ${color[1]}, ${color[2]}, 1)` : "transparent",
         placeholderHeight: video.poster.height,
         placeholderWidth: video.poster.width,
       },

@@ -611,6 +611,18 @@ describe("the cloud with clips", () => {
     expect(clip?.cluster).toBe(0);
   });
 
+  // The cloud filters by camera; a clip names its camera now, so a clip is
+  // found by it like a photograph.
+  it("carries a clip's camera to its point", async () => {
+    const dbPath = await createEmbeddingsDb(embeddingsFor([CLIP_PATH]));
+    const clip = makeClip(poster);
+    clip._build!.camera = { Make: "FUJIFILM", Model: "X-T5" };
+
+    const space = await loadEmbeddingSpacePoints([albumWithClip(clip)], dbPath);
+
+    expect(space.points.find((point) => point.src === CLIP_POSTER)?.camera).toBe("FUJIFILM X-T5");
+  });
+
   it("skips a clip whose poster has not been extracted", async () => {
     const dbPath = await createEmbeddingsDb(embeddingsFor([CLIP_PATH]));
 

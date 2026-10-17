@@ -1,5 +1,6 @@
 import { RandomPhotoRow } from "../components/search/api";
 import { SlideshowMode } from "./slideshowUrl";
+import { clipPathOf } from "./videoScenePath";
 
 // Pure decision core for topical slideshow seeding. A topic is a free-text
 // query the user types (e.g. "cat"): the screen encodes it with the EmbeddingGemma 2
@@ -156,15 +157,18 @@ export const mapTopicSeedResults = (input: {
   const seeded: RandomPhotoRow[] = [];
 
   for (const item of input.resultData) {
-    if (seen.has(item.path)) {
+    // A result may be one minute of a long clip; the pool holds the clip, and a
+    // clip seeds the topic once however many of its moments matched.
+    const path = clipPathOf(item.path);
+    if (seen.has(path)) {
       continue;
     }
-    if (input.filter && !item.path.startsWith(`../albums/${input.filter}/`)) {
+    if (input.filter && !path.startsWith(`../albums/${input.filter}/`)) {
       continue;
     }
-    const match = byPath.get(item.path);
+    const match = byPath.get(path);
     if (match) {
-      seen.add(item.path);
+      seen.add(path);
       seeded.push(match);
     }
   }

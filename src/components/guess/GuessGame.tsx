@@ -33,7 +33,13 @@ const parsePhotos = (rows: RandomPhotoRow[]): GuessPhoto[] => {
   return rows.flatMap((row) => {
     if (seen.has(row.path)) return [];
     seen.add(row.path);
-    const gps = extractGPSFromExifString(row.exif);
+    // A photograph's place is in its EXIF; a clip's only in the index's
+    // metadata, which the query returns for every placed row.
+    const gps =
+      extractGPSFromExifString(row.exif) ??
+      (row.latDeg !== undefined && row.lngDeg !== undefined
+        ? ([row.latDeg, row.lngDeg] as const)
+        : null);
     if (!gps) return [];
     const albumName = row.path.split("/")?.[2] ?? "";
     const photoName = row.path.split("/")?.[3] ?? "";

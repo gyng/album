@@ -101,6 +101,8 @@ jest.mock("../../../components/useRemixGridReveal", () => ({
   useRemixGridReveal: () => ({ markRemixCellLoaded: jest.fn(), isRemixGridReady: true }),
 }));
 jest.mock("../../../util/slideshowRemix", () => ({
+  // Pure: the queue the page builds from similar results is the real one.
+  toSimilarQueueRows: jest.requireActual("../../../util/slideshowRemix").toSimilarQueueRows,
   decideRemixPlan: () => remixPlan,
   mapVectorRemixResult: ({ resultData }: { resultData: any[] }) => ({
     companions: resultData.slice(0, 1),

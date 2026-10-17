@@ -1,4 +1,4 @@
-import type { Content, PhotoBlock, TextBlock } from "../../../services/types";
+import type { Content, PhotoBlock, TextBlock, VideoBlock } from "../../../services/types";
 
 jest.mock("../../../services/album", () => ({ getAlbums: jest.fn() }));
 
@@ -49,6 +49,41 @@ describe("map search data endpoint", () => {
     await expect(loadMapSearchIndexEntries()).resolves.toEqual([
       ["/album/singapore#night%20market.jpg", "Night market"],
     ]);
+  });
+
+  // A clip's indexed row and its camera are as searchable as a photograph's;
+  // the index used to hold only its filename.
+  it("finds a clip by what its indexed row and its camera say", async () => {
+    const clip: VideoBlock = {
+      kind: "video",
+      id: "DSCF7497.MOV",
+      data: { type: "local", href: "/DSCF7497.MOV" },
+      _build: {
+        src: "/DSCF7497.MOV@1920.mp4",
+        mimeType: "video/mp4",
+        poster: { srcset: [{ src: "/DSCF7497.MOV@800.avif", width: 800, height: 450 }] },
+        capturedAtLocal: "2025-12-01T20:15:51",
+        latDeg: 35.66,
+        lngDeg: 139.73,
+        camera: { Make: "FUJIFILM", Model: "X-T5" },
+        tags: { alt_text: "City lights from an observation deck.", tags: ["night"] },
+      },
+    };
+    mockGetAlbums.mockResolvedValue([
+      {
+        name: "tokyo",
+        title: "Tokyo",
+        blocks: [clip],
+        formatting: {},
+        _build: { slug: "tokyo", srcdir: "../albums/tokyo" },
+      } satisfies Content,
+    ]);
+
+    const [entry] = await loadMapSearchIndexEntries();
+    expect(entry?.[0]).toBe("/album/tokyo#DSCF7497.MOV");
+    for (const text of ["DSCF7497.MOV", "observation deck", "night", "X-T5"]) {
+      expect(entry?.[1]).toContain(text);
+    }
   });
 
   it("exposes the entries as a framework-neutral JSON response", async () => {

@@ -186,6 +186,21 @@ describe("LocalVideoBlockEl details", () => {
     expect(screen.getByText("hevc")).toBeTruthy();
   });
 
+  // A photograph's pane links the sizes it is served at; a clip's links the
+  // file it plays. And a <video> has no alt, so it is named for what it shows.
+  it("links the clip it plays and names the player for what it shows", () => {
+    open();
+
+    expect(screen.getByRole("link", { name: "View 1920px" })).toHaveAttribute(
+      "href",
+      "/data/albums/2511japan/.resized_videos/DSCF7497.MOV@1920.mp4",
+    );
+    expect(document.querySelector("video")).toHaveAttribute(
+      "aria-label",
+      "City lights from an observation deck.",
+    );
+  });
+
   // An inferred place is a guess with a reason, and the pane gives the reason.
   it("says where an inferred location came from", () => {
     open({

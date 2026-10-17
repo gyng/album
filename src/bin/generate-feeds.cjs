@@ -7,6 +7,14 @@ const fs = require("fs");
 const path = require("path");
 
 const { resolveAlbumsDir, resolveSiteOrigin, siteConfig } = require("./siteConfig.cjs");
+const { parseYoutubeVideoId, youtubeMediaFilename } = require("../services/youtubeExternal.ts");
+
+// A YouTube clip's anchor on the album page is the synthetic "<id>.youtube"
+// name it is indexed and postered under, so a feed item opens at the clip.
+const youtubeAnchorLink = (slug, href) => {
+  const videoId = parseYoutubeVideoId(href);
+  return videoId ? `/album/${slug}#${youtubeMediaFilename(videoId)}` : `/album/${slug}`;
+};
 
 const appRoot = path.resolve(__dirname, "..");
 const albumsDir = resolveAlbumsDir(appRoot);
@@ -233,9 +241,11 @@ const getAlbumFeedItems = (slug, albumPath, albumMetadata, albumLastmod) => {
             block.data?.description,
             `From ${albumMetadata.title}`,
           ),
-          link: isYoutube ? `/album/${slug}` : `/album/${slug}#${source.split("/").at(-1)}`,
-          // YouTube items all share the bare /album/<slug> link, so give them a
-          // unique guid from the video href to stop readers deduping them.
+          link: isYoutube
+            ? youtubeAnchorLink(slug, source)
+            : `/album/${slug}#${source.split("/").at(-1)}`,
+          // Kept as the video href, which is what readers already know these
+          // items by: a new guid would show every one of them again.
           ...(isYoutube ? { guid: source } : {}),
           pubDate: sortDate,
           sortDate,
@@ -282,9 +292,10 @@ const getAlbumFeedItems = (slug, albumPath, albumMetadata, albumLastmod) => {
             `External item from ${albumMetadata.title}`,
             albumMetadata.description,
           ),
-          link: `/album/${slug}`,
-          // External items also share the bare album link — key their guid off
-          // the (unique) external href, falling back to a positional id.
+          link:
+            external.type === "youtube" ? youtubeAnchorLink(slug, external.href) : `/album/${slug}`,
+          // Keyed off the (unique) external href, which readers already know
+          // these items by.
           guid: external.href,
           pubDate: sortDate,
           sortDate,

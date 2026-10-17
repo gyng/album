@@ -19,7 +19,8 @@ const videoTimelineEntries = (album: Awaited<ReturnType<typeof getAlbums>>[numbe
     const wallClock = parseExifLocalDateTime(video.capturedAtLocal);
     if (!wallClock) return [];
     const wallClockIso = formatExifWallClockIso(wallClock);
-    const primaryColor = video.block._build?.tags?.colors?.[0];
+    const tags = video.block._build?.tags;
+    const primaryColor = tags?.colors?.[0];
 
     return [
       {
@@ -27,9 +28,12 @@ const videoTimelineEntries = (album: Awaited<ReturnType<typeof getAlbums>>[numbe
         mediaKind: "video",
         date: wallClockIso.slice(0, 10),
         dateTimeOriginal: wallClockIso,
+        // The indexer geocodes a clip and derives its zone exactly as it does a
+        // photograph's, so a clip names its place in the day's summary.
+        dateOffset: tags?.tz_offset ?? null,
         decLat: video.decLat,
         decLng: video.decLng,
-        geocode: null,
+        geocode: tags?.geocode ?? null,
         src: video.poster,
         href: `/album/${album._build.slug}#${encodeURIComponent(video.anchor)}`,
         // The same shape a photo's path takes here: a public media path, which
