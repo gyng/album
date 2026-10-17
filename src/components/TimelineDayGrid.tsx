@@ -5,7 +5,7 @@ import { MapWorldDeferred } from "./MapWorldDeferred";
 import { useIntersectionObserverMissing } from "./useNearViewport";
 import type { MapWorldEntry, TimelineEntry } from "../util/pageDataTypes";
 import { HydratedRelativeTime } from "./HydratedRelativeTime";
-import { Caption, Heading, Thumb, buttonStyles, overlayButtonStyles } from "./ui";
+import { Caption, Heading, HoverPlayClip, Thumb, buttonStyles, overlayButtonStyles } from "./ui";
 import styles from "./TimelineDayGrid.module.css";
 import {
   exifRelativeTimestamp,
@@ -13,6 +13,7 @@ import {
   formatExifWallClockDateTime,
 } from "../util/exifTime";
 import { summariseTimelineGeocode } from "../util/pageDataRows";
+import { isPlayableClipPath } from "../util/videoScenePath";
 
 const formatLongDate = (date: string) => formatExifWallClockDate(`${date}T00:00:00`) ?? date;
 
@@ -190,67 +191,91 @@ export const TimelineDayGrid = ({
       ) : null}
 
       <ul className={styles.grid}>
-        {entries.map((entry) => (
-          <li key={entry.href} className={styles.item}>
-            <div className={styles.card}>
-              <div className={styles.thumbnailWrap}>
-                <Link
-                  href={entry.href}
-                  // Only a video says so: a photo's name is the existing
-                  // "<album> <date>" that the rest of the page reads by.
-                  aria-label={
-                    entry.mediaKind === "video"
-                      ? `Video, ${entry.album} ${formattedDate}`
-                      : `${entry.album} ${formattedDate}`
-                  }
-                >
-                  <Thumb
-                    src={entry.src.src}
-                    width={entry.placeholderWidth}
-                    height={entry.placeholderHeight}
-                    style={{ backgroundColor: entry.placeholderColor }}
-                    className={styles.image}
-                    alt=""
-                  />
-                  {entry.mediaKind === "video" ? (
-                    <span className={styles.videoBadge} aria-hidden="true">
-                      ▶
-                    </span>
-                  ) : null}
-                </Link>
-                <Link
-                  href={`/search?similar=${encodeURIComponent(toSimilarSearchPath(entry.path))}`}
-                  className={`${overlayButtonStyles.base} ${styles.similarButton}`}
-                  aria-label="Find similar photos"
-                  title="Find similar photos"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                  }}
-                >
-                  <span className={styles.similarButtonIcon}>
-                    <Icon kind="search" />
-                  </span>
-                </Link>
-              </div>
+        {entries.map((entry) => {
+          // The grid's own album-relative form of the entry's path. The
+          // playable file's URL is built by swapping `data` for `..` and the
+          // poster's cache for the transcoded one, so a `/data/…` path here
+          // would come back protocol-relative.
+          const albumRelativePath = toSimilarSearchPath(entry.path);
+          // A clip's tile is the frame extracted from it; pointing at the tile
+          // plays the clip. A YouTube external is indexed as a video too, but
+          // has no transcoded file to play.
+          const playableClipPath =
+            entry.mediaKind === "video" && isPlayableClipPath(albumRelativePath)
+              ? albumRelativePath
+              : null;
+          const poster = (
+            <Thumb
+              src={entry.src.src}
+              width={entry.placeholderWidth}
+              height={entry.placeholderHeight}
+              style={{ backgroundColor: entry.placeholderColor }}
+              className={styles.image}
+              alt=""
+            />
+          );
 
-              <div className={styles.details}>
-                <div className={styles.source}>
-                  <strong className={styles.sourceText}>{entry.album}</strong>
-                  {exifRelativeTimestamp(entry.dateTimeOriginal, entry.dateOffset) !== null ? (
-                    <span
-                      className={styles.secondaryMeta}
-                      title={formatDateTimeTitle(entry.dateTimeOriginal, entry.dateOffset)!}
-                    >
-                      <HydratedRelativeTime
-                        date={exifRelativeTimestamp(entry.dateTimeOriginal, entry.dateOffset)!}
-                      />
+          return (
+            <li key={entry.href} className={styles.item}>
+              <div className={styles.card}>
+                <div className={styles.thumbnailWrap}>
+                  <Link
+                    href={entry.href}
+                    // Only a video says so: a photo's name is the existing
+                    // "<album> <date>" that the rest of the page reads by.
+                    aria-label={
+                      entry.mediaKind === "video"
+                        ? `Video, ${entry.album} ${formattedDate}`
+                        : `${entry.album} ${formattedDate}`
+                    }
+                  >
+                    {playableClipPath !== null ? (
+                      <HoverPlayClip clipPath={playableClipPath} className={styles.hoverPlayWrap}>
+                        {poster}
+                      </HoverPlayClip>
+                    ) : (
+                      poster
+                    )}
+                    {entry.mediaKind === "video" ? (
+                      <span className={styles.videoBadge} aria-hidden="true">
+                        ▶
+                      </span>
+                    ) : null}
+                  </Link>
+                  <Link
+                    href={`/search?similar=${encodeURIComponent(albumRelativePath)}`}
+                    className={`${overlayButtonStyles.base} ${styles.similarButton}`}
+                    aria-label="Find similar photos"
+                    title="Find similar photos"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                    }}
+                  >
+                    <span className={styles.similarButtonIcon}>
+                      <Icon kind="search" />
                     </span>
-                  ) : null}
+                  </Link>
+                </div>
+
+                <div className={styles.details}>
+                  <div className={styles.source}>
+                    <strong className={styles.sourceText}>{entry.album}</strong>
+                    {exifRelativeTimestamp(entry.dateTimeOriginal, entry.dateOffset) !== null ? (
+                      <span
+                        className={styles.secondaryMeta}
+                        title={formatDateTimeTitle(entry.dateTimeOriginal, entry.dateOffset)!}
+                      >
+                        <HydratedRelativeTime
+                          date={exifRelativeTimestamp(entry.dateTimeOriginal, entry.dateOffset)!}
+                        />
+                      </span>
+                    ) : null}
+                  </div>
                 </div>
               </div>
-            </div>
-          </li>
-        ))}
+            </li>
+          );
+        })}
       </ul>
 
       {mapPhotos.length > 0 ? (

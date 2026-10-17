@@ -5,10 +5,11 @@ import {
   type AlbumNeighbours as Neighbours,
 } from "../util/albumNeighbours";
 import type { AlbumPreview } from "../util/pageDataTypes";
-import { coverBlockOf } from "../util/videoBlockMedia";
+import { coverBlockOf, coverClipBlockOf } from "../util/videoBlockMedia";
+import { isPlayableClipPath } from "../util/videoScenePath";
 import { rgbToString } from "../util/colorDistance";
 import { AppLink } from "./platform";
-import { Caption, Thumb } from "./ui";
+import { Caption, HoverPlayClip, Thumb } from "./ui";
 import { ALBUM_STEP_ATTRIBUTE } from "./useAlbumStepping";
 import photoStyles from "./Photo.module.css";
 import styles from "./AlbumNeighbours.module.css";
@@ -17,18 +18,36 @@ import styles from "./AlbumNeighbours.module.css";
 // under it. Full-size covers here read as more of the album's photographs.
 const Neighbour = ({ album, side }: { album: AlbumPreview; side: "previous" | "next" }) => {
   const cover = coverBlockOf(album.blocks);
+  // A neighbouring album of clips alone shows a clip's poster, and pointing at
+  // it plays the clip. Only a local clip has a file to play: a YouTube external
+  // is indexed as one but has no transcoded MP4, and a photograph is not a clip
+  // at all, so both keep the poster they already had.
+  const coverClip = coverClipBlockOf(album.blocks);
+  const coverClipPath =
+    coverClip !== undefined && coverClip.data.type === "local"
+      ? `../albums/${album._build.slug}/${coverClip.id}`
+      : null;
+  const playableCoverClipPath =
+    coverClipPath !== null && isPlayableClipPath(coverClipPath) ? coverClipPath : null;
   const src = cover?._build.srcset[0]?.src;
   const colour = cover?._build.tags.colors?.[0];
+  const thumbnail = src ? (
+    <Thumb
+      src={src}
+      loading="lazy"
+      {...(colour ? { style: { backgroundColor: rgbToString(colour) } } : {})}
+    />
+  ) : null;
   return (
     <li className={styles.neighbour} data-side={side}>
       <AppLink href={`/album/${album._build.slug}`} className={styles.link}>
-        {src ? (
-          <Thumb
-            src={src}
-            loading="lazy"
-            {...(colour ? { style: { backgroundColor: rgbToString(colour) } } : {})}
-          />
-        ) : null}
+        {thumbnail !== null && playableCoverClipPath !== null ? (
+          <HoverPlayClip clipPath={playableCoverClipPath} className={styles.hoverPlayWrap}>
+            {thumbnail}
+          </HoverPlayClip>
+        ) : (
+          thumbnail
+        )}
         <span className={styles.text}>
           <Caption as="span" size="sm">
             {side === "previous" ? "Previous album" : "Next album"}

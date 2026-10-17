@@ -52,3 +52,10 @@
   color: var(--c-bg-contrast-light);
   overflow-wrap: anywhere;
 }
+
+/* The poster's own box, so the shared HoverPlayClip's overlay is positioned
+   against the thumbnail rather than the whole link. Block keeps the thumbnail
+   at the tile's full width. */
+.videoPoster {
+  display: block;
+}

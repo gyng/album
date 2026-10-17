@@ -1,0 +1,16 @@
+/* The consumer's own class sets the display (block or inline-block); what this
+   adds is the containing block the preview is positioned against. */
+.wrapper {
+  position: relative;
+}
+
+/* Fills the wrapper the poster already sized, cropping a clip of any shape to
+   it. Pointer events pass through to the link and text under the poster. */
+.preview {
+  position: absolute;
+  inset: 0;
+  inline-size: 100%;
+  block-size: 100%;
+  object-fit: cover;
+  pointer-events: none;
+}

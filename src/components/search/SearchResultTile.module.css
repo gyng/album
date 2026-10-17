@@ -16,6 +16,13 @@
   position: relative;
 }
 
+/* The clip's poster box — the hover preview overlay is positioned against it
+   (the shared HoverPlayClip supplies `position: relative`). Block keeps the
+   inline `<picture>` from collapsing around its block-level image. */
+.hoverPlayWrap {
+  display: block;
+}
+
 .resultPicture {
   margin-block-end: var(--m);
   object-position: center;

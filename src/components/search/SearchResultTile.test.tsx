@@ -19,6 +19,23 @@ const makeResult = (overrides: Record<string, unknown> = {}) => ({
 });
 
 describe("SearchResultTile", () => {
+  let playSpy: jest.SpyInstance;
+  let pauseSpy: jest.SpyInstance;
+
+  beforeEach(() => {
+    // jsdom has no media pipeline; without these stubs a hover preview's
+    // element.play() throws "Not implemented".
+    playSpy = jest
+      .spyOn(HTMLMediaElement.prototype, "play")
+      .mockImplementation(() => Promise.resolve());
+    pauseSpy = jest.spyOn(HTMLMediaElement.prototype, "pause").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    playSpy.mockRestore();
+    pauseSpy.mockRestore();
+  });
+
   it("uses the snippet as image alt text without rendering a visible caption", () => {
     render(
       <SearchResultTile
@@ -269,5 +286,110 @@ describe("SearchResultTile", () => {
       "title",
       "Hybrid search: semantic n/a, keyword 2.0, fused score 0.020 (20)",
     );
+  });
+
+  // A local clip's poster plays in place on hover. Nothing is fetched or
+  // decoded first, so a page of these tiles holds no videos until pointed at.
+  it("plays a local clip over its poster on hover", () => {
+    const { container } = render(
+      <SearchResultTile
+        result={makeResult({
+          path: "../albums/test-simple/DSCF0159.MOV",
+          album_relative_path: "/album/test-simple#DSCF0159.MOV",
+          filename: "DSCF0159.MOV",
+          mediaKind: "video",
+          durationSeconds: 73.4,
+        })}
+      />,
+    );
+
+    expect(container.querySelector("video")).toBeNull();
+
+    const poster = screen.getByTestId("result-picture");
+    // The poster's box is the shared component's span, and the poster itself is
+    // still the element it was: same variant URL, same test id.
+    expect(poster.closest("picture")!.parentElement!.tagName).toBe("SPAN");
+    expect(poster).toHaveAttribute(
+      "src",
+      "/data/albums/test-simple/.resized_images/DSCF0159.MOV%40800.avif",
+    );
+    fireEvent.pointerOver(poster.closest("picture")!.parentElement!);
+
+    // Exactly one video, with the clip's transcoded file and the muted,
+    // inline, looping preview's attribute set.
+    expect(container.querySelectorAll("video")).toHaveLength(1);
+    const video = container.querySelector<HTMLVideoElement>("video");
+    if (!video) throw new Error("video element not rendered");
+    expect(video).toHaveAttribute(
+      "src",
+      "/data/albums/test-simple/.resized_videos/DSCF0159.MOV%401920.mp4",
+    );
+    expect(video).toHaveAttribute("preload", "none");
+    expect(video).toHaveAttribute("aria-hidden", "true");
+    expect(video).toHaveAttribute("tabindex", "-1");
+    expect(video.muted).toBe(true);
+    expect(video.loop).toBe(true);
+    expect(playSpy).toHaveBeenCalled();
+
+    // The poster stays exactly the element it was, now inside the wrapper.
+    expect(screen.getByTestId("result-picture")).toBe(poster);
+  });
+
+  // A scene row belongs to the clip it was cut from, so hovering its frame
+  // plays that clip — the same file, not a minute-long one.
+  it("plays the clip behind a scene row's poster", () => {
+    const { container } = render(
+      <SearchResultTile
+        result={makeResult({
+          path: "../albums/test-simple/clip.mov@t180",
+          album_relative_path: "/album/test-simple?t=180#clip.mov",
+          filename: "clip.mov@t180",
+          mediaKind: "video",
+          durationSeconds: 600,
+        })}
+      />,
+    );
+
+    fireEvent.pointerOver(
+      screen.getByTestId("result-picture").closest("picture")!.parentElement!,
+    );
+
+    expect(container.querySelector("video")).toHaveAttribute(
+      "src",
+      "/data/albums/test-simple/.resized_videos/clip.mov%401920.mp4",
+    );
+  });
+
+  it("mounts no video for a photo, however its poster is pointed at", () => {
+    const { container } = render(<SearchResultTile result={makeResult()} />);
+    const poster = screen.getByTestId("result-picture");
+
+    fireEvent.pointerOver(poster.closest("picture")!.parentElement!);
+    fireEvent.pointerOver(poster);
+
+    expect(container.querySelector("video")).toBeNull();
+    // A photo gets no wrapper at all — its poster stays exactly where it was.
+    expect(poster.closest("picture")!.parentElement!.tagName).toBe("DIV");
+  });
+
+  // A YouTube external has no transcoded file; the poster must not pretend
+  // otherwise by arming a preview.
+  it("mounts no video for a YouTube external's poster", () => {
+    const { container } = render(
+      <SearchResultTile
+        result={makeResult({
+          path: "../albums/test-simple/ycyUWULJxdU.youtube",
+          album_relative_path: "/album/test-simple#ycyUWULJxdU",
+          filename: "ycyUWULJxdU.youtube",
+          mediaKind: "video",
+        })}
+      />,
+    );
+
+    fireEvent.pointerOver(
+      screen.getByTestId("result-picture").closest("picture")!.parentElement!,
+    );
+
+    expect(container.querySelector("video")).toBeNull();
   });
 });

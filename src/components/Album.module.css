@@ -40,6 +40,13 @@
   block-size: 100%;
 }
 
+/* The containing block a clip cover's preview is positioned against. It takes
+   the link's whole height so the cover keeps filling the card. */
+.hoverPlayWrap {
+  display: block;
+  block-size: 100%;
+}
+
 .itemLink img {
   object-fit: cover;
   block-size: 100%;

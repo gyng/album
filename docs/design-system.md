@@ -66,6 +66,11 @@ Shared primitives live in `src/components/ui/` and are exported from its barrel.
 - `Input` / `Select` / `SegmentedToggle` — form controls on the shared geometry.
 - `Card`, `Heading` / `Caption`, `Thumb` — surfaces, hierarchy and thumbnails.
 - `OverlayButton` — dark glass for controls over photographs.
+- `HoverPlayClip` — a video thumbnail that plays its clip while a pointer is on
+  it. Nothing is mounted or fetched before that hover, one clip plays at a time,
+  and it never arms for a coarse pointer, under reduced motion, or for a clip
+  with no playable file. It wraps the poster the tile already renders and leaves
+  it untouched, so the still is what a keyboard, a test and a slow network see.
 - `Icon` — the shared SVG set. Icons inherit `currentColor` and occupy a fixed
   em-sized box. Hide decorative icons from assistive technology and name
   icon-only controls by their action.

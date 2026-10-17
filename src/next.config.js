@@ -69,6 +69,19 @@ const nextConfig = {
         },
       ],
     },
+    {
+      // The same reasoning for the transcoded clip a thumbnail hover plays.
+      // Under the default headers a second hover — or the element being
+      // mounted again after a remount — would wait on a revalidation
+      // round-trip for a file the browser already has.
+      source: "/data/albums/:album/.resized_videos/:file",
+      headers: [
+        {
+          key: "Cache-Control",
+          value: "public, max-age=604800, stale-while-revalidate=2592000",
+        },
+      ],
+    },
   ],
   experimental: {
     globalNotFound: true,

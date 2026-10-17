@@ -1,6 +1,6 @@
 import { mergeCssModuleStyles } from "../../util/mergeCssModuleStyles";
 import { AppLink as Link } from "../platform";
-import { Caption, Thumb } from "../ui";
+import { Caption, Thumb, HoverPlayClip } from "../ui";
 import { formatDuration } from "../../util/formatDuration";
 import { formatExifWallClockDate } from "../../util/exifTime";
 import sharedStyles from "./ExploreShared.module.css";
@@ -11,7 +11,7 @@ import type { ExploreClipRow } from "../../util/pageDataTypes";
 const styles = mergeCssModuleStyles(
   sharedStyles,
   localStyles,
-  ["videoGrid", "videoTile", "videoThumbLink", "videoBadge", "videoMeta"],
+  ["videoGrid", "videoTile", "videoThumbLink", "videoBadge", "videoMeta", "videoPoster"],
   [],
 );
 
@@ -38,12 +38,17 @@ export const ExploreVideoSection = ({ clips }: { clips: ExploreClipRow[] }) => {
             return (
               <li key={clip.href} className={styles.videoTile}>
                 <Link href={clip.href} className={styles.videoThumbLink}>
-                  <Thumb
-                    src={clip.src.src}
-                    alt={clip.label}
-                    loading="lazy"
-                    {...(clip.swatch ? { style: { backgroundColor: clip.swatch } } : {})}
-                  />
+                  <HoverPlayClip
+                    clipPath={`../albums/${clip.album}/${clip.id}`}
+                    className={styles.videoPoster}
+                  >
+                    <Thumb
+                      src={clip.src.src}
+                      alt={clip.label}
+                      loading="lazy"
+                      {...(clip.swatch ? { style: { backgroundColor: clip.swatch } } : {})}
+                    />
+                  </HoverPlayClip>
                   {duration ? (
                     <span
                       className={styles.videoBadge}

@@ -1,4 +1,4 @@
-import type { Block, Content, PhotoBlock } from "../services/types";
+import type { Block, Content, PhotoBlock, VideoBlock } from "../services/types";
 import type { TripPhoto } from "./computeTrips";
 import { toVideoBlockEntry } from "./videoBlockEntry";
 import { tripPhotoFromBlock } from "./tripPhotoFromBlock";
@@ -57,6 +57,23 @@ export const coverBlockOf = (blocks: readonly Block[]): PhotoBlock | undefined =
     if (asPhoto) return asPhoto;
   }
   return undefined;
+};
+
+/**
+ * The clip an album's cover was drawn from, when the cover is one.
+ *
+ * `coverBlockOf` hands a clip's poster back wearing a photograph's shape, so
+ * the block behind it is found by the anchor that poster carries — the block's
+ * own id — rather than guessed from the poster's URL. A photograph comes back
+ * as itself, so a cover already among `blocks` is a photograph, not a clip.
+ */
+export const coverClipBlockOf = (blocks: readonly Block[]): VideoBlock | undefined => {
+  const cover = coverBlockOf(blocks);
+  if (!cover || blocks.includes(cover)) return undefined;
+
+  return blocks.find(
+    (block): block is VideoBlock => block.kind === "video" && block.id === cover.id,
+  );
 };
 
 /**

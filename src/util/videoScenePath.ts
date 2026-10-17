@@ -15,6 +15,21 @@ export const sceneSecondsOf = (path: string): number | undefined => {
 /** The clip a row belongs to; anything that is not a scene is its own clip. */
 export const clipPathOf = (path: string): string => path.replace(SCENE_SUFFIX_PATTERN, "");
 
+/** The container formats `optimiseVideo` transcodes a web-playable MP4 from. */
+export const CLIP_EXTENSIONS = [".mp4", ".mov", ".m4v", ".webm", ".mkv", ".avi"] as const;
+
+/**
+ * True when a path names a clip this site serves a playable file for. A YouTube
+ * external is indexed as `<album>/<videoId>.youtube` with `media_kind='video'`
+ * but has no transcoded MP4, so it must never be offered as playable.
+ */
+export const isPlayableClipPath = (path: string): boolean => {
+  // A scene row (`clip.MOV@t120`) is a frame inside the clip, so it answers for
+  // the clip it was extracted from.
+  const clip = clipPathOf(path).toLowerCase();
+  return CLIP_EXTENSIONS.some((extension) => clip.endsWith(extension));
+};
+
 /**
  * Reduce a ranking to one entry per clip, keeping whichever moment ranked
  * highest. A twenty-minute video has twenty scenes, and without this a single

@@ -4,6 +4,7 @@ export { ChartTooltip } from "./ChartTooltip";
 export { TooltipSurface } from "./TooltipSurface";
 export { Footer } from "./Footer";
 export { Heading, Caption } from "./Heading";
+export { HoverPlayClip } from "./HoverPlayClip";
 export { Input } from "./Input";
 export { KeyHint } from "./KeyHint";
 export { OverlayButton, OverlayButtonLink, overlayButtonStyles } from "./OverlayButton";

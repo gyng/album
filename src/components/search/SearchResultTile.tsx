@@ -1,7 +1,7 @@
 import type { CSSProperties } from "react";
 import { Icon } from "../ui/Icon";
 import { AppLink as Link } from "../platform";
-import { Thumb, OverlayButton } from "../ui";
+import { Thumb, OverlayButton, HoverPlayClip } from "../ui";
 import styles from "./SearchResultTile.module.css";
 import { HydratedRelativeTime } from "../HydratedRelativeTime";
 import { extractDateFromExifString } from "../../util/extractExifFromDb";
@@ -9,7 +9,7 @@ import { SearchResultRow } from "./searchTypes";
 import { RGB, rgbToString, parseColorPalette } from "../../util/colorDistance";
 import { getResizedAlbumImageSrc } from "../../util/getResizedAlbumImageSrc";
 import { formatDuration } from "../../util/formatDuration";
-import { sceneSecondsOf } from "../../util/videoScenePath";
+import { sceneSecondsOf, isPlayableClipPath } from "../../util/videoScenePath";
 
 const stripHtml = (value?: string): string => {
   if (!value) {
@@ -67,6 +67,20 @@ export const SearchResultTile = (props: {
         : null;
   const actionColor = result.matchingColor ?? (palette[0] as RGB | undefined) ?? null;
   const matchingColorStyle = actionColor ? rgbToString(actionColor) : null;
+  // Only a local clip has a web-playable file behind its poster frame; a photo
+  // and a YouTube external do not, and stay exactly as they were.
+  const isPlayableClip = isPlayableClipPath(result.path);
+  const poster = (
+    <picture>
+      <Thumb
+        className={styles.resultPicture}
+        data-testid="result-picture"
+        src={resized}
+        alt={imageAlt}
+        style={{ backgroundColor: colour }}
+      />
+    </picture>
+  );
   const scoreTitle = isHybridResult
     ? `Hybrid search: semantic ${
         typeof result.similarity === "number" ? `${Math.round(result.similarity * 100)}%` : "n/a"
@@ -160,15 +174,13 @@ export const SearchResultTile = (props: {
       <Link href={result.album_relative_path} className={styles.link}>
         <div className={styles.result}>
           <div className={styles.thumbnailWrap}>
-            <picture>
-              <Thumb
-                className={styles.resultPicture}
-                data-testid="result-picture"
-                src={resized}
-                alt={imageAlt}
-                style={{ backgroundColor: colour }}
-              />
-            </picture>
+            {isPlayableClip ? (
+              <HoverPlayClip clipPath={result.path} className={styles.hoverPlayWrap}>
+                {poster}
+              </HoverPlayClip>
+            ) : (
+              poster
+            )}
           </div>
           <div className={styles.details}>
             <div className={styles.source}>

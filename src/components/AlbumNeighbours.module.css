@@ -49,6 +49,12 @@
   outline-offset: var(--size-2);
 }
 
+/* The containing block a clip preview is positioned against: the tile is the
+   poster's own square, so the preview covers it exactly. */
+.hoverPlayWrap {
+  display: block;
+}
+
 .text {
   display: grid;
   gap: var(--space-1);

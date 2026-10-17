@@ -3,10 +3,11 @@ import { AppLink as Link } from "./platform";
 import type { PhotoBlock } from "../services/types";
 import type { AlbumPreview, HomePageData } from "../util/pageDataTypes";
 import { Picture } from "./Photo";
-import { Caption, Heading } from "./ui";
+import { Caption, Heading, HoverPlayClip } from "./ui";
 import { parseExifLocalDateTime } from "../util/exifTime";
 import { prefetchImageSrcSet } from "../util/prefetchImage";
-import { coverBlockOf, mediaBlockAsPhoto } from "../util/videoBlockMedia";
+import { coverBlockOf, coverClipBlockOf, mediaBlockAsPhoto } from "../util/videoBlockMedia";
+import { isPlayableClipPath } from "../util/videoScenePath";
 import styles from "./Album.module.css";
 
 /**
@@ -52,6 +53,17 @@ export const Albums: React.FC<HomePageData> = (props) => {
     <ul className={styles.list}>
       {props.albums.map((album, i) => {
         const cover = coverBlockOf(album.blocks);
+        // A clip's cover plays the clip it stands for on hover. Only a local
+        // clip has a file to play: a YouTube external is indexed as one but has
+        // no transcoded MP4, and a photograph is not a clip at all, so both
+        // keep the poster they already had.
+        const coverClip = coverClipBlockOf(album.blocks);
+        const coverClipPath =
+          coverClip !== undefined && coverClip.data.type === "local"
+            ? `../albums/${album._build.slug}/${coverClip.id}`
+            : null;
+        const playableCoverClipPath =
+          coverClipPath !== null && isPlayableClipPath(coverClipPath) ? coverClipPath : null;
         const firstMedia = album.blocks
           .map(mediaBlockAsPhoto)
           .find((block): block is PhotoBlock => block !== null);
@@ -65,6 +77,24 @@ export const Albums: React.FC<HomePageData> = (props) => {
         const prefetchFirstPhoto = firstMedia
           ? () => prefetchImageSrcSet(firstMedia._build.srcset, "auto, 100vw")
           : undefined;
+
+        const coverImage = cover ? (
+          <Picture
+            block={cover}
+            thumb
+            lazy={i !== firstCoveredAlbumIndex}
+            label={`Album cover for ${album._build.slug}`}
+            useColourPlaceholder
+          />
+        ) : null;
+        const coverElement =
+          coverImage !== null && playableCoverClipPath !== null ? (
+            <HoverPlayClip clipPath={playableCoverClipPath} className={styles.hoverPlayWrap}>
+              {coverImage}
+            </HoverPlayClip>
+          ) : (
+            coverImage
+          );
 
         return (
           <li key={album._build.slug} className={styles.item}>
@@ -87,15 +117,7 @@ export const Albums: React.FC<HomePageData> = (props) => {
                   }
                 : {})}
             >
-              {cover ? (
-                <Picture
-                  block={cover}
-                  thumb
-                  lazy={i !== firstCoveredAlbumIndex}
-                  label={`Album cover for ${album._build.slug}`}
-                  useColourPlaceholder
-                />
-              ) : null}
+              {coverElement}
             </Link>
 
             <div className={styles.name}>

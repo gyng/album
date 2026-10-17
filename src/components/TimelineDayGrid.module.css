@@ -41,6 +41,13 @@
   position: relative;
 }
 
+/* The containing block a clip tile's preview is positioned against. The tile's
+   own margin still sits outside it, so the preview covers the frame and no
+   more. */
+.hoverPlayWrap {
+  display: block;
+}
+
 .image {
   margin-block-end: var(--m);
 }

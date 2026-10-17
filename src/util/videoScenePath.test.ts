@@ -1,4 +1,10 @@
-import { clipPathOf, collapseSceneRanking, sceneSecondsOf } from "./videoScenePath";
+import {
+  CLIP_EXTENSIONS,
+  clipPathOf,
+  collapseSceneRanking,
+  isPlayableClipPath,
+  sceneSecondsOf,
+} from "./videoScenePath";
 
 describe("scene paths", () => {
   it("reads the moment a scene row was taken from", () => {
@@ -49,5 +55,27 @@ describe("collapseSceneRanking", () => {
       { path: "../albums/trip/b.jpg", similarity: 0.8 },
     ];
     expect(collapseSceneRanking(photos)).toEqual(photos);
+  });
+});
+
+describe("isPlayableClipPath", () => {
+  it("accepts the formats the optimiser transcodes, whatever their case", () => {
+    expect(isPlayableClipPath("../albums/x/clip.mp4")).toBe(true);
+    expect(isPlayableClipPath("../albums/x/clip.MOV")).toBe(true);
+    for (const extension of CLIP_EXTENSIONS) {
+      expect(isPlayableClipPath(`../albums/x/clip${extension}`)).toBe(true);
+    }
+  });
+
+  it("answers for a scene row with the clip it was extracted from", () => {
+    expect(isPlayableClipPath("../albums/x/clip.MOV@t120")).toBe(true);
+  });
+
+  it("refuses a YouTube external, a photograph and an empty path", () => {
+    // A YouTube external is indexed with `media_kind='video'` but the site
+    // serves no transcoded MP4 for it, so it has nothing to play.
+    expect(isPlayableClipPath("../albums/x/dQw4w9WgXcQ.youtube")).toBe(false);
+    expect(isPlayableClipPath("../albums/x/photo.jpg")).toBe(false);
+    expect(isPlayableClipPath("")).toBe(false);
   });
 });

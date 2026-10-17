@@ -55,11 +55,20 @@ describe("TimelineDayGrid", () => {
     // viewer's zone for relative labels. A Z-anchored "now" against a local
     // wall clock would make the expected labels depend on the runner's timezone.
     jest.spyOn(Date, "now").mockReturnValue(new Date(2024, 0, 3, 12, 0, 0).getTime());
+    // jsdom has no media pipeline; the hover preview's element.play() would
+    // otherwise throw "Not implemented".
+    playSpy = jest
+      .spyOn(HTMLMediaElement.prototype, "play")
+      .mockImplementation(() => Promise.resolve());
+    pauseSpy = jest.spyOn(HTMLMediaElement.prototype, "pause").mockImplementation(() => {});
   });
 
   afterEach(() => {
     jest.restoreAllMocks();
   });
+
+  let playSpy: jest.SpyInstance;
+  let pauseSpy: jest.SpyInstance;
 
   const entries: TimelineEntry[] = [
     {
@@ -91,6 +100,104 @@ describe("TimelineDayGrid", () => {
       placeholderHeight: 150,
     },
   ];
+
+  // A clip's tile is the frame extracted from it, and pointing at the tile
+  // plays the clip itself. The entry carries the database path, so the tile's
+  // playable file is asked for under the album-relative form the resized caches
+  // are addressed by.
+  it("plays a clip's own file over its tile on hover", () => {
+    const { container } = render(
+      <TimelineDayGrid
+        date="2024-01-02"
+        entries={[
+          {
+            ...entries[0]!,
+            mediaKind: "video",
+            href: "/album/kansai#clip.mov",
+            src: { src: "/clip.mov@800.avif", width: 20, height: 10 },
+            path: "/data/albums/kansai/clip.mov",
+          },
+        ]}
+      />,
+    );
+
+    expect(container.querySelector("video")).toBeNull();
+
+    const poster = container.querySelector("img");
+    if (!poster) throw new Error("poster not rendered");
+    // React derives onPointerEnter from the bubbling pointerover event; a
+    // native pointerenter never reaches its listeners.
+    fireEvent.pointerOver(poster.parentElement!);
+
+    // Exactly one video, over the poster, playing the clip's transcoded file.
+    expect(container.querySelectorAll("video")).toHaveLength(1);
+    const video = container.querySelector<HTMLVideoElement>("video");
+    if (!video) throw new Error("video element not rendered");
+    expect(video).toHaveAttribute(
+      "src",
+      "/data/albums/kansai/.resized_videos/clip.mov%401920.mp4",
+    );
+    expect(video).toHaveAttribute("preload", "none");
+    expect(video.muted).toBe(true);
+    expect(playSpy).toHaveBeenCalled();
+
+    // The poster is still the element it was, inside the same link, and the
+    // tile still names the clip and offers the same search.
+    expect(container.querySelector("img")).toBe(poster);
+    expect(poster.closest("a")).toHaveAttribute("href", "/album/kansai#clip.mov");
+    expect(screen.getByRole("link", { name: /^Video, kansai/ })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Find similar photos" })).toHaveAttribute(
+      "href",
+      `/search?similar=${encodeURIComponent("../albums/kansai/clip.mov")}`,
+    );
+
+    // Leaving pauses; the element stays mounted, so coming back plays the same
+    // one rather than fetching a second.
+    fireEvent.pointerOut(poster.parentElement!);
+    expect(pauseSpy).toHaveBeenCalled();
+    const playsBefore = playSpy.mock.calls.length;
+    fireEvent.pointerOver(poster.parentElement!);
+    expect(container.querySelectorAll("video")).toHaveLength(1);
+    expect(playSpy.mock.calls.length).toBeGreaterThan(playsBefore);
+  });
+
+  // A YouTube external is indexed as a video too, but has no transcoded file
+  // behind its frame, so pointing at the tile must arm nothing at all.
+  it("mounts no preview for a YouTube external's tile", () => {
+    const { container } = render(
+      <TimelineDayGrid
+        date="2024-01-02"
+        entries={[
+          {
+            ...entries[0]!,
+            mediaKind: "video",
+            href: "/album/kansai#ycyUWULJxdU",
+            path: "/data/albums/kansai/ycyUWULJxdU.youtube",
+          },
+        ]}
+      />,
+    );
+
+    const poster = container.querySelector("img");
+    if (!poster) throw new Error("poster not rendered");
+    fireEvent.pointerOver(poster.parentElement!);
+
+    expect(container.querySelector("video")).toBeNull();
+    // Nothing was wrapped: the tile's own link is still the poster's parent.
+    expect(poster.parentElement?.tagName).toBe("A");
+  });
+
+  // A photograph's tile is not a clip, so pointing at it mounts nothing either.
+  it("mounts no preview over a photograph's tile", () => {
+    const { container } = render(<TimelineDayGrid date="2024-01-02" entries={[entries[0]!]} />);
+
+    const poster = container.querySelector("img");
+    if (!poster) throw new Error("poster not rendered");
+    fireEvent.pointerOver(poster.parentElement!);
+
+    expect(container.querySelector("video")).toBeNull();
+    expect(poster.parentElement?.tagName).toBe("A");
+  });
 
   it("renders a wrapping day grid with photo links for the selected date", () => {
     render(<TimelineDayGrid date="2024-01-02" entries={entries} />);

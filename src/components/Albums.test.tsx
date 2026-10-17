@@ -33,10 +33,10 @@ const text = (id: string): TextBlock => ({
   data: { title: "Introduction" },
 });
 
-const video = (id: string): VideoBlock => ({
+const video = (id: string, type: "local" | "youtube" = "local"): VideoBlock => ({
   kind: "video",
   id,
-  data: { type: "local", href: id },
+  data: type === "local" ? { type: "local", href: id } : { type: "youtube", href: id },
   _build: {
     src: `${id}@1920.mp4`,
     mimeType: "video/mp4",
@@ -66,6 +66,23 @@ const album = (
 });
 
 describe("Albums", () => {
+  let playSpy: jest.SpyInstance;
+  let pauseSpy: jest.SpyInstance;
+
+  beforeEach(() => {
+    // jsdom has no media pipeline; a cover's preview play() would otherwise
+    // throw "Not implemented".
+    playSpy = jest
+      .spyOn(HTMLMediaElement.prototype, "play")
+      .mockImplementation(() => Promise.resolve());
+    pauseSpy = jest.spyOn(HTMLMediaElement.prototype, "pause").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    playSpy.mockRestore();
+    pauseSpy.mockRestore();
+  });
+
   it("shows newest-first album years in descending order", () => {
     render(
       <Albums
@@ -153,6 +170,73 @@ describe("Albums", () => {
       "sunset.mov",
     );
     expect(screen.getByText("1 snap")).toBeTruthy();
+  });
+
+  // A clip's cover is its poster frame, so pointing at the card plays the clip
+  // itself — the file the transcoder wrote into the album's own cache.
+  it("plays a local clip's file over its cover on hover", () => {
+    const { container } = render(
+      <Albums albums={[album("clips", { blocks: [video("sunset.mov")] })]} />,
+    );
+
+    // Nothing is fetched or decoded before a pointer arrives.
+    expect(container.querySelector("video")).toBeNull();
+
+    const cover = screen.getByRole("img", { name: "Album cover for clips" });
+    // React derives onPointerEnter from the bubbling pointerover event; a
+    // native pointerenter never reaches its listeners.
+    fireEvent.pointerOver(cover.parentElement!);
+
+    expect(container.querySelectorAll("video")).toHaveLength(1);
+    const preview = container.querySelector<HTMLVideoElement>("video");
+    if (!preview) throw new Error("video element not rendered");
+    expect(preview).toHaveAttribute(
+      "src",
+      "/data/albums/clips/.resized_videos/sunset.mov%401920.mp4",
+    );
+    expect(preview).toHaveAttribute("preload", "none");
+    expect(preview).toHaveAttribute("aria-hidden", "true");
+    expect(preview.muted).toBe(true);
+    expect(preview.loop).toBe(true);
+    expect(playSpy).toHaveBeenCalled();
+
+    // The cover is still the element it was, in the same link.
+    expect(screen.getByRole("img", { name: "Album cover for clips" })).toBe(cover);
+    expect(cover.closest("a")).toHaveAttribute("href", "/album/clips");
+
+    // Leaving pauses; the element stays mounted, so a second hover plays that
+    // same one rather than fetching a second.
+    fireEvent.pointerOut(cover.parentElement!);
+    expect(pauseSpy).toHaveBeenCalled();
+    const playsBefore = playSpy.mock.calls.length;
+    fireEvent.pointerOver(cover.parentElement!);
+    expect(container.querySelectorAll("video")).toHaveLength(1);
+    expect(playSpy.mock.calls.length).toBeGreaterThan(playsBefore);
+  });
+
+  // A photograph is not a clip: its cover keeps the poster it already had.
+  it("mounts no preview over a photograph's cover", () => {
+    const { container } = render(<Albums albums={[album("stills")]} />);
+
+    const cover = screen.getByRole("img", { name: "Album cover for stills" });
+    fireEvent.pointerOver(cover.parentElement!);
+
+    expect(container.querySelector("video")).toBeNull();
+    // Nothing was wrapped: the card's own link is still the cover's parent.
+    expect(cover.parentElement?.tagName).toBe("A");
+  });
+
+  // A YouTube external's cover is a poster frame like a clip's, but there is no
+  // transcoded MP4 behind it, so it must stay a poster.
+  it("mounts no preview over a YouTube external's cover", () => {
+    const external = video("ycyUWULJxdU.youtube", "youtube");
+    const { container } = render(<Albums albums={[album("externals", { blocks: [external] })]} />);
+
+    const cover = screen.getByRole("img", { name: "Album cover for externals" });
+    fireEvent.pointerOver(cover.parentElement!);
+
+    expect(container.querySelector("video")).toBeNull();
+    expect(cover.parentElement?.tagName).toBe("A");
   });
 
   // The router prefetches the page; nothing prefetched the photograph the page

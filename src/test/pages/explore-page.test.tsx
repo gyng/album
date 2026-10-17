@@ -119,6 +119,9 @@ jest.mock("../../components/ui", () => ({
     </div>
   ),
   Select: (props: React.SelectHTMLAttributes<HTMLSelectElement>) => <select {...props} />,
+  // The hover preview only mounts a video on a real pointer hover, which this
+  // suite never performs: passthrough keeps the poster in the tree.
+  HoverPlayClip: ({ children }: React.PropsWithChildren) => <span>{children}</span>,
   pillStyles: { base: "base", ghost: "ghost" },
 }));
 
