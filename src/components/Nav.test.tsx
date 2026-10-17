@@ -88,6 +88,24 @@ describe("Nav", () => {
     expect(container.querySelector("nav")?.className).not.toContain("scrollableRight");
   });
 
+  it("scrolls the list sideways for a mouse wheel while it has room", () => {
+    render(<Nav />);
+    const list = screen.getByRole("list");
+    Object.defineProperties(list, {
+      clientWidth: { configurable: true, value: 100 },
+      scrollWidth: { configurable: true, value: 300 },
+      scrollLeft: { configurable: true, writable: true, value: 0 },
+    });
+
+    const turned = fireEvent.wheel(list, { deltaY: 60 });
+    expect(list.scrollLeft).toBe(60);
+    // The page does not scroll as well.
+    expect(turned).toBe(false);
+
+    list.scrollLeft = 200;
+    expect(fireEvent.wheel(list, { deltaY: 60 })).toBe(true);
+  });
+
   it("moves keyboard focus to main content from the skip link", () => {
     const main = document.createElement("main");
     document.body.append(main);

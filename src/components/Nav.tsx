@@ -1,5 +1,6 @@
 import { AppLink as Link } from "./platform";
 import { useEffect, useRef, useState } from "react";
+import { inlineScrollForWheel } from "../util/navWheel";
 import { useNavPositionMotion } from "./useNavPositionMotion";
 import styles from "./Nav.module.css";
 import commonStyles from "../styles/common.module.css";
@@ -44,13 +45,26 @@ export const Nav: React.FC<{
       setHasMoreRight(ul.scrollLeft + ul.clientWidth < ul.scrollWidth - 1);
     };
 
+    // A mouse wheel only turns one way and the strip hides its scrollbar, so a
+    // vertical turn scrolls it sideways while it has room. Attached by hand:
+    // React registers wheel listeners passively, and one that cannot cancel the
+    // page scroll would move both.
+    const turnWheel = (event: WheelEvent) => {
+      const delta = inlineScrollForWheel(event, ul);
+      if (delta === null) return;
+      event.preventDefault();
+      ul.scrollLeft += delta;
+    };
+
     update();
     ul.addEventListener("scroll", update, { passive: true });
+    ul.addEventListener("wheel", turnWheel, { passive: false });
     const resizeObserver = new ResizeObserver(update);
     resizeObserver.observe(ul);
 
     return () => {
       ul.removeEventListener("scroll", update);
+      ul.removeEventListener("wheel", turnWheel);
       resizeObserver.disconnect();
     };
   }, []);
