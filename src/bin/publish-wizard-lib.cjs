@@ -963,15 +963,20 @@ const createAlbumReport = async ({ albumDir, albumName, dbState }) => {
   });
 
   // Externals are indexed but never on disk, so the set of paths that legitimately
-  // exist for this album is its photos plus whatever the manifest declares.
+  // exist for this album is its photos and clips plus whatever the manifest
+  // declares. A clip's indexed moments ("clip.mov@t60") stand or fall with it.
   const externalPaths = readDeclaredExternalNames(albumDir).map((filename) =>
     toPosixPath(path.join("../albums", albumName, filename)),
   );
-  const indexablePaths = [...photoPaths, ...externalPaths];
+  const videoPaths = videos.map((filename) =>
+    toPosixPath(path.join("../albums", albumName, filename)),
+  );
+  const indexablePaths = new Set([...photoPaths, ...videoPaths, ...externalPaths]);
+  const withoutMoment = (indexedPath) => indexedPath.replace(/@t\d+(?:\.\d+)?$/, "");
 
   const removedPhotos = Array.from(dbState.indexedPhotoPaths)
     .filter((indexedPath) => indexedPath.startsWith(`../albums/${albumName}/`))
-    .filter((indexedPath) => !indexablePaths.includes(indexedPath));
+    .filter((indexedPath) => !indexablePaths.has(withoutMoment(indexedPath)));
 
   const newPhotos = [];
   for (const filename of newPhotoNames) {

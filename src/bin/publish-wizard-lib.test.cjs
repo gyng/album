@@ -54,6 +54,34 @@ describe("createAlbumReport with externals", () => {
     expect(report.removedPhotos).toEqual(["../albums/trip/deleted.jpg"]);
   });
 
+  // A local clip and its indexed moments are on disk as the clip itself. Read
+  // as missing photos, every clip in the archive was reported "no longer on
+  // disk" before each deploy, and offered up for pruning.
+  it("does not read an indexed clip or its moments as removed photos", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "album-wizard-clips-"));
+    const albumDir = path.join(root, "trip");
+    fs.mkdirSync(albumDir, { recursive: true });
+    fs.writeFileSync(path.join(albumDir, "a.jpg"), "photo");
+    fs.writeFileSync(path.join(albumDir, "clip.MOV"), "video");
+
+    const report = await lib.createAlbumReport({
+      albumDir,
+      albumName: "trip",
+      dbState: {
+        indexedPhotoPaths: new Set([
+          "../albums/trip/a.jpg",
+          "../albums/trip/clip.MOV",
+          "../albums/trip/clip.MOV@t60",
+          "../albums/trip/gone.MOV@t60",
+        ]),
+        hasEmbeddingsTable: true,
+      },
+    });
+
+    // A moment of a clip that is gone is gone with it.
+    expect(report.removedPhotos).toEqual(["../albums/trip/gone.MOV@t60"]);
+  });
+
   it("still reports an external that the manifest no longer declares", async () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "album-wizard-externals-"));
     const albumDir = path.join(root, "trip");
