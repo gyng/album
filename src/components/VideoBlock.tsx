@@ -479,6 +479,8 @@ export type LocalVideoBlockElProps = {
 
 export const LocalVideoBlockEl: React.FC<LocalVideoBlockElProps> = (props) => {
   const videoRef = React.useRef<HTMLVideoElement>(null);
+  const { width, height } = props.originalTechnicalData ?? {};
+  const clipAspect = width && height ? `${width} / ${height}` : null;
 
   React.useEffect(() => {
     // The video is rendered unconditionally, so its ref is attached before
@@ -556,6 +558,8 @@ export const LocalVideoBlockEl: React.FC<LocalVideoBlockElProps> = (props) => {
           preload="metadata"
           src={props.src}
           {...(props.posterSrc ? { poster: props.posterSrc } : {})}
+          // The clip's own shape, so a portrait clip is not boxed as 16:9.
+          {...(clipAspect ? { style: { "--clip-aspect": clipAspect } as React.CSSProperties } : {})}
           // A <video> has no alt: it is named for what it shows, as a
           // photograph is by its alt text.
           aria-label={props.reading?.tags?.alt_text ?? props.id ?? "Video"}

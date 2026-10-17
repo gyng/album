@@ -201,6 +201,14 @@ describe("LocalVideoBlockEl details", () => {
     );
   });
 
+  // A portrait clip boxed as 16:9 sat in black bars as wide as the screen.
+  it("shapes the player to the clip's recorded dimensions", () => {
+    open({ originalTechnicalData: { width: 1080, height: 1920 } });
+    expect(document.querySelector("video")!.style.getPropertyValue("--clip-aspect")).toBe(
+      "1080 / 1920",
+    );
+  });
+
   // An inferred place is a guess with a reason, and the pane gives the reason.
   it("says where an inferred location came from", () => {
     open({

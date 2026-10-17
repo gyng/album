@@ -71,6 +71,41 @@ test.describe("Smoke Tests", () => {
     expect(response.status()).toBe(200);
   });
 
+  // On a wide, short screen the clip's 16:9 box was capped by the viewport's
+  // height and left at the start of its row, so the picture sat ~90px left of
+  // the photographs around it at 1920x1080.
+  for (const [width, height] of [
+    [1920, 1080],
+    [390, 844],
+  ] as const) {
+    test(`a clip's picture is centred like a photograph at ${width}x${height}`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width, height });
+      await gotoHydrated(page, "/album/test-simple#DSCF0159.MOV");
+      const video = page.locator("[data-testid=videoblockel] video").first();
+      await expect
+        .poll(() => video.evaluate((v: HTMLVideoElement) => v.videoWidth))
+        .toBeGreaterThan(0);
+
+      const { frameCentre, pageCentre } = await video.evaluate((v: HTMLVideoElement) => {
+        const box = v.getBoundingClientRect();
+        // The picture is contained in the element's box, centred in it.
+        const paintedWidth = Math.min(box.width, (box.height * v.videoWidth) / v.videoHeight);
+        return {
+          frameCentre: box.x + (box.width - paintedWidth) / 2 + paintedWidth / 2,
+          // The page's own column: the scrollbar may belong to an inner
+          // scroller, so the document's width is not the content's.
+          pageCentre: (() => {
+            const photo = document.querySelector("main picture img")!.getBoundingClientRect();
+            return photo.x + photo.width / 2;
+          })(),
+        };
+      });
+      expect(Math.abs(frameCentre - pageCentre)).toBeLessThanOrEqual(2);
+    });
+  }
+
   test("map page loads a map that really rendered", async ({ page }) => {
     await gotoHydrated(page, "/map");
     await expect(page).toHaveTitle("Map | Snapshots");

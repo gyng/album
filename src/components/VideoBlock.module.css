@@ -1,11 +1,13 @@
+/* Sized by its own shape: as wide as the row allows, but never taller than the
+   screen, so on a wide, short screen it narrows instead of overflowing. The
+   width carries the cap, not a box around it, which is what keeps the picture
+   centred on the page like a photograph. */
 .youtubeIframe {
-  max-block-size: 90svh;
+  --clip-aspect: 16 / 9;
+
+  aspect-ratio: var(--clip-aspect);
+  inline-size: min(90%, calc(90svh * (var(--clip-aspect))));
   block-size: auto;
-
-  aspect-ratio: 16 / 9;
-
-  max-inline-size: 100svw;
-  inline-size: 90%;
 }
 
 .block {
@@ -19,15 +21,7 @@
   display: flex;
   justify-content: center;
   align-items: center;
-
-  max-block-size: 90svh;
-  block-size: auto;
-
-  max-inline-size: 100svw;
-
-  aspect-ratio: 16 / 9;
-
-  inline-size: auto;
+  inline-size: 100%;
 }
 
 .sourceCell {
