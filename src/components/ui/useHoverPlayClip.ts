@@ -22,8 +22,7 @@ const mediaQuery = (query: string) => ({
     list.addEventListener("change", onChange);
     return () => list.removeEventListener("change", onChange);
   },
-  read: (): boolean =>
-    typeof window.matchMedia === "function" && window.matchMedia(query).matches,
+  read: (): boolean => typeof window.matchMedia === "function" && window.matchMedia(query).matches,
 });
 
 const coarsePointer = mediaQuery(COARSE_POINTER_QUERY);

@@ -47,14 +47,7 @@ export const ExploreFunStatsSection = ({
   cards: FunStatCard[];
   overviewStats?: OverviewCard[];
 }) => (
-  <ExploreStatGroup
-    id="fun-stats"
-    title="Fun stats"
-    deferredSummary={cards
-      .slice(0, 4)
-      .map((card) => `${card.label}: ${card.value}`)
-      .join(" · ")}
-  >
+  <ExploreStatGroup id="fun-stats" title="Fun stats">
     <section className={`${styles.section} ${styles.sectionWide}`}>
       {overviewStats.length > 0 ? (
         <dl className={styles.archiveSummary}>
@@ -109,7 +102,6 @@ export const ExploreRecentTrendsSection = ({ data }: { data: PhotoStats["recentY
     <ExploreStatGroup
       id="recent-trends"
       title="Recent trends"
-      deferredSummary={`Recent-year trends cover ${data.map((item) => item.label).join(", ")}.`}
       actions={
         <Link href="/explore/timeline" className={`${pillStyles.base} ${pillStyles.ghost}`}>
           <span>Open Timeline</span>
@@ -132,17 +124,7 @@ export const ExploreRevisitedPlacesSection = ({
 }) => {
   const [visible, setVisible] = useState(4);
   return places.length > 0 ? (
-    <ExploreStatGroup
-      id="revisited-places"
-      title="Revisited places"
-      deferredSummary={places
-        .slice(0, 4)
-        .map(
-          (place) =>
-            `${place.label}: ${place.photoCount.toLocaleString("en")} photos from ${place.firstYear} to ${place.lastYear}`,
-        )
-        .join(" · ")}
-    >
+    <ExploreStatGroup id="revisited-places" title="Revisited places">
       <section className={`${styles.section} ${styles.sectionWide}`}>
         <div className={styles.revisitedPlacesGrid}>
           {places.slice(0, visible).map((place) => (

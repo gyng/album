@@ -350,9 +350,7 @@ describe("SearchResultTile", () => {
       />,
     );
 
-    fireEvent.pointerOver(
-      screen.getByTestId("result-picture").closest("picture")!.parentElement!,
-    );
+    fireEvent.pointerOver(screen.getByTestId("result-picture").closest("picture")!.parentElement!);
 
     expect(container.querySelector("video")).toHaveAttribute(
       "src",
@@ -386,9 +384,7 @@ describe("SearchResultTile", () => {
       />,
     );
 
-    fireEvent.pointerOver(
-      screen.getByTestId("result-picture").closest("picture")!.parentElement!,
-    );
+    fireEvent.pointerOver(screen.getByTestId("result-picture").closest("picture")!.parentElement!);
 
     expect(container.querySelector("video")).toBeNull();
   });

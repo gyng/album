@@ -75,7 +75,7 @@ export const SearchResultsGrid: React.FC<Props> = ({
 
   if (!showResults) {
     return (
-      <ul className={styles.results} aria-busy={isSearching}>
+      <ul className={`${styles.results} ${styles.resultsIdle}`} aria-busy={isSearching}>
         {statusItem}
       </ul>
     );

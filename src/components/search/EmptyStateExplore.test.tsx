@@ -2,7 +2,7 @@
  * @jest-environment jsdom
  */
 
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { EmptyStateExplore } from "./EmptyStateExplore";
 import { fetchMemoryCandidates, fetchRandomResults, fetchRecentResults } from "./api";
 import { getMemoryClusters } from "../../util/clusterByDate";
@@ -20,6 +20,7 @@ jest.mock("../../util/clusterByDate", () => ({
 }));
 
 jest.mock("./SearchResultTile", () => ({
+  SearchResultTilePlaceholder: () => <div data-testid="tile-placeholder" />,
   SearchResultTile: ({ result, onFindSimilar, onSearchByColor, persistColorAction }: any) => (
     <div data-testid={`tile-${result.path}`} data-persist-colour={String(persistColorAction)}>
       <button type="button" onClick={() => onFindSimilar(result.path)}>
@@ -74,12 +75,77 @@ describe("EmptyStateExplore", () => {
       <EmptyStateExplore database={null} onStartSimilarSearch={jest.fn()} />,
     );
     expect(screen.getByText("Loading recent photos…")).toBeTruthy();
-    expect(screen.getByText("Loading random photos…")).toBeTruthy();
     expect(mockRecent).not.toHaveBeenCalled();
 
     rerender(<EmptyStateExplore database={database} onStartSimilarSearch={jest.fn()} />);
     expect(await screen.findByText("No dated photos available yet.")).toBeTruthy();
     expect(await screen.findByText("No random photos available yet.")).toBeTruthy();
+  });
+
+  // The grids' first pages are what pushes the rest of the page down when they
+  // land, so until they do each grid holds that page's place with tiles of the
+  // same geometry: one row of status text growing into rows of photographs threw
+  // "Random selection" out of the viewport on every visit.
+  it("holds each grid's first page with placeholder tiles while it loads", async () => {
+    let resolveRecent!: (value: any[]) => void;
+    mockRecent.mockReturnValueOnce(new Promise((resolve) => (resolveRecent = resolve)) as any);
+    mockRandom.mockReturnValueOnce(new Promise(() => {}) as any);
+
+    render(<EmptyStateExplore database={database} onStartSimilarSearch={jest.fn()} />);
+
+    const latest = screen.getByRole("heading", { name: "Latest" }).closest("section")!;
+    // A page of tiles plus the "More…" tile that follows it.
+    expect(within(latest).getAllByTestId("tile-placeholder")).toHaveLength(16);
+    // Still announced, though the placeholders are what the eye sees.
+    expect(within(latest).getByRole("status")).toHaveTextContent("Loading recent photos…");
+
+    await act(async () => {
+      resolveRecent(rows("recent", 15));
+      await Promise.resolve();
+    });
+    expect(within(latest).queryAllByTestId("tile-placeholder")).toHaveLength(0);
+    expect(within(latest).getAllByTestId(/^tile-recent-/)).toHaveLength(15);
+    const random = (await screen.findByRole("heading", { name: "Random selection" })).closest(
+      "section",
+    )!;
+    expect(within(random).getAllByTestId("tile-placeholder")).toHaveLength(8);
+  });
+
+  // "On this day" is inserted above "Random selection" only once memories have
+  // answered, and on a wide screen the random section is already in view by
+  // then: it was pushed down under the reader. Arriving is not moving, so the
+  // random section arrives with or after the memories instead.
+  it("adds the random section only once memories have answered", async () => {
+    let resolveMemories!: (value: any[]) => void;
+    mockMemory.mockReturnValueOnce(new Promise((resolve) => (resolveMemories = resolve)) as any);
+
+    render(<EmptyStateExplore database={database} onStartSimilarSearch={jest.fn()} />);
+    expect(screen.queryByRole("heading", { name: "Random selection" })).toBeNull();
+
+    await act(async () => {
+      resolveMemories([]);
+      await Promise.resolve();
+    });
+    expect(screen.getByRole("heading", { name: "Random selection" })).toBeTruthy();
+  });
+
+  // A small archive's latest page is shorter than its placeholders, so the
+  // grid shrinks when it answers; a random section already below it moved up.
+  it("adds the random section only once the latest photos have answered", async () => {
+    let resolveRecent!: (value: any[]) => void;
+    mockRecent.mockReturnValueOnce(new Promise((resolve) => (resolveRecent = resolve)) as any);
+
+    render(<EmptyStateExplore database={database} onStartSimilarSearch={jest.fn()} />);
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(screen.queryByRole("heading", { name: "Random selection" })).toBeNull();
+
+    await act(async () => {
+      resolveRecent(rows("recent", 3));
+      await Promise.resolve();
+    });
+    expect(screen.getByRole("heading", { name: "Random selection" })).toBeTruthy();
   });
 
   it("shows independent memory, recent, and random load failures", async () => {

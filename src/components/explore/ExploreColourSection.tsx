@@ -92,26 +92,10 @@ export const ExploreColourSection = ({ stats }: { stats: PhotoStats }) => {
   // 2025's three hundred.
   const busiestYear = Math.max(...colourStacks.map((year) => year.total), 1);
   const maxColorCount = Math.max(...stats.colorStats.map((item) => item.count), 1);
-  const leadingColourFamily = stats.colorStats.reduce(
-    (best, family) => (family.count > (best?.count ?? 0) ? family : best),
-    stats.colorStats[0],
-  );
   const accentStats = stats.accentColorStats?.filter((bucket) => bucket.count > 0) ?? [];
   const maxAccentCount = Math.max(...accentStats.map((bucket) => bucket.count), 1);
-  const deferredSummary = [
-    formatCoverage(stats.colorCoverage),
-    leadingColourFamily
-      ? `Dominant colour families are led by ${leadingColourFamily.label.toLowerCase()} across ${leadingColourFamily.count.toLocaleString("en")} photos.`
-      : "No dominant colour families are available yet.",
-    stats.colorYearRibbons.length > 0
-      ? `Colour over time covers ${stats.colorYearRibbons.length.toLocaleString("en")} years.`
-      : null,
-  ]
-    .filter(Boolean)
-    .join(" ");
-
   return (
-    <ExploreStatGroup id="colour" title="Colour" deferredSummary={deferredSummary}>
+    <ExploreStatGroup id="colour" title="Colour">
       <section className={`${styles.section} ${styles.sectionWide}`}>
         <div className={styles.colourSectionGrid}>
           <section className={styles.colourPanel}>

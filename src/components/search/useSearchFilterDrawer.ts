@@ -3,7 +3,16 @@ import { useCallback, useEffect, useRef, useState } from "react";
 const COMPACT_FILTER_QUERY = "(max-width: 900px)";
 
 export const useSearchFilterDrawer = ({ isSimilarMode }: { isSimilarMode: boolean }) => {
-  const [isCompact, setIsCompact] = useState(false);
+  // Read during the first render, not only in the effect: the search widget is
+  // client-only, so its first render is what paints, and a compact viewport
+  // painted without the Filters button had the browse area pushed down by it a
+  // frame later.
+  const [isCompact, setIsCompact] = useState(
+    () =>
+      typeof window !== "undefined" &&
+      typeof window.matchMedia === "function" &&
+      window.matchMedia(COMPACT_FILTER_QUERY).matches,
+  );
   const [isOpen, setIsOpen] = useState(false);
   const dialogRef = useRef<HTMLDialogElement | null>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);

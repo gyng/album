@@ -40,6 +40,13 @@
   font-size: var(--fs-sm);
 }
 
+/* Holding only the live region while the browse sections show above it, the
+   list has nothing to give room to — and an empty box below the browse grids
+   counted as moved every time one of them grew. */
+.resultsIdle {
+  min-block-size: 0;
+}
+
 .resultLi {
   animation-name: fadein;
   animation-duration: var(--t-base);

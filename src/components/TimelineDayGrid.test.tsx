@@ -133,10 +133,7 @@ describe("TimelineDayGrid", () => {
     expect(container.querySelectorAll("video")).toHaveLength(1);
     const video = container.querySelector<HTMLVideoElement>("video");
     if (!video) throw new Error("video element not rendered");
-    expect(video).toHaveAttribute(
-      "src",
-      "/data/albums/kansai/.resized_videos/clip.mov%401920.mp4",
-    );
+    expect(video).toHaveAttribute("src", "/data/albums/kansai/.resized_videos/clip.mov%401920.mp4");
     expect(video).toHaveAttribute("preload", "none");
     expect(video.muted).toBe(true);
     expect(playSpy).toHaveBeenCalled();

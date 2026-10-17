@@ -2,6 +2,7 @@ import type { CSSProperties } from "react";
 import { Icon } from "../ui/Icon";
 import { AppLink as Link } from "../platform";
 import { Thumb, OverlayButton, HoverPlayClip } from "../ui";
+import common from "../../styles/common.module.css";
 import styles from "./SearchResultTile.module.css";
 import { HydratedRelativeTime } from "../HydratedRelativeTime";
 import { extractDateFromExifString } from "../../util/extractExifFromDb";
@@ -203,3 +204,15 @@ export const SearchResultTile = (props: {
     </div>
   );
 };
+
+/**
+ * A tile's box with nothing in it, for holding a grid's place until its rows
+ * arrive. It is built from the tile's own classes, so the picture and the
+ * caption line take exactly the room a loaded tile's do.
+ */
+export const SearchResultTilePlaceholder = () => (
+  <div className={styles.result} aria-hidden="true">
+    <div className={`${common.thumb} ${styles.resultPicture}`} />
+    <div className={styles.details}>&nbsp;</div>
+  </div>
+);

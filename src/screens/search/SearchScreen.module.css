@@ -4,13 +4,41 @@
   flex-direction: column;
 }
 
-/* Title row: the database-download progress bar sits to the right of the
-   "Search" heading so it never occupies vertical space in the results flow. */
+/* Title row: the database-download progress bar sits beside the "Search"
+   heading in a track of its own. It used to be a flex item free to wrap onto a
+   line of its own beneath the heading, so its appearing, counting bytes and
+   disappearing moved everything below. Beside the heading it never grows the
+   row, whose height is the heading's box. */
 .searchHeadingRow {
-  display: flex;
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
   align-items: center;
   gap: var(--m-m);
-  flex-wrap: wrap;
+}
+
+/* The search widget is fetched on the client, and until it arrives the page
+   holds a one-line placeholder where the widget's opening screen — the search
+   bar, the facet rail and the browse grids' first pages — will be most of a
+   viewport. This box reserves that room from the first paint, as
+   EmbeddingSpaceDeferred does for the cloud, so the widget's arrival cannot
+   push the footer out of view. `svh` so a phone's URL bar sliding away cannot
+   resize it by itself; it is a minimum, and the page grows past it freely.
+
+   `flow-root` keeps the placeholder's paragraph margin inside the box: it
+   collapsed through it, so the box sat 18px lower until the widget replaced
+   the paragraph. */
+.widgetReservation {
+  display: flow-root;
+  min-block-size: max(var(--size-560), 80svh);
+}
+
+@media (max-width: 900px) {
+  /* The breakpoint of the filter-drawer decision (useSearchFilterDrawer): at
+     compact widths the search bar wraps over several rows and the opening
+     screen is a whole viewport. */
+  .widgetReservation {
+    min-block-size: max(var(--size-760), 100svh);
+  }
 }
 
 /* Matches Search.module.css .inlineError (the shared error treatment). */

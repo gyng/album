@@ -21,9 +21,9 @@ const videoBadgePattern = /^Video, 0:1/;
 const clipVideoSrc = "/data/albums/test-simple/.resized_videos/DSCF0159.MOV%401920.mp4";
 
 /**
- * The video group's content is in the DOM at every width — the collapse is a
- * stylesheet decision — so a tile assertion only has to scroll the section into
- * view and then wait on the tile itself rather than on a timer.
+ * The video group's content is in the DOM at every width, so a tile assertion
+ * only has to scroll the section into view and then wait on the tile itself
+ * rather than on a timer.
  */
 const scrollToVideoSection = async (page: Page) => {
   const section = page.locator("section#video");
@@ -132,8 +132,6 @@ test("the jump nav reaches the video section", async ({ page }) => {
 
 test("the video grid does not overflow a 390px viewport", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  // The hash keeps the narrow-viewport group open, so the grid itself — not
-  // just its collapsed summary — is what gets measured.
   await gotoHydrated(page, "/explore#video");
 
   const section = page.locator("section#video");

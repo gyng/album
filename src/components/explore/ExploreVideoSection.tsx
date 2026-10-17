@@ -23,11 +23,7 @@ export const ExploreVideoSection = ({ clips }: { clips: ExploreClipRow[] }) => {
   if (clips.length === 0) return null;
 
   return (
-    <ExploreStatGroup
-      id="video"
-      title="Video"
-      deferredSummary={`${clips.length} ${clips.length === 1 ? "clip" : "clips"}`}
-    >
+    <ExploreStatGroup id="video" title="Video">
       <section className={`${styles.section} ${styles.sectionWide}`}>
         <ul className={styles.videoGrid}>
           {clips.map((clip) => {
@@ -59,7 +55,9 @@ export const ExploreVideoSection = ({ clips }: { clips: ExploreClipRow[] }) => {
                     </span>
                   ) : null}
                 </Link>
-                <Caption as="div" size="sm" className={styles.videoMeta}>{caption}</Caption>
+                <Caption as="div" size="sm" className={styles.videoMeta}>
+                  {caption}
+                </Caption>
               </li>
             );
           })}

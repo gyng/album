@@ -3,6 +3,7 @@
  */
 
 import { fireEvent, render, screen } from "@testing-library/react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { useSearchFilterDrawer } from "./useSearchFilterDrawer";
 
 const Harness = ({ isSimilarMode = false }: { isSimilarMode?: boolean }) => {
@@ -47,6 +48,13 @@ describe("useSearchFilterDrawer", () => {
       removeEventListener: jest.fn(),
       dispatchEvent: jest.fn(),
     }));
+  });
+
+  // The search widget is client-only, so its first render is its first paint:
+  // deciding in an effect painted a compact viewport without the Filters
+  // button, then pushed the whole browse area down by the button's height.
+  it("decides on its very first render, before any effect has run", () => {
+    expect(renderToStaticMarkup(<Harness />)).toContain("Open");
   });
 
   it("opens a native modal, handles cancellation, and restores trigger focus", () => {

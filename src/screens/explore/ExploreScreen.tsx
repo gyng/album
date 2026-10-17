@@ -370,22 +370,14 @@ const ExploreScreen = ({
               it is the collection arranged by what the photographs are of, and
               the only way to read it is to turn it around — so it is left to
               speak for itself rather than introduced. */}
-          <StatGroup
-            id="embedding-space"
-            title="Cloud"
-            deferredSummary="Every photograph, placed by what it is of — or by when it happened."
-          >
+          <StatGroup id="embedding-space" title="Cloud">
             <section className={`${styles.section} ${styles.sectionWide}`}>
               <EmbeddingSpaceDeferred />
             </section>
           </StatGroup>
 
           {visualSameness ? (
-            <StatGroup
-              id="visual-sameness"
-              title="Visual sameness"
-              deferredSummary={`${visualSameness.samenessPercent}% average nearest-neighbour similarity across ${visualSameness.sampleSize.toLocaleString("en")} embedded photos; ${visualSameness.repeatedMotifPercent}% have a repeated visual motif and ${visualSameness.distinctPercent}% are distinct frames.`}
-            >
+            <StatGroup id="visual-sameness" title="Visual sameness">
               <section className={`${styles.section} ${styles.sectionWide}`}>
                 <div className={styles.visualSummaryGrid}>
                   <Card as="article" className={styles.overviewCard}>
@@ -648,17 +640,7 @@ const ExploreScreen = ({
           <ExploreRecentTrendsSection data={stats.recentYearStats} />
           <ExploreRevisitedPlacesSection places={stats.revisitedPlaces} />
 
-          <StatGroup
-            id="when-you-shoot"
-            title="Time"
-            actions={renderScopeFilterControls("Time")}
-            deferredSummary={[
-              formatCoverage(activeCalendarCoverage),
-              "Time relationships and archive cadence summarise when photos were made.",
-            ]
-              .filter(Boolean)
-              .join(" ")}
-          >
+          <StatGroup id="when-you-shoot" title="Time" actions={renderScopeFilterControls("Time")}>
             {activeTimeFacet && activeTimeRelationships ? (
               <section className={`${styles.section} ${styles.sectionWide}`}>
                 <TimeRelationshipExplorer
@@ -698,7 +680,6 @@ const ExploreScreen = ({
             id="how-you-shoot"
             title="Shooting settings"
             actions={renderScopeFilterControls("Settings")}
-            deferredSummary={`Camera settings span ${activeTechnicalFacets.length.toLocaleString("en")} technical facets${filteredTechnicalRelationships ? `; settings relationships cover ${filteredTechnicalRelationships.total.toLocaleString("en")} photos` : ""}.`}
           >
             {activeTechnicalFacets.map(renderNumericFacet)}
             {stats.technicalRelationships ? (
@@ -720,7 +701,6 @@ const ExploreScreen = ({
           <StatGroup
             id="where-you-shoot"
             title="Places"
-            deferredSummary={`${stats.mapPoints.length.toLocaleString("en")} mapped photo locations are available as a map, location flow, and searchable place bars.`}
             actions={
               <div className={styles.groupActionsStack}>
                 <Link
@@ -771,11 +751,7 @@ const ExploreScreen = ({
             </div>
           </StatGroup>
 
-          <StatGroup
-            id="what-you-shoot-with"
-            title="Cameras and lenses"
-            deferredSummary={`Camera and lens relationships are summarised across ${gearFacets.length.toLocaleString("en")} searchable gear facets.`}
-          >
+          <StatGroup id="what-you-shoot-with" title="Cameras and lenses">
             {/* What is done with the kit comes first; the inventory of it is
                 what a reader turns to afterwards to check a number, so it sits
                 at the foot of the group rather than in front of everything. */}
@@ -815,17 +791,7 @@ const ExploreScreen = ({
             </section>
           </StatGroup>
 
-          <StatGroup
-            id="framing"
-            title="Framing"
-            deferredSummary={
-              findStringFacet(stats, "orientation")
-                ?.data.map(
-                  (bucket) => `${bucket.count.toLocaleString("en")} ${bucket.label.toLowerCase()}`,
-                )
-                .join(" · ") ?? ""
-            }
-          >
+          <StatGroup id="framing" title="Framing">
             {framingFacets.map((facet) => (
               <ExploreFramingFacet key={facet.facetId} facet={facet} />
             ))}
@@ -836,7 +802,6 @@ const ExploreScreen = ({
               id="weather"
               title="Weather"
               description="Estimated hourly conditions near each photograph."
-              deferredSummary={formatCoverage(weatherCoverage)}
             >
               {weatherFacets.map(renderStringFacet)}
               <section className={`${styles.section} ${styles.sectionWide}`}>

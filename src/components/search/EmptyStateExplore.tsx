@@ -7,7 +7,7 @@ import localStyles from "./EmptyStateExplore.module.css";
 import { Heading, buttonStyles } from "../ui";
 import { fetchMemoryCandidates, fetchRecentResults, fetchRandomResults } from "./api";
 import { SearchResultRow } from "./searchTypes";
-import { SearchResultTile } from "./SearchResultTile";
+import { SearchResultTile, SearchResultTilePlaceholder } from "./SearchResultTile";
 import {
   formatMemoryDateRange,
   getMemoryClusters,
@@ -59,6 +59,27 @@ type Props = {
 
 const EMPTY_RESULTS: SearchResultRow[] = [];
 const EMPTY_MEMORY_CLUSTERS: ResolvedMemoryCluster<MemoryResult>[] = [];
+
+/**
+ * A grid's first page, held open until its rows arrive: one line of status
+ * text growing into rows of photographs pushed everything below it — the next
+ * section, and on a phone the whole page — down as the database answered. The
+ * page counts include the "More…" tile that follows a full page.
+ */
+const LoadingGrid = ({ label, tiles }: { label: string; tiles: number }) => (
+  <>
+    <div className={styles.visuallyHidden} role="status">
+      {label}
+    </div>
+    <ul className={styles.results} aria-hidden="true">
+      {Array.from({ length: tiles }, (_, index) => (
+        <li key={index}>
+          <SearchResultTilePlaceholder />
+        </li>
+      ))}
+    </ul>
+  </>
+);
 
 export const EmptyStateExplore: React.FC<Props> = ({
   database,
@@ -282,7 +303,11 @@ export const EmptyStateExplore: React.FC<Props> = ({
         void loadMoreRandomResults("auto");
       },
       {
-        rootMargin: "160px 0px",
+        // Two viewports ahead, so the next page is in place before the reader
+        // gets there: appended within sight, it pushed the footer down under
+        // them, and a fling on a phone covers one viewport faster than a page
+        // loads.
+        rootMargin: "200% 0px",
         threshold: 0.1,
       },
     );
@@ -330,11 +355,10 @@ export const EmptyStateExplore: React.FC<Props> = ({
           </div>
 
           {/* Only while the grid is still empty: during a "More…"/refresh the
-              existing tiles stay mounted, so an in-flow status line here would
-              shove them down and snap them back. The load-more button carries
-              its own "Loading…" label for that case. */}
+              existing tiles stay mounted and the load-more button carries its
+              own "Loading…" label. */}
           {(!database || isRecentLoading || isMemoriesLoading) && recentResults.length === 0 ? (
-            <div className={styles.sectionStatus}>Loading recent photos…</div>
+            <LoadingGrid label="Loading recent photos…" tiles={RECENT_ROW_INITIAL_SIZE + 1} />
           ) : null}
 
           {recentExploreError ? (
@@ -460,65 +484,71 @@ export const EmptyStateExplore: React.FC<Props> = ({
           </section>
         ) : null}
 
-        <section className={styles.sectionSurface}>
-          <div className={styles.sectionHeader}>
-            <Heading level={2} as="h3">
-              Random selection
-            </Heading>
-          </div>
+        {/* Only once everything above it has answered: "On this day" lands
+            above this section and the latest grid can shrink from its
+            placeholders, and on a wide screen this section is in view by then,
+            so arriving earlier meant being moved under the reader. */}
+        {database && !isMemoriesLoading && !isRecentLoading ? (
+          <section className={styles.sectionSurface}>
+            <div className={styles.sectionHeader}>
+              <Heading level={2} as="h3">
+                Random selection
+              </Heading>
+            </div>
 
-          {/* Guarded like the recent section: the random grid auto-loads on
-              scroll (IntersectionObserver), so an in-flow status line above the
-              mounted tiles would shift the whole page down on every extend. */}
-          {(!database || isRandomResultsLoading) && randomResults.length === 0 ? (
-            <div className={styles.sectionStatus}>Loading random photos…</div>
-          ) : null}
+            {/* Guarded like the recent section: the random grid auto-loads on
+              scroll (IntersectionObserver), so nothing may appear above the
+              mounted tiles on every extend. */}
+            {(!database || isRandomResultsLoading) && randomResults.length === 0 ? (
+              <LoadingGrid label="Loading random photos…" tiles={RANDOM_ROW_INITIAL_SIZE + 1} />
+            ) : null}
 
-          {randomResultsError ? (
-            <div className={styles.inlineError}>{randomResultsError}</div>
-          ) : null}
+            {randomResultsError ? (
+              <div className={styles.inlineError}>{randomResultsError}</div>
+            ) : null}
 
-          {database &&
-          !isRandomResultsLoading &&
-          !randomResultsError &&
-          randomResults.length === 0 ? (
-            <div className={styles.sectionStatus}>No random photos available yet.</div>
-          ) : null}
+            {database &&
+            !isRandomResultsLoading &&
+            !randomResultsError &&
+            randomResults.length === 0 ? (
+              <div className={styles.sectionStatus}>No random photos available yet.</div>
+            ) : null}
 
-          {randomResults.length > 0 ? (
-            <ul className={styles.results}>
-              {randomResults.map((result) => {
-                return (
-                  <li key={result.path} className={styles.resultLi}>
-                    <SearchResultTile
-                      result={result}
-                      onFindSimilar={(path) => {
-                        onStartSimilarSearch(path);
+            {randomResults.length > 0 ? (
+              <ul className={styles.results}>
+                {randomResults.map((result) => {
+                  return (
+                    <li key={result.path} className={styles.resultLi}>
+                      <SearchResultTile
+                        result={result}
+                        onFindSimilar={(path) => {
+                          onStartSimilarSearch(path);
+                        }}
+                        {...(onSearchByColor ? { onSearchByColor } : {})}
+                        persistColorAction={isColorCategoryActive}
+                      />
+                    </li>
+                  );
+                })}
+                {hasMoreRandomResults ? (
+                  <li>
+                    <button
+                      type="button"
+                      ref={randomLoadMoreButtonRef}
+                      className={styles.moreButton}
+                      onClick={() => {
+                        void loadMoreRandomResults();
                       }}
-                      {...(onSearchByColor ? { onSearchByColor } : {})}
-                      persistColorAction={isColorCategoryActive}
-                    />
+                      disabled={isRandomResultsLoading}
+                    >
+                      {isRandomResultsLoading ? <>Loading&hellip;</> : <>More&hellip;</>}
+                    </button>
                   </li>
-                );
-              })}
-              {hasMoreRandomResults ? (
-                <li>
-                  <button
-                    type="button"
-                    ref={randomLoadMoreButtonRef}
-                    className={styles.moreButton}
-                    onClick={() => {
-                      void loadMoreRandomResults();
-                    }}
-                    disabled={isRandomResultsLoading}
-                  >
-                    {isRandomResultsLoading ? <>Loading&hellip;</> : <>More&hellip;</>}
-                  </button>
-                </li>
-              ) : null}
-            </ul>
-          ) : null}
-        </section>
+                ) : null}
+              </ul>
+            ) : null}
+          </section>
+        ) : null}
       </div>
     </section>
   );

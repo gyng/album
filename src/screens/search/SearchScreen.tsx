@@ -82,9 +82,8 @@ const SearchPage = () => {
       <main id="main-content" className={baseStyles.main}>
         {globalNav}
 
-        {/* The database-download progress sits beside the title so it never
-            takes vertical space in the results flow or shifts content when it
-            finishes and disappears. */}
+        {/* The database-download progress sits beside the title, in a track
+            of its own, so the bar coming and going cannot move what is below. */}
         <div className={styles.searchHeadingRow}>
           <Heading level={1} as="h1">
             Search
@@ -102,7 +101,11 @@ const SearchPage = () => {
         {searchNavState?.randomExploreError ? (
           <p className={styles.inlineError}>{searchNavState.randomExploreError}</p>
         ) : null}
-        <DynamicSearchWithCoi onNavStateChange={handleNavStateChange} />
+        {/* Reserves the widget's opening screen from the first paint, so its
+            arrival cannot push the footer down (see the stylesheet). */}
+        <div className={styles.widgetReservation}>
+          <DynamicSearchWithCoi onNavStateChange={handleNavStateChange} />
+        </div>
       </main>
       <Footer />
     </>

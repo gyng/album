@@ -126,10 +126,7 @@ it("plays a clip over a neighbouring album's poster on hover", async () => {
   expect(container.querySelectorAll("video")).toHaveLength(1);
   const preview = container.querySelector<HTMLVideoElement>("video");
   if (!preview) throw new Error("video element not rendered");
-  expect(preview).toHaveAttribute(
-    "src",
-    "/data/albums/newest/.resized_videos/clip.mov%401920.mp4",
-  );
+  expect(preview).toHaveAttribute("src", "/data/albums/newest/.resized_videos/clip.mov%401920.mp4");
   expect(preview).toHaveAttribute("preload", "none");
   expect(preview).toHaveAttribute("aria-hidden", "true");
   expect(preview.muted).toBe(true);
