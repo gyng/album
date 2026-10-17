@@ -8,6 +8,7 @@ import {
   APERTURE_FACET,
   CAMERA_FACET,
   FOCAL_LENGTH_35MM_FACET,
+  FOCAL_LENGTH_ACTUAL_FACET,
   HOUR_FACET,
   ISO_FACET,
   LENS_FACET,
@@ -1599,6 +1600,16 @@ const statsPhotoFromVideoBlock = (block: VideoBlock): PhotoBlock | null => {
   };
 };
 
+/** Facets read from what the camera records about an exposure. */
+const CAMERA_FACET_IDS = new Set([
+  FOCAL_LENGTH_35MM_FACET.id,
+  FOCAL_LENGTH_ACTUAL_FACET.id,
+  APERTURE_FACET.id,
+  ISO_FACET.id,
+  CAMERA_FACET.id,
+  LENS_FACET.id,
+]);
+
 export function computePhotoStats(albums: Content[]): PhotoStats {
   // Every still and clip in the gallery as one list of statistics input.
   const entries = albums.flatMap((album) =>
@@ -1622,11 +1633,15 @@ export function computePhotoStats(albums: Content[]): PhotoStats {
     }),
   );
   const photos = entries.map((entry) => entry.photo);
-  // Framing is measured from a still's own dimensions and orientation, which a
-  // clip's poster cannot stand in for, so that aggregation stays stills-only.
+  // What the camera records — framing, and the camera, lens and exposure — is
+  // read from a still's own EXIF. A clip's is not read, which is not the same
+  // as having none: counted, every clip was another "unknown" lens and lowered
+  // the coverage of facets every photograph records. Those stay stills-only.
   const stillPhotos = albums.flatMap((album) =>
     album.blocks.filter((block): block is PhotoBlock => block.kind === "photo"),
   );
+  const facetInput = (facet: { id: string }) =>
+    CAMERA_FACET_IDS.has(facet.id) ? stillPhotos : photos;
 
   let minYear = Infinity;
   let maxYear = -Infinity;
@@ -1645,8 +1660,8 @@ export function computePhotoStats(albums: Content[]): PhotoStats {
   const calendarStats = computeCalendarStats(photos);
   const recentTrendStats = computeRecentTrendStats(photos);
   const colorStats = computeRichColorStats(entries);
-  const lensTypeStats = computeLensTypeStats(photos);
-  const technicalRelationshipFilters = computeTechnicalRelationshipFilters(photos);
+  const lensTypeStats = computeLensTypeStats(stillPhotos);
+  const technicalRelationshipFilters = computeTechnicalRelationshipFilters(stillPhotos);
   const revisitedPlaces = computeRevisitedPlace(photos);
   const mapPoints = entries.flatMap(({ decLat, decLng }) =>
     typeof decLat === "number" && typeof decLng === "number" ? [{ lat: decLat, lng: decLng }] : [],
@@ -1660,16 +1675,18 @@ export function computePhotoStats(albums: Content[]): PhotoStats {
     totalPhotos: photos.length,
     totalAlbums: albums.length,
     dateRange,
-    numericFacets: NUMERIC_FACETS.map((f) => computeNumericFacet(photos, f as PhotoFacet<number>)),
+    numericFacets: NUMERIC_FACETS.map((f) =>
+      computeNumericFacet(facetInput(f), f as PhotoFacet<number>),
+    ),
     stringFacets: [
-      ...STRING_FACETS.map((f) => computeStringFacet(photos, f as PhotoFacet<string>)),
+      ...STRING_FACETS.map((f) => computeStringFacet(facetInput(f), f as PhotoFacet<string>)),
       ...computeFramingFacets(stillPhotos),
       ...computeWeatherFacets(entries),
     ],
-    gearFlow: computeGearFlow(photos),
+    gearFlow: computeGearFlow(stillPhotos),
     gear: computeGearStats(albums),
     locationFlow: computeLocationFlow(photos),
-    technicalRelationships: computeTechnicalRelationships(photos),
+    technicalRelationships: computeTechnicalRelationships(stillPhotos),
     technicalRelationshipFilters,
     timeRelationships: computeTimeRelationships(photos),
     weekdayStats: calendarStats.weekdayStats,

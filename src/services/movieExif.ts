@@ -265,12 +265,14 @@ const parseTagPayload = (buffer: Buffer): MovieExif | null => {
       longitude,
       longitudeRef.toUpperCase().startsWith("W"),
     );
-    // A coordinate is only a place with both halves of it, in range.
+    // A coordinate is only a place with both halves of it, in range — and not
+    // the zeroes a camera writes before it has a fix.
     if (
       Number.isFinite(candidateLat) &&
       Number.isFinite(candidateLng) &&
       Math.abs(candidateLat) <= 90 &&
-      Math.abs(candidateLng) <= 180
+      Math.abs(candidateLng) <= 180 &&
+      (candidateLat !== 0 || candidateLng !== 0)
     ) {
       latDeg = Number(candidateLat.toFixed(7));
       lngDeg = Number(candidateLng.toFixed(7));
@@ -306,14 +308,20 @@ const readAtomHeader = (handle: number, position: number, fileSize: number): Ato
     if (position + ATOM_HEADER_BYTES + EXTENDED_SIZE_BYTES > fileSize) {
       return null;
     }
+    // After the type, so the type is still there to be read.
     if (
-      fs.readSync(handle, header, 0, EXTENDED_SIZE_BYTES, position + ATOM_HEADER_BYTES) <
-      EXTENDED_SIZE_BYTES
+      fs.readSync(
+        handle,
+        header,
+        ATOM_HEADER_BYTES,
+        EXTENDED_SIZE_BYTES,
+        position + ATOM_HEADER_BYTES,
+      ) < EXTENDED_SIZE_BYTES
     ) {
       return null;
     }
     headerBytes += EXTENDED_SIZE_BYTES;
-    const extended = header.readBigUInt64BE(0);
+    const extended = header.readBigUInt64BE(ATOM_HEADER_BYTES);
     if (extended > BigInt(Number.MAX_SAFE_INTEGER)) {
       return null;
     }

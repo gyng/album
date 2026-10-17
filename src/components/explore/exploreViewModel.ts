@@ -50,6 +50,20 @@ export const EXPLORE_SECTION_LINKS = [
   { href: "#colour", label: "Colour" },
 ] as const;
 
+/** The jump-nav links, less those whose optional group renders nothing. */
+export const visibleSectionLinks = ({
+  weatherCoverage,
+  clipCount,
+}: {
+  weatherCoverage: number;
+  clipCount: number;
+}) =>
+  EXPLORE_SECTION_LINKS.filter(
+    (link) =>
+      (link.href !== "#weather" || weatherCoverage > 0) &&
+      (link.href !== "#video" || clipCount > 0),
+  );
+
 export const formatCoverage = (coverage: number): string =>
   Math.round(coverage * 100) >= 100
     ? ""

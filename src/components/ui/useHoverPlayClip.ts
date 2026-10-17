@@ -117,8 +117,10 @@ export const useHoverPlayClip = (
   }, [shouldRenderVideo]);
 
   const handlers: HoverPlayClipHandlers = {
-    onPointerEnter: () => {
-      if (!isPlayable) return;
+    onPointerEnter: (event) => {
+      // The media query describes the primary pointer only; a finger on a
+      // touchscreen laptop is a touch whatever the device's primary pointer is.
+      if (!isPlayable || event.pointerType === "touch") return;
       pointerInsideRef.current = true;
       setShouldRenderVideo(true);
       const video = videoRef.current;

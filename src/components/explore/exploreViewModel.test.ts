@@ -4,6 +4,7 @@ import {
   COLOR_SEARCH_PARAMS,
   COLOR_SWATCHES,
   EXPLORE_SECTION_LINKS,
+  visibleSectionLinks,
   buildYearSearchHref,
   buildExploreFunStats,
   buildExploreOverviewCards,
@@ -61,6 +62,19 @@ const makeStats = (): PhotoStats =>
   }) as PhotoStats;
 
 describe("exploreViewModel", () => {
+  // A link to a group that renders nothing goes nowhere: an archive without
+  // clips showed "Video" in the jump nav, and clicking it did nothing.
+  it("offers a jump link only to the optional groups that render", () => {
+    const hrefs = (options: { weatherCoverage: number; clipCount: number }) =>
+      visibleSectionLinks(options).map((link) => link.href);
+
+    expect(hrefs({ weatherCoverage: 0, clipCount: 0 })).not.toContain("#video");
+    expect(hrefs({ weatherCoverage: 0, clipCount: 0 })).not.toContain("#weather");
+    expect(hrefs({ weatherCoverage: 0.5, clipCount: 3 })).toEqual(
+      EXPLORE_SECTION_LINKS.map((link) => link.href),
+    );
+  });
+
   it("keeps colour and section metadata aligned", () => {
     expect(COLOR_FAMILY_ORDER).toEqual(Object.keys(COLOR_SWATCHES));
     expect(COLOR_FAMILY_ORDER).toEqual(Object.keys(COLOR_SEARCH_PARAMS));

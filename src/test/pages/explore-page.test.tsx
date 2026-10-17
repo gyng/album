@@ -23,6 +23,7 @@ jest.mock("../../components/explore/exploreViewModel", () => ({
   buildExploreFunStats: () => [],
   buildExploreOverviewCards: () => [],
   EXPLORE_SECTION_LINKS: [],
+  visibleSectionLinks: () => [],
   findNumericFacet: (stats: { numericFacets: Array<{ facetId: string }> }, id: string) =>
     stats.numericFacets.find((facet) => facet.facetId === id) ?? null,
   findStringFacet: (stats: { stringFacets: Array<{ facetId: string }> }, id: string) =>

@@ -4,7 +4,7 @@ import {
 } from "../../util/computeEmbeddingStats";
 import { computePhotoStats, type PhotoStats } from "../../util/computeStats";
 import { rgbToString } from "../../util/colorDistance";
-import { parseExifLocalDateTime } from "../../util/exifTime";
+import { formatExifWallClockIso, parseExifLocalDateTime } from "../../util/exifTime";
 import type { ExploreClipRow } from "../../util/pageDataTypes";
 import { toVideoBlockEntry } from "../../util/videoBlockEntry";
 import { getAlbums } from "../album";
@@ -39,7 +39,9 @@ export const loadExploreClips = (albums: Content[]): ExploreClipRow[] =>
             album: album._build.slug,
             href: `/album/${album._build.slug}#${encodeURIComponent(clip.anchor)}`,
             src: clip.poster,
-            capturedAtLocal: clip.capturedAtLocal,
+            // One form, whichever the clip was read in: a sidecar's ISO or a
+            // manifest's EXIF colons, which as raw strings sort out of order.
+            capturedAtLocal: formatExifWallClockIso(wallClock),
             year: wallClock.year,
             ...(clip.durationSeconds !== undefined
               ? { durationSeconds: clip.durationSeconds }

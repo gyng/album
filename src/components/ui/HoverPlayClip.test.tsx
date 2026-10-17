@@ -174,6 +174,20 @@ describe("HoverPlayClip", () => {
     expect(pauseSpy).not.toHaveBeenCalled();
   });
 
+  // `(pointer: coarse)` describes the device's primary pointer, so a touchscreen
+  // laptop reports fine — and a finger tapping a tile fired pointerenter,
+  // mounting the video and fetching the clip as the tap navigated away.
+  it("never arms for a finger, even on a device whose primary pointer is fine", () => {
+    const { container } = renderTile();
+    const touch = new Event("pointerover", { bubbles: true });
+    Object.defineProperty(touch, "pointerType", { value: "touch" });
+
+    fireEvent(wrapper(), touch);
+
+    expect(container.querySelectorAll("video")).toHaveLength(0);
+    expect(playSpy).not.toHaveBeenCalled();
+  });
+
   it("plays the clip a scene row was extracted from, not a file of its own", () => {
     const { container } = renderTile(`${CLIP_PATH}@t120`);
 

@@ -63,20 +63,24 @@ export const sortAlbumsForHome = <T extends Content>(albums: readonly T[]): T[] 
     // Push test albums to the end.
     .sort((a, b) => (a.name.startsWith("test") ? 1 : 0) - (b.name.startsWith("test") ? 1 : 0));
 
-/** An album as a card: its covers plus the first piece of media, nothing else. */
+/** An album as a card: its covers plus the block it falls back on, nothing else. */
 export const toAlbumPreview = (album: Content): AlbumPreview => {
-  // Keep only covers plus the first media item, deduplicating when the cover is
-  // also first. This limits the serialised payload. A clip joins a photograph
-  // here — counted like one and drawn through its poster frame.
+  // Keep only covers plus what `coverBlockOf` falls back on without one — the
+  // first photograph, else the first clip with a poster — so the card shows
+  // the cover the album page shares. It kept the first piece of media, so an
+  // album opening on a clip had a card and a share image that disagreed. This
+  // limits the serialised payload; a clip is drawn through its poster frame.
   const coverBlocks = album.blocks.filter(
     (block): block is PhotoBlock => block.kind === "photo" && Boolean(block.formatting?.cover),
   );
-  const firstMedia = album.blocks.find(
-    (block): block is PhotoBlock | VideoBlock => mediaBlockAsPhoto(block) !== null,
-  );
+  const fallback =
+    album.blocks.find((block): block is PhotoBlock => block.kind === "photo") ??
+    album.blocks.find(
+      (block): block is PhotoBlock | VideoBlock => mediaBlockAsPhoto(block) !== null,
+    );
   const previewBlocks: (PhotoBlock | VideoBlock)[] =
-    firstMedia && !coverBlocks.some((block) => block.id === firstMedia.id)
-      ? [...coverBlocks, firstMedia]
+    fallback && !coverBlocks.some((block) => block.id === fallback.id)
+      ? [...coverBlocks, fallback]
       : coverBlocks;
   return {
     ...album,

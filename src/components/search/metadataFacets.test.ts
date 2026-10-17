@@ -1,6 +1,6 @@
 import { DatabaseSync } from "node:sqlite";
 import type { Database } from "@sqlite.org/sqlite-wasm";
-import { fetchSearchFacetSections, searchInternals } from "./api";
+import { fetchResults, fetchSearchFacetSections, searchInternals } from "./api";
 import { weatherFixture } from "../../test/fixtures/weather";
 import { weatherFacetValue } from "../../util/metadataFacets";
 
@@ -130,6 +130,65 @@ it("recalculates metadata facet counts against the other active facets", async (
       { value: "Rain", count: 1 },
     ]);
     expect(sections.find((section) => section.facetId === "weather-cloud")).toBeUndefined();
+  } finally {
+    sqlite.close();
+  }
+});
+
+// A long clip is indexed a minute at a time, and each moment inherits the
+// clip's place, weather and framing. Moments are for semantic search only:
+// counted in facets, a half-hour clip filmed in the rain added thirty to
+// "Rain", and a facet-only browse returned thirty near-identical tiles.
+it("keeps a clip's indexed moments out of facet counts and facet browsing", async () => {
+  const sqlite = new DatabaseSync(":memory:");
+  sqlite.exec(
+    "CREATE TABLE images(path TEXT, album_relative_path TEXT, filename TEXT, geocode TEXT, exif TEXT, tags TEXT, colors TEXT, alt_text TEXT, subject TEXT); CREATE TABLE metadata(path TEXT, iso8601 TEXT, aspect_ratio TEXT, orientation TEXT, weather_json TEXT, scene_of TEXT)",
+  );
+  const rain = JSON.stringify({ ...weatherFixture, weather_code: 61, precipitation: 2 });
+  for (const [path, sceneOf] of [
+    ["../albums/trip/clip.mov", null],
+    ["../albums/trip/clip.mov@t60", "../albums/trip/clip.mov"],
+    ["../albums/trip/clip.mov@t120", "../albums/trip/clip.mov"],
+  ] as const) {
+    sqlite.prepare("INSERT INTO images VALUES (?, '', '', '', '', '', '', '', '')").run(path);
+    sqlite
+      .prepare("INSERT INTO metadata VALUES (?, '2026-10-01', '16:9', 'Landscape', ?, ?)")
+      .run(path, rain, sceneOf);
+  }
+  const database = {
+    exec: ({
+      sql,
+      bind = [],
+      callback,
+    }: {
+      sql: string;
+      bind?: (string | number)[];
+      callback?: (row: unknown[]) => void;
+    }) => {
+      const statement = sqlite.prepare(sql);
+      statement.setReturnArrays(true);
+      const rows = statement.all(...bind) as unknown as unknown[][];
+      for (const row of rows) callback?.(row);
+      return rows;
+    },
+  } as unknown as Database;
+  try {
+    const sections = await fetchSearchFacetSections({ database });
+    expect(sections.find((section) => section.facetId === "weather-condition")?.options).toEqual([
+      { value: "Rain", count: 1 },
+    ]);
+    expect(sections.find((section) => section.facetId === "orientation")?.options).toEqual([
+      { value: "Landscape", count: 1 },
+    ]);
+
+    const browse = await fetchResults({
+      database,
+      query: "",
+      pageSize: 10,
+      page: 0,
+      selectedFacets: [{ facetId: "weather-condition", value: "Rain" }],
+    });
+    expect(browse.data.map((row) => row.path)).toEqual(["../albums/trip/clip.mov"]);
   } finally {
     sqlite.close();
   }

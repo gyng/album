@@ -39,7 +39,7 @@ import {
 import {
   buildExploreFunStats,
   buildExploreOverviewCards,
-  EXPLORE_SECTION_LINKS,
+  visibleSectionLinks,
   findNumericFacet,
   findStringFacet,
   formatCoverage,
@@ -254,9 +254,7 @@ const ExploreScreen = ({
       window.location.replace(`/explore/wander${window.location.search}`);
     }
   }, []);
-  const sectionLinks = EXPLORE_SECTION_LINKS.filter(
-    (link) => link.href !== "#weather" || weatherCoverage > 0,
-  );
+  const sectionLinks = visibleSectionLinks({ weatherCoverage, clipCount: clips.length });
   const renderNumericFacet = (facet: NumericFacetStat) => {
     const max = Math.max(...facet.data.map((b) => b.count), 1);
     const hasData = facet.data.some((b) => b.count > 0);

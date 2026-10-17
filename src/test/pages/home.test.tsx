@@ -4,6 +4,7 @@
 
 import { render, screen } from "@testing-library/react";
 import type { Content, PhotoBlock, TextBlock, VideoBlock } from "../../services/types";
+import { coverBlockOf } from "../../util/videoBlockMedia";
 
 const getTimestampRange = (album: Content): [string | null, string | null] => {
   const ranges: Record<string, [string | null, string | null]> = {
@@ -148,6 +149,19 @@ describe("home page", () => {
       },
       srcset: [],
     });
+  });
+
+  // The album page shares the album as its first photograph when no cover is
+  // marked. The card kept only the first piece of media, so an album opening on
+  // a clip had a card showing the clip and a share image showing a photograph.
+  it("keeps the block the album page takes for its cover", async () => {
+    const full = album("opens-on-a-clip", [video("clip.mov"), photo("a.jpg"), photo("b.jpg")]);
+    mockGetAlbums.mockResolvedValue([full]);
+
+    const result = await loadHomePageData();
+
+    expect(coverBlockOf(result.albums[0]!.blocks)?.id).toBe(coverBlockOf(full.blocks)?.id);
+    expect(coverBlockOf(result.albums[0]!.blocks)?.id).toBe("a.jpg");
   });
 
   // A clip is media too: it counts, and its poster frame is what the card

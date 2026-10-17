@@ -1450,13 +1450,23 @@ describe("clips beside photographs", () => {
     );
   });
 
-  // A clip records no camera or lens of its own, so the camera-led statistics
-  // are left to stills — except the lens split, which is a partition of all
-  // media and so counts the clip where a lensless photograph would land.
+  // A clip's camera and lens are not read, which is not the same as having
+  // none: counted, every clip was another "unknown" lens and pulled the
+  // coverage of ISO, aperture, focal length, camera and lens below what the
+  // photographs actually record. Camera statistics are left to stills.
   it("leaves camera statistics to photographs", () => {
     const withCamera = computePhotoStats([
       makeAlbum([
-        makePhoto({ exif: { Make: "FUJIFILM", Model: "X-T5", LensModel: "XF 23mm F1.4" } }),
+        makePhoto({
+          exif: {
+            Make: "FUJIFILM",
+            Model: "X-T5",
+            LensModel: "XF 23mm F1.4",
+            ISO: 400,
+            FNumber: 2,
+            FocalLength: 23,
+          },
+        }),
         makeVideo({ capturedAtLocal: "2024-01-01T00:00:00" }),
       ]),
     ]);
@@ -1464,7 +1474,15 @@ describe("clips beside photographs", () => {
     expect(
       withCamera.gearFlow.nodes.filter((node) => node.depth === 0).map((node) => node.label),
     ).toEqual(["FUJIFILM X-T5"]);
-    expect(withCamera.lensTypeStats).toEqual({ prime: 1, zoom: 0, unknown: 1 });
+    expect(withCamera.lensTypeStats).toEqual({ prime: 1, zoom: 0, unknown: 0 });
+    for (const facetId of ["iso", "aperture", "focal-length-actual"]) {
+      expect(withCamera.numericFacets.find((facet) => facet.facetId === facetId)?.coverage).toBe(1);
+    }
+    for (const facetId of ["camera", "lens"]) {
+      expect(withCamera.stringFacets.find((facet) => facet.facetId === facetId)?.coverage).toBe(1);
+    }
+    // The clip still counts where it does have the reading: its moment.
+    expect(withCamera.totalPhotos).toBe(2);
   });
 
   // A poster cannot prove how the clip was framed, so framing keeps its own

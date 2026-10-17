@@ -545,6 +545,32 @@ def read_poster_sidecar(
     return payload if isinstance(payload, dict) else None
 
 
+# What the core stage reads from a clip's sidecar. A poster re-extracted from
+# the same clip is the same frame, so the stage's pixel digest cannot see a
+# corrected reading; these fields go into its version instead.
+CORE_SIDECAR_FIELDS = ("capturedAtLocal", "latDeg", "lngDeg", "durationSeconds")
+
+
+def core_pipeline_version_for(path: str, media_root: str | None = None) -> str:
+    """The core stage's version for one path.
+
+    A photo's EXIF lives in its own bytes, which the digest already covers. A
+    clip's place and wall clock live in its sidecar, and re-extracting a poster
+    gives an identical frame: a fixed clock or coordinates added to the clip
+    rewrote the sidecar and left the stage looking fresh, so the index kept the
+    old reading. The reading is folded into the version, so it is re-read
+    whenever it changes and never when only something else in the sidecar does."""
+    if not is_media_path(path):
+        return CORE_PIPELINE_VERSION
+    sidecar = read_poster_sidecar(path, media_root)
+    if sidecar is None:
+        return CORE_PIPELINE_VERSION
+    reading = json.dumps([sidecar.get(field) for field in CORE_SIDECAR_FIELDS])
+    return (
+        f"{CORE_PIPELINE_VERSION}+{hashlib.sha256(reading.encode()).hexdigest()[:12]}"
+    )
+
+
 def sidecar_number(value: typing.Any) -> float | None:
     """A finite number from a sidecar field, or None for anything else.
 
@@ -3557,7 +3583,10 @@ def index(
         # nothing in `metadata.iso8601`. `read_exif` at the analysis step follows
         # this flag, so gating it also switched off its own input.
         needs_core = stage_needs_refresh(
-            file_path, CORE_STAGE, CORE_PIPELINE_VERSION, has_core
+            file_path,
+            CORE_STAGE,
+            core_pipeline_version_for(file_path, media_root),
+            has_core,
         )
         needs_classifier = (
             uses_classifier
@@ -5517,7 +5546,12 @@ def validate_index_database(
                     rewritten = rewrite_default_caption_provenance(stored_version)
                     if rewritten is not None:
                         stored_version, stored_model_id = rewritten
-                if version and stored_version != version:
+                expected_version = (
+                    core_pipeline_version_for(path, media_root)
+                    if stage == CORE_STAGE
+                    else version
+                )
+                if expected_version and stored_version != expected_version:
                     raise click.ClickException(
                         f"validate: unexpected {stage} pipeline version for {path}"
                     )
@@ -6079,9 +6113,7 @@ def update_gps(dbpath: str, match: str | None, media_root: str, dry_run: bool):
 
                 with open(path, "rb") as fh:
                     exif_full = get_exif(fh)
-                exif = {
-                    k: v for k, v in exif_full.items() if not isinstance(v, bytes)
-                }
+                exif = {k: v for k, v in exif_full.items() if not isinstance(v, bytes)}
 
                 lat = exif.get("GPS GPSLatitude")
                 lng = exif.get("GPS GPSLongitude")
@@ -6159,8 +6191,18 @@ def update_gps(dbpath: str, match: str | None, media_root: str, dry_run: bool):
                 # from a single file this command re-hashes. Writing a plain file
                 # digest here would make the next index run see every clip as
                 # stale and re-derive the vectors this refresh exists to avoid
-                # touching, so the index's own provenance rows are left as they
-                # are. The clip's pixels did not change; only its sidecar did.
+                # touching, so the digests are left as they are. The clip's
+                # pixels did not change; only its sidecar did — and the reading
+                # just written is what the core version records.
+                core_state = existing_states.get((path, CORE_STAGE))
+                if core_state is not None:
+                    db.upsert_pipeline_state(
+                        path,
+                        CORE_STAGE,
+                        core_state[0],
+                        core_pipeline_version_for(path),
+                        cur=cur,
+                    )
                 updated += 1
                 continue
             digest = file_content_sha256(path)
@@ -7343,7 +7385,7 @@ def insert_analysed_images_batch(db, results: list[Mapping]):
                         path,
                         CORE_STAGE,
                         source_sha256,
-                        CORE_PIPELINE_VERSION,
+                        core_pipeline_version_for(path),
                         cur=cur,
                     )
 

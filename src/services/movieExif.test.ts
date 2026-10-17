@@ -165,6 +165,37 @@ describe("readMovieExif", () => {
     expect(readMovieExif(file)?.latDeg).toBeCloseTo(35.6601, 3);
   });
 
+  // An atom whose size does not fit 32 bits says so with a size of 1 and an
+  // 8-byte size after its type. That second read landed over the type, so a
+  // container written this way was never recognised and the clip read as
+  // having no EXIF.
+  it("descends into a container written with an extended size", () => {
+    const body = atom("udta", atom("MVTG", tagPayload(TOKYO, 16)));
+    const header = Buffer.alloc(16);
+    header.writeUInt32BE(1, 0);
+    header.write("moov", 4, "latin1");
+    header.writeBigUInt64BE(BigInt(body.length + 16), 8);
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), "movie-exif-"));
+    const file = path.join(directory, "extended.MOV");
+    fs.writeFileSync(
+      file,
+      Buffer.concat([atom("ftyp", Buffer.from("qt  ", "latin1")), header, body]),
+    );
+
+    expect(readMovieExif(file)?.dateTimeOriginal).toBe("2025-12-01T20:15:51");
+  });
+
+  // A GPS block the camera wrote before it had a fix holds zeroes, which read
+  // as a place in the Gulf of Guinea: a clip on the map where nobody has been.
+  it("reports no coordinates for a GPS block without a fix", () => {
+    const noFix: Readings = { ...TOKYO, lat: [0, 0, 0], lng: [0, 0, 0] };
+    const exif = readMovieExif(writeMovie("nofix.MOV", atom("MVTG", tagPayload(noFix, 16))));
+
+    expect(exif?.dateTimeOriginal).toBe("2025-12-01T20:15:51");
+    expect(exif?.latDeg).toBeUndefined();
+    expect(exif?.lngDeg).toBeUndefined();
+  });
+
   it("returns null rather than throwing on anything it cannot read", () => {
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), "movie-exif-"));
     const notAMovie = path.join(directory, "notes.txt");

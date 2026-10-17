@@ -28,6 +28,7 @@ import commonStyles from "../../styles/common.module.css";
 import { ThemeToggle } from "../../components/ThemeToggle";
 import { useLocalStorage } from "usehooks-ts";
 import { getResizedAlbumVideoSrc } from "../../util/getResizedAlbumImageSrc";
+import { isPlayableClipPath } from "../../util/videoScenePath";
 import { Seo } from "../../components/Seo";
 import { buildCollectionPageJsonLd, formatPageTitle } from "../../lib/seo";
 import { getPhotoAltText } from "../../lib/alt";
@@ -2678,6 +2679,22 @@ export const Slideshow: React.FC<{
   // Effective mute: an unmuted autoplay is refused by every modern browser, so
   // with clips off there is nothing to unmute either way.
   const effectiveClipMuted = clipMuted || !playClips;
+  // A storage value is not validated the way the URL's is, and a volume outside
+  // 0–1 makes the element throw.
+  const safeClipVolume = Number.isFinite(clipVolume) ? Math.min(1, Math.max(0, clipVolume)) : 0.5;
+
+  // Clips this session has given up on: one that errored (a codec the browser
+  // lacks, an uncached MP4 offline) or whose first frame never came. Each is
+  // shown as its poster frame from then on — the clip's own picture — instead
+  // of the slide being skipped, so a clip can never cost the show a slide.
+  const [unplayableClips, setUnplayableClips] = React.useState<ReadonlySet<string>>(
+    () => new Set(),
+  );
+  const showClipAsPoster = useCallback((path: string) => {
+    setUnplayableClips((previous) =>
+      previous.has(path) ? previous : new Set([...previous, path]),
+    );
+  }, []);
 
   // The cells of the slide on screen: seed first, then remix companions.
   // `path` keys the remix-grid reveal hook; `src` is what each cell loads (a
@@ -2691,7 +2708,13 @@ export const Slideshow: React.FC<{
     if (!currentPhotoPath || !activePhotoSrc) return [];
     const toCell = (row: RandomPhotoRow, src: string): SlideCell => {
       const cell: SlideCell = { path: row.path, src };
-      if (playClips && row.mediaKind === "video") {
+      // An external is indexed as a video but has no transcoded MP4.
+      if (
+        playClips &&
+        row.mediaKind === "video" &&
+        isPlayableClipPath(row.path) &&
+        !unplayableClips.has(row.path)
+      ) {
         cell.mediaKind = "video";
       }
       return cell;
@@ -2700,7 +2723,7 @@ export const Slideshow: React.FC<{
       toCell(currentPhotoPath, activePhotoSrc),
       ...remixCompanions.map((companion) => toCell(companion, getSlideshowPhotoSrc(companion)!)),
     ];
-  }, [currentPhotoPath, activePhotoSrc, remixCompanions, playClips]);
+  }, [currentPhotoPath, activePhotoSrc, remixCompanions, playClips, unplayableClips]);
 
   const currentSnapshot = React.useMemo(() => buildSlideSnapshot(currentCells), [currentCells]);
   // Identity of the slide on screen. Changes on a normal advance AND when a
@@ -2728,7 +2751,7 @@ export const Slideshow: React.FC<{
   // being available — readyState >= 2 (HAVE_CURRENT_DATA/HAVE_FUTURE_DATA) — is
   // the equivalent signal. It feeds the very same markDecoded path, so the
   // `presentation` message is posted only once the clip can actually be seen,
-  // and a clip that never gets there is skipped by the existing
+  // and a clip that never gets there is shown as its poster by the
   // hung-replacement timer rather than stalling the show.
   const markVideoReady = useCallback(
     (element: HTMLVideoElement, key: string, src: string) => {
@@ -2902,7 +2925,7 @@ export const Slideshow: React.FC<{
   //
   // A clip's <video> is never left to the autoplay attribute: the runtime plays
   // it itself, so it can be paused again. Exactly one element plays — the one
-  // that is the revealed top layer — and every other one (the outgoing layer
+  // that is the top layer — and every other one (the outgoing layer
   // fading out beneath, a clip waiting under a remix grid, one being replaced)
   // is paused, so a cross-fade does not leave the old clip running on behind
   // the new slide. `isPaused` (the Pause button and the hold-to-pause gesture)
@@ -2910,18 +2933,26 @@ export const Slideshow: React.FC<{
   // to move. Playback simply starts again from wherever it got to: a re-shown
   // clip needs no seek, since it loops.
   //
-  // play() is called through `.catch()`: a refused autoplay (or a source that
-  // has gone) must leave the poster frame showing and must NEVER stall the
-  // advance. The cadence is untouched, and a clip whose first frame never
-  // arrives is skipped by the hung-replacement timer above like any other
-  // slide.
+  // play() is called through `.catch()`: a refused unmuted autoplay is retried
+  // muted, and a clip that cannot play at all is shown as its poster by its
+  // error handler or the hung-replacement timer — never skipped.
   const videoElementsRef = React.useRef(new Map<string, HTMLVideoElement>());
   const registerVideoElement = useCallback((key: string, element: HTMLVideoElement | null) => {
     if (element) {
       videoElementsRef.current.set(key, element);
-    } else {
-      videoElementsRef.current.delete(key);
+      return;
     }
+    const removed = videoElementsRef.current.get(key);
+    videoElementsRef.current.delete(key);
+    // An inline ref is detached and re-attached on every render, so only a
+    // clip that has really left the page is released — otherwise a dropped
+    // `preload="auto"` element keeps buffering until it is collected.
+    queueMicrotask(() => {
+      if (removed && !removed.isConnected) {
+        removed.removeAttribute("src");
+        removed.load();
+      }
+    });
   }, []);
   useEffect(() => {
     const applyPlayback = () => {
@@ -2930,13 +2961,21 @@ export const Slideshow: React.FC<{
         // React does not reliably manage a media element's volume property, so
         // it is written here through the element ref: both the playing clip and
         // one still fading out carry the setting while they are on screen.
-        element.volume = clipVolume;
-        const isRevealedTop =
-          key === slideKey && layers.some((layer) => layer.key === key && layer.loaded);
-        if (isRevealedTop && !isPaused && visible) {
-          element.play().catch(() => {
-            // Autoplay refused, or the clip cannot be played: the poster/first
-            // frame stays visible and the cadence advances normally.
+        element.volume = safeClipVolume;
+        // The incoming clip plays from the moment it is the top layer, not
+        // only once revealed: iOS fetches no media for a video until it is
+        // asked to play, so waiting for the first frame before playing waited
+        // forever. The outgoing clip pauses as the cross-fade starts.
+        if (key === slideKey && !isPaused && visible) {
+          element.play().catch((error: unknown) => {
+            // An unmuted autoplay without a gesture — a reload or a kiosk
+            // restart after the reader unmuted — is refused. Play it muted
+            // rather than leave it on its first frame. Anything else is the
+            // clip failing, which its error handler shows as the poster.
+            if (error instanceof Error && error.name === "NotAllowedError" && !element.muted) {
+              element.muted = true;
+              element.play().catch(() => {});
+            }
           });
         } else {
           element.pause();
@@ -2946,7 +2985,7 @@ export const Slideshow: React.FC<{
     applyPlayback();
     document.addEventListener("visibilitychange", applyPlayback);
     return () => document.removeEventListener("visibilitychange", applyPlayback);
-  }, [layers, slideKey, isPaused, clipVolume]);
+  }, [layers, slideKey, isPaused, safeClipVolume]);
 
   // A hung replacement must not erase the last good photograph. Skip/retry it
   // instead of fabricating a successful decode after the deadline.
@@ -2981,9 +3020,15 @@ export const Slideshow: React.FC<{
     if (!slideKey) return;
     const top = layersRef.current[layersRef.current.length - 1];
     if (top?.key === slideKey && top.loaded && decodedPresentationKey === slideKey) return;
-    const t = window.setTimeout(() => advanceCurrentSlideRef.current("app"), 6000);
+    // A clip whose first frame has not come shows its poster instead; the
+    // poster is then a slide like any other, with its own deadline.
+    const hungClip = currentCells[0]?.mediaKind === "video" ? currentCells[0].path : null;
+    const t = window.setTimeout(
+      () => (hungClip ? showClipAsPoster(hungClip) : advanceCurrentSlideRef.current("app")),
+      6000,
+    );
     return () => window.clearTimeout(t);
-  }, [slideKey, layers, decodedPresentationKey]);
+  }, [slideKey, layers, decodedPresentationKey, currentCells, showClipAsPoster]);
 
   if (currentPhotoPath === null) {
     // Effective download progress for whichever database the current mode is
@@ -3580,7 +3625,9 @@ export const Slideshow: React.FC<{
                         markVideoReady(e.currentTarget, layer.key, seedCell.src),
                       onCanPlay: (e: React.SyntheticEvent<HTMLVideoElement>) =>
                         markVideoReady(e.currentTarget, layer.key, seedCell.src),
-                      onError: () => scheduleImageErrorRetry(),
+                      // A clip that cannot play is shown as its poster, not
+                      // skipped as a broken image would be.
+                      onError: () => showClipAsPoster(seedCell.path),
                     }
                   : { "aria-hidden": true })}
               />

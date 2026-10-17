@@ -327,7 +327,7 @@ const searchMetadataColumns = (db: Database): Set<string> => {
   const cached = metadataColumnCache.get(db);
   if (cached) return cached;
   const columns = new Set<string>();
-  for (const name of ["aspect_ratio", "orientation", "weather_json"]) {
+  for (const name of ["aspect_ratio", "orientation", "weather_json", "scene_of"]) {
     try {
       db.exec({
         sql: `SELECT 1 FROM pragma_table_info('metadata') WHERE name = '${name}' LIMIT 1`,
@@ -503,6 +503,15 @@ const buildSingleFacetClause = (
 
   return null;
 };
+
+/**
+ * A clip's indexed moments inherit its place, weather and framing, but they are
+ * for semantic search only (see `withoutScenes`): counted in facets, every
+ * minute of a long clip was another photograph. Databases from before scenes
+ * have no such rows, and no column to test.
+ */
+const notSceneSql = (metadataColumns: Set<string>): string =>
+  metadataColumns.has("scene_of") ? "m.scene_of IS NULL" : "";
 
 const buildFacetWhereClause = (
   selectedFacets: SearchFacetSelection[],
@@ -911,7 +920,9 @@ export const fetchSearchFacetSections = async (opts: {
   const metadataColumns = searchMetadataColumns(database);
 
   const loadFacetItems = async (facetWhere: ReturnType<typeof buildFacetWhereClause>) => {
-    const whereClause = [keywordWhere.sql, facetWhere.sql].filter(Boolean);
+    const whereClause = [keywordWhere.sql, facetWhere.sql, notSceneSql(metadataColumns)].filter(
+      Boolean,
+    );
     const geoSelect = useGeoColumns
       ? ", m.geo_city, m.geo_region, m.geo_subregion, m.geo_country"
       : "";
@@ -1287,16 +1298,15 @@ export const fetchResults = async (opts: {
   const colorMap = colorMatchedPaths
     ? new Map(colorMatchedPaths.map((candidate) => [candidate.path, candidate]))
     : null;
+  const metadataColumns = searchMetadataColumns(database);
   const facetWhere = colorSearch
     ? { sql: "", bind: [] as (string | number)[] }
-    : buildFacetWhereClause(
-        selectedFacets,
-        hasStructuredGeocode(database),
-        searchMetadataColumns(database),
-      );
+    : buildFacetWhereClause(selectedFacets, hasStructuredGeocode(database), metadataColumns);
+  const notScene = notSceneSql(metadataColumns);
   const whereParts = [
     ...Array.from({ length: queries.length }, () => "images MATCH ?"),
     ...(facetWhere.sql ? [facetWhere.sql] : []),
+    ...(notScene ? [notScene] : []),
     ...(allowedPaths && allowedPaths.size > 0
       ? [`images.path IN (${Array.from({ length: allowedPaths.size }, () => "?").join(", ")})`]
       : allowedPaths

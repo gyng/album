@@ -131,9 +131,12 @@ def enrich_database(
     # A clip carries the same sidecar-derived coordinates and camera-local wall
     # clock a photo carries in EXIF, so it earns an estimate on identical terms:
     # a row without a location or a time is skipped exactly as a photo's is.
+    # A clip's indexed moments do not: they are for semantic search only, and
+    # each one cost a request and then counted in the facets as a photograph.
+    not_scene = " AND scene_of IS NULL" if "scene_of" in columns else ""
     rows = con.execute(
         "SELECT path,lat_deg,lng_deg,iso8601,tz_offset,weather_json FROM metadata "
-        "WHERE media_kind IN ('photo', 'video') ORDER BY path"
+        f"WHERE media_kind IN ('photo', 'video'){not_scene} ORDER BY path"
     ).fetchall()
     report = {
         "updated": 0,

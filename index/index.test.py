@@ -41,6 +41,7 @@ from index import (
     complete_json_object_end,
     compute_reindex_plan,
     configured_media_root,
+    core_pipeline_version_for,
     create_classifier,
     decode_embedding,
     derive_zone,
@@ -494,6 +495,70 @@ class TestMain(unittest.TestCase):
         self.assertIsNone(weather["nogps.mp4"])
         self.assertIsNone(weather["nodate.mp4"])
 
+    def test_weather_enrichment_skips_a_clips_indexed_moments(self):
+        # A long clip is indexed a minute at a time, and every moment carries the
+        # clip's place and a shifted time. Moments are for semantic search only:
+        # each one used to cost a weather request and then counted in the
+        # weather facets as another photograph.
+        from datetime import UTC, datetime
+
+        from weather import VARIABLES, enrich_database
+
+        values = {variable: [0, 1] for variable in VARIABLES}
+        response = {
+            "latitude": 1.25,
+            "longitude": 103.75,
+            "hourly": dict(time=["2024-01-01T23:00", "2024-01-02T00:00"], **values),
+        }
+        with tempfile.TemporaryDirectory() as tmpdir:
+            dbpath = os.path.join(tmpdir, "weather-scenes.sqlite")
+            con = sqlite3.connect(dbpath)
+            con.execute(
+                "CREATE TABLE metadata(path TEXT PRIMARY KEY, lat_deg REAL, "
+                "lng_deg REAL, iso8601 TEXT, tz_offset TEXT, media_kind TEXT, "
+                "scene_of TEXT)"
+            )
+            con.executemany(
+                "INSERT INTO metadata VALUES (?,?,?,?,?,?,?)",
+                [
+                    (
+                        "clip.mov",
+                        1.3,
+                        103.8,
+                        "2024-01-02T07:45:00",
+                        "+08:00",
+                        "video",
+                        None,
+                    ),
+                    (
+                        "clip.mov@t60",
+                        1.3,
+                        103.8,
+                        "2024-01-02T07:46:00",
+                        "+08:00",
+                        "video",
+                        "clip.mov",
+                    ),
+                ],
+            )
+            con.commit()
+            con.close()
+
+            enrich_database(
+                dbpath,
+                interval=0,
+                fetch=mock.Mock(return_value=response),
+                now=datetime(2026, 10, 12, tzinfo=UTC),
+                log=lambda _: None,
+            )
+
+            con = sqlite3.connect(dbpath)
+            weather = dict(con.execute("SELECT path, weather_json FROM metadata"))
+            con.close()
+
+        self.assertIsNotNone(weather["clip.mov"])
+        self.assertIsNone(weather["clip.mov@t60"])
+
     def test_insert_metadata_records_media_kind_and_duration(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             dbpath = os.path.join(tmpdir, "media-kind.sqlite")
@@ -655,6 +720,46 @@ class TestMain(unittest.TestCase):
         self.assertEqual("video", analysed["media_kind"])
         self.assertEqual(90.0, analysed["scene_seconds"])
         self.assertAlmostEqual(35.6895, analysed["lat_deg"], places=4)
+
+    def test_a_clips_core_version_follows_its_sidecar_reading(self):
+        # A clip's core stage is pinned to its poster frame, and re-extracting a
+        # poster gives the same frame — so a corrected reading (a fixed clock,
+        # coordinates added with exiftool) never reached the index: the stage
+        # looked fresh. The reading core consumes is part of its version.
+        with tempfile.TemporaryDirectory(dir=".") as root:
+            album_dir, poster_dir = self._make_media_album(root)
+            media_root = os.path.join(root, "src", "public", "data", "albums")
+            clip = os.path.join(album_dir, "clip.mov")
+            sidecar = os.path.join(poster_dir, "clip.mov@poster.json")
+
+            def version_with(**reading):
+                with open(sidecar, "w") as fh:
+                    json.dump(
+                        {
+                            "mediaKind": "video",
+                            "capturedAtLocal": "2026-02-27T10:52:10",
+                            "durationSeconds": 60.0,
+                            **reading,
+                        },
+                        fh,
+                    )
+                return core_pipeline_version_for(clip, media_root)
+
+            original = version_with()
+            self.assertNotEqual(original, version_with(latDeg=35.68, lngDeg=139.69))
+            self.assertNotEqual(
+                original, version_with(capturedAtLocal="2026-02-27T19:52:10")
+            )
+            # What core does not read does not invalidate it.
+            self.assertEqual(original, version_with(width=1920, height=1080))
+            # A scene is read through its clip's sidecar.
+            self.assertEqual(
+                original, core_pipeline_version_for(f"{clip}@t30", media_root)
+            )
+
+        self.assertEqual(
+            CORE_PIPELINE_VERSION, core_pipeline_version_for("../albums/a/b.jpg")
+        )
 
     def test_scene_rows_link_into_the_clip_at_their_moment(self):
         self.assertEqual(
@@ -900,7 +1005,7 @@ class TestMain(unittest.TestCase):
                                 path,
                                 CORE_STAGE,
                                 digests[path],
-                                CORE_PIPELINE_VERSION,
+                                core_pipeline_version_for(path, media_root),
                                 cur=cur,
                             )
                             if needs_caption_for(path):
