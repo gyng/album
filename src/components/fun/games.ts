@@ -1,12 +1,5 @@
 export const FUN_GAMES = [
   {
-    id: "guess",
-    href: "/fun/guess",
-    title: "Guess Where",
-    illustration: "/fun/guess-where.avif",
-    description: "Place a photograph on the map. How close can you get?",
-  },
-  {
     id: "connections",
     href: "/fun/connections",
     title: "Connect the Shots",
@@ -21,33 +14,11 @@ export const FUN_GAMES = [
     description: "Every photograph has two connections. Find its place in the grid.",
   },
   {
-    id: "sight-lines",
-    href: "/fun/sight-lines",
-    title: "Sight Lines",
-    illustration: "/fun/sight-lines.avif",
-    description: "A word search with photographs. Find lines that share a subject.",
-  },
-  {
-    id: "wander",
-    href: "/fun/wander",
-    title: "Wander",
-    illustration: "/fun/wander.avif",
-    description:
-      "Follow photographic trails, find hidden subjects, or wander without a destination.",
-  },
-  {
-    id: "photo-pairs",
-    href: "/fun/photo-pairs",
-    title: "Photo Pairs",
-    illustration: "/fun/photo-pairs.avif",
-    description: "Remember the photographs. Find the pairs that belong together.",
-  },
-  {
-    id: "blind-frame",
-    href: "/fun/blind-frame",
-    title: "Blind Frame",
-    illustration: "/fun/blind-frame.avif",
-    description: "Draw a hidden photograph from its description. How close will your sketch come?",
+    id: "guess",
+    href: "/fun/guess",
+    title: "Guess Where",
+    illustration: "/fun/guess-where.avif",
+    description: "Place a photograph on the map. How close can you get?",
   },
   {
     id: "oracle",
@@ -58,18 +29,25 @@ export const FUN_GAMES = [
       "Discover a photograph through visual questions, or challenge the oracle to find yours.",
   },
   {
-    id: "double-take",
-    href: "/fun/double-take",
-    title: "Double Take",
-    illustration: "/fun/double-take.avif",
-    description: "Two fleeting photographs. Same look. Same place?",
+    id: "blind-frame",
+    href: "/fun/blind-frame",
+    title: "Blind Frame",
+    illustration: "/fun/blind-frame.avif",
+    description: "Draw a hidden photograph from its description. How close will your sketch come?",
   },
   {
-    id: "hindsight",
-    href: "/fun/hindsight",
-    title: "Hindsight",
-    illustration: "/fun/hindsight.avif",
-    description: "Put the photographs in the order they were taken.",
+    id: "sight-lines",
+    href: "/fun/sight-lines",
+    title: "Sight Lines",
+    illustration: "/fun/sight-lines.avif",
+    description: "A word search with photographs. Find lines that share a subject.",
+  },
+  {
+    id: "photo-pairs",
+    href: "/fun/photo-pairs",
+    title: "Photo Pairs",
+    illustration: "/fun/photo-pairs.avif",
+    description: "Remember the photographs. Find the pairs that belong together.",
   },
   {
     id: "warmer",
@@ -77,6 +55,35 @@ export const FUN_GAMES = [
     title: "Warmer",
     illustration: "/fun/warmer.avif",
     description: "Describe a hidden photograph. Each guess says how close you are.",
+  },
+  {
+    id: "double-take",
+    href: "/fun/double-take",
+    title: "Double Take",
+    illustration: "/fun/double-take.avif",
+    description: "Two fleeting photographs. Same look. Same place?",
+  },
+  {
+    id: "photo-jigsaw",
+    href: "/fun/photo-jigsaw",
+    title: "Photo Jigsaw",
+    illustration: "/fun/photo-jigsaw.avif",
+    description: "Piece an archive photograph back together, with a twist.",
+  },
+  {
+    id: "wander",
+    href: "/fun/wander",
+    title: "Wander",
+    illustration: "/fun/wander.avif",
+    description:
+      "Follow photographic trails, find hidden subjects, or wander without a destination.",
+  },
+  {
+    id: "hindsight",
+    href: "/fun/hindsight",
+    title: "Hindsight",
+    illustration: "/fun/hindsight.avif",
+    description: "Put the photographs in the order they were taken.",
   },
   {
     id: "caption-it",
@@ -100,13 +107,6 @@ export const FUN_GAMES = [
     illustration: "/fun/photo-relay.avif",
     description:
       "Two photographs, five missing links. Find the smoothest visual route between them.",
-  },
-  {
-    id: "photo-jigsaw",
-    href: "/fun/photo-jigsaw",
-    title: "Photo Jigsaw",
-    illustration: "/fun/photo-jigsaw.avif",
-    description: "Piece an archive photograph back together, with a twist.",
   },
 ] as const;
 

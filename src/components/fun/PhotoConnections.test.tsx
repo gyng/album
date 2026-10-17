@@ -47,6 +47,37 @@ it("checks groups, avoids charging twice for the same mistake and reveals all co
     within(screen.getByRole("region", { name: "Connections result" })).getAllByRole("img"),
   ).toHaveLength(16);
 });
+// A hint names a connection still to find — never which photographs are in it
+// — one more each time, and a solved connection's name drops off the list.
+it("names an unfound connection for each hint asked for", () => {
+  render(<PhotoConnections photos={photos} />);
+  fireEvent.click(screen.getByRole("button", { name: "Start connecting" }));
+  fireEvent.click(screen.getByRole("button", { name: "Auto check" }));
+  const hint = screen.getByRole("button", { name: "Hint" });
+
+  fireEvent.click(hint);
+  const named = () =>
+    within(screen.getByRole("list", { name: "Hints" }))
+      .getAllByRole("listitem")
+      .map((item) => item.textContent);
+  expect(named()).toHaveLength(1);
+  fireEvent.click(hint);
+  expect(named()).toHaveLength(2);
+  const [first, second] = named();
+  expect(first).not.toBe(second);
+
+  fireEvent.click(screen.getByRole("button", { name: "Give up" }));
+  const result = within(screen.getByRole("region", { name: "Connections result" }));
+  expect(result.getByRole("region", { name: first! })).toBeTruthy();
+  expect(result.getByRole("region", { name: second! })).toBeTruthy();
+});
+it("stops offering hints once every remaining connection has been named", () => {
+  render(<PhotoConnections photos={photos} />);
+  fireEvent.click(screen.getByRole("button", { name: "Start connecting" }));
+  const hint = screen.getByRole("button", { name: "Hint" });
+  for (let i = 0; i < 4; i++) fireEvent.click(hint);
+  expect(hint).toBeDisabled();
+});
 it("ends after four different mistakes and reveals the groups", () => {
   render(<PhotoConnections photos={photos} />);
   fireEvent.click(screen.getByRole("button", { name: "4 lives" }));
@@ -297,6 +328,17 @@ describe("daily", () => {
     expect(readGameStats("connections")).toMatchObject({ played: 2, won: 1 });
     fireEvent.click(screen.getByRole("button", { name: "Change board size" }));
     expect(screen.getByText(/Played 2 · won 1/)).toBeTruthy();
+  });
+
+  // A shared score says how it was got.
+  it("counts the hints a daily used in its result", () => {
+    render(<PhotoConnections photos={archive} />);
+    fireEvent.click(screen.getByRole("button", { name: dailyName }));
+    fireEvent.click(screen.getByRole("button", { name: "Hint" }));
+    fireEvent.click(screen.getByRole("button", { name: "Give up" }));
+    expect(readGameStats("connections").dailies[today.day]?.summary).toBe(
+      "Gave up · 0 of 4 connections · 1 hint",
+    );
   });
 
   it("shares a finished daily and shows its result instead of offering it again", () => {

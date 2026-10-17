@@ -45,15 +45,18 @@ export const dailyConnectionsPuzzle = (photos: PhotoGamePhoto[], day?: string) =
 const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? "" : "s"}`;
 
 // Spoiler-free: how the round went, never which photographs or subjects.
+// A shared score says how it was got, so the hints used are part of it.
 const dailySummary = (
   outcome: "won" | "lost" | "gave-up",
   found: number,
   mistakes: number,
   size: number,
+  hints: number,
 ) =>
-  outcome === "won"
+  (outcome === "won"
     ? `${size}×${size} · ${mistakes ? plural(mistakes, "mistake") : "No mistakes"}`
-    : `${outcome === "gave-up" ? "Gave up" : "Out of lives"} · ${found} of ${size} connections`;
+    : `${outcome === "gave-up" ? "Gave up" : "Out of lives"} · ${found} of ${size} connections`) +
+  (hints ? ` · ${plural(hints, "hint")}` : "");
 
 export const PhotoConnections = ({ photos }: { photos: PhotoGamePhoto[] }) => {
   const [settings, setSettings] = useGameSettings("connections");
@@ -81,6 +84,8 @@ export const PhotoConnections = ({ photos }: { photos: PhotoGamePhoto[] }) => {
   const [mistakes, setMistakes] = useState(0);
   const [gaveUp, setGaveUp] = useState(false);
   const [message, setMessage] = useState("");
+  // Connections whose names a hint has given away, in the order asked for.
+  const [hinted, setHinted] = useState<string[]>([]);
   const attempted = useRef(new Set<string>());
   const resultRef = useRef<HTMLDivElement>(null);
   const boardRef = useRef<HTMLDivElement>(null);
@@ -173,6 +178,7 @@ export const PhotoConnections = ({ photos }: { photos: PhotoGamePhoto[] }) => {
     setMistakes(0);
     setGaveUp(false);
     setMessage("");
+    setHinted([]);
     attempted.current.clear();
   };
   const start = () =>
@@ -197,7 +203,12 @@ export const PhotoConnections = ({ photos }: { photos: PhotoGamePhoto[] }) => {
     record({
       won: outcome === "won",
       ...(daily
-        ? { daily: { day: daily, summary: dailySummary(outcome, foundCount, mistakeCount, size) } }
+        ? {
+            daily: {
+              day: daily,
+              summary: dailySummary(outcome, foundCount, mistakeCount, size, hinted.length),
+            },
+          }
         : {}),
     });
   const giveUp = () => {
@@ -245,6 +256,17 @@ export const PhotoConnections = ({ photos }: { photos: PhotoGamePhoto[] }) => {
       );
     }
   };
+  // A hint names a connection still to find, never which photographs are in it.
+  const nextHint = puzzle?.groups.find(
+    (group) => !found.includes(group.id) && !hinted.includes(group.id),
+  );
+  const hint = () => {
+    if (!finished && nextHint) setHinted([...hinted, nextHint.id]);
+  };
+  const hintLabels =
+    puzzle?.groups
+      .filter((group) => hinted.includes(group.id) && !found.includes(group.id))
+      .map((group) => group.label) ?? [];
   const shortcuts = [
     {
       key: "Enter",
@@ -259,6 +281,7 @@ export const PhotoConnections = ({ photos }: { photos: PhotoGamePhoto[] }) => {
       enabled: !!puzzle && !finished && !!selected.length,
     },
     { key: "s", label: "Shuffle", action: shuffle, enabled: !!puzzle && !finished },
+    { key: "h", label: "Hint", action: hint, enabled: !!puzzle && !finished && !!nextHint },
     { key: "g", label: "Give up", action: giveUp, enabled: !!puzzle && !finished },
     { key: "n", label: "New game", action: start, enabled: !puzzle || finished },
   ];
@@ -411,6 +434,10 @@ export const PhotoConnections = ({ photos }: { photos: PhotoGamePhoto[] }) => {
             <Icon kind="shuffle" />
             <KeyHint aria-hidden="true">S</KeyHint>
           </Button>
+          <Button aria-label="Hint" title="Hint" disabled={!nextHint} onClick={hint}>
+            <Icon kind="sparkles" />
+            <KeyHint aria-hidden="true">H</KeyHint>
+          </Button>
         </GameDock>
       ) : null}
       {visibleGroups.length ? (
@@ -464,6 +491,16 @@ export const PhotoConnections = ({ photos }: { photos: PhotoGamePhoto[] }) => {
               </ol>
             </section>
           ))}
+        </div>
+      ) : null}
+      {!finished && hintLabels.length ? (
+        <div className={styles.connectionHints}>
+          <Caption>Still to find</Caption>
+          <ul aria-label="Hints">
+            {hintLabels.map((label) => (
+              <li key={label}>{label}</li>
+            ))}
+          </ul>
         </div>
       ) : null}
       {!finished ? (

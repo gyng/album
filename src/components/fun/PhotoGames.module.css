@@ -290,6 +290,31 @@
   }
 }
 
+/* The connections a hint has named, as small labels above the board. */
+.connectionHints {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.connectionHints ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.connectionHints li {
+  padding: var(--space-1) var(--space-3);
+  border: solid var(--line-hairline) var(--c-border);
+  border-radius: var(--radius-pill);
+  background-color: var(--c-surface);
+  font-size: var(--fs-s);
+}
+
 .connectionChoices {
   display: grid;
   grid-template-columns: repeat(var(--connection-columns, 4), minmax(0, 1fr));
