@@ -34,3 +34,7 @@
   max-inline-size: min(50dvw, var(--size-460));
   word-break: break-word;
 }
+
+.similarPhotosWrap {
+  margin: 0 0 var(--m-l);
+}

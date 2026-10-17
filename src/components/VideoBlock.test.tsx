@@ -5,6 +5,17 @@
 import { act } from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { LocalVideoBlockEl, YoutubeBlockEl } from "./VideoBlock";
+import { weatherFixture } from "../test/fixtures/weather";
+
+jest.mock("./MapDeferred", () => ({
+  MapDeferred: ({ coordinates }: { coordinates: [number, number] }) => (
+    <div data-testid="clip-map">{coordinates.map((value) => value.toFixed(4)).join(",")}</div>
+  ),
+}));
+
+jest.mock("./PhotoSimilarPhotosDeferred", () => ({
+  PhotoSimilarPhotosDeferred: ({ path }: { path?: string }) => <p>Similar to {path}</p>,
+}));
 
 describe("VideoBlock", () => {
   it("renders details panel for YouTube videos", () => {
@@ -88,6 +99,108 @@ describe("VideoBlock", () => {
     expect(screen.getByText("10.00 MB")).toBeTruthy();
     expect(screen.queryByText("Source")).toBeNull();
     expect(screen.getByText("2026-01-02")).toBeTruthy();
+  });
+});
+
+// The details pane used to describe only the encoding — codec, bitrate, MIME
+// type — and none of what a reader opens it for. A clip knows when and where it
+// was shot, its camera, and everything the index says about its frame, so its
+// pane says so, the way a photograph's does.
+describe("LocalVideoBlockEl details", () => {
+  const reading = {
+    capturedAtLocal: "2025-12-01T20:15:51",
+    latDeg: 35.6601711,
+    lngDeg: 139.7292303,
+    durationSeconds: 7.2,
+    camera: {
+      Make: "FUJIFILM",
+      Model: "X-T5",
+      LensInfo: [23, 23, 1.4, 1.4],
+      FNumber: 1.4,
+      ISO: 4000,
+      ExposureTime: 1 / 30,
+      FocalLength: 23,
+    },
+    tags: {
+      path: "../albums/2511japan/DSCF7497.MOV",
+      geocode: "35.66\n139.73\nMinato\nTokyo\nMinato\nJP\nJapan",
+      tz_offset: "+09:00",
+      tags: ["night", "city"],
+      colors: [[200, 30, 40]] as [number, number, number][],
+      alt_text: "City lights from an observation deck.",
+      weather: weatherFixture,
+    },
+  };
+
+  const open = (props: Partial<React.ComponentProps<typeof LocalVideoBlockEl>> = {}) => {
+    render(
+      <LocalVideoBlockEl
+        id="DSCF7497.MOV"
+        src="/data/albums/2511japan/.resized_videos/DSCF7497.MOV@1920.mp4"
+        mimeType="video/mp4"
+        originalTechnicalData={{ codec: "hevc" }}
+        reading={reading}
+        {...props}
+      />,
+    );
+    // jsdom does not toggle a <details> from a click on its summary.
+    const details = screen.getByLabelText("Video details").closest("details")!;
+    details.open = true;
+    fireEvent(details, new Event("toggle", { bubbles: true }));
+  };
+
+  it("says when, where and with what the clip was shot", () => {
+    open();
+
+    expect(screen.getByText("Location")).toBeTruthy();
+    expect(screen.getByTestId("clip-map").textContent).toBe("35.6602,139.7292");
+    expect(
+      screen.getByText(
+        (_content, element) =>
+          element?.tagName === "TD" &&
+          element.textContent?.startsWith("1 December 2025 at 20:15 (+09:00)") === true,
+      ),
+    ).toBeTruthy();
+    expect(screen.getByText("0:07")).toBeTruthy();
+    expect(screen.getByText("FUJIFILM X-T5")).toBeTruthy();
+    expect(screen.getByText("23mm f/1.4")).toBeTruthy();
+    expect(screen.getByText("𝑓/1.4")).toBeTruthy();
+    expect(screen.getByText("4000")).toBeTruthy();
+  });
+
+  it("carries what the index says about the clip's frame", () => {
+    open();
+
+    expect(screen.getByRole("link", { name: "night" })).toBeTruthy();
+    expect(
+      screen.getByLabelText("Search photos with similar colour rgb(200, 30, 40)"),
+    ).toBeTruthy();
+    expect(screen.getByText("City lights from an observation deck.")).toBeTruthy();
+    expect(screen.getByText("Weather")).toBeTruthy();
+    expect(screen.getByText("Similar to ../albums/2511japan/DSCF7497.MOV")).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Wander from here" })).toHaveAttribute(
+      "href",
+      "/explore/wander?wander=..%2Falbums%2F2511japan%2FDSCF7497.MOV",
+    );
+    // The encoding is still there for whoever wants it.
+    expect(screen.getByText("hevc")).toBeTruthy();
+  });
+
+  // An inferred place is a guess with a reason, and the pane gives the reason.
+  it("says where an inferred location came from", () => {
+    open({
+      reading: { ...reading, locationInferredFrom: { photo: "DSCF7490.JPG", minutesApart: -4 } },
+    });
+
+    expect(screen.getByText("From DSCF7490.JPG, 4 minutes before")).toBeTruthy();
+  });
+
+  it("shows no location row for a clip that has none", () => {
+    const { latDeg: _lat, lngDeg: _lng, ...unplaced } = reading;
+    open({ reading: unplaced });
+
+    expect(screen.queryByText("Location")).toBeNull();
+    expect(screen.queryByTestId("clip-map")).toBeNull();
   });
 });
 

@@ -184,9 +184,13 @@ export const deserializeVideoBlock = async (
                 : {}),
               ...(poster.latDeg !== undefined ? { latDeg: poster.latDeg } : {}),
               ...(poster.lngDeg !== undefined ? { lngDeg: poster.lngDeg } : {}),
+              ...(poster.locationInferredFrom !== undefined
+                ? { locationInferredFrom: poster.locationInferredFrom }
+                : {}),
               ...(poster.durationSeconds !== undefined
                 ? { durationSeconds: poster.durationSeconds }
                 : {}),
+              ...(poster.camera !== undefined ? { camera: poster.camera } : {}),
             }
           : {}),
       },

@@ -27,11 +27,33 @@ export interface Exif {
   FocalLengthIn35mmFormat?: number;
   LensMake?: string;
   LensModel?: string;
-  LensInfo?: string;
+  /** exifr reports the four numbers EXIF stores; see util/formatLensInfo. */
+  LensInfo?: number[] | string;
   Make?: string;
   Model?: string;
   ImageDescription?: string;
 }
+
+/**
+ * What a clip's camera recorded about its exposure (read by services/movieExif.ts),
+ * keyed exactly as a photograph's EXIF is, so the same formatting, facets and
+ * statistics read both. Exposure settings are the ones the clip started with.
+ */
+export type VideoCamera = {
+  Make?: string;
+  Model?: string;
+  LensMake?: string;
+  LensModel?: string;
+  /** Minimum and maximum focal length, then the maximum aperture at each. */
+  LensInfo?: number[];
+  /** Seconds. */
+  ExposureTime?: number;
+  FNumber?: number;
+  ISO?: number;
+  ExposureCompensation?: number;
+  FocalLength?: number;
+  FocalLengthIn35mmFormat?: number;
+};
 
 export interface Tags {
   weather?: WeatherMetadata;
@@ -119,7 +141,14 @@ export interface VideoBlock extends IBlock {
     capturedAtLocal?: string;
     latDeg?: number;
     lngDeg?: number;
+    /**
+     * Set when the clip recorded no place and these coordinates are the
+     * nearest geotagged photograph's (services/clipLocation.ts).
+     */
+    locationInferredFrom?: { photo: string; minutesApart: number };
     durationSeconds?: number;
+    /** Camera, lens and exposure from the clip's own EXIF, keyed as a photo's are. */
+    camera?: VideoCamera;
     /**
      * The clip's own row from the search index, keyed by the clip's path (or by
      * its synthetic `<video id>.youtube` name) and built from the poster frame —

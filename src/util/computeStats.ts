@@ -275,6 +275,8 @@ type StatsPhotoEntry = {
   photo: PhotoBlock;
   decLat: number | null;
   decLng: number | null;
+  /** A still always does; a clip only when its own EXIF named its camera. */
+  recordsCamera: boolean;
 };
 
 function computeNumericFacet(photos: PhotoBlock[], facet: PhotoFacet<number>): NumericFacetStat {
@@ -1190,12 +1192,19 @@ function computeLensTypeStats(photos: PhotoBlock[]): PhotoStats["lensTypeStats"]
 
   for (const photo of photos) {
     const lens = LENS_FACET.extract(photo._build.exif, photo._build.tags ?? undefined);
-    if (!lens) {
-      counts.unknown += 1;
+    if (lens) {
+      counts[classifyLensType(lens)] += 1;
       continue;
     }
-
-    counts[classifyLensType(lens)] += 1;
+    // Without a model name, the lens's own range still says which it is: one
+    // focal length is a prime, a span is a zoom. A clip records only this.
+    const lensInfo = photo._build.exif.LensInfo;
+    const [shortest, longest] = Array.isArray(lensInfo) ? lensInfo : [];
+    if (typeof shortest === "number" && typeof longest === "number" && shortest > 0) {
+      counts[shortest === longest ? "prime" : "zoom"] += 1;
+    } else {
+      counts.unknown += 1;
+    }
   }
 
   return counts;
@@ -1588,6 +1597,9 @@ const statsPhotoFromVideoBlock = (block: VideoBlock): PhotoBlock | null => {
       width: entry.poster.width,
       height: entry.poster.height,
       exif: {
+        // The camera and exposure, when the clip's own EXIF recorded them, are
+        // keyed as a photograph's are.
+        ...entry.block._build?.camera,
         ...(entry.capturedAtLocal ? { DateTimeOriginal: entry.capturedAtLocal } : {}),
         // A clip records no OffsetTime of its own; the zone the indexer derived
         // for it is the same reading the map and timeline already prefer over a
@@ -1616,7 +1628,15 @@ export function computePhotoStats(albums: Content[]): PhotoStats {
     album.blocks.flatMap((block): StatsPhotoEntry[] => {
       if (block.kind === "photo") {
         const { decLat, decLng } = getDegLatLngFromExif(block._build.exif);
-        return [{ album, photo: block, decLat: decLat ?? null, decLng: decLng ?? null }];
+        return [
+          {
+            album,
+            photo: block,
+            decLat: decLat ?? null,
+            decLng: decLng ?? null,
+            recordsCamera: true,
+          },
+        ];
       }
 
       if (block.kind !== "video") {
@@ -1629,19 +1649,32 @@ export function computePhotoStats(albums: Content[]): PhotoStats {
         return [];
       }
 
-      return [{ album, photo, decLat: entry.decLat, decLng: entry.decLng }];
+      return [
+        {
+          album,
+          photo,
+          decLat: entry.decLat,
+          decLng: entry.decLng,
+          recordsCamera: Boolean(block._build?.camera),
+        },
+      ];
     }),
   );
   const photos = entries.map((entry) => entry.photo);
-  // What the camera records — framing, and the camera, lens and exposure — is
-  // read from a still's own EXIF. A clip's is not read, which is not the same
-  // as having none: counted, every clip was another "unknown" lens and lowered
-  // the coverage of facets every photograph records. Those stay stills-only.
+  // Framing is measured from a still's own dimensions and orientation, which a
+  // poster cannot stand in for.
   const stillPhotos = albums.flatMap((album) =>
     album.blocks.filter((block): block is PhotoBlock => block.kind === "photo"),
   );
+  // The camera, lens and exposure count every still and every clip whose own
+  // EXIF recorded them. A clip whose camera was not recorded is left out rather
+  // than counted as having none: it was another "unknown" lens, and lowered the
+  // coverage of facets every photograph records.
+  const cameraPhotos = entries.flatMap(({ photo, recordsCamera }) =>
+    recordsCamera ? [photo] : [],
+  );
   const facetInput = (facet: { id: string }) =>
-    CAMERA_FACET_IDS.has(facet.id) ? stillPhotos : photos;
+    CAMERA_FACET_IDS.has(facet.id) ? cameraPhotos : photos;
 
   let minYear = Infinity;
   let maxYear = -Infinity;
@@ -1660,8 +1693,8 @@ export function computePhotoStats(albums: Content[]): PhotoStats {
   const calendarStats = computeCalendarStats(photos);
   const recentTrendStats = computeRecentTrendStats(photos);
   const colorStats = computeRichColorStats(entries);
-  const lensTypeStats = computeLensTypeStats(stillPhotos);
-  const technicalRelationshipFilters = computeTechnicalRelationshipFilters(stillPhotos);
+  const lensTypeStats = computeLensTypeStats(cameraPhotos);
+  const technicalRelationshipFilters = computeTechnicalRelationshipFilters(cameraPhotos);
   const revisitedPlaces = computeRevisitedPlace(photos);
   const mapPoints = entries.flatMap(({ decLat, decLng }) =>
     typeof decLat === "number" && typeof decLng === "number" ? [{ lat: decLat, lng: decLng }] : [],
@@ -1683,10 +1716,10 @@ export function computePhotoStats(albums: Content[]): PhotoStats {
       ...computeFramingFacets(stillPhotos),
       ...computeWeatherFacets(entries),
     ],
-    gearFlow: computeGearFlow(stillPhotos),
+    gearFlow: computeGearFlow(cameraPhotos),
     gear: computeGearStats(albums),
     locationFlow: computeLocationFlow(photos),
-    technicalRelationships: computeTechnicalRelationships(stillPhotos),
+    technicalRelationships: computeTechnicalRelationships(cameraPhotos),
     technicalRelationshipFilters,
     timeRelationships: computeTimeRelationships(photos),
     weekdayStats: calendarStats.weekdayStats,

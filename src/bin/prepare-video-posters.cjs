@@ -13,8 +13,13 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const imageOptimisationConfig = require("../services/imageOptimisationConfig.json");
-const { listAlbumFiles, runPool } = require("./prepare-optimised-images.cjs");
-const { ensureVideoPoster, posterPathsFor } = require("../services/videoPoster.ts");
+const { listAlbumFiles, runPool, PHOTO_EXTENSIONS } = require("./prepare-optimised-images.cjs");
+const {
+  ensureVideoPoster,
+  posterPathsFor,
+  readVideoPosterSidecar,
+} = require("../services/videoPoster.ts");
+const { reconcileInferredLocation } = require("../services/clipLocation.ts");
 const { readMovieExif } = require("../services/movieExif.ts");
 const { ensureYoutubePoster } = require("../services/youtubeExternal.ts");
 
@@ -22,6 +27,40 @@ const VIDEO_EXTENSIONS = new Set([".mp4", ".mov", ".m4v", ".webm", ".mkv", ".avi
 const MANIFEST_V2_NAME = "album.json";
 
 const isVideoFile = (filename) => VIDEO_EXTENSIONS.has(path.extname(filename).toLowerCase());
+const isPhotoFile = (filename) => PHOTO_EXTENSIONS.has(path.extname(filename).toLowerCase());
+
+// A photograph's wall clock and place, for inferring where a clip without one
+// was shot. `reviveValues: false` keeps the wall clock the string the camera
+// wrote: revived, it becomes a Date in this machine's zone.
+const readPhotoPlaceWithExifr = async (photoPath) => {
+  try {
+    const exif = await require("exifr").parse(photoPath, {
+      pick: [
+        "DateTimeOriginal",
+        "GPSLatitude",
+        "GPSLatitudeRef",
+        "GPSLongitude",
+        "GPSLongitudeRef",
+      ],
+      reviveValues: false,
+    });
+    if (
+      typeof exif?.DateTimeOriginal !== "string" ||
+      !Number.isFinite(exif.latitude) ||
+      !Number.isFinite(exif.longitude) ||
+      (exif.latitude === 0 && exif.longitude === 0)
+    ) {
+      return null;
+    }
+    return {
+      capturedAtLocal: exif.DateTimeOriginal,
+      latDeg: exif.latitude,
+      lngDeg: exif.longitude,
+    };
+  } catch {
+    return null;
+  }
+};
 
 // Externals are declared per album in the v2 manifest. A malformed manifest is
 // a content problem, not a build failure: the album pages report it themselves.
@@ -81,6 +120,7 @@ const prepareVideoPosters = async ({
       sizes: imageOptimisationConfig.sizes,
       avif: imageOptimisationConfig.avif,
     }),
+  readPhotoPlace = readPhotoPlaceWithExifr,
 } = {}) => {
   const startedAt = Date.now();
   const videos = listAlbumFiles({ albumsDir, includeTestAlbums, matches: isVideoFile });
@@ -93,6 +133,7 @@ const prepareVideoPosters = async ({
     externalPostersFetched: 0,
     externalPostersCached: 0,
     variantsEncoded: 0,
+    locationsInferred: 0,
     failures: [],
     jobs,
     durationMs: 0,
@@ -113,6 +154,50 @@ const prepareVideoPosters = async ({
       console.warn(`Could not extract a poster frame for ${source}: ${message}`);
     }
   });
+
+  // A clip without a place of its own borrows the nearest geotagged photograph
+  // of its album (services/clipLocation.ts). Re-checked on every run against
+  // the photographs as they are now, so it follows their edits; an album's
+  // photographs are read once, and only for an album that has such a clip.
+  const albumPlaces = new Map();
+  const placesOf = (albumName) => {
+    if (!albumPlaces.has(albumName)) {
+      const albumDir = path.join(albumsDir, albumName);
+      const photos = fs
+        .readdirSync(albumDir)
+        .filter(isPhotoFile)
+        .sort((a, b) => a.localeCompare(b));
+      albumPlaces.set(
+        albumName,
+        Promise.all(
+          photos.map(async (name) => {
+            const place = await readPhotoPlace(path.join(albumDir, name));
+            return place ? { name, ...place } : null;
+          }),
+        ).then((places) => places.filter(Boolean)),
+      );
+    }
+    return albumPlaces.get(albumName);
+  };
+  for (const { albumName, filename, source } of videos) {
+    try {
+      const { sidecar: sidecarPath } = posterPathsFor(source, publicAlbumsDir);
+      const sidecar = readVideoPosterSidecar(sidecarPath);
+      if (!sidecar) continue;
+      const recorded =
+        sidecar.locationSource === "camera" ||
+        (sidecar.locationSource === undefined && typeof sidecar.latDeg === "number");
+      if (recorded || !sidecar.capturedAtLocal) continue;
+      const reconciled = reconcileInferredLocation(sidecar, await placesOf(albumName));
+      if (reconciled !== sidecar) {
+        fs.writeFileSync(sidecarPath, `${JSON.stringify(reconciled, null, 2)}\n`);
+      }
+      if (reconciled.locationSource === "nearby-photo") summary.locationsInferred += 1;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.warn(`Could not infer a place for ${albumName}/${filename}: ${message}`);
+    }
+  }
 
   await runPool(externals, jobs, async ({ albumName, external }) => {
     try {

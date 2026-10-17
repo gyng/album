@@ -1485,6 +1485,30 @@ describe("clips beside photographs", () => {
     expect(withCamera.totalPhotos).toBe(2);
   });
 
+  // A Fuji clip's own EXIF names its camera and exposure, so it counts where
+  // the camera is concerned exactly as a photograph does; a clip whose camera
+  // was not recorded still stays out of those statistics.
+  it("counts a clip's recorded camera and exposure like a photograph's", () => {
+    const stats = computePhotoStats([
+      makeAlbum([
+        makePhoto({ exif: { Make: "FUJIFILM", Model: "X-T5", ISO: 400 } }),
+        makeVideo({
+          capturedAtLocal: "2024-01-01T00:00:00",
+          camera: { Make: "FUJIFILM", Model: "X-T5", ISO: 4000, LensInfo: [23, 23, 1.4, 1.4] },
+        }),
+        makeVideo({ capturedAtLocal: "2024-01-02T00:00:00" }),
+      ]),
+    ]);
+
+    expect(stats.stringFacets.find((facet) => facet.facetId === "camera")).toMatchObject({
+      coverage: 1,
+      data: [{ label: "FUJIFILM X-T5", count: 2 }],
+    });
+    expect(stats.numericFacets.find((facet) => facet.facetId === "iso")?.coverage).toBe(1);
+    // The clip's lens is a prime (one focal length), the photo's is unrecorded.
+    expect(stats.lensTypeStats).toEqual({ prime: 1, zoom: 0, unknown: 1 });
+  });
+
   // A poster cannot prove how the clip was framed, so framing keeps its own
   // coverage over stills rather than inventing dimensions for the clip.
   it("does not let a poster stand in for a still's framing", () => {

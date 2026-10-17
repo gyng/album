@@ -175,6 +175,30 @@ describe("readVideoPoster", () => {
     expect(poster?.capturedAtLocal).toBeUndefined();
   });
 
+  // The camera and an inferred location travel into page props like the rest,
+  // so they are read field by field: a stray string ISO or a tampered
+  // inference must not reach the album page.
+  it("reads the camera and an inferred location, and only what they may hold", () => {
+    const { video, publicAlbumsDir, videoCacheDir, imageCacheDir } = buildAlbum();
+    fs.writeFileSync(path.join(imageCacheDir, "clip.mov@800.avif"), "avif");
+    fs.writeFileSync(
+      path.join(videoCacheDir, "clip.mov@poster.json"),
+      JSON.stringify({
+        mediaKind: "video",
+        latDeg: 1.28,
+        lngDeg: 103.85,
+        locationSource: "nearby-photo",
+        locationInferredFrom: { photo: "near.jpg", minutesApart: -4 },
+        camera: { Make: "FUJIFILM", ISO: "4000", FNumber: 1.4, LensInfo: [23, 23, 1.4], extra: 1 },
+      }),
+    );
+
+    const poster = readVideoPoster(video, publicAlbumsDir);
+
+    expect(poster?.locationInferredFrom).toEqual({ photo: "near.jpg", minutesApart: -4 });
+    expect(poster?.camera).toEqual({ Make: "FUJIFILM", FNumber: 1.4 });
+  });
+
   it("reads a sidecar that is valid JSON but not an object as no sidecar", () => {
     const { video, publicAlbumsDir, videoCacheDir, imageCacheDir } = buildAlbum();
     fs.writeFileSync(path.join(imageCacheDir, "clip.mov@800.avif"), "avif");

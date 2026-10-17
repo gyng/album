@@ -29,10 +29,8 @@ export const Block: React.FC<{
           />
         );
       } else if ((props.b as VideoBlock).data.type === "local") {
-        const poster = pickPosterVariant(
-          (props.b as VideoBlock)._build?.poster?.srcset,
-          POSTER_DISPLAY_WIDTH,
-        );
+        const build = (props.b as VideoBlock)._build;
+        const poster = pickPosterVariant(build?.poster?.srcset, POSTER_DISPLAY_WIDTH);
         return (
           <LocalVideoBlockEl
             id={(props.b as VideoBlock).id}
@@ -42,6 +40,7 @@ export const Block: React.FC<{
             date={(props.b as VideoBlock).data.date}
             mimeType={(props.b as VideoBlock)._build?.mimeType}
             originalTechnicalData={(props.b as VideoBlock)._build?.originalTechnicalData}
+            {...(build ? { reading: build } : {})}
           />
         );
       } else {

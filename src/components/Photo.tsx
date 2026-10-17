@@ -11,30 +11,23 @@ import { Heading } from "./ui";
 import { AppLink } from "./platform";
 import commonStyles from "../styles/common.module.css";
 
-import type { JSX } from "react";
 import { rgbToString } from "../util/colorDistance";
+import { buildSearchFacetHref, getLocationFacetSelection } from "../util/searchFacets";
 import {
-  buildSearchFacetHref,
-  buildSearchHref,
-  getBucketFacetSelection,
-  getCameraFacetSelection,
-  getLensFacetSelection,
-  getLocationFacetSelection,
-} from "../util/searchFacets";
-import {
-  APERTURE_FACET,
-  FOCAL_LENGTH_35MM_FACET,
-  FOCAL_LENGTH_ACTUAL_FACET,
-  ISO_FACET,
-} from "../util/photoBuckets";
+  ColourSwatches,
+  TagLinks,
+  cameraExifRows,
+  detailValueWithActionClass,
+  narrowCellClass,
+  type MediaDetailRow,
+  type MediaDetailValue,
+} from "./MediaDetailsParts";
 import { exifRelativeTimestamp, formatExifWallClockDateTime } from "../util/exifTime";
 import { PhotoSimilarPhotosDeferred } from "./PhotoSimilarPhotosDeferred";
 import { MediaDetailsIcon } from "./MediaDetailsIcon";
 import { formatAspectRatio } from "../util/formatAspectRatio";
-import { formatExposureTime } from "../util/formatExposureTime";
 import { getDisplayDimensions, isExifRotated } from "../util/photoDimensions";
 import { PhotoWeatherDetails } from "./PhotoWeatherDetails";
-import { forceDocumentNavigation } from "./search/searchUtils";
 
 type ExifCoordinatesRowProps = {
   kind: "coordinates";
@@ -92,7 +85,7 @@ const ExifCoordinatesRow: React.FC<{ row: ExifCoordinatesRowProps }> = (props) =
       <tr>
         <td>{props.row.k}</td>
         <td>
-          <span className={styles.detailValueWithAction}>
+          <span className={detailValueWithActionClass}>
             <span>{formatted}</span>
             {locationHref ? (
               <FacetLinkIcon href={locationHref} label="Find photos from this place" />
@@ -128,16 +121,8 @@ const ExifCoordinatesRow: React.FC<{ row: ExifCoordinatesRowProps }> = (props) =
   );
 };
 
-type ExifRow =
-  | {
-      kind: "kv";
-      /** Display key */
-      k: string;
-      /** Display value */
-      v: ExifCellValue;
-      valid?: boolean;
-      className?: string | undefined;
-    }
+export type ExifTableRow =
+  | MediaDetailRow
   | {
       kind: "coordinates";
       /** Display key */
@@ -157,14 +142,14 @@ type ExifRow =
       valid?: boolean;
     };
 
-type ExifCellValue = string | string[] | number | JSX.Element | JSX.Element[] | undefined | null;
+type ExifCellValue = MediaDetailValue;
 
 export const PhotoDescription: React.FC<{ description: string }> = (props) => {
   return <div>{props.description}</div>;
 };
 
 export const ExifTable: React.FC<{
-  rows: ExifRow[];
+  rows: ExifTableRow[];
 }> = (props) => {
   return (
     <>
@@ -235,23 +220,6 @@ export type PhotoBlockEditDetails = {
 };
 
 const THUMBNAIL_MIN_SOURCE_WIDTH = 1600;
-
-const withFacetAction = (
-  value: ExifCellValue,
-  href: string | null,
-  label: string,
-): ExifCellValue => {
-  if (!href) {
-    return value;
-  }
-
-  return (
-    <span className={styles.detailValueWithAction}>
-      <span>{value}</span>
-      <FacetLinkIcon href={href} label={label} />
-    </span>
-  );
-};
 
 export const Picture: React.FC<{
   block: PhotoBlock;
@@ -347,13 +315,6 @@ export const PhotoBlockEl: React.FC<{
   const { exif } = props.block._build;
 
   const [isDetailsOpen, setIsDetailsOpen] = React.useState(false);
-  const cameraSelection = getCameraFacetSelection(exif);
-  const lensSelection = getLensFacetSelection(exif);
-  const isoSelection = getBucketFacetSelection(ISO_FACET.id, exif.ISO);
-  const apertureSelection = getBucketFacetSelection(APERTURE_FACET.id, exif.FNumber);
-  const focalLengthSelection =
-    getBucketFacetSelection(FOCAL_LENGTH_35MM_FACET.id, exif.FocalLengthIn35mmFormat) ??
-    getBucketFacetSelection(FOCAL_LENGTH_ACTUAL_FACET.id, exif.FocalLength);
   const displayDimensions = getDisplayDimensions(props.block);
   // Derived-from-location wins over the camera's own tag: measured against the
   // zone its coordinates imply, the X100T is wrong on every frame and the X-T5
@@ -444,81 +405,7 @@ export const PhotoBlockEl: React.FC<{
                         props.block._build.exif.GPSLongitude,
                       ),
                     },
-                    {
-                      kind: "kv",
-                      k: "Shutter speed",
-                      v: (() => {
-                        const t = props.block._build.exif.ExposureTime;
-                        if (!t) return undefined;
-                        return formatExposureTime(t);
-                      })(),
-                      valid: Boolean(props.block._build.exif.ExposureTime),
-                    },
-                    {
-                      kind: "kv",
-                      k: "ISO",
-                      v: withFacetAction(
-                        exif.ISO,
-                        isoSelection ? buildSearchFacetHref(isoSelection) : null,
-                        "Find photos at this ISO",
-                      ),
-                    },
-                    {
-                      kind: "kv",
-                      k: "Aperture",
-                      v: withFacetAction(
-                        `𝑓/${exif.FNumber}`,
-                        apertureSelection ? buildSearchFacetHref(apertureSelection) : null,
-                        "Find photos at this aperture",
-                      ),
-                      valid: Boolean(exif.FNumber),
-                    },
-                    {
-                      kind: "kv",
-                      k: "Exposure compensation",
-                      v: props.block._build.exif.ExposureCompensation,
-                    },
-                    //   { kind: "kv", k: "Flash", v: props.block._build.exif.Flash },
-                    {
-                      kind: "kv",
-                      k: "Focal length",
-                      v: withFacetAction(
-                        `${exif.FocalLength}mm (actual)${
-                          exif.FocalLengthIn35mmFormat
-                            ? `; ${exif.FocalLengthIn35mmFormat}mm (35mm equivalent)`
-                            : ""
-                        }`,
-                        focalLengthSelection ? buildSearchFacetHref(focalLengthSelection) : null,
-                        "Find photos with this focal length",
-                      ),
-                      valid: Boolean(exif.FocalLength),
-                    },
-                    {
-                      kind: "kv",
-                      k: "Lens",
-                      v: withFacetAction(
-                        [
-                          exif.LensMake,
-                          exif.LensModel,
-                          exif.LensMake || exif.LensModel ? null : exif.LensInfo,
-                        ]
-                          .filter(Boolean)
-                          .join(" "),
-                        lensSelection ? buildSearchFacetHref(lensSelection) : null,
-                        "Find photos with this lens",
-                      ),
-                      valid: Boolean(exif.LensMake || exif.LensModel || exif.LensInfo),
-                    },
-                    {
-                      kind: "kv",
-                      k: "Camera",
-                      v: withFacetAction(
-                        [exif.Make, exif.Model].filter(Boolean).join(" "),
-                        cameraSelection ? buildSearchFacetHref(cameraSelection) : null,
-                        "Find photos with this camera",
-                      ),
-                      valid: Boolean(exif.Make || exif.Model),
-                    },
+                    ...cameraExifRows(exif),
                     {
                       kind: "kv",
                       k: "Description",
@@ -577,60 +464,21 @@ export const PhotoBlockEl: React.FC<{
                     {
                       kind: "kv",
                       k: "Tags",
-                      v: (
-                        <ul className={styles.tagLinks}>
-                          {props.block._build.tags.tags?.map((tag) => (
-                            <li key={tag}>
-                              <AppLink
-                                href={buildSearchHref({ query: [tag] })}
-                                onClick={(event) =>
-                                  forceDocumentNavigation(event, buildSearchHref({ query: [tag] }))
-                                }
-                                className={styles.tagLink}
-                              >
-                                {tag}
-                              </AppLink>
-                            </li>
-                          ))}
-                        </ul>
-                      ),
+                      v: <TagLinks tags={props.block._build.tags.tags ?? []} />,
                       valid: Boolean(props.block._build.tags.tags?.length),
-                      className: styles.narrowCell,
+                      className: narrowCellClass,
                     },
                     {
                       kind: "kv",
                       k: "Colours",
-                      v: (
-                        <div className={styles.colorswatches}>
-                          {props.block._build.tags.colors?.map((rgb: number[]) => {
-                            const rgbStr = rgbToString(rgb as [number, number, number]);
-                            const colorParam = `${rgb[0]},${rgb[1]},${rgb[2]}`;
-                            return (
-                              <AppLink
-                                data-colour-swatch
-                                key={rgbStr}
-                                href={`/search?color=${colorParam}`}
-                                onClick={(event) =>
-                                  forceDocumentNavigation(event, `/search?color=${colorParam}`)
-                                }
-                                style={{
-                                  backgroundColor: rgbStr,
-                                }}
-                                className={styles.colorswatch}
-                                title={`Search photos with similar colour: ${rgbStr}`}
-                                aria-label={`Search photos with similar colour ${rgbStr}`}
-                              />
-                            );
-                          })}
-                        </div>
-                      ),
+                      v: <ColourSwatches colors={props.block._build.tags.colors ?? []} />,
                       valid: Boolean(props.block._build.tags.colors?.length),
                     },
                     {
                       kind: "kv",
                       k: "Description (AI)",
                       v: props.block._build.tags.alt_text,
-                      className: styles.narrowCell,
+                      className: narrowCellClass,
                       valid: Boolean(props.block._build.tags?.alt_text),
                     },
                   ]}

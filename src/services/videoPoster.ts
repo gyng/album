@@ -27,7 +27,7 @@ import ffprobeStatic from "ffprobe-static";
 import sharp from "sharp";
 // Type-only, and therefore erased: this module keeps no runtime relative import
 // (see the header). The reader itself is injected by the caller.
-import type { MovieExif } from "./movieExif";
+import type { MovieCamera, MovieExif } from "./movieExif";
 
 export const RESIZED_IMAGE_DIR = ".resized_images";
 export const RESIZED_VIDEO_DIR = ".resized_videos";
@@ -45,14 +45,24 @@ export const POSTER_CANDIDATE_FRACTIONS = [0.1, 0.3, 0.5, 0.7];
 /**
  * Bump when the sidecar's *readings* change meaning. 2: a clip's wall clock and
  * coordinates come from its own EXIF, not from the QuickTime UTC instant.
+ * 3: the camera and exposure are read too, and a location records its source.
  */
-export const POSTER_METADATA_VERSION = 2;
+export const POSTER_METADATA_VERSION = 3;
 
 export type VideoPosterMetadata = {
   capturedAtLocal?: string;
   timeSource?: "movie-exif" | "quicktime-creationdate" | "creation_time";
   latDeg?: number;
   lngDeg?: number;
+  /**
+   * Where the coordinates came from: the clip's own recording, or the
+   * geotagged photograph nearest to it in time (services/clipLocation.ts),
+   * which `locationInferredFrom` names.
+   */
+  locationSource?: "camera" | "nearby-photo";
+  locationInferredFrom?: { photo: string; minutesApart: number };
+  /** The camera, lens and exposure the clip's own EXIF records. */
+  camera?: MovieCamera;
   durationSeconds?: number;
   width?: number;
   height?: number;
@@ -228,6 +238,8 @@ export const buildVideoPosterMetadata = (
     timeSource,
     latDeg: coordinates?.latDeg,
     lngDeg: coordinates?.lngDeg,
+    locationSource: coordinates ? ("camera" as const) : undefined,
+    camera: movieExif?.camera,
     durationSeconds,
     width,
     height,

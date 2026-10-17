@@ -2,7 +2,124 @@ import styles from "./VideoBlock.module.css";
 import React from "react";
 import { License } from "../License";
 import commonStyles from "../styles/common.module.css";
+import type { VideoBlock } from "../services/types";
+import { rgbToString } from "../util/colorDistance";
+import { exifRelativeTimestamp, formatExifWallClockDateTime } from "../util/exifTime";
+import { formatDuration } from "../util/formatDuration";
+import { HydratedRelativeTime } from "./HydratedRelativeTime";
 import { MediaDetailsIcon } from "./MediaDetailsIcon";
+import { ColourSwatches, TagLinks, cameraExifRows, narrowCellClass } from "./MediaDetailsParts";
+import { ExifTable, type ExifTableRow } from "./Photo";
+import { PhotoSimilarPhotosDeferred } from "./PhotoSimilarPhotosDeferred";
+import { PhotoWeatherDetails } from "./PhotoWeatherDetails";
+import { AppLink } from "./platform";
+
+/** What a local clip knows about itself beyond its encoding. */
+export type ClipReading = Pick<
+  NonNullable<VideoBlock["_build"]>,
+  | "capturedAtLocal"
+  | "latDeg"
+  | "lngDeg"
+  | "locationInferredFrom"
+  | "durationSeconds"
+  | "camera"
+  | "tags"
+>;
+
+// A decimal coordinate in the shape EXIF stores one, so the photo pane's
+// location row — its place link and its map — reads a clip's place unchanged.
+const toExifCoordinate = (value: number): [number, number, number] => {
+  const magnitude = Math.abs(value);
+  const degrees = Math.floor(magnitude);
+  const minutes = Math.floor((magnitude - degrees) * 60);
+  const seconds = ((magnitude - degrees) * 60 - minutes) * 60;
+  return [degrees, minutes, seconds];
+};
+
+const describeInference = ({ photo, minutesApart }: { photo: string; minutesApart: number }) => {
+  const minutes = Math.abs(minutesApart);
+  if (minutes === 0) return `From ${photo}, taken the same minute`;
+  const span = `${minutes} ${minutes === 1 ? "minute" : "minutes"}`;
+  return `From ${photo}, ${span} ${minutesApart < 0 ? "before" : "after"}`;
+};
+
+/**
+ * The rows a reader opens the pane for: when, where and with what the clip was
+ * shot, and what the index says about its frame — the photo pane's rows, from
+ * the clip's own reading.
+ */
+const clipRows = (reading: ClipReading): ExifTableRow[] => {
+  const tags = reading.tags ?? {};
+  const zone = tags.tz_offset;
+  const capturedAt = formatExifWallClockDateTime(reading.capturedAtLocal, zone);
+  const relative = exifRelativeTimestamp(reading.capturedAtLocal, zone);
+  const placed = typeof reading.latDeg === "number" && typeof reading.lngDeg === "number";
+  return [
+    {
+      kind: "coordinates",
+      k: "Location",
+      v: placed
+        ? {
+            GPSLatitude: toExifCoordinate(reading.latDeg!),
+            GPSLatitudeRef: reading.latDeg! < 0 ? "S" : "N",
+            GPSLongitude: toExifCoordinate(reading.lngDeg!),
+            GPSLongitudeRef: reading.lngDeg! < 0 ? "W" : "E",
+            geocode: tags.geocode,
+          }
+        : {},
+      options: {
+        showMap: true,
+        ...(tags.colors?.[0] ? { markerColour: rgbToString(tags.colors[0]) } : {}),
+      },
+      valid: placed,
+    },
+    {
+      kind: "kv",
+      k: "Inferred",
+      v: reading.locationInferredFrom ? describeInference(reading.locationInferredFrom) : undefined,
+      valid: placed && Boolean(reading.locationInferredFrom),
+    },
+    {
+      kind: "kv",
+      k: "Camera datetime",
+      v: capturedAt ? (
+        <>
+          {capturedAt}
+          {relative != null ? (
+            <>
+              <br />
+              <HydratedRelativeTime date={relative} />
+            </>
+          ) : null}
+        </>
+      ) : undefined,
+    },
+    { kind: "kv", k: "Duration", v: formatDuration(reading.durationSeconds) },
+    ...cameraExifRows(reading.camera ?? {}),
+    ...(tags.weather
+      ? [{ kind: "kv" as const, k: "Weather", v: <PhotoWeatherDetails weather={tags.weather} /> }]
+      : []),
+    {
+      kind: "kv",
+      k: "Tags",
+      v: <TagLinks tags={tags.tags ?? []} />,
+      valid: Boolean(tags.tags?.length),
+      className: narrowCellClass,
+    },
+    {
+      kind: "kv",
+      k: "Colours",
+      v: <ColourSwatches colors={tags.colors ?? []} />,
+      valid: Boolean(tags.colors?.length),
+    },
+    {
+      kind: "kv",
+      k: "Description (AI)",
+      v: tags.alt_text,
+      className: narrowCellClass,
+    },
+  ];
+};
 
 export type YoutubeBlockElProps = {
   id?: string | undefined;
@@ -18,6 +135,7 @@ export type YoutubeBlockElProps = {
 
 const VideoDetailsPanel: React.FC<{
   type: "youtube" | "local";
+  reading?: ClipReading | undefined;
   id?: string | undefined;
   src: string;
   originalSrc?: string | undefined;
@@ -41,10 +159,154 @@ const VideoDetailsPanel: React.FC<{
 }> = (props) => {
   const technicalProfile =
     props.type === "local" ? "H.264 (AVC) + AAC, web-optimised MP4" : "YouTube adaptive stream";
+  // The map and the similar photographs are fetched only once the pane opens,
+  // as a photograph's are.
+  const [isOpen, setIsOpen] = React.useState(false);
+  const indexedPath = props.reading?.tags?.path;
+
+  const technicalTable = (
+    <table>
+      <tbody>
+        <tr>
+          <td>Type</td>
+          <td>{props.type}</td>
+        </tr>
+
+        <tr>
+          <td>Technical profile</td>
+          <td>{technicalProfile}</td>
+        </tr>
+
+        {props.mimeType ? (
+          <tr>
+            <td>Playback MIME</td>
+            <td>{props.mimeType}</td>
+          </tr>
+        ) : null}
+
+        {props.type === "local" ? (
+          <tr>
+            <td>Max width</td>
+            <td>1920px</td>
+          </tr>
+        ) : null}
+
+        {props.type === "local" && props.originalSrc ? (
+          <tr>
+            <td>Original file</td>
+            <td className={styles.sourceCell}>{props.originalSrc}</td>
+          </tr>
+        ) : null}
+
+        {props.type === "local" && props.originalTechnicalData?.originalDate ? (
+          <tr>
+            <td>Original date</td>
+            <td>{props.originalTechnicalData.originalDate}</td>
+          </tr>
+        ) : null}
+
+        {props.type === "local" && props.originalTechnicalData?.codec ? (
+          <tr>
+            <td>Codec</td>
+            <td>{props.originalTechnicalData.codec}</td>
+          </tr>
+        ) : null}
+
+        {props.type === "local" && props.originalTechnicalData?.profile ? (
+          <tr>
+            <td>Profile</td>
+            <td>{props.originalTechnicalData.profile}</td>
+          </tr>
+        ) : null}
+
+        {props.type === "local" && props.originalTechnicalData?.fps ? (
+          <tr>
+            <td>Framerate</td>
+            <td>{props.originalTechnicalData.fps} fps</td>
+          </tr>
+        ) : null}
+
+        {props.type === "local" && props.originalTechnicalData?.bitrateKbps ? (
+          <tr>
+            <td>Bitrate</td>
+            <td>{props.originalTechnicalData.bitrateKbps} kbps</td>
+          </tr>
+        ) : null}
+
+        {props.type === "local" && props.originalTechnicalData?.durationSeconds ? (
+          <tr>
+            <td>Duration</td>
+            <td>{props.originalTechnicalData.durationSeconds}s</td>
+          </tr>
+        ) : null}
+
+        {props.type === "local" &&
+        props.originalTechnicalData?.width &&
+        props.originalTechnicalData?.height ? (
+          <tr>
+            <td>Original size</td>
+            <td>
+              {props.originalTechnicalData.width}px × {props.originalTechnicalData.height}px
+            </td>
+          </tr>
+        ) : null}
+
+        {props.type === "local" && props.originalTechnicalData?.audioCodec ? (
+          <tr>
+            <td>Audio codec</td>
+            <td>{props.originalTechnicalData.audioCodec}</td>
+          </tr>
+        ) : null}
+
+        {props.type === "local" && props.originalTechnicalData?.container ? (
+          <tr>
+            <td>Original container</td>
+            <td>{props.originalTechnicalData.container}</td>
+          </tr>
+        ) : null}
+
+        {props.type === "local" && props.originalTechnicalData?.fileSizeBytes ? (
+          <tr>
+            <td>File size</td>
+            <td>{(props.originalTechnicalData.fileSizeBytes / (1024 * 1024)).toFixed(2)} MB</td>
+          </tr>
+        ) : null}
+
+        {props.date ? (
+          <tr>
+            <td>Date</td>
+            <td>{props.date}</td>
+          </tr>
+        ) : null}
+      </tbody>
+    </table>
+  );
+
+  const links = (
+    <div className={commonStyles.mediaDetailsViewOriginal}>
+      <a href={`#${props.id ?? props.src}`}>Permalink</a>
+      {props.type === "local" && indexedPath ? (
+        <>
+          &nbsp;&middot;&nbsp;
+          <AppLink href={`/explore/wander?wander=${encodeURIComponent(indexedPath)}`}>
+            Wander from here
+          </AppLink>
+        </>
+      ) : null}
+      {props.type === "youtube" ? (
+        <>
+          &nbsp;&middot;&nbsp;Open <a href={props.src}>embed source</a>
+        </>
+      ) : null}
+    </div>
+  );
 
   return (
     <div id={props.id ?? props.src} className={commonStyles.mediaDetails}>
-      <details className={commonStyles.disclosure}>
+      <details
+        className={commonStyles.disclosure}
+        onToggle={(event) => setIsOpen(event.currentTarget.open)}
+      >
         <summary
           aria-label="Video details"
           title="Video details"
@@ -57,135 +319,28 @@ const VideoDetailsPanel: React.FC<{
 
         <div className={commonStyles.mediaDetailsContent}>
           <div className={commonStyles.mediaDetailsTable}>
-            <table>
-              <tbody>
-                <tr>
-                  <td>Type</td>
-                  <td>{props.type}</td>
-                </tr>
-
-                <tr>
-                  <td>Technical profile</td>
-                  <td>{technicalProfile}</td>
-                </tr>
-
-                {props.mimeType ? (
-                  <tr>
-                    <td>Playback MIME</td>
-                    <td>{props.mimeType}</td>
-                  </tr>
+            {props.type === "local" && props.reading ? (
+              <>
+                {/* What a reader opens the pane for comes first; the encoding,
+                    which only says how the clip is served, folds away below. */}
+                {isOpen ? <ExifTable rows={clipRows(props.reading)} /> : null}
+                {isOpen && indexedPath ? (
+                  <div className={styles.similarPhotosWrap}>
+                    <PhotoSimilarPhotosDeferred path={indexedPath} />
+                  </div>
                 ) : null}
-
-                {props.type === "local" ? (
-                  <tr>
-                    <td>Max width</td>
-                    <td>1920px</td>
-                  </tr>
-                ) : null}
-
-                {props.type === "local" && props.originalSrc ? (
-                  <tr>
-                    <td>Original file</td>
-                    <td className={styles.sourceCell}>{props.originalSrc}</td>
-                  </tr>
-                ) : null}
-
-                {props.type === "local" && props.originalTechnicalData?.originalDate ? (
-                  <tr>
-                    <td>Original date</td>
-                    <td>{props.originalTechnicalData.originalDate}</td>
-                  </tr>
-                ) : null}
-
-                {props.type === "local" && props.originalTechnicalData?.codec ? (
-                  <tr>
-                    <td>Codec</td>
-                    <td>{props.originalTechnicalData.codec}</td>
-                  </tr>
-                ) : null}
-
-                {props.type === "local" && props.originalTechnicalData?.profile ? (
-                  <tr>
-                    <td>Profile</td>
-                    <td>{props.originalTechnicalData.profile}</td>
-                  </tr>
-                ) : null}
-
-                {props.type === "local" && props.originalTechnicalData?.fps ? (
-                  <tr>
-                    <td>Framerate</td>
-                    <td>{props.originalTechnicalData.fps} fps</td>
-                  </tr>
-                ) : null}
-
-                {props.type === "local" && props.originalTechnicalData?.bitrateKbps ? (
-                  <tr>
-                    <td>Bitrate</td>
-                    <td>{props.originalTechnicalData.bitrateKbps} kbps</td>
-                  </tr>
-                ) : null}
-
-                {props.type === "local" && props.originalTechnicalData?.durationSeconds ? (
-                  <tr>
-                    <td>Duration</td>
-                    <td>{props.originalTechnicalData.durationSeconds}s</td>
-                  </tr>
-                ) : null}
-
-                {props.type === "local" &&
-                props.originalTechnicalData?.width &&
-                props.originalTechnicalData?.height ? (
-                  <tr>
-                    <td>Original size</td>
-                    <td>
-                      {props.originalTechnicalData.width}px × {props.originalTechnicalData.height}px
-                    </td>
-                  </tr>
-                ) : null}
-
-                {props.type === "local" && props.originalTechnicalData?.audioCodec ? (
-                  <tr>
-                    <td>Audio codec</td>
-                    <td>{props.originalTechnicalData.audioCodec}</td>
-                  </tr>
-                ) : null}
-
-                {props.type === "local" && props.originalTechnicalData?.container ? (
-                  <tr>
-                    <td>Original container</td>
-                    <td>{props.originalTechnicalData.container}</td>
-                  </tr>
-                ) : null}
-
-                {props.type === "local" && props.originalTechnicalData?.fileSizeBytes ? (
-                  <tr>
-                    <td>File size</td>
-                    <td>
-                      {(props.originalTechnicalData.fileSizeBytes / (1024 * 1024)).toFixed(2)} MB
-                    </td>
-                  </tr>
-                ) : null}
-
-                {props.date ? (
-                  <tr>
-                    <td>Date</td>
-                    <td>{props.date}</td>
-                  </tr>
-                ) : null}
-              </tbody>
-            </table>
-
-            <div className={commonStyles.mediaDetailsViewOriginal}>
-              <a href={`#${props.id ?? props.src}`}>Permalink</a>
-              &nbsp;&middot;&nbsp;
-              {props.type === "local" ? (
-                <>Optimized playback in page</>
-              ) : (
-                <>
-                  Open <a href={props.src}>embed source</a>
-                </>
-              )}
-            </div>
+                {links}
+                <details className={commonStyles.mediaDetailsRaw}>
+                  <summary>Encoding</summary>
+                  {technicalTable}
+                </details>
+              </>
+            ) : (
+              <>
+                {technicalTable}
+                {links}
+              </>
+            )}
 
             <details className={commonStyles.mediaDetailsRaw}>
               <summary>Raw video details</summary>
@@ -242,6 +397,8 @@ export const YoutubeBlockEl: React.FC<YoutubeBlockElProps> = (props) => {
 
 export type LocalVideoBlockElProps = {
   id?: string | undefined;
+  /** When, where and with what the clip was shot, and its indexed row. */
+  reading?: ClipReading | undefined;
   src: string;
   /** Extracted frame shown before playback; absent until the poster prepass has run. */
   posterSrc?: string | undefined;
@@ -349,6 +506,7 @@ export const LocalVideoBlockEl: React.FC<LocalVideoBlockElProps> = (props) => {
 
       <VideoDetailsPanel
         type="local"
+        reading={props.reading}
         id={props.id}
         src={props.src}
         originalSrc={props.originalSrc}

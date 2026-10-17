@@ -140,6 +140,23 @@ describe("readMovieExif", () => {
     expect(exif?.lngDeg).toBeCloseTo(140.7917567, 6);
   });
 
+  // The same block holds the camera and the exposure, under the keys a
+  // photograph's EXIF uses, so a clip can be described and counted like one.
+  it("reads the camera, lens and exposure a Fuji clip records", () => {
+    expect(readMovieExif(FIXTURE)?.camera).toEqual({
+      Make: "FUJIFILM",
+      Model: "X-T5",
+      ExposureTime: 1 / 30,
+      FNumber: 1.4,
+      ISO: 4000,
+      ExposureCompensation: -2,
+      LensInfo: [23, 23, 1.4, 1.4],
+      // A prime's lens range is one focal length, so that is the focal length;
+      // a zoom's would not be.
+      FocalLength: 23,
+    });
+  });
+
   // The X-T5 writes a genuine UTC instant into creation_time (~35s after the
   // first frame) and the camera-local wall clock into EXIF, so reading the
   // former as local placed every clip hours from where it was taken.

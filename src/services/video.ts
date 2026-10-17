@@ -9,6 +9,7 @@ import { encodePublicAssetPath } from "../util/encodePublicAssetPath";
 import imageOptimisationConfig from "./imageOptimisationConfig.json";
 import { posterPathsFor, readVideoPosterSidecar } from "./videoPoster";
 import type { OptimisedPhoto } from "./types";
+import type { MovieCamera } from "./movieExif";
 
 export const OPTIMISED_VIDEO_MAX_WIDTH = 1920;
 export const OPTIMISED_VIDEO_PRESET = "medium";
@@ -258,7 +259,41 @@ export type VideoPoster = {
   capturedAtLocal?: string;
   latDeg?: number;
   lngDeg?: number;
+  /** Set when the coordinates were borrowed from a nearby photograph. */
+  locationInferredFrom?: { photo: string; minutesApart: number };
   durationSeconds?: number;
+  camera?: MovieCamera;
+};
+
+const CAMERA_TEXT_KEYS = ["Make", "Model", "LensMake", "LensModel"] as const;
+const CAMERA_NUMBER_KEYS = [
+  "ExposureTime",
+  "FNumber",
+  "ISO",
+  "ExposureCompensation",
+  "FocalLength",
+  "FocalLengthIn35mmFormat",
+] as const;
+
+/** Only the camera fields a sidecar may hold, each of the type it must be. */
+const readCamera = (value: unknown): MovieCamera | undefined => {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return undefined;
+  const raw = value as Record<string, unknown>;
+  const camera: Record<string, unknown> = {};
+  for (const key of CAMERA_TEXT_KEYS) {
+    if (typeof raw[key] === "string" && raw[key]) camera[key] = raw[key];
+  }
+  for (const key of CAMERA_NUMBER_KEYS) {
+    if (typeof raw[key] === "number" && Number.isFinite(raw[key])) camera[key] = raw[key];
+  }
+  if (
+    Array.isArray(raw.LensInfo) &&
+    raw.LensInfo.length === 4 &&
+    raw.LensInfo.every((part) => typeof part === "number" && Number.isFinite(part))
+  ) {
+    camera.LensInfo = raw.LensInfo;
+  }
+  return Object.keys(camera).length > 0 ? (camera as MovieCamera) : undefined;
 };
 
 /**
@@ -314,6 +349,13 @@ export const readVideoPoster = (
 
   const latDeg = finiteNumber(sidecar.latDeg);
   const lngDeg = finiteNumber(sidecar.lngDeg);
+  const inferredFrom = sidecar.locationInferredFrom;
+  const locationInferredFrom =
+    sidecar.locationSource === "nearby-photo" &&
+    typeof inferredFrom?.photo === "string" &&
+    finiteNumber(inferredFrom.minutesApart) !== undefined
+      ? { photo: inferredFrom.photo, minutesApart: inferredFrom.minutesApart }
+      : undefined;
 
   return omitUndefined({
     srcset,
@@ -321,7 +363,9 @@ export const readVideoPoster = (
     // A coordinate is only a place with both halves of it.
     latDeg: lngDeg === undefined ? undefined : latDeg,
     lngDeg: latDeg === undefined ? undefined : lngDeg,
+    locationInferredFrom: latDeg === undefined ? undefined : locationInferredFrom,
     durationSeconds: finiteNumber(sidecar.durationSeconds),
+    camera: readCamera(sidecar.camera),
   }) as VideoPoster;
 };
 

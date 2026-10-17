@@ -1,0 +1,65 @@
+/* Shared by the photo and clip details panes (MediaDetailsParts.tsx). */
+
+.colorswatch {
+  block-size: 1.5em;
+  inline-size: 1.5em;
+  cursor: pointer;
+  transition:
+    transform var(--t-theme) var(--ease-out),
+    opacity var(--t-theme) var(--ease-out);
+  display: block;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .colorswatch:hover {
+    transform: scale(1.2);
+    opacity: 0.8;
+  }
+}
+
+.colorswatch:focus-visible {
+  outline: solid var(--size-2) var(--c-bg-contrast-light);
+  outline-offset: var(--size-2);
+}
+
+@media (hover: none), (pointer: coarse) {
+  .colorswatch {
+    inline-size: var(--tap-target);
+    block-size: var(--tap-target);
+    padding: var(--m-m);
+    background-clip: content-box;
+  }
+}
+
+.colorswatches {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.tagLinks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tagLink {
+  composes: compact from "./ui/Control.module.css";
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+}
+
+.narrowCell {
+  inline-size: min-content;
+}
+
+.detailValueWithAction {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--m-xs);
+}

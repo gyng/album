@@ -25,6 +25,7 @@
  */
 
 import fs from "node:fs";
+import type { VideoCamera } from "./types";
 
 export type MovieExif = {
   /** Camera-local wall clock, `YYYY-MM-DDTHH:MM:SS` with no zone. */
@@ -33,7 +34,17 @@ export type MovieExif = {
   offsetTimeOriginal?: string;
   latDeg?: number;
   lngDeg?: number;
+  /** The camera, lens and exposure, under the keys a photograph's EXIF uses. */
+  camera?: MovieCamera;
 };
+
+/**
+ * What the camera recorded about the clip's exposure, keyed exactly as a
+ * photograph's EXIF is (as exifr reports it), so the same formatting, facets
+ * and statistics read both. Exposure settings are the ones the clip started
+ * with; a clip may change them as it runs.
+ */
+export type MovieCamera = VideoCamera;
 
 const ATOM_HEADER_BYTES = 8;
 const EXTENDED_SIZE_BYTES = 8;
@@ -60,6 +71,17 @@ const tagExifIfd = 0x8769;
 const tagGpsIfd = 0x8825;
 const tagDateTimeOriginal = 0x9003;
 const tagOffsetTimeOriginal = 0x9011;
+const tagMake = 0x010f;
+const tagModel = 0x0110;
+const tagExposureTime = 0x829a;
+const tagFNumber = 0x829d;
+const tagIso = 0x8827;
+const tagExposureCompensation = 0x9204;
+const tagFocalLength = 0x920a;
+const tagFocalLengthIn35mm = 0xa405;
+const tagLensInfo = 0xa432;
+const tagLensMake = 0xa433;
+const tagLensModel = 0xa434;
 
 const gpsLatitudeRef = 1;
 const gpsLatitude = 2;
@@ -70,6 +92,14 @@ const TYPE_ASCII = 2;
 const TYPE_SHORT = 3;
 const TYPE_LONG = 4;
 const TYPE_RATIONAL = 5;
+const TYPE_SRATIONAL = 10;
+
+const TYPE_WIDTHS: Record<number, number> = {
+  [TYPE_SHORT]: 2,
+  [TYPE_LONG]: 4,
+  [TYPE_RATIONAL]: 8,
+  [TYPE_SRATIONAL]: 8,
+};
 
 type Layout = {
   littleEndian: boolean;
@@ -118,7 +148,7 @@ const findEntry = (entries: IfdEntry[] | null, tag: number): IfdEntry | undefine
 
 /** Bytes for an entry: a short value travels inside the entry itself. */
 const entryBytes = (buffer: Buffer, entry: IfdEntry, layout: Layout): Buffer | null => {
-  const width = entry.type === TYPE_RATIONAL ? 8 : 1;
+  const width = TYPE_WIDTHS[entry.type] ?? 1;
   const total = entry.count * width;
   if (total <= 4) {
     return entry.inline.subarray(0, total);
@@ -175,6 +205,80 @@ const readRationals = (
     values.push(numerator / denominator);
   }
   return values;
+};
+
+/** The first value of a numeric entry, whatever numeric type it was written as. */
+const readNumber = (
+  buffer: Buffer,
+  entry: IfdEntry | undefined,
+  layout: Layout,
+): number | undefined => {
+  if (!entry || entry.count < 1 || TYPE_WIDTHS[entry.type] === undefined) {
+    return undefined;
+  }
+  const bytes = entryBytes(buffer, entry, layout);
+  if (!bytes) {
+    return undefined;
+  }
+  const le = layout.littleEndian;
+  switch (entry.type) {
+    case TYPE_SHORT:
+      return le ? bytes.readUInt16LE(0) : bytes.readUInt16BE(0);
+    case TYPE_LONG:
+      return le ? bytes.readUInt32LE(0) : bytes.readUInt32BE(0);
+    default: {
+      const signed = entry.type === TYPE_SRATIONAL;
+      const numerator = signed
+        ? le
+          ? bytes.readInt32LE(0)
+          : bytes.readInt32BE(0)
+        : le
+          ? bytes.readUInt32LE(0)
+          : bytes.readUInt32BE(0);
+      const denominator = signed
+        ? le
+          ? bytes.readInt32LE(4)
+          : bytes.readInt32BE(4)
+        : le
+          ? bytes.readUInt32LE(4)
+          : bytes.readUInt32BE(4);
+      return denominator === 0 ? undefined : numerator / denominator;
+    }
+  }
+};
+
+const readCamera = (
+  buffer: Buffer,
+  ifd0: IfdEntry[],
+  exifIfd: IfdEntry[] | null,
+  layout: Layout,
+): MovieCamera | undefined => {
+  const lensInfo = readRationals(buffer, findEntry(exifIfd, tagLensInfo), layout, 4);
+  const recordedFocalLength = readNumber(buffer, findEntry(exifIfd, tagFocalLength), layout);
+  // A prime's lens range is a single focal length, which is therefore the one
+  // the clip was shot at. A zoom's range says nothing about where it was set.
+  const focalLength =
+    recordedFocalLength ??
+    (lensInfo && lensInfo[0] === lensInfo[1] && lensInfo[0]! > 0 ? lensInfo[0] : undefined);
+  const camera: { [K in keyof MovieCamera]: MovieCamera[K] | undefined } = {
+    Make: readAscii(buffer, findEntry(ifd0, tagMake), layout),
+    Model: readAscii(buffer, findEntry(ifd0, tagModel), layout),
+    LensMake: readAscii(buffer, findEntry(exifIfd, tagLensMake), layout),
+    LensModel: readAscii(buffer, findEntry(exifIfd, tagLensModel), layout),
+    LensInfo: lensInfo,
+    ExposureTime: readNumber(buffer, findEntry(exifIfd, tagExposureTime), layout),
+    FNumber: readNumber(buffer, findEntry(exifIfd, tagFNumber), layout),
+    ISO: readNumber(buffer, findEntry(exifIfd, tagIso), layout),
+    ExposureCompensation: readNumber(buffer, findEntry(exifIfd, tagExposureCompensation), layout),
+    FocalLength: focalLength,
+    FocalLengthIn35mmFormat: readNumber(buffer, findEntry(exifIfd, tagFocalLengthIn35mm), layout),
+  };
+  const recorded = Object.fromEntries(
+    Object.entries(camera).filter(
+      ([, value]) => value !== undefined && (typeof value !== "number" || Number.isFinite(value)),
+    ),
+  ) as MovieCamera;
+  return Object.keys(recorded).length > 0 ? recorded : undefined;
 };
 
 const readSubIfdOffset = (
@@ -279,11 +383,19 @@ const parseTagPayload = (buffer: Buffer): MovieExif | null => {
     }
   }
 
-  if (dateTimeOriginal === undefined && latDeg === undefined && offsetTimeOriginal === undefined) {
+  const camera = readCamera(buffer, ifd0, exifIfd, layout);
+
+  if (
+    dateTimeOriginal === undefined &&
+    latDeg === undefined &&
+    offsetTimeOriginal === undefined &&
+    camera === undefined
+  ) {
     return null;
   }
 
   return {
+    ...(camera !== undefined ? { camera } : {}),
     ...(dateTimeOriginal !== undefined ? { dateTimeOriginal } : {}),
     ...(offsetTimeOriginal !== undefined ? { offsetTimeOriginal } : {}),
     ...(latDeg !== undefined ? { latDeg } : {}),
