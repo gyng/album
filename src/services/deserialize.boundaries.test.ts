@@ -156,6 +156,8 @@ describe("deserialisation adapter boundaries", () => {
   // colours, tags, geocode, weather and derived zone from. Keying it wrongly is
   // silent: the lookup simply misses and the clip reports no palette.
   it("attaches the clip's own indexed row, keyed by the clip's path", async () => {
+    // The index exists here as it does in a build, on any machine.
+    jest.spyOn(fs, "existsSync").mockReturnValue(true);
     const result = await deserializeVideoBlock(localVideo(), { dirname: "../albums/trip" });
 
     expect(result._build?.tags).toEqual({ colors: [[1, 2, 3]] });
@@ -167,6 +169,8 @@ describe("deserialisation adapter boundaries", () => {
   // A clip's timeline is read beside its row; the row's flat search text is
   // not page data and is left behind.
   it("attaches a clip's timeline, and not the timeline's search text", async () => {
+    // The index exists here as it does in a build, on any machine.
+    jest.spyOn(fs, "existsSync").mockReturnValue(true);
     db.rows.mockImplementation((sql: string) =>
       sql.includes("timeline_json")
         ? {
@@ -188,6 +192,8 @@ describe("deserialisation adapter boundaries", () => {
   // An index from before timelines has no column: the clip has no timeline,
   // and keeps everything else its row says.
   it("keeps a clip's details when the index has no timelines", async () => {
+    // The index exists here as it does in a build, on any machine.
+    jest.spyOn(fs, "existsSync").mockReturnValue(true);
     db.rows.mockImplementation((sql: string) => {
       if (sql.includes("timeline_json")) throw new Error("no such column: timeline_json");
       return { alt_text: "A street" };
@@ -200,6 +206,8 @@ describe("deserialisation adapter boundaries", () => {
   });
 
   it("looks a YouTube external up under the synthetic name it is indexed by", async () => {
+    // The index exists here as it does in a build, on any machine.
+    jest.spyOn(fs, "existsSync").mockReturnValue(true);
     (readVideoPoster as jest.Mock).mockReturnValue({
       srcset: [{ src: "/ycyUWULJxdU.youtube@800.avif", width: 800, height: 450 }],
     });
