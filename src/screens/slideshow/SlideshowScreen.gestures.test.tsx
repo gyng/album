@@ -389,6 +389,19 @@ describe("SlideshowScreen touch gestures (screen-level)", () => {
     await flush();
     expect(peek()).toBe(uncovered);
     expect(peek()).toHaveAttribute("data-settling", "true");
+
+    // Once the swipe has settled, no preview may keep the gesture's progress:
+    // the preview falls back to an opacity drawn from it, and by then its
+    // source is the photograph after the new one — which showed through a
+    // portrait's letterbox until the next touch.
+    const settled = new Event("transitionend", { bubbles: true });
+    Object.defineProperty(settled, "propertyName", { value: "transform" });
+    fireEvent(image, settled);
+    await flush();
+    expect(peek()).toBeNull();
+    for (const buffer of document.querySelectorAll<HTMLElement>("[data-drag-buffer]")) {
+      expect(Number(buffer.style.getPropertyValue("--drag-peek-progress") || 0)).toBe(0);
+    }
   });
 
   // Every finger movement used to re-render the whole slideshow through five

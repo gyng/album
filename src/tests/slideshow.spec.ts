@@ -435,6 +435,12 @@ test.describe("Slideshow touch mode", () => {
     await dispatchPointer(page, "up", x - 110, y);
     await waitForImageChange(page, String(currentSrc));
     await expect(peek).toHaveCount(0);
+    // And nothing it leaves behind shows: the retained preview once kept the
+    // gesture's opacity and, holding the photograph after the new one, showed
+    // through a portrait's letterbox until the next touch.
+    for (const buffer of await page.locator("[data-drag-buffer]").all()) {
+      await expect(buffer).toHaveCSS("opacity", "0");
+    }
   });
 
   test("horizontal swipe past commit advances to next photo", async ({ page }) => {

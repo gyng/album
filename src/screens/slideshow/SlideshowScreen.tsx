@@ -2954,8 +2954,16 @@ export const Slideshow: React.FC<{
   layersRef.current = layers;
   // A render that uncovers a different neighbour adds its data-drag-peek after
   // the move that caused it; bring the live values onto it.
+  // When the drag ends — however it ends — take the neighbour back down too: a
+  // preview no longer being uncovered falls back to an opacity drawn from its
+  // last progress, and by then it holds the photograph after the new one, which
+  // showed through a portrait's letterbox until the next touch.
   useSafeLayoutEffect(() => {
     if (layerDrag && !layerDrag.settling) writeLiveDrag();
+    if (!layerDrag && liveDragRef.current.peekProgress !== 0) {
+      liveDragRef.current.peekProgress = 0;
+      writeLiveDrag();
+    }
   }, [layerDrag, writeLiveDrag]);
   // A dragged layer can be removed by its opacity fade before its transform
   // transition reports completion; drop the stale offset so a later layer
