@@ -157,6 +157,26 @@ describe("readMovieExif", () => {
     });
   });
 
+  // A manual lens on a mount adapter reports nothing; the camera writes its
+  // adapter preset instead — "24mm f/?", the X-T5's default — which is a
+  // setting, not the lens: a Helios 44-2 58mm was on the camera for the clip
+  // this was found on. It must never become a lens or a focal length.
+  it("ignores the lens range a mount adapter writes for a manual lens", () => {
+    const adapterPayload = Buffer.concat([
+      Buffer.alloc(16),
+      ifd([entry(0x8769, 4, 1, 2 + 12 + 4)]),
+      ifd([entry(0xa432, 5, 4, 2 + 12 + 4 + 2 + 12 + 4)]),
+      rational(24, 1),
+      rational(24, 1),
+      rational(0, 0),
+      rational(0, 0),
+    ]);
+    const exif = readMovieExif(writeMovie("adapter.MOV", atom("MVTG", adapterPayload)));
+
+    expect(exif?.camera?.LensInfo).toBeUndefined();
+    expect(exif?.camera?.FocalLength).toBeUndefined();
+  });
+
   // The X-T5 writes a genuine UTC instant into creation_time (~35s after the
   // first frame) and the camera-local wall clock into EXIF, so reading the
   // former as local placed every clip hours from where it was taken.

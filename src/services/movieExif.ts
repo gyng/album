@@ -257,6 +257,9 @@ const readCamera = (
   const recordedFocalLength = readNumber(buffer, findEntry(exifIfd, tagFocalLength), layout);
   // A prime's lens range is a single focal length, which is therefore the one
   // the clip was shot at. A zoom's range says nothing about where it was set.
+  // A manual lens on an adapter writes the adapter's preset with an unknown
+  // aperture — "24mm f/?", 0/0, the X-T5's default preset — which
+  // readRationals rejects, rightly: the preset is a setting, not the lens.
   const focalLength =
     recordedFocalLength ??
     (lensInfo && lensInfo[0] === lensInfo[1] && lensInfo[0]! > 0 ? lensInfo[0] : undefined);
