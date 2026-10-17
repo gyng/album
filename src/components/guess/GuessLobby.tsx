@@ -223,29 +223,25 @@ export const GuessLobby: React.FC<GuessLobbyProps> = ({
             <KeyHint>Enter</KeyHint>
           </Button>
           {todaysDaily ? (
-            // Today's daily is done: its result is shared, not replayed.
+            // Today's daily is done: its result is shared, not replayed. Named
+            // and laid out as every other game's daily is.
             <div className={styles.dailyAction}>
+              <Caption as="span" className={styles.dailyDescription}>
+                Daily #{dailyNumber(today)} · {todaysDaily.summary}
+              </Caption>
               <div className={styles.dailyShare}>
                 <ShareResult
                   text={dailyShareText("guess", today, todaysDaily.summary, siteOrigin)}
                 />
               </div>
-              <Caption as="span" size="sm" className={styles.dailyDescription}>
-                Daily #{dailyNumber(today)} · {todaysDaily.summary}
-              </Caption>
             </div>
           ) : (
             <div className={styles.dailyAction}>
               <Button aria-describedby={dailyDescriptionId} onClick={handleDaily}>
-                Daily challenge
+                Daily #{dailyNumber(today)}
               </Button>
-              <Caption
-                id={dailyDescriptionId}
-                as="span"
-                size="sm"
-                className={styles.dailyDescription}
-              >
-                Five rounds · same photos for everyone today
+              <Caption id={dailyDescriptionId} as="span" className={styles.dailyDescription}>
+                5 rounds · untimed
               </Caption>
             </div>
           )}

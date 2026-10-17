@@ -15,6 +15,7 @@ import styles from "./GuessSummary.module.css";
 import { encodePublicAssetPath } from "../../util/encodePublicAssetPath";
 import { ShareResult, dailyShareText, useShareOrigin } from "../fun/GameRecord";
 import { guessDailySeedDay } from "./guessDaily";
+import { dailyNumber } from "../../util/gameDaily";
 import { guessWherePath } from "./guessPhotoLinks";
 
 type GuessSummaryProps = {
@@ -101,7 +102,7 @@ export const GuessSummary: React.FC<GuessSummaryProps> = ({
       <div className={styles.header}>
         {settings.daily ? (
           <Caption as="p" className={styles.dailyLabel}>
-            Daily challenge
+            {dailyDay ? `Daily #${dailyNumber(dailyDay)}` : "Daily"}
           </Caption>
         ) : null}
         <Heading level={1}>

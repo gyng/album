@@ -141,7 +141,7 @@ describe("GuessSummary", () => {
   it("shares a finished daily as a spoiler-free result", async () => {
     renderSummary([result(1_000)], { rounds: 5, timeLimit: null, daily: true }, "daily-2026-10-16");
 
-    expect(screen.getByText("Daily challenge")).toBeInTheDocument();
+    expect(screen.getByText("Daily #3")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Copy challenge link" })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Share result" }));
 

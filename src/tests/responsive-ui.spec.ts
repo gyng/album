@@ -512,11 +512,11 @@ test.describe("Responsive UI", () => {
   test("guess lobby explains the daily challenge without mobile overflow", async ({ page }) => {
     await gotoHydrated(page, "/guess");
 
-    const description = page.getByText("Five rounds · same photos for everyone today");
+    const description = page.getByText("5 rounds · untimed");
     await expect(description).toBeVisible();
     const descriptionId = await description.getAttribute("id");
     expect(descriptionId).not.toBeNull();
-    await expect(page.getByRole("button", { name: "Daily challenge" })).toHaveAttribute(
+    await expect(page.getByRole("button", { name: /^Daily #\d+$/ })).toHaveAttribute(
       "aria-describedby",
       descriptionId!,
     );
@@ -537,7 +537,7 @@ test.describe("Responsive UI", () => {
         expect(Math.abs(box!.x - controls[0]!.x)).toBeLessThan(1);
         expect(Math.abs(box!.width - controls[0]!.width)).toBeLessThan(1);
       }
-      const daily = await page.getByRole("button", { name: "Daily challenge" }).boundingBox();
+      const daily = await page.getByRole("button", { name: /^Daily #\d+$/ }).boundingBox();
       const play = await page.getByRole("button", { name: /^Play/ }).boundingBox();
       expect(Math.abs(daily!.y - play!.y)).toBeLessThan(1);
       expect(Math.abs(daily!.height - play!.height)).toBeLessThan(1);

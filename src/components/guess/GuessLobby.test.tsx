@@ -76,7 +76,9 @@ describe("GuessLobby", () => {
       />,
     );
     await screen.findByText("20 photos available");
-    const dailyButton = screen.getByRole("button", { name: "Daily challenge" });
+    const dailyButton = screen.getByRole("button", {
+      name: `Daily #${dailyNumber(localDayKey())}`,
+    });
 
     fireEvent.keyDown(dailyButton, { key: "Enter" });
     fireEvent.keyDown(dailyButton, { key: " " });
@@ -119,8 +121,10 @@ describe("GuessLobby", () => {
     );
     await screen.findByText("12 photos available");
 
-    const dailyButton = screen.getByRole("button", { name: "Daily challenge" });
-    const description = screen.getByText("Five rounds · same photos for everyone today");
+    const dailyButton = screen.getByRole("button", {
+      name: `Daily #${dailyNumber(localDayKey())}`,
+    });
+    const description = screen.getByText("5 rounds · untimed");
     expect(dailyButton).toHaveAttribute("aria-describedby", description.id);
     fireEvent.click(dailyButton);
 
@@ -288,7 +292,9 @@ describe("GuessLobby", () => {
       />,
     );
     await screen.findByText("20 photos available");
-    expect(screen.queryByRole("button", { name: "Daily challenge" })).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: `Daily #${dailyNumber(localDayKey())}` }),
+    ).toBeNull();
     expect(screen.getByText(/18,420 \/ 25,000 points/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Share result" }));
     await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
