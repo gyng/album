@@ -27,33 +27,30 @@ const ClipTimeline: React.FC<{ id: string; timeline: ClipTimelineSegment[] }> = 
   id,
   timeline,
 }) => (
-  <section className={styles.timeline}>
-    <h3 className={styles.timelineHeading}>Timeline (AI)</h3>
-    <ol aria-label="Timeline" className={styles.timelineList}>
-      {timeline.map((segment) => {
-        const moment = `?t=${Math.round(segment.start)}#${encodeURIComponent(id)}`;
-        return (
-          <li key={segment.start} className={styles.timelineSegment}>
-            <a
-              href={moment}
-              className={styles.timelineMoment}
-              onClick={(event) => {
-                event.preventDefault();
-                window.history.replaceState(window.history.state, "", moment);
-                seekLinkedMoment((name) => (name === "t" ? String(segment.start) : null), `#${id}`);
-              }}
-            >
-              {formatDuration(segment.start) ?? "0:00"}
-            </a>
-            <div>
-              {segment.description ? <span>{segment.description}</span> : null}
-              {segment.speech ? <q className={styles.timelineSpeech}>{segment.speech}</q> : null}
-            </div>
-          </li>
-        );
-      })}
-    </ol>
-  </section>
+  <ol aria-label="Timeline" className={styles.timelineList}>
+    {timeline.map((segment) => {
+      const moment = `?t=${Math.round(segment.start)}#${encodeURIComponent(id)}`;
+      return (
+        <li key={segment.start} className={styles.timelineSegment}>
+          <a
+            href={moment}
+            className={styles.timelineMoment}
+            onClick={(event) => {
+              event.preventDefault();
+              window.history.replaceState(window.history.state, "", moment);
+              seekLinkedMoment((name) => (name === "t" ? String(segment.start) : null), `#${id}`);
+            }}
+          >
+            {formatDuration(segment.start) ?? "0:00"}
+          </a>
+          <div>
+            {segment.description ? <span>{segment.description}</span> : null}
+            {segment.speech ? <q className={styles.timelineSpeech}>{segment.speech}</q> : null}
+          </div>
+        </li>
+      );
+    })}
+  </ol>
 );
 
 /** What a local clip knows about itself beyond its encoding. */
@@ -91,7 +88,7 @@ const describeInference = ({ photo, minutesApart }: { photo: string; minutesApar
  * shot, and what the index says about its frame — the photo pane's rows, from
  * the clip's own reading.
  */
-const clipRows = (reading: ClipReading): ExifTableRow[] => {
+const clipRows = (id: string, reading: ClipReading): ExifTableRow[] => {
   const tags = reading.tags ?? {};
   const zone = tags.tz_offset;
   const capturedAt = formatExifWallClockDateTime(reading.capturedAtLocal, zone);
@@ -159,6 +156,14 @@ const clipRows = (reading: ClipReading): ExifTableRow[] => {
       kind: "kv",
       k: "Description (AI)",
       v: tags.alt_text,
+      className: narrowCellClass,
+    },
+    {
+      kind: "kv",
+      k: "Timeline (AI)",
+      v: reading.timeline?.length ? (
+        <ClipTimeline id={id} timeline={reading.timeline} />
+      ) : undefined,
       className: narrowCellClass,
     },
   ];
@@ -375,9 +380,8 @@ const VideoDetailsPanel: React.FC<{
               <>
                 {/* What a reader opens the pane for comes first; the encoding,
                     which only says how the clip is served, folds away below. */}
-                {isOpen ? <ExifTable rows={clipRows(props.reading)} /> : null}
-                {isOpen && props.reading.timeline?.length ? (
-                  <ClipTimeline id={props.id ?? props.src} timeline={props.reading.timeline} />
+                {isOpen ? (
+                  <ExifTable rows={clipRows(props.id ?? props.src, props.reading)} />
                 ) : null}
                 {isOpen && indexedPath ? (
                   <div className={styles.similarPhotosWrap}>

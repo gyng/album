@@ -1,9 +1,11 @@
 .weather {
+  position: relative;
   display: grid;
   gap: var(--space-3);
   max-width: 32rem;
   justify-items: start;
   text-align: start;
+  container-type: inline-size;
 }
 
 .summary {
@@ -49,4 +51,23 @@
 }
 .source {
   margin-block: var(--space-3);
+}
+
+/* With room beside it, the disclosure's toggle sits at the end of the reading's
+   own line rather than taking a line of its own under it; opened, its content
+   still unfolds below at full width. A phone's narrow column keeps it stacked. */
+@container (min-width: 15rem) {
+  .summary {
+    padding-inline-end: var(--size-120);
+  }
+
+  .provenance > summary {
+    position: absolute;
+    inset-block-start: 0;
+    inset-inline-end: 0;
+  }
+
+  .provenance:not([open]) {
+    margin-block-start: calc(var(--space-3) * -1);
+  }
 }

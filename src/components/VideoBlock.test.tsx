@@ -238,6 +238,19 @@ describe("LocalVideoBlockEl details", () => {
     expect(within(timeline).getByText("Mind the gap.").tagName).toBe("Q");
   });
 
+  // It is one of the pane's readings, so it sits in the table with the others:
+  // its name in the key column, its moments in the value column.
+  it("lists the timeline as a row of the details table", () => {
+    open({
+      reading: { ...reading, timeline: [{ start: 0, end: 15, description: "A bus pulls in." }] },
+    });
+
+    const row = screen.getByRole("list", { name: "Timeline" }).closest("tr")!;
+    expect(row).not.toBeNull();
+    expect(within(row).getAllByRole("cell")[0]).toHaveTextContent("Timeline (AI)");
+    expect(row.closest("table")).toBe(screen.getByText("Description (AI)").closest("table"));
+  });
+
   it("seeks the clip to a moment chosen in its timeline, and keeps the moment in the URL", () => {
     open({
       reading: { ...reading, timeline: [{ start: 15, end: 30, description: "A bus pulls in." }] },
