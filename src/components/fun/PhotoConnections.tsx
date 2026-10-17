@@ -380,7 +380,7 @@ export const PhotoConnections = ({ photos }: { photos: PhotoGamePhoto[] }) => {
       style={{ "--connections-dock-height": `${dockHeight}px` } as React.CSSProperties}
     >
       <div className={styles.roundProgress}>
-        <p role="status">{message || `${found.length} of ${size} connections found`}</p>
+        <p>{`${found.length} of ${size} connections found`}</p>
         <div className={styles.actions}>
           <Caption>
             {lives === null
@@ -398,9 +398,11 @@ export const PhotoConnections = ({ photos }: { photos: PhotoGamePhoto[] }) => {
           onStickyHeightChange={setDockHeight}
           {...(styles.connectionControls ? { className: styles.connectionControls } : {})}
         >
-          <Caption>
-            {selected.length} / {size} selected
-          </Caption>
+          {/* What a check says lives here, with the controls that stay on screen:
+              the round's header scrolls away once the board is long. */}
+          <div role="status" className={styles.connectionStatus}>
+            <Caption>{message || `${selected.length} / ${size} selected`}</Caption>
+          </div>
           <Button
             aria-label="Check connection"
             variant="primary"

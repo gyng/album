@@ -47,6 +47,21 @@ it("checks groups, avoids charging twice for the same mistake and reveals all co
     within(screen.getByRole("region", { name: "Connections result" })).getAllByRole("img"),
   ).toHaveLength(16);
 });
+// The board is long enough to scroll past the round's header, so what a check
+// says goes in the controls that stay on screen with the reader.
+it("says what a check found in the controls that stay on screen", () => {
+  render(<PhotoConnections photos={photos} />);
+  fireEvent.click(screen.getByRole("button", { name: "Start connecting" }));
+  fireEvent.click(screen.getByRole("button", { name: "Auto check" }));
+  const controls = within(screen.getByRole("group", { name: "Connection controls" }));
+  expect(controls.getByRole("status")).toHaveTextContent("0 / 4 selected");
+
+  choose("A cat", 2);
+  choose("A lake", 2);
+  fireEvent.click(screen.getByRole("button", { name: "Check connection" }));
+  fireEvent.click(screen.getByRole("button", { name: "Check connection" }));
+  expect(controls.getByRole("status")).toHaveTextContent("You’ve already tried that group.");
+});
 // A hint names a connection still to find — never which photographs are in it
 // — one more each time, and a solved connection's name drops off the list.
 it("names an unfound connection for each hint asked for", () => {
