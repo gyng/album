@@ -11,13 +11,16 @@ const { spawn } = require("node:child_process");
  *   directories the posters write into;
  * - map styles read the photographs' palette from the search database, which
  *   search framing writes — a read during that write would find it locked and
- *   quietly fall back to the default palette.
+ *   quietly fall back to the default palette;
+ * - the typecheck imports lib/buildVersion.ts, which the build manifest writes
+ *   and git ignores, so on a fresh checkout it does not exist until that step
+ *   has run.
  */
 const BUILD_PREPARE_LANES = [
   ["prepare:images", "prepare:posters", "prepare:embedding-atlas"],
-  ["typecheck"],
+  ["prepare:build-manifest", "typecheck"],
   ["prepare:search-framing", "prepare:map-styles"],
-  ["prepare:build-manifest", "prepare:feeds", "prepare:pwa-icons", "prepare:vendor-maplibre"],
+  ["prepare:feeds", "prepare:pwa-icons", "prepare:vendor-maplibre"],
 ];
 
 /**

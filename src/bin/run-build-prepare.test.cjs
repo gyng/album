@@ -73,5 +73,9 @@ describe("BUILD_PREPARE_LANES", () => {
     expect(before("prepare:posters", "prepare:embedding-atlas")).toBe(true);
     // Map styles read the search database that search framing writes.
     expect(before("prepare:search-framing", "prepare:map-styles")).toBe(true);
+    // The typecheck imports lib/buildVersion.ts, which the build manifest step
+    // generates. A fresh checkout has no copy, so a typecheck that won the race
+    // failed CI on "Cannot find module '../lib/buildVersion'".
+    expect(before("prepare:build-manifest", "typecheck")).toBe(true);
   });
 });
