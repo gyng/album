@@ -74,6 +74,8 @@ export const PhotoCrossword = ({ photos }: { photos: PhotoGamePhoto[] }) => {
   const dailyRequested = useRef(false);
   const [revealedClues, setRevealedClues] = useState<CrosswordClueCoordinate[]>([]);
   const [lastHint, setLastHint] = useState<string | null>(null);
+  // Squares a hint has filled for the player, locked like the starting photographs.
+  const [placedByHint, setPlacedByHint] = useState<number[]>([]);
   const [puzzle, setPuzzle] = useState<PhotoCrosswordPuzzle | null>(null);
   const [tiles, setTiles] = useState<PhotoGamePhoto[]>([]);
   const [cells, setCells] = useState<Array<PhotoGamePhoto | null>>([]);
@@ -167,6 +169,7 @@ export const PhotoCrossword = ({ photos }: { photos: PhotoGamePhoto[] }) => {
     setTiles(next.tiles);
     setRevealedClues([]);
     setLastHint(null);
+    setPlacedByHint([]);
     const seeds = new Set(crosswordSeedIndices(next.size, roundSettings.prefill));
     setCells(
       Array.from({ length: next.size ** 2 }, (_, index) =>
@@ -198,12 +201,17 @@ export const PhotoCrossword = ({ photos }: { photos: PhotoGamePhoto[] }) => {
     record({
       won: outcome === "solved",
       ...(daily
-        ? { daily: { day: daily, summary: dailySummary(outcome, size, revealedClues.length) } }
+        ? {
+            daily: {
+              day: daily,
+              summary: dailySummary(outcome, size, revealedClues.length + placedByHint.length),
+            },
+          }
         : {}),
     });
   };
   const seedIndices = new Set(crosswordSeedIndices(size, prefill));
-  const isFixed = (index: number) => seedIndices.has(index);
+  const isFixed = (index: number) => seedIndices.has(index) || placedByHint.includes(index);
   const showClue = (axis: "row" | "column", index: number) =>
     mode === "visible" ||
     !!finished ||
@@ -254,8 +262,34 @@ export const PhotoCrossword = ({ photos }: { photos: PhotoGamePhoto[] }) => {
       `${clue}. ${remainingHints - 1} ${remainingHints - 1 === 1 ? "clue" : "clues"} still hidden.`,
     );
   };
+  // The square a placing hint fills next: an empty one first, then one holding
+  // the wrong photograph. The photograph is the solution's for that square, so
+  // the rest of the solution stays reachable whatever else is on the board.
+  const nextPlacement = puzzle
+    ? (() => {
+        const open = Array.from({ length: size ** 2 }, (_, index) => index).filter(
+          (index) => !isFixed(index) && cells[index]?.path !== puzzle.solution[index]!.path,
+        );
+        return open.find((index) => !cells[index]) ?? open[0];
+      })()
+    : undefined;
+  const placeHint = () => {
+    if (!puzzle || finished || nextPlacement === undefined) return;
+    const photo = puzzle.solution[nextPlacement]!;
+    const next = [...cells];
+    const previous = next.findIndex((item) => item?.path === photo.path);
+    if (previous >= 0) next[previous] = next[nextPlacement]!;
+    next[nextPlacement] = photo;
+    setCells(next);
+    setPlacedByHint([...placedByHint, nextPlacement]);
+    setSelected(null);
+    setChecked(null);
+    const square = `Row ${Math.floor(nextPlacement / size) + 1}, column ${columnLetter(nextPlacement % size)}`;
+    setLastHint(`${square} · placed`);
+    setMessage(`A photograph is placed and locked in ${square}.`);
+  };
   const label = (index: number) =>
-    `Row ${Math.floor(index / size) + 1}${showClue("row", Math.floor(index / size)) ? `: ${crosswordClue(puzzle!.rows[Math.floor(index / size)]!)}` : ""}; column ${columnLetter(index % size)}${showClue("column", index % size) ? `: ${crosswordClue(puzzle!.columns[index % size]!)}` : ""}${isFixed(index) ? "; fixed starting photograph" : cells[index] ? "; occupied" : "; empty"}`;
+    `Row ${Math.floor(index / size) + 1}${showClue("row", Math.floor(index / size)) ? `: ${crosswordClue(puzzle!.rows[Math.floor(index / size)]!)}` : ""}; column ${columnLetter(index % size)}${showClue("column", index % size) ? `: ${crosswordClue(puzzle!.columns[index % size]!)}` : ""}${placedByHint.includes(index) ? "; placed by a hint" : isFixed(index) ? "; fixed starting photograph" : cells[index] ? "; occupied" : "; empty"}`;
   const checkGrid = () => {
     if (!puzzle || finished) return;
 
@@ -323,6 +357,12 @@ export const PhotoCrossword = ({ photos }: { photos: PhotoGamePhoto[] }) => {
       label: "Hint",
       action: revealHint,
       enabled: !!puzzle && !finished && mode === "hidden" && remainingHints > 0,
+    },
+    {
+      key: "p",
+      label: "Place a photo",
+      action: placeHint,
+      enabled: !!puzzle && !finished && nextPlacement !== undefined,
     },
     {
       key: "Escape",
@@ -483,6 +523,12 @@ export const PhotoCrossword = ({ photos }: { photos: PhotoGamePhoto[] }) => {
                 <KeyHint aria-hidden="true">H</KeyHint>
               </Button>
             ) : null}
+            {!finished && nextPlacement !== undefined ? (
+              <Button onClick={placeHint}>
+                Place a photo
+                <KeyHint aria-hidden="true">P</KeyHint>
+              </Button>
+            ) : null}
           </div>
           {lastHint && !finished ? (
             <Caption className={styles.hintFeedback}>{lastHint}</Caption>
@@ -530,7 +576,7 @@ export const PhotoCrossword = ({ photos }: { photos: PhotoGamePhoto[] }) => {
                       aria-label={showClue("row", row) ? crosswordClue(question) : `Row ${row + 1}`}
                     >
                       {showClue("row", row) ? (
-                        crosswordClue(question)
+                        <span className={styles.rowClue}>{crosswordClue(question)}</span>
                       ) : (
                         <>
                           <span className={styles.fullClue} aria-hidden="true">

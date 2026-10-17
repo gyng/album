@@ -209,6 +209,17 @@
 .rowColumn {
   inline-size: 1.5rem;
 }
+/* A row's clue sits in the narrow column left of the grid, where a word laid
+   out across wrapped a letter or two to a line. Turned to read up the row, it
+   has the row's height to run along instead. */
+.rowClue {
+  display: inline-block;
+  writing-mode: vertical-rl;
+  rotate: 180deg;
+  max-block-size: 100%;
+  overflow-wrap: normal;
+  line-height: var(--lh-label);
+}
 .fullClue {
   display: none;
 }

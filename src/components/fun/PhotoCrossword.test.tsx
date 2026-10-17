@@ -258,6 +258,30 @@ it("reveals one unique clue per hint without exposing other headers, cells or cl
   expect(screen.queryByRole("rowheader", { name: "round" })).toBeNull();
 });
 
+// The second kind of hint puts a photograph in its place for the player: an
+// empty square first, locked there like a starting photograph, and moved off
+// whichever square the player had put it on.
+it("places a photograph for the player as a hint, and locks it", () => {
+  startVisible();
+  fireEvent.click(screen.getByRole("button", { name: "Select photograph 1" }));
+  fireEvent.click(screen.getByRole("button", { name: /^Row 1: round; column B/ }));
+
+  fireEvent.click(screen.getByRole("button", { name: "Place a photo" }));
+
+  const placed = screen.getByRole("button", { name: /^Row 1: round; column A: scarlet/ });
+  expect(placed).toHaveAccessibleName(/placed by a hint/);
+  expect(placed).toBeDisabled();
+  expect(within(placed).getByRole("img")).toHaveAttribute("src", expect.stringContaining("0-0"));
+  expect(screen.getByRole("button", { name: /^Row 1: round; column B/ })).toHaveAccessibleName(
+    /empty$/,
+  );
+});
+it("stops placing photographs once every square holds its own", () => {
+  startVisible();
+  const place = screen.getByRole("button", { name: "Place a photo" });
+  for (let i = 0; i < 9; i++) fireEvent.click(place);
+  expect(screen.queryByRole("button", { name: "Place a photo" })).toBeNull();
+});
 it("saves lobby choices without restoring an active puzzle", () => {
   const { unmount } = render(<PhotoCrossword photos={photos} />);
   fireEvent.click(screen.getByRole("button", { name: "Visible clues" }));
@@ -471,6 +495,17 @@ describe("daily", () => {
     expect(screen.getByText(`${dailyName} · 3×3 · Gave up after 1 hint`)).toBeTruthy();
     expect(screen.getByRole("button", { name: "Share result" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Start crossing" })).toBeEnabled();
+  });
+
+  it("counts a placed photograph among a daily's hints", () => {
+    render(<PhotoCrossword photos={photos} />);
+    fireEvent.click(screen.getByRole("button", { name: dailyName }));
+    fireEvent.click(screen.getByRole("button", { name: "Hint" }));
+    fireEvent.click(screen.getByRole("button", { name: "Place a photo" }));
+    fireEvent.click(screen.getByRole("button", { name: "Give up" }));
+    expect(readGameStats("cross-exposure").dailies[today.day]?.summary).toBe(
+      "3×3 · Gave up after 2 hints",
+    );
   });
 
   it("opens today's board from the URL, and its result once it is finished", () => {
