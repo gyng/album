@@ -19,8 +19,25 @@ const slideshowSlide = '[data-media-kind]:not([aria-hidden="true"])';
 // on an iPad decodes off the main thread. These cases are about recovery, not
 // resolution, so WebKit is served the 800px variant (about 50ms to decode)
 // under the URL it asked for.
+//
+// Linux WebKit also composites in software, and a backdrop blur across an iPad
+// Pro viewport at 2x costs it seconds a frame: measured, animation frames fell
+// from ~40 a second to none within two seconds of the toolbar opening, with or
+// without a photograph, and came back at 24-45 with the blur removed. With no
+// frames, a click never sees its target "stable"; in CI it waited out the
+// touch toolbar's 30-second dwell and landed on the photograph instead. Safari
+// on an iPad blurs on the GPU, so the blur goes, in every frame, and nothing
+// these cases check depends on it.
 test.beforeEach(async ({ page, browserName }) => {
   if (browserName !== "webkit") return;
+  await page.addInitScript(() => {
+    const style = document.createElement("style");
+    style.textContent =
+      "*, *::before, *::after { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }";
+    document.addEventListener("DOMContentLoaded", () => document.head.append(style), {
+      once: true,
+    });
+  });
   // Variant URLs encode the "@" as %40.
   await page.route(/(@|%40)(1600|3200)\.avif(\?|$)/, (route) =>
     route.continue({
@@ -351,6 +368,9 @@ test("wake-lock failure never blocks the embedded slideshow", async ({ page }) =
 });
 
 test("slideshow exit controls leave the outer shell", async ({ page }) => {
+  // The slide alone may take 15s, and a document navigation follows it — the
+  // same journey as the context-link case below, so the same budget.
+  test.setTimeout(45_000);
   await gotoHydrated(page, "/slideshow/shell?mode=random&delay=86400");
   const runtime = page.frameLocator('iframe[title="Slideshow"]');
   await expect(runtime.locator(slideshowSlide).first()).toBeVisible({ timeout: 15_000 });
