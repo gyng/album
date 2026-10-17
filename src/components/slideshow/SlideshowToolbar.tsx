@@ -122,6 +122,9 @@ export type SlideshowToolbarProps = {
   onTogglePlayClips: () => void;
   clipMuted: boolean;
   onToggleClipMuted: () => void;
+  // Loop a clip for its whole slide rather than playing it once.
+  clipLoop: boolean;
+  onToggleClipLoop: () => void;
   // Clip playback volume, 0..1. The control is a percentage.
   clipVolume: number;
   onChangeClipVolume: (volume: number) => void;
@@ -971,6 +974,24 @@ export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
               onClick={props.onToggleClipMuted}
             >
               Mute
+            </button>
+
+            <button
+              type="button"
+              className={[
+                props.clipLoop ? buttonStyles.active : "",
+                styles.playbackModifier,
+                buttonStyles.base,
+              ].join(" ")}
+              aria-pressed={props.clipLoop}
+              title={
+                props.clipLoop
+                  ? "Clips repeat for as long as their slide lasts"
+                  : "Clips play once, then rest on their still frame"
+              }
+              onClick={props.onToggleClipLoop}
+            >
+              Loop
             </button>
           </div>
 

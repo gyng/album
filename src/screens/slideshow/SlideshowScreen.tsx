@@ -620,9 +620,11 @@ export const Slideshow: React.FC<{
     initializeWithValue: false,
   });
   // Clip playback. A clip's row in the pool is its poster frame like any other
-  // photo; these three decide what its slide does with it. Clips play by
+  // photo; these four decide what its slide does with it. Clips play by
   // default, muted — an unmuted autoplay is refused by every modern browser
-  // anyway, so a kiosk that never touches these still shows a moving slide.
+  // anyway, so a kiosk that never touches these still shows a moving slide —
+  // and once: a slide lasts minutes and a clip seconds, so a looped clip jumped
+  // back to its start every few seconds for the whole slide.
   const [playClips, setPlayClips] = useLocalStorage("slideshow-play-clips", true, {
     initializeWithValue: false,
   });
@@ -630,6 +632,9 @@ export const Slideshow: React.FC<{
     initializeWithValue: false,
   });
   const [clipVolume, setClipVolume] = useLocalStorage("slideshow-volume", 0.5, {
+    initializeWithValue: false,
+  });
+  const [clipLoop, setClipLoop] = useLocalStorage("slideshow-loop", false, {
     initializeWithValue: false,
   });
   const [poolStats, setPoolStats] = React.useState<PoolStats>(EMPTY_POOL_STATS);
@@ -911,6 +916,8 @@ export const Slideshow: React.FC<{
    *   - clips=1                  Play a clip's video in place of its poster frame (default on;
    *                              clips=0 shows the still, which is what every slide did before)
    *   - muted=1                  Start clips muted (default on; an unmuted autoplay is refused)
+   *   - loop=1                   Loop a clip for its whole slide (default off: it plays once,
+   *                              then rests on its poster)
    *   - volume=<0..1>            Clip playback volume (default 0.5)
    *
    * Examples:
@@ -986,6 +993,9 @@ export const Slideshow: React.FC<{
     if (parsed.volume !== null) {
       setClipVolume(parsed.volume);
     }
+    if (parsed.loop !== null) {
+      setClipLoop(parsed.loop);
+    }
 
     setHasParsedInitialUrl(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- slideshowMode is only read as a fallback on mount
@@ -1004,6 +1014,7 @@ export const Slideshow: React.FC<{
     setPlayClips,
     setClipMuted,
     setClipVolume,
+    setClipLoop,
   ]);
 
   // The advance cadence (nextChangeAt timer, pause/resume, countdown + clock
@@ -2572,9 +2583,10 @@ export const Slideshow: React.FC<{
       // The link reproduces what the sender was watching, clips included.
       clips: playClips,
       muted: clipMuted,
+      loop: clipLoop,
       volume: clipVolume,
     });
-  }, [filter, slideshowMode, topic, playClips, clipMuted, clipVolume]);
+  }, [filter, slideshowMode, topic, playClips, clipMuted, clipLoop, clipVolume]);
 
   const copyCurrentPhotoLink = useCallback(async () => {
     const photoLink = getCurrentPhotoLink();
@@ -2688,6 +2700,15 @@ export const Slideshow: React.FC<{
       previous.has(path) ? previous : new Set([...previous, path]),
     );
   }, []);
+  // A clip that has played its once settles back to its poster for the rest of
+  // its slide, through the same cross-fade a failed clip takes. It is the slide
+  // that remembers, not the session: the mark goes as soon as the slide moves
+  // on, so the next time the clip is on screen — "Previous" back to it, or its
+  // turn coming round again — it plays again.
+  const [finishedClipRow, setFinishedClipRow] = React.useState<RandomPhotoRow | null>(null);
+  useEffect(() => {
+    if (finishedClipRow && finishedClipRow !== currentPhotoPath) setFinishedClipRow(null);
+  }, [currentPhotoPath, finishedClipRow]);
 
   // The cells of the slide on screen: seed first, then remix companions.
   // `path` keys the remix-grid reveal hook; `src` is what each cell loads (a
@@ -2706,7 +2727,8 @@ export const Slideshow: React.FC<{
         playClips &&
         row.mediaKind === "video" &&
         isPlayableClipPath(row.path) &&
-        !unplayableClips.has(row.path)
+        !unplayableClips.has(row.path) &&
+        row !== finishedClipRow
       ) {
         cell.mediaKind = "video";
       }
@@ -2716,7 +2738,14 @@ export const Slideshow: React.FC<{
       toCell(currentPhotoPath, activePhotoSrc),
       ...remixCompanions.map((companion) => toCell(companion, getSlideshowPhotoSrc(companion)!)),
     ];
-  }, [currentPhotoPath, activePhotoSrc, remixCompanions, playClips, unplayableClips]);
+  }, [
+    currentPhotoPath,
+    activePhotoSrc,
+    remixCompanions,
+    playClips,
+    unplayableClips,
+    finishedClipRow,
+  ]);
 
   const currentSnapshot = React.useMemo(() => buildSlideSnapshot(currentCells), [currentCells]);
   // Identity of the slide on screen. Changes on a normal advance AND when a
@@ -2923,8 +2952,9 @@ export const Slideshow: React.FC<{
   // is paused, so a cross-fade does not leave the old clip running on behind
   // the new slide. `isPaused` (the Pause button and the hold-to-pause gesture)
   // holds it too, as does a hidden document, where there is nothing on screen
-  // to move. Playback simply starts again from wherever it got to: a re-shown
-  // clip needs no seek, since it loops.
+  // to move. Playback simply starts again from wherever it got to; a clip that
+  // reaches its end without looping hands its slide back to its poster (see
+  // `finishedClipRow`), so an ended element is never asked to play again.
   //
   // play() is called through `.catch()`: a refused unmuted autoplay is retried
   // muted, and a clip that cannot play at all is shown as its poster by its
@@ -3284,6 +3314,8 @@ export const Slideshow: React.FC<{
           onTogglePlayClips={() => setPlayClips(!playClips)}
           clipMuted={clipMuted}
           onToggleClipMuted={() => setClipMuted(!clipMuted)}
+          clipLoop={clipLoop}
+          onToggleClipLoop={() => setClipLoop(!clipLoop)}
           clipVolume={clipVolume}
           onChangeClipVolume={setClipVolume}
           onRemixNow={() => {
@@ -3595,7 +3627,7 @@ export const Slideshow: React.FC<{
                 poster={seedCell.src}
                 muted={effectiveClipMuted}
                 playsInline
-                loop
+                loop={clipLoop}
                 preload="auto"
                 style={motionStyle}
                 onTransitionEnd={onFadeEnd}
@@ -3621,6 +3653,9 @@ export const Slideshow: React.FC<{
                       // A clip that cannot play is shown as its poster, not
                       // skipped as a broken image would be.
                       onError: () => showClipAsPoster(seedCell.path),
+                      onEnded: () => {
+                        if (!clipLoop && currentPhotoPath) setFinishedClipRow(currentPhotoPath);
+                      },
                     }
                   : { "aria-hidden": true })}
               />

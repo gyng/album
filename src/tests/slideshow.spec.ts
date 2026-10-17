@@ -88,7 +88,10 @@ test.describe("Slideshow", () => {
     expect(secondSrc).not.toBe(firstSrc);
 
     // The actual Previous control returns to the first photo; keyboard shortcut
-    // dispatch is covered at the utility layer.
+    // dispatch is covered at the utility layer. The controls hide after three
+    // idle seconds, and waiting for the next photo can take longer than that,
+    // so they are shown again first — as a reader would have to.
+    await revealControls(page);
     await page.getByRole("button", { name: "Previous", exact: true }).click();
     await expect(image).toHaveAttribute("src", String(firstSrc));
   });
@@ -254,7 +257,7 @@ test.describe("Slideshow clips", () => {
   const clipUrl = (extra = "") =>
     `/slideshow?mode=random&filter=test-simple&remix=0&delay=86400&photo=${encodeURIComponent(clipPath)}${extra}`;
 
-  test("plays a clip as a muted, looping video whose time advances", async ({ page }) => {
+  test("plays a clip once, muted, as a video whose time advances", async ({ page }) => {
     await gotoHydrated(page, clipUrl());
     await waitForSlideshow(page);
 
@@ -279,7 +282,7 @@ test.describe("Slideshow clips", () => {
     expect(media.src).toBe(clipVideoSrc);
     expect(media.poster).toBe(clipPosterSrc);
     expect(media.muted).toBe(true);
-    expect(media.loop).toBe(true);
+    expect(media.loop).toBe(false);
     expect(media.playsInline).toBe(true);
     expect(media.controls).toBe(false);
 
@@ -288,6 +291,37 @@ test.describe("Slideshow clips", () => {
     await expect
       .poll(() => slide.evaluate((element) => (element as HTMLVideoElement).currentTime))
       .toBeGreaterThan(0);
+  });
+
+  // Played once, a clip ends on its poster: the frame chosen to stand for it,
+  // for the rest of a slide that lasts minutes. The 24h cadence means nothing
+  // else can change the slide.
+  test("a clip that has played once settles back to its poster", async ({ page }) => {
+    await gotoHydrated(page, clipUrl());
+    await waitForSlideshow(page);
+
+    const slide = page.locator(slideshowSlide).first();
+    await expect(slide).toHaveAttribute("data-media-kind", "video");
+    await expect
+      .poll(() => slide.evaluate((element) => (element as HTMLVideoElement).currentTime))
+      .toBeGreaterThan(0);
+    await slide.evaluate((element) => {
+      const video = element as HTMLVideoElement;
+      video.currentTime = Math.max(0, video.duration - 0.3);
+    });
+
+    const settled = page.locator(slideshowSlide).first();
+    await expect(settled).toHaveAttribute("data-media-kind", "photo");
+    await expect(settled).toHaveAttribute("src", clipPosterSrc);
+  });
+
+  test("loop=1 keeps a clip playing for its whole slide", async ({ page }) => {
+    await gotoHydrated(page, clipUrl("&loop=1"));
+    await waitForSlideshow(page);
+
+    const slide = page.locator(slideshowSlide).first();
+    await expect(slide).toHaveAttribute("data-media-kind", "video");
+    expect(await slide.evaluate((element) => (element as HTMLVideoElement).loop)).toBe(true);
   });
 
   test("clips=0 shows the clip as its poster still with no video element", async ({ page }) => {

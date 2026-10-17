@@ -30,6 +30,9 @@ export type ParsedSlideshowParams = {
   clips: boolean | null;
   // Start clips muted. null when absent.
   muted: boolean | null;
+  // Loop a clip for as long as its slide lasts, instead of playing it once.
+  // null when absent.
+  loop: boolean | null;
   // Clip playback volume, 0..1 (an out-of-range or unparseable value is null,
   // i.e. absent — leave the persisted volume alone). null when absent.
   volume: number | null;
@@ -109,6 +112,7 @@ export const parseSlideshowSearchParams = (
     shuffleHistory,
     clips: parseBool(params.get("clips")),
     muted: parseBool(params.get("muted")),
+    loop: parseBool(params.get("loop")),
     volume: parseVolume(params.get("volume")),
     topic: params.get("topic")?.trim() || null,
   };
@@ -153,6 +157,7 @@ export const buildSlideshowPermalink = (opts: {
   topic?: string;
   clips?: boolean;
   muted?: boolean;
+  loop?: boolean;
   volume?: number;
 }): string => {
   const url = new URL("/slideshow/shell", opts.origin);
@@ -168,6 +173,9 @@ export const buildSlideshowPermalink = (opts: {
   }
   if (opts.muted !== undefined) {
     url.searchParams.set("muted", opts.muted ? "1" : "0");
+  }
+  if (opts.loop !== undefined) {
+    url.searchParams.set("loop", opts.loop ? "1" : "0");
   }
   if (opts.volume !== undefined) {
     url.searchParams.set("volume", String(opts.volume));

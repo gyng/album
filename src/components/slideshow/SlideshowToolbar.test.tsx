@@ -34,6 +34,8 @@ const makeProps = (overrides: Partial<SlideshowToolbarProps> = {}): SlideshowToo
   onTogglePlayClips: noop,
   clipMuted: true,
   onToggleClipMuted: noop,
+  clipLoop: false,
+  onToggleClipLoop: noop,
   clipVolume: 0.5,
   onChangeClipVolume: noop,
   onRemixNow: noop,
@@ -531,6 +533,22 @@ describe("SlideshowToolbar", () => {
     expect(off.getByRole("button", { name: "Mute" }).getAttribute("title")).toMatch(/silently/i);
     expect(off.getByRole("slider", { name: "Clip volume" })).toHaveValue("80");
     expect(off.getByText("80%")).toBeTruthy();
+  });
+
+  it("offers looping clips beside the mute and reports a change", () => {
+    const onToggleClipLoop = jest.fn();
+    const { rerender } = render(<SlideshowToolbar {...makeProps({ onToggleClipLoop })} />);
+    const loop = within(screen.getByRole("group", { name: "Clips" })).getByRole("button", {
+      name: "Loop",
+    });
+    expect(loop).toHaveAttribute("aria-pressed", "false");
+    fireEvent.click(loop);
+    expect(onToggleClipLoop).toHaveBeenCalledTimes(1);
+
+    rerender(<SlideshowToolbar {...makeProps({ clipLoop: true })} />);
+    expect(
+      within(screen.getByRole("group", { name: "Clips" })).getByRole("button", { name: "Loop" }),
+    ).toHaveAttribute("aria-pressed", "true");
   });
 
   // A slider that moves while nothing can be heard looks like it does nothing.

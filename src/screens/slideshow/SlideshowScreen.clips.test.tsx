@@ -8,7 +8,7 @@
 // browser refuses — the slide falls back to the poster frame the clip started
 // from, rather than being skipped.
 
-import { act, fireEvent, render } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 
 const mockUseDatabase = jest.fn();
 const mockUseEmbeddingsDatabase = jest.fn();
@@ -185,6 +185,49 @@ describe("SlideshowScreen clip slides", () => {
   it("plays a clip as a video", async () => {
     await startOn(clip);
     expect(slide()?.tagName).toBe("VIDEO");
+  });
+
+  // A slide lasts minutes and a clip seconds: looped, a ten-second clip jumped
+  // back to its start ninety times a slide. It plays once and settles back to
+  // its poster, the frame chosen to stand for it, without costing the slide.
+  it("plays a clip once, then settles back to its poster", async () => {
+    await startOn(clip);
+    const video = slide() as HTMLVideoElement;
+    expect(video.loop).toBe(false);
+    const poster = video.getAttribute("poster");
+    const fetchesBefore = mockFetchRandomPhoto.mock.calls.length;
+
+    fireEvent.ended(video);
+    await flush();
+
+    expect(slide()?.tagName).toBe("IMG");
+    expect(slide()?.getAttribute("src")).toBe(poster);
+    expect(mockFetchRandomPhoto.mock.calls.length).toBe(fetchesBefore);
+  });
+
+  // "Previous" back to a clip that has finished is asking to see it again.
+  it("plays a finished clip again when the reader comes back to it", async () => {
+    await startOn(clip);
+    fireEvent.ended(slide()!);
+    await flush();
+    expect(slide()?.tagName).toBe("IMG");
+
+    mockFetchRandomPhoto.mockResolvedValue([still]);
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
+    await flush();
+    await flush();
+    expect(slide()?.getAttribute("src")).toMatch(/b\.jpg/);
+    fireEvent.click(screen.getByRole("button", { name: "Previous" }));
+    await flush();
+    await flush();
+
+    expect(slide()?.tagName).toBe("VIDEO");
+  });
+
+  it("loops a clip when the reader has asked for it", async () => {
+    mockStored.set("slideshow-loop", true);
+    await startOn(clip);
+    expect((slide() as HTMLVideoElement).loop).toBe(true);
   });
 
   // A clip the browser cannot play — a codec it lacks, no network for an

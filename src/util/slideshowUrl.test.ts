@@ -93,6 +93,9 @@ describe("parseSlideshowSearchParams", () => {
     expect(parse("clips=").clips).toBe(false);
     expect(parse("muted=1").muted).toBe(true);
     expect(parse("muted=false").muted).toBe(false);
+    expect(parse("loop=1").loop).toBe(true);
+    expect(parse("loop=0").loop).toBe(false);
+    expect(parse("").loop).toBeNull();
 
     expect(parse("volume=0.25").volume).toBe(0.25);
     expect(parse("volume=0").volume).toBe(0);
