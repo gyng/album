@@ -5,6 +5,8 @@ import type { MapWorldEntry } from "../util/pageDataTypes";
 import type { MapBounds } from "./mapWorldViewModel";
 import { getMiddleDragCamera } from "./mapInteractions";
 import styles from "./MapWorld.module.css";
+import { HoverPlayClip } from "./ui";
+import { isPlayableClipPath } from "../util/videoScenePath";
 
 // Frames the map on a set of photos: flyTo a single point, or fitBounds the
 // enclosing rectangle. Shared by the initial auto-fit and the on-demand
@@ -118,6 +120,28 @@ export const MARKER_PREVIEW_EXTENT_PX = 139;
 export const MARKER_RENDER_PADDING_PX = 150;
 
 export const LazyMapMarkerImage = ({ photo }: { photo: MapWorldEntry }) => {
+  const thumbnail = <MarkerThumbnail photo={photo} />;
+  if (photo.mediaKind !== "video") return thumbnail;
+  // A clip's thumbnail is badged as every clip thumbnail is, and plays while a
+  // pointer is on it; an external with no transcoded file only gets the badge.
+  const clipPath = photo.clipPath && isPlayableClipPath(photo.clipPath) ? photo.clipPath : null;
+  return (
+    <span className={styles.markerClip}>
+      {clipPath ? (
+        <HoverPlayClip clipPath={clipPath} className={styles.markerClipPlayer}>
+          {thumbnail}
+        </HoverPlayClip>
+      ) : (
+        thumbnail
+      )}
+      <span className={styles.markerVideoBadge} data-testid="map-video-badge" aria-hidden="true">
+        ▶
+      </span>
+    </span>
+  );
+};
+
+const MarkerThumbnail = ({ photo }: { photo: MapWorldEntry }) => {
   // The fade waits for the photo rather than starting at mount. Mounting is
   // only the request going out: an image that takes a moment to arrive would
   // otherwise fade its placeholder colour in as a bare rectangle and then snap

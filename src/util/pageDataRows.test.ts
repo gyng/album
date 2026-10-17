@@ -30,6 +30,23 @@ describe("compact page-data rows", () => {
     });
   });
 
+  it("round-trips a clip's path, which the map plays on hover", () => {
+    const entry: MapWorldEntry = {
+      album: "trip",
+      mediaKind: "video",
+      clipPath: "../albums/trip/clip.mov",
+      src: { src: "/trip/clip.mov@800.avif", width: 800, height: 450 },
+      decLat: 1.25,
+      decLng: 103.8,
+      date: "2026-07-04T18:37:35",
+      href: "/album/trip#clip.mov",
+      placeholderWidth: 800,
+      placeholderHeight: 450,
+    };
+
+    expect(unpackMapWorldEntry(packMapWorldEntry(entry))).toEqual(entry);
+  });
+
   it("round-trips timeline entries and stores only the displayed geocode summary", () => {
     const entry: TimelineEntry = {
       album: "trip",

@@ -2,7 +2,7 @@
  * @jest-environment jsdom
  */
 
-import { act, fireEvent, render } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import type { MapWorldEntry } from "../util/pageDataTypes";
 import {
   LazyMapMarkerImage,
@@ -142,6 +142,30 @@ describe("LazyMapMarkerImage", () => {
 
     rerender(<LazyMapMarkerImage photo={photo()} />);
     expect(image).not.toHaveAttribute("width");
+  });
+
+  // A clip's thumbnail says it is one, as every other clip thumbnail does, and
+  // plays while a pointer is on it.
+  it("badges a clip's thumbnail and plays it on hover", () => {
+    jest.spyOn(HTMLMediaElement.prototype, "play").mockResolvedValue(undefined);
+    render(
+      <LazyMapMarkerImage
+        photo={photo({ mediaKind: "video", clipPath: "../albums/test-simple/clip.mov" })}
+      />,
+    );
+    expect(screen.getByTestId("map-video-badge")).toBeInTheDocument();
+    expect(document.querySelector("video")).toBeNull();
+
+    fireEvent.pointerOver(document.querySelector("img")!.parentElement!);
+    expect(document.querySelector("video")).toHaveAttribute(
+      "src",
+      "/data/albums/test-simple/.resized_videos/clip.mov%401920.mp4",
+    );
+  });
+
+  it("puts no badge on a photograph", () => {
+    render(<LazyMapMarkerImage photo={photo()} />);
+    expect(screen.queryByTestId("map-video-badge")).toBeNull();
   });
 
   it("stays transparent until the photo itself has arrived", () => {

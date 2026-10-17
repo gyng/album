@@ -15,6 +15,8 @@ export type MapWorldEntryRow = [
   // Likewise: EXIF OffsetTime, present on about half the library, used only to
   // date relative labels against the real present.
   dateOffset?: string | null,
+  // A clip's own file, which the map plays on hover.
+  clipPath?: string | null,
 ];
 
 export type TimelineEntryRow = [
@@ -77,6 +79,7 @@ export const packMapWorldEntry = (entry: MapWorldEntry): MapWorldEntryRow => [
   entry.placeholderColor ?? null,
   entry.mediaKind ?? null,
   entry.dateOffset ?? null,
+  entry.clipPath ?? null,
 ];
 
 export const unpackMapWorldEntry = (row: MapWorldEntryRow): MapWorldEntry => ({
@@ -89,6 +92,7 @@ export const unpackMapWorldEntry = (row: MapWorldEntryRow): MapWorldEntry => ({
   ...(row[8] === null ? {} : { placeholderColor: row[8] }),
   ...(row[9] ? { mediaKind: row[9] } : {}),
   ...(row[10] ? { dateOffset: row[10] } : {}),
+  ...(row[11] ? { clipPath: row[11] } : {}),
   placeholderWidth: row[2],
   placeholderHeight: row[3],
 });

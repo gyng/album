@@ -21,6 +21,7 @@ const videoMapEntries = (album: Awaited<ReturnType<typeof getAlbums>>[number]) =
       {
         album: album._build.slug,
         mediaKind: "video",
+        clipPath: `../albums/${album._build.slug}/${video.anchor}`,
         src: video.poster,
         decLng: video.decLng,
         decLat: video.decLat,

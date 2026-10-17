@@ -28,6 +28,10 @@ const mediaQuery = (query: string) => ({
 const coarsePointer = mediaQuery(COARSE_POINTER_QUERY);
 const reducedMotion = mediaQuery(REDUCED_MOTION_QUERY);
 
+/** Whether the reader has asked for less motion; false on the server. */
+export const usePrefersReducedMotion = (): boolean =>
+  React.useSyncExternalStore(reducedMotion.subscribe, reducedMotion.read, () => false);
+
 /**
  * A blocked autoplay rejects the promise, and this preview is decorative: there
  * is nothing to say to the reader about a poster that stayed a poster.
@@ -72,11 +76,7 @@ export const useHoverPlayClip = (
     coarsePointer.read,
     () => false,
   );
-  const prefersReducedMotion = React.useSyncExternalStore(
-    reducedMotion.subscribe,
-    reducedMotion.read,
-    () => false,
-  );
+  const prefersReducedMotion = usePrefersReducedMotion();
 
   const isPlayable =
     !isCoarsePointer && !prefersReducedMotion && clipPath !== null && isPlayableClipPath(clipPath);

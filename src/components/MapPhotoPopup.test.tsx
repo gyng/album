@@ -46,6 +46,49 @@ describe("MapPhotoPopup", () => {
     expect(screen.getByText(/video/i)).toBeInTheDocument();
   });
 
+  // The popup is what a hovered pin shows, so for a clip it is the clip,
+  // starting from the poster frame the pin was drawn with.
+  it("plays a clip in the popup, from its poster", () => {
+    render(
+      <MapPhotoPopup
+        photo={{ ...photo, mediaKind: "video", clipPath: "../albums/kansai/clip.mov" }}
+        selected={false}
+        onClose={() => {}}
+        onInteractionStart={() => {}}
+      />,
+    );
+
+    const video = document.querySelector("video")!;
+    expect(video).toHaveAttribute("poster", "/photo.jpg");
+    expect(video).toHaveAttribute("src", "/data/albums/kansai/.resized_videos/clip.mov%401920.mp4");
+    expect(video).toHaveProperty("muted", true);
+    expect(video).toHaveProperty("autoplay", true);
+  });
+
+  it("keeps the poster for a reader who asked for reduced motion", () => {
+    const original = window.matchMedia;
+    window.matchMedia = ((query: string) => ({
+      matches: query.includes("prefers-reduced-motion"),
+      media: query,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    })) as unknown as typeof window.matchMedia;
+    try {
+      render(
+        <MapPhotoPopup
+          photo={{ ...photo, mediaKind: "video", clipPath: "../albums/kansai/clip.mov" }}
+          selected={false}
+          onClose={() => {}}
+          onInteractionStart={() => {}}
+        />,
+      );
+      expect(document.querySelector("video")).toBeNull();
+      expect(document.querySelector("img")).toHaveAttribute("src", "/photo.jpg");
+    } finally {
+      window.matchMedia = original;
+    }
+  });
+
   it("says nothing of the sort for a photo", () => {
     render(
       <MapPhotoPopup

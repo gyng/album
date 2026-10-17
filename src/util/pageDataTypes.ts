@@ -12,6 +12,8 @@ export type MapWorldEntry = {
   album: string;
   /** "video" when the entry is a clip drawn through its poster frame. */
   mediaKind?: "video";
+  /** A clip's own file (`../albums/<album>/<name>`), which the map plays on hover. */
+  clipPath?: string;
   src: OptimisedPhoto;
   decLat: number | null;
   decLng: number | null;

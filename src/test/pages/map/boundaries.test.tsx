@@ -271,6 +271,9 @@ describe("map page boundaries", () => {
         decLng: 139.7,
         date: "2024-01-02T03:04:05",
         href: "/album/trip#clip.mov",
+        // The file the thumbnail and popup play, in the album-relative form
+        // every clip URL builder takes.
+        clipPath: "../albums/trip/clip.mov",
         // Its poster's own colour and its derived zone, as a photograph's pin has.
         placeholderColor: "rgba(200, 30, 40, 1)",
         dateOffset: "+09:00",

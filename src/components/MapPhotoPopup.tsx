@@ -6,6 +6,9 @@ import type { MapWorldEntry } from "../util/pageDataTypes";
 import { formatMapPhotoDateTime } from "./mapWorldViewModel";
 import { buildExternalMapLinks } from "./mapInteractions";
 import styles from "./MapWorld.module.css";
+import { usePrefersReducedMotion } from "./ui/useHoverPlayClip";
+import { getResizedAlbumVideoSrc } from "../util/getResizedAlbumImageSrc";
+import { isPlayableClipPath } from "../util/videoScenePath";
 
 type MapPhotoPopupProps = {
   photo: MapWorldEntry | null;
@@ -20,6 +23,7 @@ export const MapPhotoPopup = ({
   onClose,
   onInteractionStart,
 }: MapPhotoPopupProps) => {
+  const prefersReducedMotion = usePrefersReducedMotion();
   if (!photo || photo.decLat === null || photo.decLng === null) {
     return null;
   }
@@ -28,6 +32,15 @@ export const MapPhotoPopup = ({
   const timestamp = exifRelativeTimestamp(photo.date, photo.dateOffset);
   const relative = timestamp === null ? null : getRelativeTimeString(new Date(timestamp));
   const mapLinks = buildExternalMapLinks(photo.decLat, photo.decLng);
+  // The popup is what a hovered pin shows, so a clip plays in it, from the
+  // poster frame the pin was drawn with.
+  const playableClipPath =
+    photo.mediaKind === "video" &&
+    photo.clipPath &&
+    isPlayableClipPath(photo.clipPath) &&
+    !prefersReducedMotion
+      ? photo.clipPath
+      : null;
 
   return (
     <Popup
@@ -50,14 +63,31 @@ export const MapPhotoPopup = ({
         }}
       >
         <Link href={photo.href} className={styles.link}>
-          <img
-            src={photo.src.src}
-            className={styles.image}
-            width={photo.placeholderWidth}
-            height={photo.placeholderHeight}
-            style={{ backgroundColor: photo.placeholderColor }}
-            alt={photo.album}
-          />
+          {playableClipPath ? (
+            <video
+              src={getResizedAlbumVideoSrc(playableClipPath)}
+              poster={photo.src.src}
+              className={styles.image}
+              width={photo.placeholderWidth}
+              height={photo.placeholderHeight}
+              style={{ backgroundColor: photo.placeholderColor }}
+              aria-label={photo.album}
+              autoPlay
+              muted
+              loop
+              playsInline
+              disablePictureInPicture
+            />
+          ) : (
+            <img
+              src={photo.src.src}
+              className={styles.image}
+              width={photo.placeholderWidth}
+              height={photo.placeholderHeight}
+              style={{ backgroundColor: photo.placeholderColor }}
+              alt={photo.album}
+            />
+          )}
           <div className={styles.details}>
             {photo.mediaKind === "video" ? (
               <>

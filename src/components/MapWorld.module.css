@@ -134,6 +134,43 @@
   opacity: 1;
 }
 
+/* A clip's thumbnail: the badge every clip thumbnail carries, over the corner
+   of the picture, and the hover preview clipped to the thumbnail's own shape. */
+.markerClip {
+  position: absolute;
+  inset-inline-start: 50%;
+  inset-block-end: calc(100% + var(--space-3));
+  transform: translateX(-50%);
+  display: block;
+}
+
+/* The wrapper holds the thumbnail's place above the pin, so the picture inside
+   it sits in flow. */
+.markerClip .photoMarkerImage {
+  position: static;
+  display: block;
+  transform: none;
+}
+
+.markerClipPlayer {
+  display: block;
+  overflow: hidden;
+  border-radius: var(--radius-control);
+}
+
+.markerVideoBadge {
+  position: absolute;
+  inset-block-start: var(--space-1);
+  inset-inline-start: var(--space-1);
+  border-radius: var(--radius-pill);
+  background-color: var(--c-overlay-dark);
+  color: var(--c-white);
+  font-size: var(--fs-2xs);
+  line-height: 1;
+  padding: var(--space-1) var(--space-2);
+  pointer-events: none;
+}
+
 .hover,
 .hover * {
   pointer-events: none;
