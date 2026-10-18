@@ -29,7 +29,7 @@ module.exports = {
     const archive = args.archive ? " --archive=tgz" : "";
     steps.push({
       label: "deploy",
-      command: `${VERCEL_CLI} deploy --prebuilt --prod${archive}`,
+      command: `node ./bin/write-game-metadata.cjs && ${VERCEL_CLI} deploy --prebuilt --prod${archive}`,
       cwd: context.srcDir,
     });
 

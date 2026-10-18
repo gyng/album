@@ -700,6 +700,18 @@ describe("service worker data caching", () => {
     expect(fetchMockOf(fetchHandler)).not.toHaveBeenCalled();
   });
 
+  it.each(["cors", "navigate"])("leaves game metadata outside worker caches in %s mode", (mode) => {
+    const handler = loadFetchHandler({ cachedResponse: new Response("old metadata") });
+    const respondWith = jest.fn();
+    handler({
+      request: { ...request("/fun/meta.json"), mode },
+      respondWith,
+      waitUntil: jest.fn(),
+    });
+    expect(respondWith).not.toHaveBeenCalled();
+    expect(fetchMockOf(handler)).not.toHaveBeenCalled();
+  });
+
   it("does not turn album media opened in a tab into a cached shell document", () => {
     const fetchHandler = loadFetchHandler({
       cachedResponse: new Response("retired cache entry"),

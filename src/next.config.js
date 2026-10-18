@@ -42,6 +42,14 @@ const nextConfig = {
   ],
   headers: async () => [
     {
+      source: "/fun/meta.json",
+      headers: [
+        { key: "Content-Type", value: "application/json" },
+        { key: "Access-Control-Allow-Origin", value: "*" },
+        { key: "Cache-Control", value: "no-cache" },
+      ],
+    },
+    {
       source: "/feed.xml",
       headers: [{ key: "Content-Type", value: "application/rss+xml; charset=utf-8" }],
     },

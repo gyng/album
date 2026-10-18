@@ -279,6 +279,12 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
+  // Deployment metadata must never fall back to a cached build, even when
+  // opened directly as a document.
+  if (url.pathname === "/fun/meta.json") {
+    return;
+  }
+
   // Opening an album asset in its own tab changes the request destination to
   // "document". Keep those /data/ navigations out of SHELL_CACHE as well as
   // the ordinary image/video requests handled farther below.

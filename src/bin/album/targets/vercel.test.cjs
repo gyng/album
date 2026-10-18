@@ -44,6 +44,16 @@ describe("vercel target", () => {
     expect(steps.find((step) => step.label === "build").command).not.toContain("--archive");
   });
 
+  it.each([false, true])(
+    "stamps metadata before uploading, including skipBuild=%s",
+    (skipBuild) => {
+      const steps = vercel.planSteps({ args: { skipBuild }, context });
+      expect(steps.find((step) => step.label === "deploy").command).toBe(
+        "node ./bin/write-game-metadata.cjs && npx --yes vercel@latest deploy --prebuilt --prod",
+      );
+    },
+  );
+
   it("checks credentials before any long step", () => {
     expect(vercel.preflightCommand({ args: {}, context })).toContain("whoami");
   });

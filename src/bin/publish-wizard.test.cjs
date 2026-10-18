@@ -337,7 +337,8 @@ describe("publish wizard orchestration", () => {
       expect.objectContaining({ command: expect.stringContaining(" pull") }),
     );
     expect(harness.services.runShellCommand).toHaveBeenLastCalledWith({
-      command: "npx --yes vercel@latest deploy --prebuilt --prod",
+      command:
+        "node ./bin/write-game-metadata.cjs && npx --yes vercel@latest deploy --prebuilt --prod",
       cwd: "/src",
     });
     expect(harness.log).toHaveBeenCalledWith(expect.stringContaining("Publish wizard complete"));
@@ -353,7 +354,8 @@ describe("publish wizard orchestration", () => {
 
     expect(harness.services.askYesNo).not.toHaveBeenCalled();
     expect(harness.services.runShellCommand).toHaveBeenLastCalledWith({
-      command: "npx --yes vercel@latest deploy --prebuilt --prod",
+      command:
+        "node ./bin/write-game-metadata.cjs && npx --yes vercel@latest deploy --prebuilt --prod",
       cwd: "/src",
     });
   });

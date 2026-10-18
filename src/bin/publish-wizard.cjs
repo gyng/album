@@ -199,7 +199,8 @@ const main = async ({ args, context, services, now, log, error, setExitCode }) =
   }
 
   await services.runShellCommand({
-    command: "npx --yes vercel@latest deploy --prebuilt --prod",
+    command:
+      "node ./bin/write-game-metadata.cjs && npx --yes vercel@latest deploy --prebuilt --prod",
     cwd: context.srcDir,
   });
 

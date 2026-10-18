@@ -203,11 +203,20 @@ elsewhere &mdash; this is a standard Next.js application.
 
    # Underneath, unchanged
    $ npx vercel@latest build --prod
-   $ npx vercel@latest deploy --prebuilt --prod
+   $ node bin/write-game-metadata.cjs && npx vercel@latest deploy --prebuilt --prod
 
    # Everything together without prompts
    $ ./album index && ./album deploy
    ```
+
+   Deploy and publish stamp `/fun/meta.json` into the prebuilt output immediately
+   before upload. It follows the games-index metadata contract: schema version 1,
+   a UTC deployment timestamp (seconds), and the version and full commit SHA from
+   that build's `version.json` where available. Reusing a build with `--skip-build`
+   stamps a new deployment time while preserving its build identity. The endpoint
+   permits public CORS reads, requires HTTP cache revalidation, and bypasses the
+   service worker. Promote or roll back through a prebuilt upload to refresh the
+   timestamp; a dashboard alias change cannot restamp an existing artefact.
 
    If the build fails, try removing `.vercel` and reinitialising the project. Somehow this seems to happen a lot.
 
