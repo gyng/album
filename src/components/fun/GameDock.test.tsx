@@ -63,3 +63,18 @@ it("releases its reserved height when it unmounts", () => {
   view.unmount();
   expect(report).toHaveBeenLastCalledWith(0);
 });
+
+// Wide (no max-width match): a single-column board still scrolls its controls away.
+it("stays docked on a wide screen when the board above it is a single column", () => {
+  layout({ bottomInset: "0px" });
+  jest
+    .spyOn(window, "matchMedia")
+    .mockImplementation((query) => ({ matches: false, media: query }) as MediaQueryList);
+  const report = jest.fn();
+  render(
+    <GameDock label="Clues" sticky="always" onStickyHeightChange={report}>
+      Clues
+    </GameDock>,
+  );
+  expect(report).toHaveBeenLastCalledWith(200);
+});

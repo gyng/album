@@ -18,3 +18,13 @@
     box-shadow: 0 var(--space-2) var(--space-3) color-mix(in oklch, var(--c-bg) 85%, transparent);
   }
 }
+/* The same dock, past the breakpoint, for a board with nothing beside it. */
+.always {
+  position: sticky;
+  inset-block-start: max(var(--space-2), env(safe-area-inset-top, 0px));
+  z-index: var(--z-sticky);
+  padding-block: var(--space-1);
+  background: var(--c-bg);
+  border-radius: var(--radius-preview);
+  box-shadow: 0 var(--space-2) var(--space-3) color-mix(in oklch, var(--c-bg) 85%, transparent);
+}

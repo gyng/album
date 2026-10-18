@@ -395,6 +395,7 @@ export const PhotoConnections = ({ photos }: { photos: PhotoGamePhoto[] }) => {
       {!finished ? (
         <GameDock
           label="Connection controls"
+          sticky="always"
           onStickyHeightChange={setDockHeight}
           {...(styles.connectionControls ? { className: styles.connectionControls } : {})}
         >

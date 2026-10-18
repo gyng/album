@@ -7,12 +7,15 @@ export const GameDock = ({
   label,
   active = true,
   className,
+  sticky = "narrow",
   onStickyHeightChange,
 }: {
   children: ReactNode;
   label: string;
   active?: boolean;
   className?: string;
+  /** "always" for a board that stays one column on a wide screen, so nothing sits beside it. */
+  sticky?: "narrow" | "always";
   onStickyHeightChange?: (height: number) => void;
 }) => {
   const ref = useRef<HTMLDivElement>(null);
@@ -39,7 +42,9 @@ export const GameDock = ({
       const canFit = viewport - height >= 144 + top + bottom;
       setFits(canFit);
       onStickyHeightChange?.(
-        canFit && window.matchMedia("(max-width: 960px)").matches ? Math.ceil(height) : 0,
+        canFit && (sticky === "always" || window.matchMedia("(max-width: 960px)").matches)
+          ? Math.ceil(height)
+          : 0,
       );
     };
     measure();
@@ -52,13 +57,18 @@ export const GameDock = ({
       window.removeEventListener("resize", measure);
       window.visualViewport?.removeEventListener("resize", measure);
     };
-  }, [active, onStickyHeightChange]);
+  }, [active, sticky, onStickyHeightChange]);
   return (
     <div
       ref={ref}
       role="group"
       aria-label={label}
-      className={[styles.dock, active && fits ? styles.active : "", className]
+      className={[
+        styles.dock,
+        active && fits ? styles.active : "",
+        active && fits && sticky === "always" ? styles.always : "",
+        className,
+      ]
         .filter(Boolean)
         .join(" ")}
     >
