@@ -8,8 +8,16 @@ const writeGameMetadata = ({
   now = new Date(),
 } = {}) => {
   const build = JSON.parse(fs.readFileSync(path.join(staticDir, "version.json"), "utf8"));
+  const metadataPath = path.join(staticDir, "fun/meta.json");
+  // Read optional fields from this build's template, including when uploading
+  // an older build. A prebuilt output from before the template existed is valid.
+  const authored = fs.existsSync(metadataPath)
+    ? JSON.parse(fs.readFileSync(metadataPath, "utf8"))
+    : {};
   const metadata = {
     schemaVersion: 1,
+    ...(authored.previewImage ? { previewImage: authored.previewImage } : {}),
+    ...(authored.changelogUrl ? { changelogUrl: authored.changelogUrl } : {}),
     updatedAt: now.toISOString().replace(/\.\d{3}Z$/, "Z"),
     ...(typeof build.buildVersion === "string" && build.buildVersion.trim()
       ? { version: build.buildVersion }
@@ -18,7 +26,11 @@ const writeGameMetadata = ({
   };
   const directory = path.join(staticDir, "fun");
   fs.mkdirSync(directory, { recursive: true });
-  fs.writeFileSync(path.join(directory, "meta.json"), `${JSON.stringify(metadata, null, 2)}\n`);
+  // Vercel hard-links public assets. Replace the output file rather than
+  // writing through that link into the authored template.
+  const temporaryPath = `${metadataPath}.tmp`;
+  fs.writeFileSync(temporaryPath, `${JSON.stringify(metadata, null, 2)}\n`);
+  fs.renameSync(temporaryPath, metadataPath);
   return metadata;
 };
 

@@ -52,6 +52,68 @@ it("omits unavailable optional fields rather than attributing the build to the c
   expect(metadata).not.toHaveProperty("version");
 });
 
+it("preserves the prebuilt preview and changelog when stamping a deployment", () => {
+  fs.writeFileSync(path.join(staticDir, "version.json"), JSON.stringify({ gitSha: commit }));
+  fs.mkdirSync(path.join(staticDir, "fun"));
+  const authored = {
+    schemaVersion: 1,
+    updatedAt: "2020-01-01T00:00:00Z",
+    previewImage: { url: "preview.abc123.webp", alt: "A grid of photographs" },
+    changelogUrl: "changelog.html",
+  };
+  fs.writeFileSync(path.join(staticDir, "fun/meta.json"), JSON.stringify(authored));
+  writeGameMetadata({ staticDir, now: new Date("2026-10-19T00:00:00Z") });
+  const read = () => JSON.parse(fs.readFileSync(path.join(staticDir, "fun/meta.json"), "utf8"));
+  expect(read()).toEqual({
+    schemaVersion: 1,
+    updatedAt: "2026-10-19T00:00:00Z",
+    commit,
+    previewImage: authored.previewImage,
+    changelogUrl: authored.changelogUrl,
+  });
+  writeGameMetadata({ staticDir, now: new Date("2026-10-20T00:00:00Z") });
+  expect(read()).toMatchObject({
+    updatedAt: "2026-10-20T00:00:00Z",
+    previewImage: authored.previewImage,
+    changelogUrl: authored.changelogUrl,
+  });
+});
+
+it("keeps the authored template intact when Vercel hard-links it into the output", () => {
+  fs.writeFileSync(path.join(staticDir, "version.json"), "{}");
+  const templatePath = path.join(staticDir, "template.json");
+  const authored = JSON.stringify({
+    schemaVersion: 1,
+    previewImage: { url: "preview.webp", alt: "Photos" },
+  });
+  fs.writeFileSync(templatePath, authored);
+  fs.mkdirSync(path.join(staticDir, "fun"));
+  fs.linkSync(templatePath, path.join(staticDir, "fun/meta.json"));
+  writeGameMetadata({ staticDir });
+  expect(fs.readFileSync(templatePath, "utf8")).toBe(authored);
+  expect(JSON.parse(fs.readFileSync(path.join(staticDir, "fun/meta.json"), "utf8"))).toHaveProperty(
+    "updatedAt",
+  );
+});
+
+it("ships a decodable 800 by 500 preview with a content-hashed URL and accessible description", async () => {
+  const crypto = require("node:crypto");
+  const sharp = require("sharp");
+  const publicDir = path.resolve(__dirname, "../public");
+  const template = JSON.parse(fs.readFileSync(path.join(publicDir, "fun/meta.json"), "utf8"));
+  expect(template.schemaVersion).toBe(1);
+  const preview = template.previewImage;
+  expect(preview.alt.trim().length).toBeGreaterThan(0);
+  const url = new URL(preview.url, "https://example.com/fun/meta.json");
+  expect(url.protocol).toBe("https:");
+  expect(url.pathname).toMatch(/^\/fun\/preview\.[a-f0-9]+\.webp$/);
+  const bytes = fs.readFileSync(path.join(publicDir, url.pathname));
+  const hash = crypto.createHash("sha256").update(bytes).digest("hex").slice(0, 12);
+  expect(url.pathname).toBe(`/fun/preview.${hash}.webp`);
+  expect(await sharp(bytes).metadata()).toMatchObject({ width: 800, height: 500, format: "webp" });
+  await expect(sharp(bytes).raw().toBuffer()).resolves.toBeInstanceOf(Buffer);
+});
+
 it("refuses to stamp a missing prebuilt output", () => {
   expect(() => writeGameMetadata({ staticDir })).toThrow();
   expect(fs.existsSync(path.join(staticDir, "fun/meta.json"))).toBe(false);

@@ -218,6 +218,14 @@ elsewhere &mdash; this is a standard Next.js application.
    service worker. Promote or roll back through a prebuilt upload to refresh the
    timestamp; a dashboard alias change cannot restamp an existing artefact.
 
+   `src/public/fun/meta.json` is the authored template for the optional index
+   preview and changelog link. It retains `schemaVersion: 1`; deployment adds the
+   date and build identity. The preview uses a content-hashed 800×500 WebP in the
+   same directory, with a plain-text description. Replace the image and update
+   its URL and description together. Add `changelogUrl` only when a public
+   changelog exists; relative URLs resolve against `/fun/meta.json`. Stamping a
+   reused build preserves its own preview and changelog.
+
    If the build fails, try removing `.vercel` and reinitialising the project. Somehow this seems to happen a lot.
 
 3. Index images. Needs CUDA and the Python toolchain: see [index/README.md](index/README.md).
