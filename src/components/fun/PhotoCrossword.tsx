@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type CSSProperties, type DragEvent } from 
 import {
   buildPhotoCrossword,
   checkPhotoCrossword,
+  checkHiddenCrossword,
   resolveHiddenCrossword,
   crosswordClue,
   crosswordSeedIndices,
@@ -303,8 +304,8 @@ export const PhotoCrossword = ({ photos }: { photos: PhotoGamePhoto[] }) => {
       } else {
         setChecked(null);
         setMessage(
-          cells.some((photo) => !photo)
-            ? "Place every photograph to check the hidden connections."
+          checkHiddenCrossword(puzzle, cells, revealedClues)
+            ? "Placed photographs fit the hidden connections so far."
             : "Some rows or columns do not share a connection. Move photographs or ask for a hint.",
         );
       }

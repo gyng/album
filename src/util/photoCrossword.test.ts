@@ -2,6 +2,7 @@ import {
   assignCrosswordPhotos,
   buildPhotoCrossword,
   checkPhotoCrossword,
+  checkHiddenCrossword,
   crosswordSeedIndices,
   resolveHiddenCrossword,
   type PhotoCrosswordPuzzle,
@@ -175,4 +176,25 @@ it("anchors only hinted lines while the remaining hidden clues can change order"
     rows.map((_, row) => photos[row * 3 + column]!),
   );
   expect(resolveHiddenCrossword(puzzle, transposed, [{ axis: "row", index: 0 }])).toBeNull();
+});
+
+it("checks partial hidden connections without imposing a secret ordering", () => {
+  const puzzle: PhotoCrosswordPuzzle = {
+    size: 3,
+    rows: rows.map(tag),
+    columns: columns.map(tag),
+    solution: photos,
+    tiles: photos,
+  };
+  const cells: Array<PhotoGamePhoto | null> = Array(9).fill(null);
+  cells[3] = photos[0]!;
+  cells[4] = photos[1]!;
+  expect(checkHiddenCrossword(puzzle, cells)).toBe(true);
+  expect(checkHiddenCrossword(puzzle, cells, [{ axis: "row", index: 1 }])).toBe(false);
+  cells[4] = photos[4]!;
+  expect(checkHiddenCrossword(puzzle, cells)).toBe(false);
+  cells[4] = photos[0]!;
+  expect(checkHiddenCrossword(puzzle, cells)).toBe(false);
+  cells[4] = { ...photos[1]!, path: "missing.jpg" };
+  expect(checkHiddenCrossword(puzzle, cells)).toBe(false);
 });

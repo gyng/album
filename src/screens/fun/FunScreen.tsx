@@ -60,6 +60,7 @@ const FunScreen = () => {
           </AppLink>
         ))}
       </div>
+      <AppLink href="/fun/changelog">Game changelog</AppLink>
     </main>
   );
 };

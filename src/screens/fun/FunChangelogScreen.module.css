@@ -1,0 +1,16 @@
+.page {
+  display: grid;
+  gap: var(--space-7);
+  max-inline-size: var(--size-1400);
+  margin-inline: auto;
+  padding: var(--page-gutter);
+}
+
+.entry {
+  max-inline-size: 65ch;
+}
+
+.entry ul {
+  padding-inline-start: var(--space-5);
+  margin-block: var(--space-4) 0;
+}

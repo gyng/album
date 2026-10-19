@@ -20,3 +20,14 @@ test.describe("Generated HTTP resources", () => {
     expect(body).toContain("<loc>");
   });
 });
+
+test("game metadata links to a public changelog document", async ({ request }) => {
+  const response = await request.get("/fun/meta.json");
+  expect(response.ok()).toBe(true);
+  const metadata = await response.json();
+  const url = new URL(metadata.changelogUrl, response.url());
+  expect(url.origin).toBe(new URL(response.url()).origin);
+  const changelog = await request.get(url.href);
+  expect(changelog.status()).toBe(200);
+  expect(changelog.headers()["content-type"]).toContain("text/html");
+});

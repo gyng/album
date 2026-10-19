@@ -222,8 +222,9 @@ elsewhere &mdash; this is a standard Next.js application.
    preview and changelog link. It retains `schemaVersion: 1`; deployment adds the
    date and build identity. The preview uses a content-hashed 800×500 WebP in the
    same directory, with a plain-text description. Replace the image and update
-   its URL and description together. Add `changelogUrl` only when a public
-   changelog exists; relative URLs resolve against `/fun/meta.json`. Stamping a
+   its URL and description together. `changelogUrl` links to `/fun/changelog`;
+   add dated game changes in `src/screens/fun/FunChangelogScreen.tsx`. Relative
+   URLs resolve against `/fun/meta.json`. Stamping a
    reused build preserves its own preview and changelog.
 
    If the build fails, try removing `.vercel` and reinitialising the project. Somehow this seems to happen a lot.

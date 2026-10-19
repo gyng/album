@@ -387,7 +387,7 @@ it("supports start, hints, cancellation, checking and give up shortcuts", () => 
   fireEvent.keyDown(window, { key: "Escape" });
   expect(tile).toHaveAttribute("aria-pressed", "false");
   fireEvent.keyDown(window, { key: "Enter" });
-  expect(screen.getByRole("status")).toHaveTextContent("Place every photograph");
+  expect(screen.getByRole("status")).toHaveTextContent(/fit the hidden connections/);
   fireEvent.keyDown(window, { key: "g" });
   expect(screen.getByRole("region", { name: "Cross Exposure result" })).toHaveFocus();
   fireEvent.keyDown(window, { key: "n" });
@@ -528,4 +528,20 @@ describe("daily", () => {
     expect(screen.queryByRole("region", { name: "Crossword board" })).toBeNull();
     expect(screen.getByText(`${dailyName} · 4×4 · Solved with no hints`)).toBeTruthy();
   });
+});
+
+it("checks partial hidden grids without revealing clues or ending the round", () => {
+  render(<PhotoCrossword photos={photos} />);
+  fireEvent.click(screen.getByRole("button", { name: "Start crossing" }));
+  fireEvent.click(screen.getByRole("button", { name: "Select photograph 1" }));
+  fireEvent.click(screen.getByRole("button", { name: /Row 2; column A;/ }));
+  fireEvent.click(screen.getByRole("button", { name: "Check grid" }));
+  expect(screen.getByRole("status")).toHaveTextContent(/fit the hidden connections/);
+  expect(screen.queryByRole("region", { name: "Cross Exposure result" })).toBeNull();
+  expect(screen.getByRole("rowheader", { name: "Row 2" })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Select photograph 4" }));
+  fireEvent.click(screen.getByRole("button", { name: /Row 2; column B;/ }));
+  fireEvent.click(screen.getByRole("button", { name: "Check grid" }));
+  expect(screen.getByRole("status")).toHaveTextContent(/do not share a connection/);
+  expect(screen.queryByRole("region", { name: "Cross Exposure result" })).toBeNull();
 });

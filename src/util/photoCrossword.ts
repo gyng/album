@@ -158,23 +158,23 @@ const matchLineClues = (
   return assigned.map((index) => questions[index]!);
 };
 
-// Unlabelled lines have no prescribed order: infer their clues from the completed grid.
-export const resolveHiddenCrossword = (
+// Unlabelled lines have no prescribed order; empty squares constrain neither axis.
+const inferHiddenCrossword = (
   puzzle: PhotoCrosswordPuzzle,
   cells: Array<PhotoGamePhoto | null>,
   revealed: readonly CrosswordClueCoordinate[] = [],
-): PhotoCrosswordPuzzle | null => {
-  if (cells.length !== puzzle.size ** 2 || cells.some((photo) => !photo)) return null;
+): Pick<PhotoCrosswordPuzzle, "rows" | "columns"> | null => {
+  if (cells.length !== puzzle.size ** 2) return null;
   const available = new Map(puzzle.tiles.map((photo) => [photo.path, photo]));
-  const placed = cells.map((photo) => available.get(photo!.path));
+  const placed = cells.filter((photo) => photo !== null).map((photo) => available.get(photo.path));
   if (
     placed.some((photo) => !photo) ||
-    new Set(placed.map((photo) => photo!.path)).size !== cells.length
+    new Set(placed.map((photo) => photo!.path)).size !== placed.length
   )
     return null;
-  const complete = placed as PhotoGamePhoto[];
+  const canonical = cells.map((photo) => (photo ? available.get(photo.path)! : null));
   const rows = Array.from({ length: puzzle.size }, (_, row) =>
-    complete.slice(row * puzzle.size, (row + 1) * puzzle.size),
+    canonical.slice(row * puzzle.size, (row + 1) * puzzle.size),
   );
   const columns = Array.from({ length: puzzle.size }, (_, column) =>
     rows.map((row) => row[column]!),
@@ -190,12 +190,37 @@ export const resolveHiddenCrossword = (
     [puzzle.rows, puzzle.columns],
     [puzzle.columns, puzzle.rows],
   ]) {
-    const rowClues = matchLineClues(rows, rowQuestions!, rowAnchors);
-    const columnClues = matchLineClues(columns, columnQuestions!, columnAnchors);
-    if (rowClues && columnClues)
-      return { ...puzzle, rows: rowClues, columns: columnClues, solution: complete };
+    const rowClues = matchLineClues(
+      rows.map((row) => row.filter((photo) => photo !== null)),
+      rowQuestions!,
+      rowAnchors,
+    );
+    const columnClues = matchLineClues(
+      columns.map((column) => column.filter((photo) => photo !== null)),
+      columnQuestions!,
+      columnAnchors,
+    );
+    if (rowClues && columnClues) return { rows: rowClues, columns: columnClues };
   }
   return null;
+};
+
+export const checkHiddenCrossword = (
+  puzzle: PhotoCrosswordPuzzle,
+  cells: Array<PhotoGamePhoto | null>,
+  revealed: readonly CrosswordClueCoordinate[] = [],
+): boolean => inferHiddenCrossword(puzzle, cells, revealed) !== null;
+
+export const resolveHiddenCrossword = (
+  puzzle: PhotoCrosswordPuzzle,
+  cells: Array<PhotoGamePhoto | null>,
+  revealed: readonly CrosswordClueCoordinate[] = [],
+): PhotoCrosswordPuzzle | null => {
+  if (cells.some((photo) => !photo)) return null;
+  const clues = inferHiddenCrossword(puzzle, cells, revealed);
+  if (!clues) return null;
+  const available = new Map(puzzle.tiles.map((photo) => [photo.path, photo]));
+  return { ...puzzle, ...clues, solution: cells.map((photo) => available.get(photo!.path)!) };
 };
 
 export const buildPhotoCrossword = (
