@@ -6,9 +6,9 @@
   --map-chrome-shadow: 0 var(--size-1) var(--m) color-mix(in oklch, var(--c-black) 12%, transparent);
   --map-chrome-gutter: var(--space-5);
   --map-control-rail-width: var(--tap-target);
-  --map-chrome-left: max(var(--map-chrome-gutter), env(safe-area-inset-left, 0px));
+  --map-chrome-left: var(--nav-inset-left);
   --map-chrome-right: max(var(--map-chrome-gutter), env(safe-area-inset-right, 0px));
-  --map-chrome-top: max(var(--map-chrome-gutter), env(safe-area-inset-top, 0px));
+  --map-chrome-top: calc(var(--nav-inset-top) + var(--size-1));
   --map-chrome-bottom: max(var(--map-chrome-gutter), env(safe-area-inset-bottom, 0px));
   --map-legend-bottom: calc(
     var(--map-chrome-bottom) + var(--map-bottom-chrome) + var(--size-24) + var(--m-s)
@@ -115,9 +115,8 @@
 .titleBar {
   position: fixed;
   z-index: var(--z-fullscreen);
-  /* Nav owns its block padding and a 1px list inset. Align the first control,
-     rather than its padded wrapper, with the native map control rail. */
-  inset-block-start: calc(var(--map-chrome-top) - var(--m-m) - var(--size-1));
+  /* Share the page nav origin; the map control rail follows its 1px list inset. */
+  inset-block-start: 0;
   inset-inline-start: var(--map-chrome-left);
   /* Reserve clearance on the right for MapLibre's stacked controls
      (NavigationControl, GeolocateControl, FullscreenControl all anchor
@@ -163,11 +162,6 @@
   .trailing .mapSearch {
     flex: 1 1 auto;
   }
-}
-
-/* Safe-area spacing belongs to the map's outer gutter, not both wrappers. */
-.titleBar nav {
-  padding-block-start: var(--m-m);
 }
 
 /* The field sits in the nav row, in the slot beside the theme toggle rather than

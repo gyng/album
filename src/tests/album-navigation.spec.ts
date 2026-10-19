@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { gotoHydrated } from "./hydrated";
+import { stubExternalMapAssets } from "./map-network";
 
 test("mobile navigation hides shortly after passing its own height and survives address-bar resizing", async ({
   page,
@@ -168,3 +169,22 @@ test("mobile navigation remains above an open photo details panel", async ({ pag
     }),
   ).toBe(true);
 });
+
+for (const width of [1440, 834, 390]) {
+  test(`album and map navigation share an origin at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 });
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await stubExternalMapAssets(page);
+    await gotoHydrated(page, "/album/test-simple");
+    const links = page.locator('[data-nav-motion-region="left"]');
+    const album = (await links.boundingBox())!;
+    await page.getByRole("link", { name: "Map", exact: true }).click();
+    await page.waitForURL(/\/map/);
+    await expect
+      .poll(async () => {
+        const map = await links.boundingBox();
+        return map ? Math.max(Math.abs(map.x - album.x), Math.abs(map.y - album.y)) : Infinity;
+      })
+      .toBeLessThanOrEqual(1);
+  });
+}

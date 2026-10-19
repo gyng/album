@@ -5,7 +5,7 @@ import path from "node:path";
 // old tokens globally would move chart and image geometry, so they retire one
 // rule at a time instead. This ratchet only stops them spreading: migrating a
 // rule lowers the count, and the baseline should be lowered with it.
-const LEGACY_SPACING_BASELINE = 985;
+const LEGACY_SPACING_BASELINE = 979;
 
 const STYLE_ROOTS = ["components", "screens", "styles"];
 

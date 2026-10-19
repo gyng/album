@@ -1,9 +1,9 @@
 .nav {
   position: relative;
-  padding-block-start: max(var(--m-m), env(safe-area-inset-top, 0));
-  padding-block-end: var(--m-m);
-  padding-inline-start: max(var(--m-l), env(safe-area-inset-left, 0));
-  padding-inline-end: max(var(--m-l), env(safe-area-inset-right, 0));
+  padding-block-start: var(--nav-inset-top);
+  padding-block-end: var(--space-3);
+  padding-inline-start: var(--nav-inset-left);
+  padding-inline-end: var(--nav-inset-right);
   /* Width of each edge fade. Set to 0 by default; the .scrollable* modifiers
      below switch them on. The .topBar mask-image (in common.module.css) reads
      these via inheritance — no descendant selectors needed across modules. */

@@ -183,6 +183,9 @@ a {
   --space-8: 48px;
   --space-9: 64px;
   --page-gutter: var(--space-7);
+  --nav-inset-top: max(var(--space-3), env(safe-area-inset-top, 0px));
+  --nav-inset-left: max(var(--size-20), env(safe-area-inset-left, 0px));
+  --nav-inset-right: max(var(--size-20), env(safe-area-inset-right, 0px));
   --section-gap: var(--space-8);
   --panel-padding: var(--space-4);
   --control-padding-inline: var(--space-3);
