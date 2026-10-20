@@ -327,3 +327,20 @@ test("game setup choices survive a page reload", async ({ page }) => {
     "true",
   );
 });
+
+for (const width of [1440, 390]) {
+  test(`Cross Exposure keeps the board still when a hint places a photograph at ${width}px`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 1000 });
+    await gotoHydrated(page, "/fun/cross-exposure");
+    await page.getByRole("button", { name: "Start crossing", exact: true }).click();
+    const board = page.getByRole("region", { name: "Crossword board" });
+    const before = (await board.boundingBox())!;
+    await page.getByRole("button", { name: "Place a photo", exact: true }).click();
+    await expect(page.getByRole("button", { name: /placed by a hint/ })).toBeDisabled();
+    const after = (await board.boundingBox())!;
+    expect(Math.abs(after.y - before.y)).toBeLessThanOrEqual(1);
+    expect(Math.abs(after.height - before.height)).toBeLessThanOrEqual(1);
+  });
+}

@@ -338,7 +338,7 @@ it("marks fixed photographs, rejects their drops and ignores unrelated dragged d
   fireEvent.click(screen.getByRole("button", { name: "Start crossing" }));
   const fixed = screen.getByRole("button", { name: /Row 1; column A/ });
   expect(fixed).toHaveAttribute("draggable", "false");
-  expect(within(fixed).getByText("Fixed")).toBeTruthy();
+  expect(fixed).toHaveAccessibleName(/fixed starting photograph/);
   const transfer = dragTransfer();
   fireEvent.dragStart(screen.getByRole("button", { name: "Select photograph 1" }), {
     dataTransfer: transfer,

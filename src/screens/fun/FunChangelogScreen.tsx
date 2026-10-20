@@ -13,6 +13,19 @@ export default function FunChangelogScreen() {
       <Heading level={1} as="h1">
         Game changelog
       </Heading>
+      <section className={styles.entry} aria-labelledby="release-2026-10-20">
+        <Heading level={2} as="h2">
+          <time id="release-2026-10-20" dateTime="2026-10-20">
+            20 October 2026
+          </time>
+        </Heading>
+        <ul>
+          <li>
+            Cross Exposure keeps the board in place when a hint places a photograph. Fixed
+            photographs have an accented border instead of a badge over the image.
+          </li>
+        </ul>
+      </section>
       <section className={styles.entry} aria-labelledby="release-2026-10-19">
         <Heading level={2} as="h2">
           <time id="release-2026-10-19" dateTime="2026-10-19">

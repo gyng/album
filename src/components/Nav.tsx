@@ -1,5 +1,5 @@
-import { AppLink as Link } from "./platform";
-import { useEffect, useRef, useState } from "react";
+import { AppLink as Link, useAfterNavigation } from "./platform";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { inlineScrollForWheel } from "../util/navWheel";
 import { useNavPositionMotion } from "./useNavPositionMotion";
 import styles from "./Nav.module.css";
@@ -27,7 +27,8 @@ export const Nav: React.FC<{
   const ulRef = useRef<HTMLUListElement>(null);
   const appearanceRef = useRef<HTMLDivElement>(null);
   const trailingRef = useRef<HTMLDivElement>(null);
-  useNavPositionMotion(ulRef, "left");
+  const continuedScroll = useNavPositionMotion(ulRef, "left");
+  const navigated = useRef(false);
   useNavPositionMotion(appearanceRef, "right", "right");
   useNavPositionMotion(trailingRef, "trailing", "right");
   // Whether the scrolling nav has hidden content beyond the left/right edges.
@@ -69,26 +70,52 @@ export const Nav: React.FC<{
     };
   }, []);
 
-  // On narrow viewports the nav is a horizontal scroller; the active pill can
-  // start off-screen (e.g. "Map" on /map). Bring it into view on mount so the
-  // current page is visible without scrolling. An animated mount-time reveal
-  // can be interrupted by focus moving into the page, leaving the pill clipped.
+  // Keep active-link reveals local to the strip; scrolling an ancestor here
+  // can undo the renderer's page-scroll restoration during history navigation.
+  const revealActive = useCallback(() => {
+    const ul = ulRef.current;
+    const active = ul?.querySelector<HTMLElement>('[aria-current="page"], [aria-current="true"]');
+    if (!ul || !active) return;
+    const strip = ul.getBoundingClientRect();
+    const link = active.getBoundingClientRect();
+    const delta =
+      link.left < strip.left ? link.left - strip.left : Math.max(0, link.right - strip.right);
+    if (!delta) return;
+    ul.scrollTo({
+      left: ul.scrollLeft + delta,
+      behavior:
+        (continuedScroll.current || navigated.current) &&
+        !window.matchMedia("(prefers-reduced-motion: reduce)").matches
+          ? "smooth"
+          : "instant",
+    });
+  }, [continuedScroll]);
+  const revealFrame = useRef<number | null>(null);
+  const revealAfterNavigation = useCallback(() => {
+    navigated.current = true;
+    if (revealFrame.current !== null) cancelAnimationFrame(revealFrame.current);
+    revealFrame.current = requestAnimationFrame(() => {
+      revealFrame.current = null;
+      revealActive();
+    });
+  }, [revealActive]);
+  useAfterNavigation(revealAfterNavigation);
   useEffect(() => {
-    const ul = ulRef.current!;
-    const active = ul.querySelector<HTMLElement>('[aria-current="page"], [aria-current="true"]');
-    if (!active) return;
     let cancelled = false;
-    const reveal = () => {
-      if (cancelled) return;
-      active.scrollIntoView({ inline: "nearest", block: "nearest", behavior: "auto" });
+    revealActive();
+    void document.fonts?.ready.then(() => {
+      if (!cancelled) revealActive();
+    });
+    const restore = (event: PageTransitionEvent) => {
+      if (event.persisted) revealAfterNavigation();
     };
-    reveal();
-    // Theme fonts can change both pill widths and the pinned picker's width.
-    void document.fonts?.ready.then(reveal);
+    window.addEventListener("pageshow", restore);
     return () => {
       cancelled = true;
+      if (revealFrame.current !== null) cancelAnimationFrame(revealFrame.current);
+      window.removeEventListener("pageshow", restore);
     };
-  }, []);
+  }, [revealActive, revealAfterNavigation]);
 
   const skipToContent: React.MouseEventHandler<HTMLAnchorElement> = (event) => {
     const main = document.querySelector("main");

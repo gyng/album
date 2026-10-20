@@ -54,11 +54,6 @@
   block-size: 100%;
   object-fit: contain;
 }
-.hintFeedback {
-  display: block;
-  margin-block-end: var(--space-2);
-  overflow-wrap: anywhere;
-}
 .boardScroll {
   overflow-x: auto;
   min-inline-size: 0;
@@ -153,27 +148,8 @@
 }
 .fixed {
   border-width: var(--line-strong);
-  border-color: var(--c-border-hover);
-  background: var(--c-surface);
-}
-.seedMark {
-  position: absolute;
-  inset-block-end: var(--size-2);
-  inset-inline-start: var(--size-2);
-  display: flex;
-  align-items: center;
-  gap: var(--space-1);
-  padding: var(--size-2) var(--space-1);
-  border: var(--line-hairline) solid var(--c-border-hover);
-  border-radius: var(--radius-control);
-  background: var(--c-bg);
-  color: var(--c-font);
-  font-size: var(--fs-xs);
-  font-weight: 600;
-}
-.seedMark svg {
-  inline-size: 0.9rem;
-  block-size: 0.9rem;
+  border-color: var(--c-accent);
+  background: var(--c-selected);
 }
 .dragging {
   opacity: 0.4;
@@ -318,12 +294,6 @@
   .clueKey li {
     overflow-wrap: anywhere;
     margin-block-start: var(--space-1);
-  }
-  .seedMark span {
-    display: none;
-  }
-  .seedMark {
-    padding: 1px;
   }
   .selectedPreview {
     display: grid;

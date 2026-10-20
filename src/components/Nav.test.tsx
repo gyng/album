@@ -10,12 +10,37 @@ jest.mock("./ThemeToggle", () => ({ ThemeToggle: () => <button type="button">The
 
 describe("Nav", () => {
   const scrollIntoView = jest.fn();
+  const scrollTo = jest.fn(function (this: HTMLElement, options: ScrollToOptions) {
+    this.scrollLeft = options.left ?? this.scrollLeft;
+  });
   const observe = jest.fn();
   const disconnect = jest.fn();
   let resize: (() => void) | undefined;
 
   beforeEach(() => {
     scrollIntoView.mockClear();
+    scrollTo.mockClear();
+    Object.defineProperty(HTMLElement.prototype, "scrollTo", {
+      configurable: true,
+      value: scrollTo,
+    });
+    jest.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (
+      this: HTMLElement,
+    ) {
+      const x = this.matches("a[aria-current]") ? 150 : 0;
+      const width = this.matches("a[aria-current]") ? 50 : 100;
+      return {
+        x,
+        y: 0,
+        left: x,
+        right: x + width,
+        top: 0,
+        bottom: 44,
+        width,
+        height: 44,
+        toJSON: () => ({}),
+      };
+    });
     observe.mockClear();
     disconnect.mockClear();
     Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
@@ -58,11 +83,7 @@ describe("Nav", () => {
       "/slideshow/shell?filter=test+manifest",
     );
     expect(screen.getByText("Extra action")).toBeInTheDocument();
-    expect(scrollIntoView).toHaveBeenCalledWith({
-      inline: "nearest",
-      block: "nearest",
-      behavior: "auto",
-    });
+    expect(screen.getByRole("list").scrollLeft).toBe(100);
     expect(observe).toHaveBeenCalledWith(screen.getByRole("list"));
 
     view.unmount();
@@ -150,13 +171,24 @@ describe("Nav", () => {
         }
       />,
     );
-    expect(scrollIntoView).toHaveBeenCalledWith(expect.objectContaining({ inline: "nearest" }));
+    expect(screen.getByRole("list").scrollLeft).toBe(100);
+  });
+
+  it("smoothly reveals the active link after a history restoration", async () => {
+    render(<Nav isHome />);
+    scrollTo.mockClear();
+    screen.getByRole("list").scrollLeft = 0;
+    await act(async () => {
+      window.dispatchEvent(new PageTransitionEvent("pageshow", { persisted: true }));
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+    });
+    expect(scrollTo).toHaveBeenCalledWith(expect.objectContaining({ behavior: "smooth" }));
   });
 
   it("honours reduced-motion when revealing the current page", () => {
     jest.mocked(window.matchMedia).mockReturnValue({ matches: true } as MediaQueryList);
     render(<Nav isHome />);
 
-    expect(scrollIntoView).toHaveBeenCalledWith(expect.objectContaining({ behavior: "auto" }));
+    expect(scrollTo).toHaveBeenCalledWith(expect.objectContaining({ behavior: "instant" }));
   });
 });

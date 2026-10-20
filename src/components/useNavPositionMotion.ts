@@ -1,6 +1,13 @@
 import { useCallback, useLayoutEffect, useRef, type RefObject } from "react";
 
-type Position = { x: number; y: number; path: string; at: number; viewport: number };
+type Position = {
+  x: number;
+  y: number;
+  path: string;
+  at: number;
+  viewport: number;
+  scrollLeft?: number;
+};
 const STORAGE_KEY = "gallery-nav-position";
 type Region = "left" | "right" | "trailing";
 const lastPositions = new Map<Region, Position>();
@@ -14,6 +21,7 @@ export const useNavPositionMotion = (
 ) => {
   const previous = useRef<Position | null>(null);
   const animation = useRef<Animation | null>(null);
+  const continued = useRef(false);
   const measure = useCallback(
     (visual = false): Position | null => {
       const node = ref.current;
@@ -38,9 +46,10 @@ export const useNavPositionMotion = (
         path: window.location.pathname,
         at: Date.now(),
         viewport: window.innerWidth,
+        ...(region === "left" ? { scrollLeft: node.scrollLeft } : {}),
       };
     },
-    [ref, edge],
+    [ref, edge, region],
   );
   const updatePosition = useCallback(
     (restored = false) => {
@@ -76,6 +85,10 @@ export const useNavPositionMotion = (
           (carried && from.path === target.path))
       )
         from = null;
+      if (carried && from && region === "left" && Number.isFinite(from.scrollLeft)) {
+        node.scrollLeft = from.scrollLeft!;
+        continued.current = true;
+      }
       previous.current = target;
       if (!from || !node.animate || window.matchMedia("(prefers-reduced-motion: reduce)").matches)
         return;
@@ -120,4 +133,5 @@ export const useNavPositionMotion = (
       window.removeEventListener("pageshow", restore);
     };
   }, [measure, region, updatePosition]);
+  return continued;
 };

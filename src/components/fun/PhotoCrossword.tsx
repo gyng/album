@@ -74,7 +74,6 @@ export const PhotoCrossword = ({ photos }: { photos: PhotoGamePhoto[] }) => {
   const todaysResult = stats?.dailies[today.day];
   const dailyRequested = useRef(false);
   const [revealedClues, setRevealedClues] = useState<CrosswordClueCoordinate[]>([]);
-  const [lastHint, setLastHint] = useState<string | null>(null);
   // Squares a hint has filled for the player, locked like the starting photographs.
   const [placedByHint, setPlacedByHint] = useState<number[]>([]);
   const [puzzle, setPuzzle] = useState<PhotoCrosswordPuzzle | null>(null);
@@ -169,7 +168,6 @@ export const PhotoCrossword = ({ photos }: { photos: PhotoGamePhoto[] }) => {
     setPuzzle(next);
     setTiles(next.tiles);
     setRevealedClues([]);
-    setLastHint(null);
     setPlacedByHint([]);
     const seeds = new Set(crosswordSeedIndices(next.size, roundSettings.prefill));
     setCells(
@@ -258,7 +256,6 @@ export const PhotoCrossword = ({ photos }: { photos: PhotoGamePhoto[] }) => {
     setChecked(null);
     const question = (next.axis === "row" ? puzzle.rows : puzzle.columns)[next.index]!;
     const clue = `${next.axis === "row" ? `Row ${next.index + 1}` : `Column ${columnLetter(next.index)}`} · ${crosswordClue(question)}`;
-    setLastHint(clue);
     setMessage(
       `${clue}. ${remainingHints - 1} ${remainingHints - 1 === 1 ? "clue" : "clues"} still hidden.`,
     );
@@ -286,7 +283,6 @@ export const PhotoCrossword = ({ photos }: { photos: PhotoGamePhoto[] }) => {
     setSelected(null);
     setChecked(null);
     const square = `Row ${Math.floor(nextPlacement / size) + 1}, column ${columnLetter(nextPlacement % size)}`;
-    setLastHint(`${square} · placed`);
     setMessage(`A photograph is placed and locked in ${square}.`);
   };
   const label = (index: number) =>
@@ -531,9 +527,6 @@ export const PhotoCrossword = ({ photos }: { photos: PhotoGamePhoto[] }) => {
               </Button>
             ) : null}
           </div>
-          {lastHint && !finished ? (
-            <Caption className={styles.hintFeedback}>{lastHint}</Caption>
-          ) : null}
           <div className={styles.boardScroll} role="region" aria-label="Crossword board">
             <table className={styles.board} style={{ "--crossword-size": size } as CSSProperties}>
               <colgroup>
@@ -648,21 +641,6 @@ export const PhotoCrossword = ({ photos }: { photos: PhotoGamePhoto[] }) => {
                             {checked && cells[index] ? (
                               <span className={styles.mark} aria-hidden="true">
                                 {checked[index] ? "✓" : "×"}
-                              </span>
-                            ) : null}
-                            {isFixed(index) && !finished ? (
-                              <span className={styles.seedMark} aria-hidden="true">
-                                <svg
-                                  viewBox="0 0 24 24"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  strokeWidth="2"
-                                  aria-hidden="true"
-                                >
-                                  <rect x="5" y="10" width="14" height="11" rx="2" />
-                                  <path d="M8 10V7a4 4 0 0 1 8 0v3" />
-                                </svg>
-                                <span>Fixed</span>
                               </span>
                             ) : null}
                           </button>

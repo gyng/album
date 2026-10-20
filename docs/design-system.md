@@ -123,9 +123,11 @@ machines to achieve a visual change.
 
 ### Navigation
 
-- Reveal the active navigation item without animation on mount, then recheck
-  after theme fonts settle; opening a game or moving focus must not leave it
-  clipped. Scrolling game subnavs also keep their active link visible.
+- Reveal the active navigation item without animation on initial load, then
+  recheck after theme fonts settle. Route changes retain the link strip’s scroll
+  position and smoothly reveal the new active link; reduced motion reveals it
+  immediately. Scroll only the strip, preserving the page’s vertical position;
+  opening a game or moving focus must not leave the active link clipped. Scrolling game subnavs also keep their active link visible.
 - Position changes use independent measured 180ms translations for the link
   list, trailing controls and appearance controls, including the map-to-page
   switch and Guess Where's move into its viewport layout. Initial loads stay

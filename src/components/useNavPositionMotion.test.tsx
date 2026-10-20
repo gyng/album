@@ -265,3 +265,27 @@ it("animates a restored history page from the latest other document's position",
   rect.mockRestore();
   match.mockRestore();
 });
+
+it("preserves the link strip's scroll position across a route change", () => {
+  sessionStorage.clear();
+  history.replaceState(null, "", "/nav-strip-before");
+  const rect = jest.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({
+    x: 24,
+    y: 24,
+    width: 200,
+    height: 44,
+    top: 24,
+    bottom: 68,
+    left: 24,
+    right: 224,
+    toJSON: () => ({}),
+  });
+  const first = render(<Harness layout="regular" />);
+  first.container.querySelector<HTMLElement>('[data-region="left"]')!.scrollLeft = 96;
+  first.unmount();
+  history.replaceState(null, "", "/nav-strip-after");
+  const next = render(<Harness layout="regular" />);
+  expect(next.container.querySelector<HTMLElement>('[data-region="left"]')!.scrollLeft).toBe(96);
+  next.unmount();
+  rect.mockRestore();
+});
