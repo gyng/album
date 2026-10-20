@@ -21,6 +21,8 @@ export const useNavPositionMotion = (
 ) => {
   const previous = useRef<Position | null>(null);
   const animation = useRef<Animation | null>(null);
+  const startFrame = useRef<number | null>(null);
+  const idleStart = useRef<number | null>(null);
   const continued = useRef(false);
   const measure = useCallback(
     (visual = false): Position | null => {
@@ -96,10 +98,38 @@ export const useNavPositionMotion = (
         dy = from.y - target.y;
       if (Math.hypot(dx, dy) < 0.5) return;
       animation.current?.cancel();
-      animation.current = node.animate(
+      if (startFrame.current !== null) cancelAnimationFrame(startFrame.current);
+      if (idleStart.current !== null) window.cancelIdleCallback(idleStart.current);
+      const motion = node.animate(
         [{ transform: `translate(${dx}px, ${dy}px)` }, { transform: "translate(0, 0)" }],
         { duration: 180, easing: "cubic-bezier(0.22, 0.61, 0.36, 1)" },
       );
+      // Mount effects and the first layout can occupy the entire duration on
+      // Explore. Paint the carried position and let startup work settle before
+      // starting its animation clock.
+      motion.pause();
+      motion.currentTime = 0;
+      animation.current = motion;
+      const play = () => {
+        startFrame.current = requestAnimationFrame(() => {
+          startFrame.current = null;
+          if (animation.current === motion) motion.play();
+        });
+      };
+      startFrame.current = requestAnimationFrame(() => {
+        startFrame.current = null;
+        if (typeof window.requestIdleCallback === "function") {
+          idleStart.current = window.requestIdleCallback(
+            () => {
+              idleStart.current = null;
+              play();
+            },
+            { timeout: 1000 },
+          );
+        } else {
+          play();
+        }
+      });
     },
     [measure, ref, region],
   );
@@ -107,7 +137,12 @@ export const useNavPositionMotion = (
   useLayoutEffect(() => {
     const save = () => {
       const measured = measure(true) ?? previous.current;
+      if (startFrame.current !== null) cancelAnimationFrame(startFrame.current);
+      startFrame.current = null;
+      if (idleStart.current !== null) window.cancelIdleCallback(idleStart.current);
+      idleStart.current = null;
       animation.current?.cancel();
+      animation.current = null;
       // Client navigation updates the URL before unmounting the old screen.
       // Keep the path belonging to the measured nav, rather than the new URL.
       const lastPosition = measured

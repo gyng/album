@@ -131,7 +131,9 @@ machines to achieve a visual change.
 - Position changes use independent measured 180ms translations for the link
   list, trailing controls and appearance controls, including the map-to-page
   switch and Guess Where's move into its viewport layout. Initial loads stay
-  still and reduced motion skips the translation. Right controls anchor to their
+  still and reduced motion skips the translation. Hold the previous position
+  through the destination’s first paint and wait for startup work to yield before
+  starting the animation clock. Right controls anchor to their
   right edge, so a wider appearance group does not move the theme selector.
   Sticky nav regions use viewport coordinates in these animations; ordinary
   desktop nav uses document coordinates.

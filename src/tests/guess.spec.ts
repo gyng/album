@@ -94,7 +94,10 @@ test("Guess Where keeps the regular nav until play and respects reduced motion w
             (node) =>
               node
                 .getAnimations({ subtree: true })
-                .filter((animation) => animation.playState === "running").length,
+                .filter(
+                  (animation) =>
+                    animation.playState === "running" || animation.playState === "paused",
+                ).length,
           ),
       )
       .toBe(0);
@@ -173,7 +176,12 @@ test("navigation moves between the map and regular pages in both directions", as
         .locator('[data-nav-motion-region="right"]')
         .evaluate(
           (node) =>
-            node.getAnimations().filter((animation) => animation.playState === "running").length,
+            node
+              .getAnimations()
+              .filter(
+                (animation) =>
+                  animation.playState === "running" || animation.playState === "paused",
+              ).length,
         ),
     )
     .toBe(0);

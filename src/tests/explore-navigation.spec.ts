@@ -207,8 +207,12 @@ for (const source of ["/", "/album/test-simple"]) {
           .poll(() =>
             strip.evaluate(
               (node) =>
-                node.getAnimations().filter((animation) => animation.playState === "running")
-                  .length,
+                node
+                  .getAnimations()
+                  .filter(
+                    (animation) =>
+                      animation.playState === "running" || animation.playState === "paused",
+                  ).length,
             ),
           )
           .toBe(0);
@@ -261,3 +265,58 @@ for (const source of ["/", "/album/test-simple"]) {
     });
   }
 }
+
+test("album to Explore paints intermediate nav positions after expensive mount work", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await page.addInitScript(() => {
+    // Leave the native animation clock untouched: checking only its first
+    // keyframe misses a transition whose entire duration passes before paint.
+    // oxlint-disable-next-line typescript/unbound-method
+    const original = Element.prototype.animate;
+    Element.prototype.animate = function (frames, options) {
+      const animation = original.call(this, frames, options);
+      if (
+        location.pathname === "/explore" &&
+        this.getAttribute("data-nav-motion-region") === "left"
+      ) {
+        requestAnimationFrame(() => {
+          // Deterministically model a heavy Explore mount occupying the first frame.
+          const until = performance.now() + 250;
+          while (performance.now() < until) {
+            /* deliberate main-thread load */
+          }
+          const positions: number[] = [];
+          const sample = () => {
+            positions.push(this.getBoundingClientRect().y);
+            if (positions.length < 25) requestAnimationFrame(sample);
+            else document.documentElement.dataset.navPaintPositions = JSON.stringify(positions);
+          };
+          requestAnimationFrame(sample);
+        });
+      }
+      return animation;
+    };
+  });
+  await gotoHydrated(page, "/album/test-simple");
+  const nav = page.locator('[data-nav-motion-region="left"]');
+  const before = (await nav.boundingBox())!.y;
+  await page
+    .getByRole("navigation")
+    .first()
+    .getByRole("link", { name: "Explore", exact: true })
+    .click();
+  await expect(page.locator("html")).toHaveAttribute("data-nav-paint-positions", /\[/);
+  const positions: number[] = JSON.parse(
+    (await page.locator("html").getAttribute("data-nav-paint-positions"))!,
+  );
+  const after = (await nav.boundingBox())!.y;
+  expect(after - before).toBeGreaterThan(10);
+  const intermediate = positions.filter((y) => y > before + 2 && y < after - 2);
+  expect(
+    new Set(intermediate.map((y) => Math.round(y))).size,
+    JSON.stringify({ before, after, positions }),
+  ).toBeGreaterThanOrEqual(2);
+});

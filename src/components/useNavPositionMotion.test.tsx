@@ -22,7 +22,7 @@ it("moves the two edges independently, anchors a wider appearance group at its r
   const cancel = jest.fn();
   const animate = jest.fn(
     (_frames: Keyframe[], _options?: KeyframeAnimationOptions) =>
-      ({ cancel }) as unknown as Animation,
+      ({ cancel, pause: jest.fn(), play: jest.fn() }) as unknown as Animation,
   );
   Object.defineProperty(HTMLElement.prototype, "animate", { configurable: true, value: animate });
   const match = jest
@@ -79,7 +79,10 @@ it("retains the presented position when navigation interrupts an unfinished anim
   const cancel = () => {
     translation = 0;
   };
-  const animate = jest.fn((_frames: Keyframe[]) => ({ cancel }) as unknown as Animation);
+  const animate = jest.fn(
+    (_frames: Keyframe[]) =>
+      ({ cancel, pause: jest.fn(), play: jest.fn() }) as unknown as Animation,
+  );
   Object.defineProperty(HTMLElement.prototype, "animate", { configurable: true, value: animate });
   const match = jest
     .spyOn(window, "matchMedia")
@@ -161,7 +164,9 @@ describe("positions that are not a navigation", () => {
   beforeEach(() => {
     sessionStorage.clear();
     target = 100;
-    animate = jest.fn(() => ({ cancel: () => {} }) as unknown as Animation);
+    animate = jest.fn(
+      () => ({ cancel: () => {}, pause: jest.fn(), play: jest.fn() }) as unknown as Animation,
+    );
     Object.defineProperty(HTMLElement.prototype, "animate", { configurable: true, value: animate });
     match = jest.spyOn(window, "matchMedia").mockReturnValue({ matches: false } as MediaQueryList);
     rect = jest.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(() => ({
@@ -225,7 +230,9 @@ describe("positions that are not a navigation", () => {
 it("animates a restored history page from the latest other document's position", () => {
   sessionStorage.clear();
   history.replaceState(null, "", "/restored-search");
-  const animate = jest.fn(() => ({ cancel: jest.fn() }) as unknown as Animation);
+  const animate = jest.fn(
+    () => ({ cancel: jest.fn(), pause: jest.fn(), play: jest.fn() }) as unknown as Animation,
+  );
   Object.defineProperty(HTMLElement.prototype, "animate", { configurable: true, value: animate });
   const match = jest
     .spyOn(window, "matchMedia")
