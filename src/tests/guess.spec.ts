@@ -219,6 +219,23 @@ test("navigation moves between the map and regular pages in both directions", as
   const returningTheme = inward.find((event) => event.path === "/fun" && event.region === "right")!;
   expect(returningTheme.dx).toBeGreaterThan(0);
   expect(Math.abs(returningTheme.theme!.x - mapTheme.x)).toBeLessThanOrEqual(1);
+  // Complete the return move before expecting another full transition. Going
+  // forward while it is still at the map's position legitimately needs no move.
+  await expect
+    .poll(() =>
+      page
+        .locator("[data-nav-motion-region]")
+        .evaluateAll(
+          (nodes) =>
+            nodes
+              .flatMap((node) => node.getAnimations())
+              .filter(
+                (animation) =>
+                  animation.playState === "running" || animation.playState === "paused",
+              ).length,
+        ),
+    )
+    .toBe(0);
   await page.goForward();
   await page.waitForURL(/\/map/);
   await expect

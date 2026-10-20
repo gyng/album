@@ -133,7 +133,8 @@ machines to achieve a visual change.
   switch and Guess Where's move into its viewport layout. Initial loads stay
   still and reduced motion skips the translation. Hold the previous position
   through the destination’s first paint and wait for startup work to yield before
-  starting the animation clock. Right controls anchor to their
+  starting the animation clock. Continuous cloud redraws yield while navigation
+  is moving so they cannot consume the animation’s frames. Right controls anchor to their
   right edge, so a wider appearance group does not move the theme selector.
   Sticky nav regions use viewport coordinates in these animations; ordinary
   desktop nav uses document coordinates.

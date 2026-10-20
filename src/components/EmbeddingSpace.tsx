@@ -641,6 +641,20 @@ export const EmbeddingSpace: React.FC<EmbeddingSpaceProps> = ({ className, heigh
     let previous = 0;
 
     const draw = (time: number) => {
+      // The cloud can fill every frame on a large archive. Let navigation paint
+      // and finish its move before resuming this continuous canvas work.
+      const navigationMoving = Array.from(
+        document.querySelectorAll<HTMLElement>("[data-nav-motion-region]"),
+      ).some((region) =>
+        region
+          .getAnimations()
+          .some((motion) => motion.playState === "running" || motion.playState === "paused"),
+      );
+      if (navigationMoving) {
+        previous = 0;
+        frame = requestAnimationFrame(draw);
+        return;
+      }
       const elapsed = previous === 0 ? 0 : Math.min(0.05, (time - previous) / 1000);
       previous = time;
 

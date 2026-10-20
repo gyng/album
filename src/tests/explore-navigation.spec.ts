@@ -275,6 +275,25 @@ test("album to Explore paints intermediate nav positions after expensive mount w
     // Leave the native animation clock untouched: checking only its first
     // keyframe misses a transition whose entire duration passes before paint.
     // oxlint-disable-next-line typescript/unbound-method
+    // Observe whether the decorative canvas keeps drawing over a nav move.
+    // oxlint-disable-next-line typescript/unbound-method
+    const clear = CanvasRenderingContext2D.prototype.clearRect;
+    CanvasRenderingContext2D.prototype.clearRect = function (...args) {
+      if (this.canvas.getAttribute("aria-label")?.includes("photographs arranged")) {
+        const moving = Array.from(document.querySelectorAll("[data-nav-motion-region]")).some(
+          (region) =>
+            region
+              .getAnimations()
+              .some((motion) => motion.playState === "running" || motion.playState === "paused"),
+        );
+        const key = moving ? "cloudMovingPaints" : "cloudRestPaints";
+        document.documentElement.dataset[key] = String(
+          Number(document.documentElement.dataset[key] ?? 0) + 1,
+        );
+      }
+      return clear.apply(this, args);
+    };
+    // oxlint-disable-next-line typescript/unbound-method
     const original = Element.prototype.animate;
     Element.prototype.animate = function (frames, options) {
       const animation = original.call(this, frames, options);
@@ -300,6 +319,25 @@ test("album to Explore paints intermediate nav positions after expensive mount w
       return animation;
     };
   });
+  await page.route("**/data/embedding-space.json", (route) =>
+    route.fulfill({
+      json: {
+        points: [
+          {
+            src: "/data/albums/test-simple/.resized_images/DSCF0506-2.jpg%40800.avif",
+            href: "/album/test-simple#DSCF0506-2.jpg",
+            label: "Test photograph",
+            x: 0,
+            y: 0,
+            z: 0,
+          },
+        ],
+        clusters: [],
+        axisScale: { x: 1, y: 1, z: 1 },
+        atlas: null,
+      },
+    }),
+  );
   await gotoHydrated(page, "/album/test-simple");
   const nav = page.locator('[data-nav-motion-region="left"]');
   const before = (await nav.boundingBox())!.y;
@@ -319,4 +357,17 @@ test("album to Explore paints intermediate nav positions after expensive mount w
     new Set(intermediate.map((y) => Math.round(y))).size,
     JSON.stringify({ before, after, positions }),
   ).toBeGreaterThanOrEqual(2);
+  const root = page.locator("html");
+  await expect
+    .poll(async () => Number(await root.getAttribute("data-cloud-rest-paints")))
+    .toBeGreaterThan(0);
+  await page.goBack();
+  await expect(page.getByRole("group", { name: "Album navigation" }).first()).toBeAttached();
+  await page.goForward();
+  await expect(page.getByRole("navigation", { name: "Explore views" })).toBeVisible();
+  await expect.poll(() => nav.evaluate((node) => node.getAnimations().length)).toBe(0);
+  await expect
+    .poll(async () => Number(await root.getAttribute("data-cloud-rest-paints")))
+    .toBeGreaterThan(0);
+  expect(Number(await root.getAttribute("data-cloud-moving-paints"))).toBe(0);
 });
