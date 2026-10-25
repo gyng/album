@@ -7,6 +7,7 @@ import { renderWithNextPlatform as render } from "../../renderWithNextPlatform";
 
 const push = jest.fn();
 const replace = jest.fn();
+const mockRouterEvents = { on: jest.fn(), off: jest.fn() };
 let mockQuery: Record<string, string> = {};
 let mockRouterReady = true;
 
@@ -16,6 +17,7 @@ jest.mock("../../../services/album", () => ({
 
 jest.mock("next/router", () => ({
   useRouter: () => ({
+    events: mockRouterEvents,
     query: mockQuery,
     isReady: mockRouterReady,
     push,

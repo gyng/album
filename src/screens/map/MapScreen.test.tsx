@@ -8,6 +8,7 @@ import type { MapWorldEntry } from "../../util/pageDataTypes";
 
 const push = jest.fn();
 const replace = jest.fn();
+const mockRouterEvents = { on: jest.fn(), off: jest.fn() };
 let mockQuery: Record<string, string> = {};
 // A statically optimised Next page does not know its query on the first client
 // render: `isReady` flips a tick later. Mutable so a test can live in that gap.
@@ -25,6 +26,7 @@ jest.mock("../../util/mapSearchIndex", () => ({
 
 jest.mock("next/router", () => ({
   useRouter: () => ({
+    events: mockRouterEvents,
     query: mockQuery,
     isReady: mockRouterReady,
     push,
