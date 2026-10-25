@@ -338,7 +338,7 @@ describe("publish wizard orchestration", () => {
     );
     expect(harness.services.runShellCommand).toHaveBeenLastCalledWith({
       command:
-        "node ./bin/write-game-metadata.cjs && npx --yes vercel@latest deploy --prebuilt --prod",
+        "node ./bin/write-game-metadata.cjs && npx --yes vercel@latest deploy --prebuilt --prod && node ./bin/prune-vercel-deployments.cjs",
       cwd: "/src",
     });
     expect(harness.log).toHaveBeenCalledWith(expect.stringContaining("Publish wizard complete"));
@@ -355,7 +355,7 @@ describe("publish wizard orchestration", () => {
     expect(harness.services.askYesNo).not.toHaveBeenCalled();
     expect(harness.services.runShellCommand).toHaveBeenLastCalledWith({
       command:
-        "node ./bin/write-game-metadata.cjs && npx --yes vercel@latest deploy --prebuilt --prod",
+        "node ./bin/write-game-metadata.cjs && npx --yes vercel@latest deploy --prebuilt --prod && node ./bin/prune-vercel-deployments.cjs",
       cwd: "/src",
     });
   });

@@ -201,13 +201,24 @@ elsewhere &mdash; this is a standard Next.js application.
    $ ./album publish -- --interactive   # older step-by-step prompting
    $ ./album publish -- --dry-run       # preflight only
 
-   # Underneath, unchanged
+   # Underneath
    $ npx vercel@latest build --prod
-   $ node bin/write-game-metadata.cjs && npx vercel@latest deploy --prebuilt --prod
+   $ node bin/write-game-metadata.cjs && npx vercel@latest deploy --prebuilt --prod && node bin/prune-vercel-deployments.cjs
 
    # Everything together without prompts
    $ ./album index && ./album deploy
    ```
+
+   Deploy, publish and `npm run deploy:vercel` keep only the live production
+   deployment after a successful upload. Cleanup uses the linked Vercel project
+   and team, verifies the live domain, and protects active aliases. It stops if
+   another deployment is still building or production changes during the check.
+   Vercel's built-in Hobby retention protects three recent deployments, so this
+   cleanup runs locally rather than relying on that policy. Running Vercel's
+   deploy command directly bypasses it; run
+   `node bin/prune-vercel-deployments.cjs` from `src/` afterwards, or add
+   `--dry-run` to preview cleanup. Superseded deployments are no longer available
+   for rollback.
 
    Deploy and publish stamp `/fun/meta.json` into the prebuilt output immediately
    before upload. It follows the games-index metadata contract: schema version 1,

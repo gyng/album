@@ -49,12 +49,19 @@ describe("vercel target", () => {
     (skipBuild) => {
       const steps = vercel.planSteps({ args: { skipBuild }, context });
       expect(steps.find((step) => step.label === "deploy").command).toBe(
-        "node ./bin/write-game-metadata.cjs && npx --yes vercel@latest deploy --prebuilt --prod",
+        "node ./bin/write-game-metadata.cjs && npx --yes vercel@latest deploy --prebuilt --prod && node ./bin/prune-vercel-deployments.cjs",
       );
     },
   );
 
   it("checks credentials before any long step", () => {
     expect(vercel.preflightCommand({ args: {}, context })).toContain("whoami");
+  });
+
+  it("also prunes after successful uploads through the npm deployment command", () => {
+    const command = require("../../../package.json").scripts["deploy:vercel"];
+    expect(command).toMatch(
+      /deploy --prebuilt --prod && node \.\/bin\/prune-vercel-deployments\.cjs$/,
+    );
   });
 });

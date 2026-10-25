@@ -200,7 +200,7 @@ const main = async ({ args, context, services, now, log, error, setExitCode }) =
 
   await services.runShellCommand({
     command:
-      "node ./bin/write-game-metadata.cjs && npx --yes vercel@latest deploy --prebuilt --prod",
+      "node ./bin/write-game-metadata.cjs && npx --yes vercel@latest deploy --prebuilt --prod && node ./bin/prune-vercel-deployments.cjs",
     cwd: context.srcDir,
   });
 
