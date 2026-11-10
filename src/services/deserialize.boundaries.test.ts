@@ -151,6 +151,32 @@ describe("deserialisation adapter boundaries", () => {
     expect(result.data).not.toHaveProperty("date");
   });
 
+  it("passes the clip's capture clock, derived zone and GPS to its playable export", async () => {
+    jest.spyOn(fs, "existsSync").mockReturnValue(true);
+    db.rows.mockReturnValue({ tz_offset: "+09:00" });
+    (readVideoPoster as jest.Mock).mockReturnValue({
+      srcset: [],
+      capturedAtLocal: "2026-11-02T22:18:00",
+      latDeg: 33.621,
+      lngDeg: 135.9519,
+    });
+    try {
+      await deserializeVideoBlock(localVideo(), { dirname: "../albums/trip" });
+      expect(mockOptimiseVideo).toHaveBeenCalledWith(
+        "../albums/trip/clip.mp4",
+        "public/data/albums",
+        {
+          capturedAtLocal: "2026-11-02T22:18:00",
+          tzOffset: "+09:00",
+          latDeg: 33.621,
+          lngDeg: 135.9519,
+        },
+      );
+    } finally {
+      (readVideoPoster as jest.Mock).mockReturnValue(null);
+    }
+  });
+
   // A clip's row in the search index is keyed by the clip's own path — the same
   // way a photo's is — and `_build.tags` is what every consumer reads its
   // colours, tags, geocode, weather and derived zone from. Keying it wrongly is

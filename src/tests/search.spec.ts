@@ -29,7 +29,8 @@ const expectJapanResults = async (page: Page) => {
  * fails here.
  */
 const clipResultHref = "/album/test-simple#DSCF0159.MOV";
-const clipPreviewSrc = "/data/albums/test-simple/.resized_videos/DSCF0159.MOV%401920.mp4";
+const clipPreviewSrc =
+  "/data/albums/test-simple/.resized_videos/DSCF0159.MOV%401920-q28.mp4?metadata=1";
 const photoResultHref = "/album/test-simple#DSCF0506-2.jpg";
 
 test.describe("Search", () => {

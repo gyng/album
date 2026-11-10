@@ -7,7 +7,7 @@ import { HoverPlayClip } from "./HoverPlayClip";
 
 const CLIP_PATH = "../albums/trip/clip.mp4";
 /** Where `getResizedAlbumVideoSrc` points a clip: the 1920px transcode beside it. */
-const CLIP_SRC = "/data/albums/trip/.resized_videos/clip.mp4%401920.mp4";
+const CLIP_SRC = "/data/albums/trip/.resized_videos/clip.mp4%401920-q28.mp4?metadata=1";
 const POSTER_SRC = "/data/albums/trip/.resized_images/clip.mp4%40400.avif";
 const YOUTUBE_PATH = "../albums/trip/dQw4w9WgXcQ.youtube";
 

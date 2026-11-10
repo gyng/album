@@ -43,9 +43,18 @@ describe("cleanupOptimisedMedia", () => {
     const keptImage = path.join(imageCacheDir, "kept.jpg@800.avif");
     const staleVideo = path.join(videoCacheDir, "missing.mp4@1920.mp4");
     const oldVideoSize = path.join(videoCacheDir, "clip.mp4@1280.mp4");
-    const keptVideo = path.join(videoCacheDir, "clip.mp4@1920.mp4");
+    const keptVideo = path.join(videoCacheDir, "clip.mp4@1920-q28.mp4");
+    const oldQualityVideo = path.join(videoCacheDir, "clip.mp4@1920-q30.mp4");
 
-    for (const file of [staleImage, oldImageSize, keptImage, staleVideo, oldVideoSize, keptVideo]) {
+    for (const file of [
+      staleImage,
+      oldImageSize,
+      keptImage,
+      staleVideo,
+      oldVideoSize,
+      keptVideo,
+      oldQualityVideo,
+    ]) {
       fs.writeFileSync(file, "cached");
     }
 
@@ -57,6 +66,7 @@ describe("cleanupOptimisedMedia", () => {
     expect(fs.existsSync(staleVideo)).toBe(false);
     expect(fs.existsSync(oldVideoSize)).toBe(false);
     expect(fs.existsSync(keptVideo)).toBe(true);
+    expect(fs.existsSync(oldQualityVideo)).toBe(false);
   });
 
   // A poster frame and its sidecar are named "<video>@poster.jpg"/".json", so

@@ -192,7 +192,7 @@ describe("Albums", () => {
     if (!preview) throw new Error("video element not rendered");
     expect(preview).toHaveAttribute(
       "src",
-      "/data/albums/clips/.resized_videos/sunset.mov%401920.mp4",
+      "/data/albums/clips/.resized_videos/sunset.mov%401920-q28.mp4?metadata=1",
     );
     expect(preview).toHaveAttribute("preload", "none");
     expect(preview).toHaveAttribute("aria-hidden", "true");

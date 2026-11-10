@@ -421,7 +421,8 @@ test("the shell retains a clip's poster still while the runtime plays the clip",
   // The one real clip in the E2E database, addressed by path so the shuffle
   // cannot choose it, with remix off so it is the single slide on screen.
   const clipPath = "../albums/test-simple/DSCF0159.MOV";
-  const clipVideoSrc = "/data/albums/test-simple/.resized_videos/DSCF0159.MOV%401920.mp4";
+  const clipVideoSrc =
+    "/data/albums/test-simple/.resized_videos/DSCF0159.MOV%401920-q28.mp4?metadata=1";
   const clipPosterSrc = "/data/albums/test-simple/.resized_images/DSCF0159.MOV%403200.avif";
   await gotoHydrated(
     page,

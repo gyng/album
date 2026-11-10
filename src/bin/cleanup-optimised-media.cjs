@@ -1,13 +1,14 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const imageOptimisationConfig = require("../services/imageOptimisationConfig.json");
+const videoEncoding = require("../util/videoEncoding.json");
 const {
   PHOTO_EXTENSIONS,
   STALE_TEMP_FILE_THRESHOLD_MS,
 } = require("./prepare-optimised-images.cjs");
 
 const OPTIMISED_IMAGE_SIZES = new Set(imageOptimisationConfig.sizes);
-const OPTIMISED_VIDEO_MAX_WIDTH = 1920;
+const OPTIMISED_VIDEO_MAX_WIDTH = videoEncoding.maxWidth;
 const RESIZED_IMAGE_DIR = ".resized_images";
 const RESIZED_VIDEO_DIR = ".resized_videos";
 const VIDEO_EXTENSIONS = new Set([".mp4", ".mov", ".m4v", ".webm", ".mkv", ".avi"]);
@@ -114,7 +115,8 @@ const parseCacheFileName = (file) => {
 
   return {
     originalName: nameWithoutExt.slice(0, lastAt),
-    size: Number(nameWithoutExt.slice(lastAt + 1)),
+    size: Number(nameWithoutExt.slice(lastAt + 1).split("-q")[0]),
+    quality: Number(nameWithoutExt.slice(lastAt + 1).split("-q")[1]),
   };
 };
 
@@ -338,7 +340,7 @@ const cleanupVideoCache = ({ albumDir, publicAlbumDir }) => {
       continue;
     }
 
-    const { originalName, size } = parseCacheFileName(file);
+    const { originalName, size, quality } = parseCacheFileName(file);
     const sourceName = baseMediaName(originalName);
     const originalFile = path.join(albumDir, sourceName);
 
@@ -370,7 +372,7 @@ const cleanupVideoCache = ({ albumDir, publicAlbumDir }) => {
 
     if (
       VIDEO_EXTENSIONS.has(path.extname(originalFile).toLowerCase()) &&
-      size !== OPTIMISED_VIDEO_MAX_WIDTH
+      (size !== OPTIMISED_VIDEO_MAX_WIDTH || quality !== videoEncoding.crf)
     ) {
       removedUnneeded += removeFileIfExists(cachedFile) ? 1 : 0;
     }

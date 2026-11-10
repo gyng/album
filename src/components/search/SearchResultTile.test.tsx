@@ -322,7 +322,7 @@ describe("SearchResultTile", () => {
     if (!video) throw new Error("video element not rendered");
     expect(video).toHaveAttribute(
       "src",
-      "/data/albums/test-simple/.resized_videos/DSCF0159.MOV%401920.mp4",
+      "/data/albums/test-simple/.resized_videos/DSCF0159.MOV%401920-q28.mp4?metadata=1",
     );
     expect(video).toHaveAttribute("preload", "none");
     expect(video).toHaveAttribute("aria-hidden", "true");
@@ -354,7 +354,7 @@ describe("SearchResultTile", () => {
 
     expect(container.querySelector("video")).toHaveAttribute(
       "src",
-      "/data/albums/test-simple/.resized_videos/clip.mov%401920.mp4",
+      "/data/albums/test-simple/.resized_videos/clip.mov%401920-q28.mp4?metadata=1",
     );
   });
 

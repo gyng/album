@@ -10,10 +10,16 @@ import imageOptimisationConfig from "./imageOptimisationConfig.json";
 import { posterPathsFor, readVideoPosterSidecar } from "./videoPoster";
 import type { OptimisedPhoto } from "./types";
 import type { MovieCamera } from "./movieExif";
+import videoEncoding from "../util/videoEncoding.json";
+import {
+  ensureVideoExportMetadata,
+  videoExportFfmpegArgs,
+  type VideoExportMetadata,
+} from "./videoExportMetadata";
 
-export const OPTIMISED_VIDEO_MAX_WIDTH = 1920;
+export const OPTIMISED_VIDEO_MAX_WIDTH = videoEncoding.maxWidth;
 export const OPTIMISED_VIDEO_PRESET = "medium";
-export const OPTIMISED_VIDEO_CRF = 30;
+export const OPTIMISED_VIDEO_CRF = videoEncoding.crf;
 export const OPTIMISED_VIDEO_AUDIO_BITRATE = "96k";
 export const VIDEO_VALIDATION_SECONDS = "0.25";
 export const VIDEO_VALIDATION_TIMEOUT_MS = 4000;
@@ -372,6 +378,7 @@ export const readVideoPoster = (
 export const optimiseVideo = async (
   videoPath: string,
   outputDirectory: string,
+  captureMetadata: VideoExportMetadata = {},
 ): Promise<OptimisedVideo> => {
   const filename = path.basename(videoPath);
   const dirname = path.dirname(videoPath);
@@ -381,7 +388,7 @@ export const optimiseVideo = async (
   const outputFile = path.join(
     publicAlbumDirectory,
     RESIZED_VIDEO_DIR,
-    `${filename}@${OPTIMISED_VIDEO_MAX_WIDTH}.mp4`,
+    `${filename}@${OPTIMISED_VIDEO_MAX_WIDTH}-q${OPTIMISED_VIDEO_CRF}.mp4`,
   );
 
   fs.mkdirSync(path.join(publicAlbumDirectory, RESIZED_VIDEO_DIR), {
@@ -392,8 +399,9 @@ export const optimiseVideo = async (
     const isValidCached = await isValidCachedVideo(outputFile);
 
     if (isValidCached) {
+      await ensureVideoExportMetadata(outputFile, captureMetadata);
       return {
-        src: encodePublicAssetPath(stripPublicFromPath(outputFile)),
+        src: `${encodePublicAssetPath(stripPublicFromPath(outputFile))}?metadata=${videoEncoding.metadataVersion}`,
         mimeType: "video/mp4",
       };
     }
@@ -422,7 +430,9 @@ export const optimiseVideo = async (
     "-pix_fmt",
     "yuv420p",
     "-movflags",
-    "+faststart",
+    "+faststart+use_metadata_tags",
+    "-write_tmcd",
+    "0",
     "-c:a",
     "aac",
     "-b:a",
@@ -431,6 +441,7 @@ export const optimiseVideo = async (
     "2",
     "-ar",
     "48000",
+    ...videoExportFfmpegArgs(captureMetadata),
     outputFile,
   ];
 
@@ -440,10 +451,12 @@ export const optimiseVideo = async (
     throw new Error(`ffmpeg produced empty output for ${videoPath}`);
   }
 
+  await ensureVideoExportMetadata(outputFile, captureMetadata);
+
   console.log(`Optimised video ready: ${outputFile}`);
 
   return {
-    src: encodePublicAssetPath(stripPublicFromPath(outputFile)),
+    src: `${encodePublicAssetPath(stripPublicFromPath(outputFile))}?metadata=${videoEncoding.metadataVersion}`,
     mimeType: "video/mp4",
   };
 };

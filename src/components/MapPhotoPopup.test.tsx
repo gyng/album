@@ -60,7 +60,10 @@ describe("MapPhotoPopup", () => {
 
     const video = document.querySelector("video")!;
     expect(video).toHaveAttribute("poster", "/photo.jpg");
-    expect(video).toHaveAttribute("src", "/data/albums/kansai/.resized_videos/clip.mov%401920.mp4");
+    expect(video).toHaveAttribute(
+      "src",
+      "/data/albums/kansai/.resized_videos/clip.mov%401920-q28.mp4?metadata=1",
+    );
     expect(video).toHaveProperty("muted", true);
     expect(video).toHaveProperty("autoplay", true);
   });

@@ -192,6 +192,46 @@ def log_gpu_status() -> None:
         )
 
 
+def require_model_vram() -> None:
+    """Refuse model loading on a crowded GPU, including Windows apps under WSL.
+
+    The production captioner peaks near 6.2 GB. Leave a little headroom before
+    loading each model; WSL can spill into shared memory instead of raising OOM.
+    This is a preflight check, not a guarantee against driver or host failures.
+    """
+    if not torch.cuda.is_available():
+        return
+    torch.cuda.empty_cache()
+    free, _ = torch.cuda.mem_get_info()
+    # Under WSL, CUDA can report 9.5 GB free while NVIDIA reports only 1.2 GB:
+    # its reading can omit Windows applications and the separate llama-server.
+    # The indexer uses GPU 0; use the more conservative of the two readings.
+    try:
+        result = subprocess.run(
+            [
+                "nvidia-smi",
+                "--id=0",
+                "--query-gpu=memory.free",
+                "--format=csv,noheader,nounits",
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        free = min(free, int(result.stdout.strip()) * 1024**2)
+    except (OSError, subprocess.SubprocessError, ValueError):
+        log("NVIDIA memory query unavailable; using CUDA's free-memory reading.")
+    minimum = 6.5e9
+    if free < minimum:
+        raise click.ClickException(
+            f"Only {free / 1e9:.1f} GB GPU memory free; model loading requires "
+            f"{minimum / 1e9:.1f} GB free. Close GPU-heavy applications (including "
+            "Windows apps under WSL), then retry. Completed indexing stages "
+            "are retained in the staging database."
+        )
+
+
 def log_vram(label: str) -> None:
     """Log GPU memory after a step: what this run holds vs how full the card is.
 
@@ -3258,6 +3298,7 @@ def run_embedding_pass(
     model first — so peak stays at one model. Mutates ``precomputed_embeddings``
     in place (path → {model_id: vector}) and returns the model-load time in ms."""
     load_started_at = time.perf_counter()
+    require_model_vram()
     embedder.init_model()
     load_ms = (time.perf_counter() - load_started_at) * 1000
     log_vram(f"{embedder.model_id} load")
@@ -3784,6 +3825,7 @@ def index(
             # nothing is left running when the run unwinds.
             try:
                 load_started_at = time.perf_counter()
+                require_model_vram()
                 classifier.init_model()
                 model_init_ms += (time.perf_counter() - load_started_at) * 1000
                 log_vram(f"{classifier.backend} load")
@@ -7477,6 +7519,7 @@ def timeline_update(dbpath, model_id, quantization, force):
         db = Sqlite3Client(dbpath)
         db.setup_tables()
         db.con.close()
+        require_model_vram()
         classifier.init_model()
 
         def complete(content, schema):

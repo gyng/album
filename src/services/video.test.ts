@@ -36,7 +36,7 @@ describe("video utilities", () => {
       outputDirectory,
       albumName,
       RESIZED_VIDEO_DIR,
-      `clip.mp4@${OPTIMISED_VIDEO_MAX_WIDTH}.mp4`,
+      `clip.mp4@${OPTIMISED_VIDEO_MAX_WIDTH}-q28.mp4`,
     );
     fs.mkdirSync(path.dirname(cachedOutput), { recursive: true });
     fs.writeFileSync(cachedOutput, "optimized-video");
@@ -45,8 +45,8 @@ describe("video utilities", () => {
 
     expect(actual).toEqual({
       src: `/${cachedOutput.split(path.sep).slice(1).join(path.sep)}`.replace(
-        "@1920.mp4",
-        "%401920.mp4",
+        "@1920-q28.mp4",
+        "%401920-q28.mp4?metadata=1",
       ),
       mimeType: "video/mp4",
     });

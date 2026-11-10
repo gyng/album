@@ -212,6 +212,94 @@ const VideoDetailsPanel: React.FC<{
   const [isOpen, setIsOpen] = React.useState(false);
   const indexedPath = props.reading?.tags?.path;
 
+  const originalTable =
+    props.type === "local" && (props.originalTechnicalData || props.originalSrc) ? (
+      <table aria-label="Original video">
+        <tbody>
+          {props.type === "local" && props.originalSrc ? (
+            <tr>
+              <td>Original file</td>
+              <td className={styles.sourceCell}>{props.originalSrc}</td>
+            </tr>
+          ) : null}
+
+          {props.type === "local" && props.originalTechnicalData?.originalDate ? (
+            <tr>
+              <td>Original date</td>
+              <td>{props.originalTechnicalData.originalDate}</td>
+            </tr>
+          ) : null}
+
+          {props.type === "local" && props.originalTechnicalData?.codec ? (
+            <tr>
+              <td>Original codec</td>
+              <td>{props.originalTechnicalData.codec}</td>
+            </tr>
+          ) : null}
+
+          {props.type === "local" && props.originalTechnicalData?.profile ? (
+            <tr>
+              <td>Codec profile</td>
+              <td>{props.originalTechnicalData.profile}</td>
+            </tr>
+          ) : null}
+
+          {props.type === "local" && props.originalTechnicalData?.fps ? (
+            <tr>
+              <td>Frame rate</td>
+              <td>{props.originalTechnicalData.fps} fps</td>
+            </tr>
+          ) : null}
+
+          {props.type === "local" && props.originalTechnicalData?.bitrateKbps ? (
+            <tr>
+              <td>Original bitrate</td>
+              <td>{props.originalTechnicalData.bitrateKbps} kbps</td>
+            </tr>
+          ) : null}
+
+          {props.type === "local" && props.originalTechnicalData?.durationSeconds ? (
+            <tr>
+              <td>Duration</td>
+              <td>{props.originalTechnicalData.durationSeconds}s</td>
+            </tr>
+          ) : null}
+
+          {props.type === "local" &&
+          props.originalTechnicalData?.width &&
+          props.originalTechnicalData?.height ? (
+            <tr>
+              <td>Original resolution</td>
+              <td>
+                {props.originalTechnicalData.width}px × {props.originalTechnicalData.height}px
+              </td>
+            </tr>
+          ) : null}
+
+          {props.type === "local" && props.originalTechnicalData?.audioCodec ? (
+            <tr>
+              <td>Audio codec</td>
+              <td>{props.originalTechnicalData.audioCodec}</td>
+            </tr>
+          ) : null}
+
+          {props.type === "local" && props.originalTechnicalData?.container ? (
+            <tr>
+              <td>Original container</td>
+              <td>{props.originalTechnicalData.container}</td>
+            </tr>
+          ) : null}
+
+          {props.type === "local" && props.originalTechnicalData?.fileSizeBytes ? (
+            <tr>
+              <td>File size</td>
+              <td>{(props.originalTechnicalData.fileSizeBytes / (1024 * 1024)).toFixed(2)} MB</td>
+            </tr>
+          ) : null}
+        </tbody>
+      </table>
+    ) : null;
+
   const technicalTable = (
     <table>
       <tbody>
@@ -236,87 +324,6 @@ const VideoDetailsPanel: React.FC<{
           <tr>
             <td>Max width</td>
             <td>1920px</td>
-          </tr>
-        ) : null}
-
-        {props.type === "local" && props.originalSrc ? (
-          <tr>
-            <td>Original file</td>
-            <td className={styles.sourceCell}>{props.originalSrc}</td>
-          </tr>
-        ) : null}
-
-        {props.type === "local" && props.originalTechnicalData?.originalDate ? (
-          <tr>
-            <td>Original date</td>
-            <td>{props.originalTechnicalData.originalDate}</td>
-          </tr>
-        ) : null}
-
-        {props.type === "local" && props.originalTechnicalData?.codec ? (
-          <tr>
-            <td>Codec</td>
-            <td>{props.originalTechnicalData.codec}</td>
-          </tr>
-        ) : null}
-
-        {props.type === "local" && props.originalTechnicalData?.profile ? (
-          <tr>
-            <td>Profile</td>
-            <td>{props.originalTechnicalData.profile}</td>
-          </tr>
-        ) : null}
-
-        {props.type === "local" && props.originalTechnicalData?.fps ? (
-          <tr>
-            <td>Framerate</td>
-            <td>{props.originalTechnicalData.fps} fps</td>
-          </tr>
-        ) : null}
-
-        {props.type === "local" && props.originalTechnicalData?.bitrateKbps ? (
-          <tr>
-            <td>Bitrate</td>
-            <td>{props.originalTechnicalData.bitrateKbps} kbps</td>
-          </tr>
-        ) : null}
-
-        {props.type === "local" && props.originalTechnicalData?.durationSeconds ? (
-          <tr>
-            <td>Duration</td>
-            <td>{props.originalTechnicalData.durationSeconds}s</td>
-          </tr>
-        ) : null}
-
-        {props.type === "local" &&
-        props.originalTechnicalData?.width &&
-        props.originalTechnicalData?.height ? (
-          <tr>
-            <td>Original size</td>
-            <td>
-              {props.originalTechnicalData.width}px × {props.originalTechnicalData.height}px
-            </td>
-          </tr>
-        ) : null}
-
-        {props.type === "local" && props.originalTechnicalData?.audioCodec ? (
-          <tr>
-            <td>Audio codec</td>
-            <td>{props.originalTechnicalData.audioCodec}</td>
-          </tr>
-        ) : null}
-
-        {props.type === "local" && props.originalTechnicalData?.container ? (
-          <tr>
-            <td>Original container</td>
-            <td>{props.originalTechnicalData.container}</td>
-          </tr>
-        ) : null}
-
-        {props.type === "local" && props.originalTechnicalData?.fileSizeBytes ? (
-          <tr>
-            <td>File size</td>
-            <td>{(props.originalTechnicalData.fileSizeBytes / (1024 * 1024)).toFixed(2)} MB</td>
           </tr>
         ) : null}
 
@@ -378,11 +385,12 @@ const VideoDetailsPanel: React.FC<{
           <div className={commonStyles.mediaDetailsTable}>
             {props.type === "local" && props.reading ? (
               <>
-                {/* What a reader opens the pane for comes first; the encoding,
-                    which only says how the clip is served, folds away below. */}
+                {/* Capture and original-file readings stay visible; playback
+                    encoding folds away below. */}
                 {isOpen ? (
                   <ExifTable rows={clipRows(props.id ?? props.src, props.reading)} />
                 ) : null}
+                {originalTable}
                 {isOpen && indexedPath ? (
                   <div className={styles.similarPhotosWrap}>
                     <PhotoSimilarPhotosDeferred path={indexedPath} />
@@ -396,6 +404,7 @@ const VideoDetailsPanel: React.FC<{
               </>
             ) : (
               <>
+                {originalTable}
                 {technicalTable}
                 {links}
               </>

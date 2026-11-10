@@ -252,7 +252,8 @@ test.describe("Slideshow clips", () => {
   // by path so these cases never depend on the shuffle landing on it, and pin
   // remix off so the clip is the one single-slide element on screen.
   const clipPath = "../albums/test-simple/DSCF0159.MOV";
-  const clipVideoSrc = "/data/albums/test-simple/.resized_videos/DSCF0159.MOV%401920.mp4";
+  const clipVideoSrc =
+    "/data/albums/test-simple/.resized_videos/DSCF0159.MOV%401920-q28.mp4?metadata=1";
   const clipPosterSrc = "/data/albums/test-simple/.resized_images/DSCF0159.MOV%403200.avif";
   const clipUrl = (extra = "") =>
     `/slideshow?mode=random&filter=test-simple&remix=0&delay=86400&photo=${encodeURIComponent(clipPath)}${extra}`;

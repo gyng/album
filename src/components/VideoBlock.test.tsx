@@ -87,11 +87,11 @@ describe("VideoBlock", () => {
     expect(screen.getByText("DSCF0159.MOV")).toBeTruthy();
     expect(screen.getByText("Original date")).toBeTruthy();
     expect(screen.getByText("2023-11-20T10:11:12.000Z")).toBeTruthy();
-    expect(screen.getByText("Codec")).toBeTruthy();
+    expect(screen.getByText("Original codec")).toBeTruthy();
     expect(screen.getByText("h264")).toBeTruthy();
-    expect(screen.getByText("Profile")).toBeTruthy();
+    expect(screen.getByText("Codec profile")).toBeTruthy();
     expect(screen.getByText("High")).toBeTruthy();
-    expect(screen.getByText("Framerate")).toBeTruthy();
+    expect(screen.getByText("Frame rate")).toBeTruthy();
     expect(screen.getByText("59.94 fps")).toBeTruthy();
     expect(screen.getByText("Original container")).toBeTruthy();
     expect(screen.getByText("mov,mp4,m4a,3gp,3g2,mj2")).toBeTruthy();
@@ -184,6 +184,28 @@ describe("LocalVideoBlockEl details", () => {
     );
     // The encoding is still there for whoever wants it.
     expect(screen.getByText("hevc")).toBeTruthy();
+  });
+
+  it("shows original resolution and bitrate without opening the encoding disclosure", () => {
+    open({
+      originalTechnicalData: {
+        width: 3840,
+        height: 2160,
+        bitrateKbps: 24000,
+        fps: 59.94,
+        codec: "hevc",
+        fileSizeBytes: 10485760,
+      },
+    });
+
+    const original = screen.getByRole("table", { name: "Original video" });
+    expect(within(original).getByText("Original resolution")).toBeVisible();
+    expect(within(original).getByText("3840px × 2160px")).toBeVisible();
+    expect(within(original).getByText("Original bitrate")).toBeVisible();
+    expect(within(original).getByText("24000 kbps")).toBeVisible();
+    expect(within(original).getByText("59.94 fps")).toBeVisible();
+    expect(within(original).getByText("hevc")).toBeVisible();
+    expect(within(original).getByText("10.00 MB")).toBeVisible();
   });
 
   // A photograph's pane links the sizes it is served at; a clip's links the

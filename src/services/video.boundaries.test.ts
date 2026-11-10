@@ -5,7 +5,10 @@
 import { EventEmitter } from "node:events";
 import fs from "node:fs";
 
-jest.mock("node:child_process", () => ({ spawn: jest.fn() }));
+jest.mock("node:child_process", () => ({
+  ...jest.requireActual("node:child_process"),
+  spawn: jest.fn(),
+}));
 jest.mock("ffmpeg-static", () => ({ __esModule: true, default: "/bin/ffmpeg-test" }));
 jest.mock("ffprobe-static", () => ({ __esModule: true, default: { path: "/bin/ffprobe-test" } }));
 jest.mock("./photo", () => ({
@@ -77,7 +80,7 @@ describe("video process boundaries", () => {
     }).toEqual({
       maxWidth: 1920,
       preset: "medium",
-      crf: 30,
+      crf: 28,
       audioBitrate: "96k",
       validationSeconds: "0.25",
       validationTimeout: 4000,
@@ -189,12 +192,12 @@ describe("video process boundaries", () => {
     jest.spyOn(console, "log").mockImplementation(() => undefined);
 
     await expect(optimiseVideo("albums/trip/clip.mov", "public/data/albums")).resolves.toEqual({
-      src: "/built/clip.mov%401920.mp4",
+      src: "/built/clip.mov%401920-q28.mp4?metadata=1",
       mimeType: "video/mp4",
     });
     expect(mockSpawn).toHaveBeenCalledWith(
       "/bin/ffmpeg-test",
-      expect.arrayContaining(["-i", "albums/trip/clip.mov", "-preset", "medium"]),
+      expect.arrayContaining(["-i", "albums/trip/clip.mov", "-preset", "medium", "-crf", "28"]),
       { stdio: "pipe" },
     );
   });

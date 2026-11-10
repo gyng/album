@@ -142,7 +142,6 @@ export const deserializeVideoBlock = async (
     }
 
     const localFilepath = path.join(options.dirname, serialized.data.href);
-    const optimised = await optimiseVideo(localFilepath, "public/data/albums");
     const originalTechnicalData = await getOriginalVideoTechnicalData(localFilepath);
     const poster = readVideoPoster(localFilepath);
     // The indexer keys a clip by the clip's own path, exactly as it keys a
@@ -163,6 +162,12 @@ export const deserializeVideoBlock = async (
     // resort here.
     const resolvedDate =
       serialized.data.date ?? poster?.capturedAtLocal ?? originalTechnicalData.originalDate;
+    const optimised = await optimiseVideo(localFilepath, "public/data/albums", {
+      ...(poster?.capturedAtLocal ? { capturedAtLocal: poster.capturedAtLocal } : {}),
+      ...(tags?.tz_offset ? { tzOffset: tags.tz_offset } : {}),
+      ...(poster?.latDeg !== undefined ? { latDeg: poster.latDeg } : {}),
+      ...(poster?.lngDeg !== undefined ? { lngDeg: poster.lngDeg } : {}),
+    });
 
     const copy: VideoBlock = {
       ...serialized,

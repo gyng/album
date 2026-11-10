@@ -78,6 +78,7 @@ from index import (
     prune,
     publish_index_databases,
     repair_classifier_json_syntax,
+    require_model_vram,
     reset_timezone_finder_for_testing,
     resolve_caption_result,
     resolve_classifier_model_id,
@@ -1178,7 +1179,11 @@ class TestMain(unittest.TestCase):
                 pass
 
         precomputed = {}
-        with mock.patch("index.log_vram"), mock.patch("index.log"):
+        with (
+            mock.patch("index.log_vram"),
+            mock.patch("index.log"),
+            mock.patch("index.require_model_vram"),
+        ):
             run_embedding_pass(StubEmbedder(), ["good.jpg", "bad.jpg"], precomputed)
         self.assertIn("good.jpg", precomputed)
         self.assertNotIn("bad.jpg", precomputed)
@@ -1733,6 +1738,43 @@ class TestMain(unittest.TestCase):
             log_vram_peak()
         self.assertEqual(mock_log.call_args_list, [])
 
+    def test_model_load_refuses_insufficient_vram(self):
+        with (
+            mock.patch("index.torch.cuda.is_available", return_value=True),
+            mock.patch("index.torch.cuda.empty_cache"),
+            mock.patch("index.torch.cuda.mem_get_info", return_value=(3e9, 10e9)),
+            mock.patch("index.subprocess.run", side_effect=FileNotFoundError),
+            self.assertRaisesRegex(click.ClickException, "3.0 GB.*6.5 GB"),
+        ):
+            require_model_vram()
+
+    def test_model_load_accepts_sufficient_vram(self):
+        with (
+            mock.patch("index.torch.cuda.is_available", return_value=True),
+            mock.patch("index.torch.cuda.empty_cache"),
+            mock.patch("index.torch.cuda.mem_get_info", return_value=(6.5e9, 10e9)),
+            mock.patch("index.subprocess.run", side_effect=FileNotFoundError),
+        ):
+            require_model_vram()
+
+    def test_model_load_checks_windows_gpu_usage_when_cuda_underreports(self):
+        with (
+            mock.patch("index.torch.cuda.is_available", return_value=True),
+            mock.patch("index.torch.cuda.empty_cache"),
+            mock.patch("index.torch.cuda.mem_get_info", return_value=(9e9, 10e9)),
+            mock.patch("index.subprocess.run", return_value=mock.Mock(stdout="3000\n")),
+            self.assertRaisesRegex(click.ClickException, "3.1 GB.*6.5 GB"),
+        ):
+            require_model_vram()
+
+    def test_model_load_on_cpu_does_not_query_vram(self):
+        with (
+            mock.patch("index.torch.cuda.is_available", return_value=False),
+            mock.patch("index.torch.cuda.mem_get_info") as memory,
+        ):
+            require_model_vram()
+        memory.assert_not_called()
+
     def test_log_vram_reports_card_usage(self):
         with (
             mock.patch("index.torch.cuda.is_available", return_value=True),
@@ -1945,7 +1987,11 @@ class TestMain(unittest.TestCase):
 
         stub = StubEmbedder()
         precomputed = {}
-        with mock.patch("index.log_vram"), mock.patch("index.log"):
+        with (
+            mock.patch("index.log_vram"),
+            mock.patch("index.log"),
+            mock.patch("index.require_model_vram"),
+        ):
             load_ms = run_embedding_pass(stub, ["a.jpg", "bb.jpg"], precomputed)
         self.assertTrue(stub.released)
         self.assertEqual(precomputed["a.jpg"]["stub-model"], [5.0])
@@ -2392,6 +2438,7 @@ class TestCli(UsesTestexistsFixture, unittest.TestCase):
             stub = RejectingClassifier()
             with (
                 mock.patch("index.create_classifier", return_value=stub),
+                mock.patch("index.require_model_vram"),
                 mock.patch(
                     "index.acquire_single_instance_lock", side_effect=self._lock_stub
                 ),

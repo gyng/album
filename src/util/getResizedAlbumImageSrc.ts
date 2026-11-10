@@ -1,17 +1,17 @@
 import { encodePublicAssetPath } from "./encodePublicAssetPath";
 import { clipPathOf } from "./videoScenePath";
+import videoEncoding from "./videoEncoding.json";
 
 /**
  * A clip's web-playable file, written by `optimiseVideo` in `services/video.ts`
- * into the album's own `.resized_videos` cache as `<filename>@1920.mp4`.
+ * into the album's own `.resized_videos` cache as `<filename>@1920-q28.mp4`.
  *
  * That module is server-only — it imports `node:fs`, `ffmpeg-static` and
- * `ffprobe-static` — so the browser cannot ask it for the URL. The width and
- * the directory name are repeated here for the same reason the cache sweep and
- * the poster prepass repeat them: three small constants are cheaper than
- * routing every clip URL through the server. Change one, change all of them.
+ * `ffprobe-static` — so the browser cannot ask it for the URL. Shared encoding
+ * settings keep browser URLs, generated files and cache cleanup in agreement.
+ * The quality suffix also makes browsers fetch a new file after a CRF change.
  */
-export const OPTIMISED_VIDEO_MAX_WIDTH = 1920;
+export const OPTIMISED_VIDEO_MAX_WIDTH = videoEncoding.maxWidth;
 export const RESIZED_VIDEO_DIR = ".resized_videos";
 
 export const getResizedAlbumImageSrc = (path: string): string => {
@@ -34,11 +34,11 @@ export const getResizedAlbumImageSrc = (path: string): string => {
  */
 export const getResizedAlbumVideoSrc = (path: string): string => {
   const clipSrc = clipPathOf(path).replace("..", "data");
-  return encodePublicAssetPath(
+  return `${encodePublicAssetPath(
     "/" +
       [...clipSrc.split("/").slice(0, -1), RESIZED_VIDEO_DIR, ...clipSrc.split("/").slice(-1)].join(
         "/",
       ) +
-      `@${OPTIMISED_VIDEO_MAX_WIDTH}.mp4`,
-  );
+      `@${OPTIMISED_VIDEO_MAX_WIDTH}-q${videoEncoding.crf}.mp4`,
+  )}?metadata=${videoEncoding.metadataVersion}`;
 };

@@ -159,7 +159,7 @@ describe("LazyMapMarkerImage", () => {
     fireEvent.pointerOver(document.querySelector("img")!.parentElement!);
     expect(document.querySelector("video")).toHaveAttribute(
       "src",
-      "/data/albums/test-simple/.resized_videos/clip.mov%401920.mp4",
+      "/data/albums/test-simple/.resized_videos/clip.mov%401920-q28.mp4?metadata=1",
     );
   });
 

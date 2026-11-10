@@ -18,7 +18,8 @@ const videoBadgePattern = /^Video, 0:1/;
  * playable source of this clip. Spelled out rather than derived, so a preview
  * pointed anywhere else fails here instead of silently loading.
  */
-const clipVideoSrc = "/data/albums/test-simple/.resized_videos/DSCF0159.MOV%401920.mp4";
+const clipVideoSrc =
+  "/data/albums/test-simple/.resized_videos/DSCF0159.MOV%401920-q28.mp4?metadata=1";
 
 /**
  * The video group's content is in the DOM at every width, so a tile assertion

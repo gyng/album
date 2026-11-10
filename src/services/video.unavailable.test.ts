@@ -4,7 +4,10 @@
 
 import fs from "node:fs";
 
-jest.mock("node:child_process", () => ({ spawn: jest.fn() }));
+jest.mock("node:child_process", () => ({
+  ...jest.requireActual("node:child_process"),
+  spawn: jest.fn(),
+}));
 jest.mock("ffmpeg-static", () => ({ __esModule: true, default: null }));
 jest.mock("ffprobe-static", () => ({ __esModule: true, default: { path: null } }));
 jest.mock("./photo", () => ({ stripPublicFromPath: jest.fn() }));
