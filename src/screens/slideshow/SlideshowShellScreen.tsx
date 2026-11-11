@@ -244,8 +244,12 @@ export const SlideshowShellScreen = () => {
       // Re-stamp the mirrored status too: a kiosk can run for hours without a
       // single state change, and a snapshot frozen at launch would read to the
       // report page as hours-stale rather than as steady.
+      // Kept in the ref as well as in storage: the runtime's health report
+      // writes the ref back every 15 seconds, and a stamp that lived only in
+      // storage was overwritten by the time of the last state change.
       if (statusRef.current) {
-        writeShellStatus({ ...statusRef.current, at: now });
+        statusRef.current = { ...statusRef.current, at: now };
+        writeShellStatus(statusRef.current);
       }
     }, HEARTBEAT_INTERVAL_MS);
     const handleVisible = () => {
@@ -773,7 +777,12 @@ export const SlideshowShellScreen = () => {
       if (event.data.health) {
         runtimeHealthRef.current = { at: Date.now(), health: event.data.health };
         if (statusRef.current) {
-          statusRef.current = { ...statusRef.current, runtimeHealth: runtimeHealthRef.current };
+          // A report arriving is itself the slideshow reporting: stamp it.
+          statusRef.current = {
+            ...statusRef.current,
+            at: runtimeHealthRef.current.at,
+            runtimeHealth: runtimeHealthRef.current,
+          };
           writeShellStatus(statusRef.current);
         }
       }

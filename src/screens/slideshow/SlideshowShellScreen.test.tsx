@@ -790,6 +790,60 @@ describe("slideshow code shell", () => {
     });
   });
 
+  // The minute beat re-stamped the stored status, and the runtime's next health
+  // report wrote it back with the time of the last state change: the report
+  // page said a slideshow running in front of it had last reported hours ago.
+  it("keeps the mirrored status fresh across beats and health reports", async () => {
+    jest.useFakeTimers();
+    const visibility = jest.spyOn(document, "visibilityState", "get").mockReturnValue("visible");
+    try {
+      global.fetch = jest.fn(() => versionResponse("build-current")) as jest.Mock;
+      const { unmount } = render(<SlideshowShellScreen />);
+      const frame = screen.getByTitle("Slideshow") as HTMLIFrameElement;
+      const sendHealth = () => {
+        window.dispatchEvent(
+          new MessageEvent("message", {
+            origin: window.location.origin,
+            source: frame.contentWindow,
+            data: {
+              ...mountedMessage("build-current"),
+              presentation: { sources: ["/photo.jpg"], cover: false },
+              health: {
+                photo: "/photo.jpg",
+                presentedAt: Date.now(),
+                pendingSince: null,
+                paused: true,
+                nextAdvanceAt: null,
+              },
+            },
+          }),
+        );
+      };
+      act(sendHealth);
+      const launchedAt = Date.now();
+
+      // Steady running: the runtime reports every 15 seconds, the shell beats
+      // every minute. End just after a beat and one more report.
+      for (let report = 0; report < 4 * 30 + 1; report += 1) {
+        await act(async () => {
+          await jest.advanceTimersByTimeAsync(15000);
+        });
+        act(sendHealth);
+      }
+
+      const status = readShellStatus();
+      expect(status?.codeStatus).not.toMatch(/reload/i);
+      expect(Date.now() - launchedAt).toBeGreaterThanOrEqual(30 * 60000);
+      expect(Date.now() - (status?.at ?? 0)).toBeLessThan(60000);
+      // The report itself is what just arrived, not the one from launch.
+      expect(Date.now() - (status?.runtimeHealth?.at ?? 0)).toBeLessThan(15000);
+      unmount();
+    } finally {
+      visibility.mockRestore();
+      jest.useRealTimers();
+    }
+  });
+
   it("links from the diagnostics panel to the full report page", () => {
     global.fetch = jest.fn(pendingVersionResponse);
 
