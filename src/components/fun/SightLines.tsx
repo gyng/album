@@ -417,7 +417,9 @@ export const SightLines = ({ photos }: { photos: PhotoGamePhoto[] }) => {
                   className={styles.tile}
                   disabled={finished}
                   aria-pressed={selected.includes(index)}
-                  aria-label={`Row ${Math.floor(index / puzzle.size) + 1}, column ${(index % puzzle.size) + 1}${matches.length ? `; ${matches.map((item) => `${item.label} ${item.revealed ? "revealed" : "found"}`).join(", ")}` : ""}${hint === index ? "; hint starts here" : ""}`}
+                  // The label replaces the photograph's alt text, so it has to
+                  // carry it: the picture is the whole of what a tile is.
+                  aria-label={`${photo.caption.trim().replace(/[.!?…]+$/, "") || "Archive photograph"}. Row ${Math.floor(index / puzzle.size) + 1}, column ${(index % puzzle.size) + 1}${matches.length ? `; ${matches.map((item) => `${item.label} ${item.revealed ? "revealed" : "found"}`).join(", ")}` : ""}${hint === index ? "; hint starts here" : ""}`}
                   onPointerDown={(event) => {
                     if (event.pointerType === "touch" && puzzle.size > 6) return;
                     if (event.button !== 0) return;

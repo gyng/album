@@ -245,3 +245,14 @@
 .changeSettings:hover {
   color: var(--c-font);
 }
+
+.copyStatus {
+  flex-basis: 100%;
+  color: var(--c-bg-contrast-light);
+  font-size: var(--fs-s);
+  text-align: center;
+}
+
+.copyStatus:empty {
+  display: none;
+}

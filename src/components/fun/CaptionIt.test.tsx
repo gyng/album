@@ -155,3 +155,25 @@ it("scores one caption against a set of three", async () => {
   expect(within(result).getByRole("heading", { name: "All three picked out" })).toBeInTheDocument();
   expect(readGameStats("caption-it")).toMatchObject({ played: 1, won: 1 });
 });
+
+it("leaves Enter to the input method while a caption is being composed", async () => {
+  jest.mocked(encodeSearchText).mockResolvedValue(oneHot(0));
+  render(<CaptionIt photos={photos} />);
+  await act(async () => {});
+  fireEvent.click(screen.getByRole("button", { name: /^Start Caption It/ }));
+  write("写真");
+  const field = screen.getByLabelText("Your caption");
+  const requestSubmit = jest
+    .spyOn(HTMLFormElement.prototype, "requestSubmit")
+    .mockImplementation(() => {});
+  try {
+    // Enter here confirms the candidate; it is not the reader finishing.
+    expect(fireEvent.keyDown(field, { key: "Enter", isComposing: true })).toBe(true);
+    expect(fireEvent.keyDown(field, { key: "Enter", keyCode: 229 })).toBe(true);
+    expect(requestSubmit).not.toHaveBeenCalled();
+    expect(fireEvent.keyDown(field, { key: "Enter" })).toBe(false);
+    expect(requestSubmit).toHaveBeenCalledTimes(1);
+  } finally {
+    requestSubmit.mockRestore();
+  }
+});

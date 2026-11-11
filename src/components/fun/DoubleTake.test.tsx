@@ -4,6 +4,9 @@ import { DoubleTake } from "./DoubleTake";
 import { buildDoubleTakeDeck, prepareDoubleTakePairs } from "../../util/doubleTake";
 import type { PhotoGamePhoto } from "../../util/photoGames";
 import { readGameStats } from "./useGameStats";
+import { dailyPhotoOrder } from "./GameRecord";
+import { dailyNumber, dailySeed, localDayKey } from "../../util/gameDaily";
+import { seededRandom } from "../../util/seededRandom";
 
 jest.mock("../../util/doubleTake", () => ({
   ...jest.requireActual("../../util/doubleTake"),
@@ -42,6 +45,7 @@ let images: Array<{
 const originalImage = global.Image;
 beforeEach(() => {
   localStorage.clear();
+  window.history.replaceState(null, "", "/fun/double-take");
   jest.clearAllMocks();
   jest.useFakeTimers();
   hidden = false;
@@ -338,4 +342,77 @@ it("distinguishes skipped pairs from incorrect guesses in the results", async ()
   fireEvent.click(screen.getByRole("button", { name: "See results" }));
   expect(screen.getByRole("region", { name: "Pair 1" })).toHaveTextContent("Skipped");
   expect(screen.getByRole("region", { name: "Pair 2" })).toHaveTextContent("Correct");
+});
+
+const playThrough = async (picks: Array<"Same place" | "Different places">) => {
+  for (const [index, pick] of picks.entries()) {
+    await watch();
+    fireEvent.click(screen.getByRole("button", { name: pick }));
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: index + 1 === picks.length ? "See results" : "Next pair",
+      }),
+    );
+  }
+};
+
+it("deals today's daily from ?daily the same for everyone, shares it and records it once", async () => {
+  const day = localDayKey();
+  const label = `Daily #${dailyNumber(day)}`;
+  window.history.replaceState(null, "", "/fun/double-take?daily");
+  // The archive arrives in random order; the daily must not depend on it.
+  render(<DoubleTake photos={[...photos].reverse()} />);
+  await act(async () => {});
+  tick(0);
+
+  const [dealtFrom, random] = jest.mocked(buildDoubleTakeDeck).mock.calls.at(-1)!;
+  expect(dealtFrom).toEqual(dailyPhotoOrder(photos));
+  const expected = seededRandom(dailySeed("double-take", day));
+  expect([random!(), random!(), random!()]).toEqual([expected(), expected(), expected()]);
+  expect(screen.getByText(label)).toBeInTheDocument();
+
+  await playThrough(["Same place", "Different places"]);
+  const results = screen.getByRole("region", { name: "Double Take results" });
+  expect(within(results).getByText(label)).toBeInTheDocument();
+  expect(within(results).getByRole("button", { name: "Share result" })).toBeInTheDocument();
+  expect(readGameStats("double-take")).toMatchObject({ played: 1, won: 1, best: 2 });
+  expect(readGameStats("double-take").dailies[day]).toEqual({
+    won: true,
+    score: 2,
+    summary: "2 of 2 correct",
+  });
+
+  // Play again after a daily is an ordinary game, dealt at random.
+  fireEvent.click(screen.getByRole("button", { name: "Play again" }));
+  tick(0);
+  expect(window.location.search).toBe("");
+  expect(screen.queryByText(label)).toBeNull();
+  expect(jest.mocked(buildDoubleTakeDeck).mock.calls.at(-1)![1]).toBeUndefined();
+  await playThrough(["Same place", "Same place"]);
+  expect(readGameStats("double-take")).toMatchObject({ played: 2, won: 1 });
+  expect(screen.queryByRole("button", { name: "Share result" })).toBeNull();
+
+  // The finished daily can be replayed, but its answers are known: not recorded.
+  fireEvent.click(screen.getByRole("button", { name: "Change viewing time" }));
+  expect(screen.getByText("Played today · 2 of 2 correct")).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: label }));
+  tick(0);
+  expect(window.location.search).toBe("?daily=");
+  await playThrough(["Different places", "Same place"]);
+  expect(readGameStats("double-take")).toMatchObject({ played: 2, won: 1 });
+  expect(readGameStats("double-take").dailies[day]).toMatchObject({ won: true, score: 2 });
+});
+
+it("leaves the daily behind when its preparation is cancelled", () => {
+  jest.mocked(prepareDoubleTakePairs).mockReturnValue(false);
+  render(<DoubleTake photos={photos} />);
+  fireEvent.click(screen.getByRole("button", { name: /^Daily #/ }));
+  expect(window.location.search).toBe("?daily=");
+  fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+  expect(window.location.search).toBe("");
+  jest.mocked(prepareDoubleTakePairs).mockReturnValue(true);
+  fireEvent.click(screen.getByRole("button", { name: "Start Double Take" }));
+  tick(0);
+  expect(jest.mocked(buildDoubleTakeDeck).mock.calls.at(-1)![1]).toBeUndefined();
+  expect(screen.queryByText(/^Daily #/)).toBeNull();
 });

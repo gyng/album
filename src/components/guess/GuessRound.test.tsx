@@ -445,6 +445,178 @@ describe("GuessRound", () => {
     jest.useRealTimers();
   });
 
+  it("names the progress dots for the round they show", () => {
+    renderRound({ roundNumber: 2, totalRounds: 5 });
+    expect(screen.getByRole("img", { name: "Round 2 of 5" })).toBeInTheDocument();
+  });
+
+  it("gives the countdown as text, and speaks it only at a few thresholds", () => {
+    jest.useFakeTimers();
+    const { container } = renderRound({ guess: null, timeLimit: 30 });
+    expect(screen.queryByRole("timer")).toBeNull();
+    fireEvent.load(container.querySelector("img")!);
+    const timer = screen.getByRole("timer", { name: "Time remaining" });
+    expect(timer).toHaveTextContent("30 seconds");
+
+    const tick = (seconds: number) =>
+      act(() => {
+        jest.advanceTimersByTime(seconds * 1_000);
+      });
+    tick(7);
+    expect(timer).toHaveTextContent("23 seconds");
+    // Announcing every second would talk over the round.
+    expect(screen.getByRole("status")).toBeEmptyDOMElement();
+    tick(8);
+    expect(screen.getByRole("status")).toHaveTextContent("15 seconds left");
+    tick(2);
+    expect(screen.getByRole("status")).toHaveTextContent("15 seconds left");
+    tick(3);
+    expect(screen.getByRole("status")).toHaveTextContent("10 seconds left");
+    tick(5);
+    expect(screen.getByRole("status")).toHaveTextContent("5 seconds left");
+    tick(5);
+    expect(screen.queryByRole("timer")).toBeNull();
+    expect(screen.getByRole("status")).toHaveTextContent("Skipped.");
+    jest.useRealTimers();
+  });
+
+  it("holds the countdown while the page is hidden", () => {
+    jest.useFakeTimers();
+    let hidden = false;
+    const visibility = jest.spyOn(document, "hidden", "get").mockImplementation(() => hidden);
+    try {
+      const { props, container } = renderRound({ guess: null, timeLimit: 10 });
+      fireEvent.load(container.querySelector("img")!);
+      act(() => {
+        jest.advanceTimersByTime(3_000);
+      });
+      hidden = true;
+      act(() => {
+        jest.advanceTimersByTime(60_000);
+      });
+      expect(props.onReveal).not.toHaveBeenCalled();
+      expect(screen.getByRole("timer")).toHaveTextContent("7 seconds");
+
+      hidden = false;
+      act(() => {
+        jest.advanceTimersByTime(6_000);
+      });
+      expect(props.onReveal).not.toHaveBeenCalled();
+      act(() => {
+        jest.advanceTimersByTime(1_000);
+      });
+      expect(props.onReveal).toHaveBeenCalledTimes(1);
+    } finally {
+      visibility.mockRestore();
+      jest.useRealTimers();
+    }
+  });
+
+  describe("a round dealt from a clip", () => {
+    const clip: GuessPhoto = {
+      ...firstPhoto,
+      path: "../albums/test-simple/clip one.MOV",
+      photoName: "clip one.MOV",
+    };
+    const reduceMotion = (reduce: boolean) =>
+      jest.spyOn(window, "matchMedia").mockImplementation((query) => ({
+        matches: reduce && query.includes("prefers-reduced-motion"),
+        media: query,
+        onchange: null,
+        addEventListener: jest.fn(),
+        removeEventListener: jest.fn(),
+        addListener: jest.fn(),
+        removeListener: jest.fn(),
+        dispatchEvent: jest.fn(),
+      }));
+    afterEach(() => jest.restoreAllMocks());
+
+    it("plays the clip over its still, muted and looping, with only a sound toggle", () => {
+      reduceMotion(false);
+      const { container } = renderRound({ photo: clip });
+      const still = container.querySelector("img")!;
+      // The still is what the round waits for, as it always was.
+      expect(container.querySelector("video")).toBeNull();
+      fireEvent.load(still);
+
+      const video = container.querySelector("video")!;
+      expect(video.getAttribute("src")).toContain(
+        "/data/albums/test-simple/.resized_videos/clip%20one.MOV",
+      );
+      expect(video.getAttribute("poster")).toBe(still.getAttribute("src"));
+      expect(video.muted).toBe(true);
+      expect(video.loop).toBe(true);
+      expect(video.autoplay).toBe(true);
+      expect(video.playsInline).toBe(true);
+      expect(video.controls).toBe(false);
+
+      const sound = screen.getByRole("button", { name: "Sound" });
+      expect(sound).toHaveAttribute("aria-pressed", "false");
+      fireEvent.click(sound);
+      expect(video.muted).toBe(false);
+      expect(sound).toHaveAttribute("aria-pressed", "true");
+    });
+
+    it("zooms the clip with its still", () => {
+      reduceMotion(false);
+      const { container } = renderRound({ photo: clip });
+      fireEvent.load(container.querySelector("img")!);
+      fireEvent.keyDown(mysteryPanel(), { key: "+" });
+      expect(container.querySelector("video")!.style.transform).toBe(
+        container.querySelector("img")!.style.transform,
+      );
+      expect(container.querySelector("video")!.style.transform).toContain("scale(1.15)");
+    });
+
+    it("falls back to the still when the clip cannot play", () => {
+      reduceMotion(false);
+      const { container } = renderRound({ photo: clip });
+      fireEvent.load(container.querySelector("img")!);
+      fireEvent.error(container.querySelector("video")!);
+
+      expect(container.querySelector("video")).toBeNull();
+      expect(container.querySelector("img")).not.toBeNull();
+      expect(screen.queryByRole("button", { name: "Sound" })).toBeNull();
+      expect(screen.queryByRole("alert")).toBeNull();
+    });
+
+    it("shows the still to a reader who asked for less motion", () => {
+      reduceMotion(true);
+      const { container } = renderRound({ photo: clip });
+      fireEvent.load(container.querySelector("img")!);
+      expect(container.querySelector("video")).toBeNull();
+      expect(screen.queryByRole("button", { name: "Sound" })).toBeNull();
+    });
+
+    it("never plays an external or a photograph", () => {
+      reduceMotion(false);
+      const { container, rerender } = renderRound({
+        photo: { ...clip, path: "../albums/test-simple/abc123.youtube", mediaKind: "video" },
+      });
+      fireEvent.load(container.querySelector("img")!);
+      expect(container.querySelector("video")).toBeNull();
+
+      rerender(<GuessRound {...baseProps} photo={{ ...clip, mediaKind: "photo" }} />);
+      fireEvent.load(container.querySelector("img")!);
+      expect(container.querySelector("video")).toBeNull();
+    });
+
+    it("starts the next clip muted again", () => {
+      reduceMotion(false);
+      const { container, rerender } = renderRound({ photo: clip });
+      fireEvent.load(container.querySelector("img")!);
+      fireEvent.click(screen.getByRole("button", { name: "Sound" }));
+      rerender(
+        <GuessRound
+          {...baseProps}
+          photo={{ ...clip, path: "../albums/test-simple/two.mp4", photoName: "two.mp4" }}
+        />,
+      );
+      fireEvent.load(container.querySelector("img")!);
+      expect(container.querySelector("video")!.muted).toBe(true);
+    });
+  });
+
   it("aborts from the top bar", () => {
     const { props } = renderRound();
     fireEvent.click(screen.getByTitle("Quit to menu"));

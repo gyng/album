@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   buildDoubleTakeDeck,
   doubleTakePoints,
@@ -14,12 +14,24 @@ import { GameProgress, GameScore } from "./GameFeedback";
 import { GamePhoto } from "./GamePhoto";
 import { useGameShortcuts } from "./useGameShortcuts";
 import { useGameSettings } from "./useGameSettings";
-import { useGameStats } from "./useGameStats";
-import { GameStatsLine } from "./GameRecord";
+import { readGameStats, useGameStats } from "./useGameStats";
+import {
+  dailyPhotoOrder,
+  dailyPuzzle,
+  dailyShareText,
+  GameStatsLine,
+  ShareResult,
+  useShareOrigin,
+} from "./GameRecord";
+import { useGameReadiness } from "./GameReadiness";
+import { useUrlSearchParams } from "../platform";
 import { ResultNextSteps } from "./ResultNextSteps";
+import styles from "./DoubleTake.module.css";
 
 const correctAnswers = (value: number) => `${value} correct`;
-import styles from "./DoubleTake.module.css";
+const summaryOf = (correct: number, pairs: number) => `${correct} of ${pairs} correct`;
+
+type Daily = { day: string; number: number };
 
 type Phase =
   | "lobby"
@@ -86,6 +98,19 @@ const PairPhotos = ({ pair }: { pair: DoubleTakePair }) => (
 );
 
 export const DoubleTake = ({ photos }: { photos: PhotoGamePhoto[] }) => {
+  const { loading } = useGameReadiness();
+  const shareOrigin = useShareOrigin();
+  const {
+    ready: urlReady,
+    searchParams,
+    hasSearchParam,
+    replaceSearchParams,
+  } = useUrlSearchParams();
+  // The archive arrives in random order, and a seed deals from the order it is
+  // given. Every game draws from this one array, so the comparison of the
+  // archive — seconds of work, kept per array — is done once for both kinds.
+  const ordered = useMemo(() => dailyPhotoOrder(photos), [photos]);
+  const [daily, setDaily] = useState<Daily | null>(null);
   const [deck, setDeck] = useState<DoubleTakePair[]>([]);
   const [round, setRound] = useState(0);
   const [phase, setPhase] = useState<Phase>("lobby");
@@ -108,19 +133,34 @@ export const DoubleTake = ({ photos }: { photos: PhotoGamePhoto[] }) => {
   const pair = deck[round];
   const duration = slower ? 3000 : Math.max(650, 1000 - streak * 100);
 
+  const setDailyParam = (on: boolean) => {
+    if (hasSearchParam("daily") === on) return;
+    const params = new URLSearchParams(searchParams);
+    if (on) params.set("daily", "");
+    else params.delete("daily");
+    replaceSearchParams(params);
+  };
+  const leaveDaily = () => {
+    setDailyParam(false);
+    setDaily(null);
+  };
+
   useEffect(() => {
     if (phase !== "preparing") return;
     // A first comparison takes seconds; slices keep Cancel and the page responsive.
     let task = 0;
     const step = () => {
       try {
-        if (!prepareDoubleTakePairs(photos, 12)) {
+        if (!prepareDoubleTakePairs(ordered, 12)) {
           task = window.setTimeout(step, 0);
           return;
         }
-        const next = buildDoubleTakeDeck(photos);
+        const next = daily
+          ? buildDoubleTakeDeck(ordered, dailyPuzzle("double-take", daily.day).random())
+          : buildDoubleTakeDeck(ordered);
         if (!next.length) {
           setMessage("There are not enough similar photographs with known locations yet.");
+          leaveDaily();
           setPhase("lobby");
           return;
         }
@@ -128,12 +168,15 @@ export const DoubleTake = ({ photos }: { photos: PhotoGamePhoto[] }) => {
         setPhase("loading");
       } catch {
         setMessage("The pairs couldn’t be prepared. Try again.");
+        leaveDaily();
         setPhase("lobby");
       }
     };
     task = window.setTimeout(step, 0);
     return () => window.clearTimeout(task);
-  }, [phase, photos]);
+    // leaveDaily only writes the URL and clears state; it is not an input.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, ordered, daily]);
 
   useEffect(() => {
     if (phase !== "loading" || !pair) return;
@@ -186,7 +229,18 @@ export const DoubleTake = ({ photos }: { photos: PhotoGamePhoto[] }) => {
       stageRef.current?.focus();
   }, [phase]);
 
-  const start = () => {
+  const backToLobby = () => {
+    leaveDaily();
+    setPhase("lobby");
+  };
+  const start = () => deal(null);
+  const startDaily = () => {
+    const today = dailyPuzzle("double-take");
+    deal({ day: today.day, number: today.number });
+  };
+  const deal = (nextDaily: Daily | null) => {
+    setDailyParam(!!nextDaily);
+    setDaily(nextDaily);
     setMessage("");
     setRound(0);
     setScore(0);
@@ -220,8 +274,16 @@ export const DoubleTake = ({ photos }: { photos: PhotoGamePhoto[] }) => {
   const next = () => {
     if (phase !== "reveal") return;
     if (round + 1 === deck.length) {
-      // Scored by correct answers; a perfect game is a win.
-      record({ won: correctCount === deck.length, score: correctCount });
+      // Scored by correct answers; a perfect game is a win. A daily already
+      // finished today is practice: its answers are known.
+      if (!daily || !readGameStats("double-take").dailies[daily.day])
+        record({
+          won: correctCount === deck.length,
+          score: correctCount,
+          ...(daily
+            ? { daily: { day: daily.day, summary: summaryOf(correctCount, deck.length) } }
+            : {}),
+        });
       setPhase("summary");
     } else {
       setRound(round + 1);
@@ -255,17 +317,29 @@ export const DoubleTake = ({ photos }: { photos: PhotoGamePhoto[] }) => {
   ];
   useGameShortcuts(shortcuts);
 
+  // A `?daily` link opens straight onto today's pairs, once the archive is ready.
+  const dailyOpened = useRef(false);
+  useEffect(() => {
+    if (dailyOpened.current || !urlReady || loading || !photos.length) return;
+    dailyOpened.current = true;
+    if (hasSearchParam("daily")) startDaily();
+    // Runs once: startDaily reads the same props this effect waits for.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [urlReady, loading, photos]);
+
   if (phase === "preparing")
     return (
       <div className={styles.placeholder}>
         <span className={styles.spinner} aria-hidden="true" />
         <p role="status">Finding visual doubles…</p>
-        <Button variant="quiet" onClick={() => setPhase("lobby")}>
+        <Button variant="quiet" onClick={backToLobby}>
           Cancel
         </Button>
       </div>
     );
-  if (phase === "lobby")
+  if (phase === "lobby") {
+    const today = dailyPuzzle("double-take");
+    const playedToday = stats?.dailies[today.day];
     return (
       <GameIntro game="double-take">
         <p>Were two photographs taken in the same place?</p>
@@ -288,8 +362,17 @@ export const DoubleTake = ({ photos }: { photos: PhotoGamePhoto[] }) => {
           Start Double Take
           <KeyHint aria-hidden="true">N</KeyHint>
         </Button>
+        <div className={styles.actions}>
+          <Button onClick={startDaily}>Daily #{today.number}</Button>
+          <Caption as="span" size="sm">
+            {playedToday
+              ? `Played today · ${playedToday.summary}`
+              : "The same pairs for everyone today."}
+          </Caption>
+        </div>
       </GameIntro>
     );
+  }
 
   if (phase === "summary")
     return (
@@ -303,6 +386,7 @@ export const DoubleTake = ({ photos }: { photos: PhotoGamePhoto[] }) => {
         <Heading level={1}>
           {correctCount === deck.length ? "An eye for places" : "The double takes"}
         </Heading>
+        {daily ? <Caption>Daily #{daily.number}</Caption> : null}
         <GameScore score={Math.round((correctCount / deck.length) * 100)} label="Accuracy" />
         <p>
           {correctCount} of {deck.length} correct · {score} points
@@ -339,11 +423,21 @@ export const DoubleTake = ({ photos }: { photos: PhotoGamePhoto[] }) => {
           })}
         </ol>
         <ResultNextSteps photos={deck.flatMap((item) => item.photos)} />
+        {daily ? (
+          <ShareResult
+            text={dailyShareText(
+              "double-take",
+              daily.day,
+              summaryOf(correctCount, deck.length),
+              shareOrigin,
+            )}
+          />
+        ) : null}
         <Button variant="primary" onClick={start}>
           Play again
           <KeyHint aria-hidden="true">N</KeyHint>
         </Button>
-        <Button onClick={() => setPhase("lobby")}>Change viewing time</Button>
+        <Button onClick={backToLobby}>Change viewing time</Button>
       </div>
     );
 
@@ -353,6 +447,7 @@ export const DoubleTake = ({ photos }: { photos: PhotoGamePhoto[] }) => {
   return (
     <div className={styles.game}>
       <div className={styles.progress}>
+        {daily ? <Caption>Daily #{daily.number}</Caption> : null}
         <Caption>
           Pair {round + 1} of {deck.length}
         </Caption>

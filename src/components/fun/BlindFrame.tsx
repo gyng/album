@@ -35,6 +35,8 @@ export const BlindFrame = ({ photos }: { photos: PhotoGamePhoto[] }) => {
   }, []);
   const [drawing, setDrawing] = useState(false);
   const [gaveUp, setGaveUp] = useState(false);
+  // A scene tried again after its reveal is practice: the original has been seen.
+  const practice = useRef(false);
   // The round keys the sketch pad; the ref lets an old pad's late callbacks see it is stale.
   const [round, setRound] = useState(0);
   const roundRef = useRef(0);
@@ -74,6 +76,7 @@ export const BlindFrame = ({ photos }: { photos: PhotoGamePhoto[] }) => {
   useEffect(() => {
     if (!result || !target || gaveUp || !imageQuery || recordedQuery.current === imageQuery) return;
     recordedQuery.current = imageQuery;
+    if (practice.current) return;
     record({
       won: result.nearest.path === target.path,
       ...(result.score === null ? {} : { score: result.score }),
@@ -84,7 +87,7 @@ export const BlindFrame = ({ photos }: { photos: PhotoGamePhoto[] }) => {
   const giveUp = () => {
     if (gaveUp) return;
     clearImageQuery();
-    record({ won: false });
+    if (!practice.current) record({ won: false });
     setGaveUp(true);
   };
   const eligible = photos.filter((photo) => photo.caption.length >= 20 && photo.vector.length > 0);
@@ -95,6 +98,7 @@ export const BlindFrame = ({ photos }: { photos: PhotoGamePhoto[] }) => {
       shuffleGamePhotos(eligible.filter((photo) => photo.path !== previousTarget.current))[0] ??
       eligible[0]!;
     previousTarget.current = next.path;
+    practice.current = false;
     setTarget(next);
     clearImageQuery();
     blobRef.current = null;
@@ -211,6 +215,7 @@ export const BlindFrame = ({ photos }: { photos: PhotoGamePhoto[] }) => {
             </Button>
             <Button
               onClick={() => {
+                practice.current = true;
                 clearImageQuery();
                 setGaveUp(false);
                 setDrawing(true);

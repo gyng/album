@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { AppLink as Link } from "../platform";
 import { Button, Caption, Heading } from "../ui";
 import { RoundResult } from "./GuessRound";
@@ -13,7 +13,7 @@ import {
 import { useAnimatedCounter } from "./useAnimatedCounter";
 import styles from "./GuessSummary.module.css";
 import { encodePublicAssetPath } from "../../util/encodePublicAssetPath";
-import { ShareResult, dailyShareText, useShareOrigin } from "../fun/GameRecord";
+import { ShareResult, copyText, dailyShareText, useShareOrigin } from "../fun/GameRecord";
 import { guessDailySeedDay } from "./guessDaily";
 import { dailyNumber } from "../../util/gameDaily";
 import { guessWherePath } from "./guessPhotoLinks";
@@ -79,6 +79,7 @@ export const GuessSummary: React.FC<GuessSummaryProps> = ({
   const rating = getRating(totalScore, results.length, hasTimer);
   const totalCounterRef = useAnimatedCounter(totalScore);
   const [copied, setCopied] = useState(false);
+  const [copyFailed, setCopyFailed] = useState(false);
   const bestScore = Math.max(...results.map((r) => r.score));
   const totalTierColour = scoreTierColour(results.length > 0 ? totalScore / results.length : 0);
 
@@ -86,19 +87,35 @@ export const GuessSummary: React.FC<GuessSummaryProps> = ({
   const siteOrigin = useShareOrigin();
   const dailyDay = settings.daily ? guessDailySeedDay(seed) : null;
 
+  // The round's Next button unmounted as it was pressed; without this, focus
+  // falls to the page and the result is never announced.
+  const summaryRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    summaryRef.current?.focus({ preventScroll: true });
+  }, []);
+
   const handleCopyLink = useCallback(() => {
     const fullUrl = `${window.location.origin}${shareUrl}`;
-    void navigator.clipboard
-      .writeText(fullUrl)
+    void copyText(fullUrl)
       .then(() => {
+        setCopyFailed(false);
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
       })
-      .catch(() => setCopied(false));
+      .catch(() => {
+        setCopied(false);
+        setCopyFailed(true);
+      });
   }, [shareUrl]);
 
   return (
-    <div className={styles.summary}>
+    <div
+      className={styles.summary}
+      ref={summaryRef}
+      tabIndex={-1}
+      role="region"
+      aria-label="Results"
+    >
       <div className={styles.header}>
         {settings.daily ? (
           <Caption as="p" className={styles.dailyLabel}>
@@ -139,7 +156,12 @@ export const GuessSummary: React.FC<GuessSummaryProps> = ({
               style={{ animationDelay: `${idx * 0.08}s` }}
             >
               <Link href={`/album/${result.photo.albumName}#${result.photo.photoName}`}>
-                <img src={thumbSrc} alt="" className={styles.thumb} draggable={false} />
+                <img
+                  src={thumbSrc}
+                  alt={`Round ${idx + 1} photograph`}
+                  className={styles.thumb}
+                  draggable={false}
+                />
               </Link>
               <div className={styles.roundDetail}>
                 <div className={styles.roundMeta}>
@@ -197,9 +219,14 @@ export const GuessSummary: React.FC<GuessSummaryProps> = ({
             )}
           />
         ) : (
-          <Button className={styles.shareButton} onClick={handleCopyLink}>
-            {copied ? "Copied!" : "Copy challenge link"}
-          </Button>
+          <>
+            <Button className={styles.shareButton} onClick={handleCopyLink}>
+              {copied ? "Copied!" : "Copy challenge link"}
+            </Button>
+            <span role="status" className={styles.copyStatus}>
+              {copyFailed ? "Could not copy" : ""}
+            </span>
+          </>
         )}
       </div>
 

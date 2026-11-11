@@ -538,6 +538,9 @@ export const CaptionIt = ({ photos }: { photos: PhotoGamePhoto[] }) => {
             rows={3}
             onChange={(event) => setDraft(event.target.value)}
             onKeyDown={(event) => {
+              // Enter during composition confirms an input method's candidate.
+              // Safari reports that keydown after composition has ended, as 229.
+              if (event.nativeEvent.isComposing || event.keyCode === 229) return;
               if (event.key === "Enter" && !event.shiftKey) {
                 event.preventDefault();
                 event.currentTarget.form?.requestSubmit();

@@ -63,6 +63,14 @@ export const GameStatsLine = ({
   return <p className={styles.stats}>{parts.join(" · ")}</p>;
 };
 
+/**
+ * Copies text, rejecting where it cannot. `navigator.clipboard` is undefined
+ * outside a secure context, so the bare call throws before any promise exists.
+ */
+export const copyText = async (text: string): Promise<void> => {
+  await navigator.clipboard.writeText(text);
+};
+
 /** Shares through the system sheet where there is one, else copies the text. */
 export const ShareResult = ({ text }: { text: string }) => {
   const [status, setStatus] = useState("");
@@ -72,7 +80,7 @@ export const ShareResult = ({ text }: { text: string }) => {
         await navigator.share({ text });
         return;
       }
-      await navigator.clipboard.writeText(text);
+      await copyText(text);
       setStatus("Copied");
     } catch (error) {
       // Dismissing the share sheet is not a failure.

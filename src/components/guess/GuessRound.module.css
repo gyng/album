@@ -101,6 +101,15 @@
   margin-inline-start: auto;
 }
 
+/* The sound toggle sits beside Quit, so only the first of the two takes the gap. */
+.soundButton {
+  margin-inline-start: auto;
+}
+
+.soundButton + .abortButton {
+  margin-inline-start: 0;
+}
+
 .abortButton:hover {
   color: var(--c-font);
   background-color: color-mix(in oklch, var(--c-bg-contrast-light) 15%, transparent);
@@ -187,6 +196,13 @@
   will-change: transform;
   transition: transform var(--t-instant) var(--ease-out);
   animation: photoCrossfade var(--t-enter) var(--ease-out);
+}
+
+/* A clip covers the still it plays in place of; the panel keeps the gestures. */
+.clip {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
 }
 
 @keyframes photoCrossfade {

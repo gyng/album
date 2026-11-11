@@ -3,6 +3,9 @@ import { distanceMetersBetween } from "../mapRoute";
 import { Button, Caption, KeyHint } from "../ui";
 import styles from "./GuessRound.module.css";
 import { encodePublicAssetPath } from "../../util/encodePublicAssetPath";
+import { getResizedAlbumVideoSrc } from "../../util/getResizedAlbumImageSrc";
+import { isPlayableClipPath } from "../../util/videoScenePath";
+import { usePrefersReducedMotion } from "../ui/useHoverPlayClip";
 import { GuessPhoto } from "./guessTypes";
 import { fireConfetti } from "./confetti";
 import { type GameShortcut, useGameShortcuts } from "../fun/useGameShortcuts";
@@ -47,6 +50,20 @@ type GuessRoundProps = {
   mapSlot: React.ReactNode;
 };
 
+/**
+ * Whether a round's row is a clip this site can play. The Guess query does not
+ * return `media_kind`, so a row that does not say is judged by its path: only a
+ * clip carries a video container's extension. An external never qualifies.
+ */
+const isPlayableClip = (photo: GuessPhoto): boolean =>
+  (photo.mediaKind === undefined || photo.mediaKind === "video") && isPlayableClipPath(photo.path);
+
+/** The moments worth saying aloud: half time, then ten and five seconds. */
+const timerThresholds = (timeLimit: number): number[] =>
+  [Math.floor(timeLimit / 2), 10, 5].filter((seconds) => seconds > 0 && seconds < timeLimit);
+
+const seconds = (value: number) => `${value} ${value === 1 ? "second" : "seconds"}`;
+
 const getGeocodeLabel = (geocode: string): string | null => {
   if (!geocode) return null;
   let parts = geocode
@@ -87,6 +104,12 @@ export const GuessRound: React.FC<GuessRoundProps> = ({
   const [photoFailed, setPhotoFailed] = useState(false);
   // Timer state — declared here so the photo-change reset below can re-seed it.
   const [timeRemaining, setTimeRemaining] = useState(timeLimit);
+  // The last threshold the countdown crossed, spoken once by the status region.
+  const [timeAnnouncement, setTimeAnnouncement] = useState("");
+  // A clip that cannot play leaves its still, which is the round as it was.
+  const [clipFailed, setClipFailed] = useState(false);
+  const [clipMuted, setClipMuted] = useState(true);
+  const prefersReducedMotion = usePrefersReducedMotion();
 
   // Reset round-local state when the photo changes.
   // setState during render is the React-approved pattern for syncing state
@@ -102,6 +125,9 @@ export const GuessRound: React.FC<GuessRoundProps> = ({
     setPhotoLoaded(false);
     setPhotoFailed(false);
     setTimeRemaining(timeLimit);
+    setTimeAnnouncement("");
+    setClipFailed(false);
+    setClipMuted(true);
   }
   const panRef = useRef({ x: 0, y: 0 });
   const dragging = useRef(false);
@@ -386,7 +412,11 @@ export const GuessRound: React.FC<GuessRoundProps> = ({
     // so the countdown always starts from full once the photo is visible.
     let remaining = timeLimit;
 
+    const thresholds = timerThresholds(timeLimit);
+
     const interval = setInterval(() => {
+      // A hidden page holds the clock: nobody is looking at the photograph.
+      if (document.hidden) return;
       remaining -= 1;
       if (remaining <= 0) {
         clearInterval(interval);
@@ -395,6 +425,7 @@ export const GuessRound: React.FC<GuessRoundProps> = ({
         return;
       }
       setTimeRemaining(remaining);
+      if (thresholds.includes(remaining)) setTimeAnnouncement(`${seconds(remaining)} left`);
     }, 1000);
 
     return () => clearInterval(interval);
@@ -403,8 +434,14 @@ export const GuessRound: React.FC<GuessRoundProps> = ({
   const geocodeLabel = revealed ? getGeocodeLabel(photo.geocode) : null;
   const tierColour = result && !result.skipped ? scoreTierColour(result.distanceScore) : undefined;
   const isBadGuess = result && !result.skipped && result.distanceScore / MAX_SCORE < 0.1;
+  const timerRunning = Boolean(timeLimit && !revealed && photoLoaded);
+  const showClip =
+    isPlayableClip(photo) && photoLoaded && !photoFailed && !clipFailed && !prefersReducedMotion;
+  const photoTransform = `scale(${zoom}) translate(${pan.x / zoom}px, ${pan.y / zoom}px)`;
   const announcement = !result
-    ? ""
+    ? timerRunning
+      ? timeAnnouncement
+      : ""
     : result.skipped
       ? "Skipped."
       : [
@@ -421,7 +458,11 @@ export const GuessRound: React.FC<GuessRoundProps> = ({
     <div className={styles.round}>
       {/* Top bar: progress dots + cumulative score */}
       <div className={styles.topBar}>
-        <div className={styles.progressDots}>
+        <div
+          className={styles.progressDots}
+          role="img"
+          aria-label={`Round ${roundNumber} of ${totalRounds}`}
+        >
           {Array.from({ length: totalRounds }, (_, idx) => (
             <span
               key={idx}
@@ -442,6 +483,25 @@ export const GuessRound: React.FC<GuessRoundProps> = ({
         >
           <span ref={cumulativeCounterRef}>{cumulativeScore.toLocaleString("en-GB")}</span> pts
         </span>
+        {/* The bar on the photograph is the countdown a sighted player reads;
+            this is the same number for one who cannot. A timer is not a live
+            region, so it is there to be read and never interrupts. */}
+        {timerRunning ? (
+          <span className={styles.visuallyHidden} role="timer" aria-label="Time remaining">
+            {seconds(timeRemaining!)}
+          </span>
+        ) : null}
+        {showClip ? (
+          <Button
+            variant="quiet"
+            className={styles.soundButton}
+            active={!clipMuted}
+            aria-pressed={!clipMuted}
+            onClick={() => setClipMuted((muted) => !muted)}
+          >
+            Sound
+          </Button>
+        ) : null}
         <Button
           variant="quiet"
           size="icon"
@@ -490,10 +550,30 @@ export const GuessRound: React.FC<GuessRoundProps> = ({
             draggable={false}
             onLoad={() => setPhotoLoaded(true)}
             onError={() => setPhotoFailed(true)}
-            style={{
-              transform: `scale(${zoom}) translate(${pan.x / zoom}px, ${pan.y / zoom}px)`,
-            }}
+            style={{ transform: photoTransform }}
           />
+          {/* The clip plays over the still it was dealt as, once that still has
+              loaded: the still stays the round's loading gate and its fallback. */}
+          {showClip ? (
+            // A camera clip has no captions to offer, and it starts muted.
+            // oxlint-disable-next-line jsx-a11y/media-has-caption
+            <video
+              key={photo.path}
+              className={[styles.photo, styles.clip].join(" ")}
+              src={getResizedAlbumVideoSrc(photo.path)}
+              poster={photoSrc}
+              muted={clipMuted}
+              autoPlay
+              loop
+              playsInline
+              preload="auto"
+              disablePictureInPicture
+              aria-hidden="true"
+              tabIndex={-1}
+              onError={() => setClipFailed(true)}
+              style={{ transform: photoTransform }}
+            />
+          ) : null}
           {timeLimit && !revealed && photoLoaded ? (
             <div
               className={styles.timerBar}

@@ -202,3 +202,34 @@ it("records each reveal once, winning when the drawing's closest match is the or
   render(<BlindFrame photos={photos} />);
   expect(screen.getByText("Played 2 · won 1 · best 100/100")).toBeInTheDocument();
 });
+
+it("does not record a second attempt at a scene whose original has been revealed", async () => {
+  render(<BlindFrame photos={photos} />);
+  fireEvent.click(screen.getByRole("button", { name: "Start Blind Frame" }));
+  const target = photos.find((photo) => screen.queryByText(photo.caption))!;
+  const other = photos.find((photo) => photo !== target)!;
+  jest.mocked(encodeSearchImage).mockResolvedValue([...other.vector]);
+  fireEvent.click(screen.getByRole("button", { name: "Draw this scene" }));
+  await act(async () => {
+    fireEvent.click(screen.getByRole("button", { name: "Submit sketch" }));
+  });
+  expect(readGameStats("blind-frame")).toMatchObject({ played: 1, won: 0 });
+
+  // The original is on screen now, so drawing it again is practice.
+  jest.mocked(encodeSearchImage).mockResolvedValue([...target.vector]);
+  fireEvent.click(screen.getByRole("button", { name: "Try this scene again" }));
+  await act(async () => {
+    fireEvent.click(screen.getByRole("button", { name: "Submit sketch" }));
+  });
+  expect(screen.getByText("Resemblance to the original: 100 / 100")).toBeTruthy();
+  expect(readGameStats("blind-frame")).toMatchObject({ played: 1, won: 0 });
+
+  fireEvent.click(screen.getByRole("button", { name: "Try this scene again" }));
+  fireEvent.click(screen.getByRole("button", { name: "Give up" }));
+  expect(readGameStats("blind-frame")).toMatchObject({ played: 1, won: 0 });
+
+  // A new scene counts again.
+  fireEvent.click(screen.getByRole("button", { name: "Play again" }));
+  fireEvent.click(screen.getByRole("button", { name: "Give up" }));
+  expect(readGameStats("blind-frame")).toMatchObject({ played: 2, won: 0 });
+});

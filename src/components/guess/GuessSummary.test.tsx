@@ -138,6 +138,36 @@ describe("GuessSummary", () => {
     );
   });
 
+  it("reports a copy that cannot happen instead of throwing on an insecure origin", async () => {
+    // `navigator.clipboard` is undefined outside a secure context.
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: undefined });
+    renderSummary([result(1_000)]);
+
+    expect(() =>
+      fireEvent.click(screen.getByRole("button", { name: "Copy challenge link" })),
+    ).not.toThrow();
+    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Could not copy"));
+  });
+
+  it("takes focus when it appears and names each photograph's link", () => {
+    renderSummary([
+      result(1_000),
+      result(2_000, {
+        photo: photo({ path: "/data/albums/test-simple/b.jpg", photoName: "b.jpg", geocode: "" }),
+      }),
+    ]);
+
+    expect(screen.getByRole("region", { name: "Results" })).toHaveFocus();
+    expect(screen.getByRole("link", { name: "Round 1 photograph" })).toHaveAttribute(
+      "href",
+      "/album/test-simple#photo.jpg",
+    );
+    expect(screen.getByRole("link", { name: "Round 2 photograph" })).toHaveAttribute(
+      "href",
+      "/album/test-simple#b.jpg",
+    );
+  });
+
   it("shares a finished daily as a spoiler-free result", async () => {
     renderSummary([result(1_000)], { rounds: 5, timeLimit: null, daily: true }, "daily-2026-10-16");
 

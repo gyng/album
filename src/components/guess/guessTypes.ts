@@ -5,6 +5,8 @@ export type GuessPhoto = {
   geocode: string;
   albumName: string;
   photoName: string;
+  /** "video" for a clip, where the index says; absent when it does not. */
+  mediaKind?: string;
 };
 
 export type GameSettings = {

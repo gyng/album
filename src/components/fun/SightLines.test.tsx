@@ -76,13 +76,13 @@ it("starts the advanced board with longer lines and supports arrow navigation an
   fireEvent.keyDown(window, { key: "n" });
   const board = screen.getByRole("group", { name: "Photo search board" });
   expect(within(board).getAllByRole("button")).toHaveLength(100);
-  const first = within(board).getByRole("button", { name: "Row 1, column 1" });
+  const first = within(board).getByRole("button", { name: /Row 1, column 1$/ });
   first.focus();
   fireEvent.keyDown(first, { key: "ArrowRight" });
-  const second = within(board).getByRole("button", { name: "Row 1, column 2" });
+  const second = within(board).getByRole("button", { name: /Row 1, column 2$/ });
   expect(second).toHaveFocus();
   fireEvent.keyDown(second, { key: "ArrowDown" });
-  expect(within(board).getByRole("button", { name: "Row 2, column 2" })).toHaveFocus();
+  expect(within(board).getByRole("button", { name: /Row 2, column 2$/ })).toHaveFocus();
   fireEvent.keyDown(window, { key: "h" });
   expect(within(board).getByRole("button", { name: /hint starts here/ })).toBeTruthy();
   fireEvent.keyDown(window, { key: "g" });
@@ -97,7 +97,7 @@ it("stops arrow navigation at the edges of the board", () => {
   fireEvent.click(screen.getByRole("button", { name: "Start searching" }));
   const board = screen.getByRole("group", { name: "Photo search board" });
   const cell = (row: number, column: number) =>
-    within(board).getByRole("button", { name: new RegExp(`^Row ${row}, column ${column}\\b`) });
+    within(board).getByRole("button", { name: new RegExp(`\\bRow ${row}, column ${column}\\b`) });
   for (const [row, column, key] of [
     [1, 3, "ArrowUp"],
     [5, 2, "ArrowDown"],
@@ -211,4 +211,23 @@ it("records each finished game once and summarises it in the lobby", () => {
   unmount();
   render(<SightLines photos={photos} />);
   expect(screen.getByText("Played 1 · won 0")).toBeTruthy();
+});
+
+it("names each tile by what its photograph shows, then where it sits and how it stands", () => {
+  const puzzle = buildPhotoWordSearch(photos, 5, () => 0.37)!;
+  render(<SightLines photos={photos} />);
+  fireEvent.click(screen.getByRole("button", { name: "Start searching" }));
+  const board = screen.getByRole("group", { name: "Photo search board" });
+  const cells = within(board).getAllByRole("button");
+  cells.forEach((cell, index) =>
+    expect(cell).toHaveAccessibleName(
+      `${puzzle.tiles[index]!.caption}. Row ${Math.floor(index / 5) + 1}, column ${(index % 5) + 1}`,
+    ),
+  );
+  const target = puzzle.targets[0]!;
+  fireEvent.click(cells[target.cells[0]!]!);
+  fireEvent.click(cells[target.cells[2]!]!);
+  expect(cells[target.cells[1]!]).toHaveAccessibleName(
+    new RegExp(`^${puzzle.tiles[target.cells[1]!]!.caption}\\. Row \\d, column \\d; .*found`),
+  );
 });

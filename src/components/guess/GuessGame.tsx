@@ -8,7 +8,7 @@ import { GuessLobby } from "./GuessLobby";
 import { GameSettings, GuessPhoto } from "./guessTypes";
 import styles from "./GuessGame.module.css";
 import { GuessMapDeferred } from "./GuessMapDeferred";
-import { guessDailySeed, guessDailySeedDay } from "./guessDaily";
+import { GUESS_POOL_LIMIT, dealGuessPhotos, guessDailySeed, guessDailySeedDay } from "./guessDaily";
 import { guessGameTotals } from "./guessScoring";
 import { useGameStats } from "../fun/useGameStats";
 import { GUESS_PHOTO_LIMIT } from "./guessPhotoLinks";
@@ -52,6 +52,7 @@ const parsePhotos = (rows: RandomPhotoRow[]): GuessPhoto[] => {
         geocode: row.geocode,
         albumName,
         photoName,
+        ...(row.mediaKind ? { mediaKind: row.mediaKind } : {}),
       },
     ];
   });
@@ -199,16 +200,21 @@ export const GuessGame: React.FC<GuessGameProps> = ({
         ? ""
         : sharedSeed || (state.settings.daily ? guessDailySeed() : generateSeed());
       try {
+        // A seeded game takes the whole placed pool and deals from it here,
+        // where the pool can be put in a known order first.
         const rows = named
           ? await fetchGuessPhotos({ database, count: GUESS_PHOTO_LIMIT, paths: named })
           : await fetchGuessPhotos({
               database,
-              count: state.settings.rounds + 5,
+              count: GUESS_POOL_LIMIT,
               ...(state.settings.region ? { region: state.settings.region } : {}),
-              seed,
             });
         if (cancelled) return;
-        const parsed = parsePhotos(rows).slice(0, state.settings.rounds);
+        const placed = parsePhotos(rows);
+        const parsed = (named ? placed : dealGuessPhotos(placed, seed)).slice(
+          0,
+          state.settings.rounds,
+        );
 
         if (parsed.length === 0) {
           dispatch({

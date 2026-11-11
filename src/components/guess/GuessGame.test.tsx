@@ -10,6 +10,7 @@ import { extractGPSFromExifString } from "../../util/extractExifFromDb";
 import { GuessGame } from "./GuessGame";
 import type { GameSettings, GuessPhoto } from "./guessTypes";
 import type { RoundResult } from "./GuessRound";
+import { GUESS_POOL_LIMIT } from "./guessDaily";
 
 let mockStartSettings: GameSettings = { rounds: 2, timeLimit: 30, region: "Japan" };
 
@@ -195,11 +196,11 @@ describe("GuessGame", () => {
     const firstRound = await screen.findByTestId("round");
     expect(firstRound).toHaveAttribute("data-round", "1");
     expect(firstRound).toHaveAttribute("data-total", "2");
+    // The whole placed pool is asked for; the seed deals from it here.
     expect(fetchGuessPhotosMock).toHaveBeenCalledWith({
       database,
-      count: 7,
+      count: GUESS_POOL_LIMIT,
       region: "Japan",
-      seed: "i",
     });
     expect(onSeedGenerated).toHaveBeenCalledWith("i", {
       rounds: 2,
@@ -213,9 +214,11 @@ describe("GuessGame", () => {
       JSON.stringify({ lat: 10, lng: 20 }),
     );
     fireEvent.click(screen.getByRole("button", { name: "Reveal mocked round" }));
+    // Seed "i" deals the second photograph first.
+    expect(screen.getByTestId("round")).toHaveAttribute("data-path", "../albums/second/two.jpg");
     expect(screen.getByTestId("guess-map")).toHaveAttribute(
       "data-reveal",
-      JSON.stringify({ lat: 35, lng: 139 }),
+      JSON.stringify({ lat: 48, lng: 2 }),
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Complete mocked round" }));
@@ -260,19 +263,20 @@ describe("GuessGame", () => {
   });
 
   it("replays the same settings and can return to the lobby", async () => {
+    const onSeedGenerated = jest.fn();
     render(
       <GuessGame
         database={database}
         initialSettings={{ rounds: 1, timeLimit: null }}
         seed="shared-seed"
+        onSeedGenerated={onSeedGenerated}
       />,
     );
     await screen.findByTestId("round");
-    expect(fetchGuessPhotosMock).toHaveBeenCalledWith({
-      database,
-      count: 6,
-      region: undefined,
-      seed: "shared-seed",
+    expect(fetchGuessPhotosMock).toHaveBeenCalledWith({ database, count: GUESS_POOL_LIMIT });
+    expect(onSeedGenerated).toHaveBeenLastCalledWith("shared-seed", {
+      rounds: 1,
+      timeLimit: null,
     });
 
     fireEvent.click(screen.getByRole("button", { name: "Complete mocked round" }));
@@ -280,14 +284,15 @@ describe("GuessGame", () => {
     expect(screen.getByText("Loading photos…")).toBeInTheDocument();
     await waitFor(() => expect(fetchGuessPhotosMock).toHaveBeenCalledTimes(2));
     // The shared seed deals the challenge once; a replay deals new photographs.
-    expect(fetchGuessPhotosMock).toHaveBeenLastCalledWith(expect.objectContaining({ seed: "i" }));
     await screen.findByTestId("round");
+    expect(onSeedGenerated).toHaveBeenLastCalledWith("i", { rounds: 1, timeLimit: null });
     fireEvent.click(screen.getByRole("button", { name: "Abort mocked round" }));
 
     expect(screen.getByTestId("lobby")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Start mocked game" }));
     await waitFor(() => expect(fetchGuessPhotosMock).toHaveBeenCalledTimes(3));
-    expect(fetchGuessPhotosMock).toHaveBeenLastCalledWith(expect.objectContaining({ seed: "i" }));
+    await screen.findByTestId("round");
+    expect(onSeedGenerated).toHaveBeenLastCalledWith("i", mockStartSettings);
   });
 
   it("replays a daily challenge as a fresh practice game", async () => {
@@ -305,24 +310,53 @@ describe("GuessGame", () => {
     fireEvent.click(screen.getByRole("button", { name: "Play again" }));
 
     await waitFor(() => expect(fetchGuessPhotosMock).toHaveBeenCalledTimes(2));
-    expect(fetchGuessPhotosMock).toHaveBeenLastCalledWith(expect.objectContaining({ seed: "i" }));
     await screen.findByTestId("round");
     expect(onSeedGenerated).toHaveBeenLastCalledWith("i", { rounds: 1, timeLimit: null });
   });
 
   it("uses a camera-local calendar date for daily seeds", async () => {
     jest.useFakeTimers().setSystemTime(new Date(2026, 6, 14, 23, 30));
+    const onSeedGenerated = jest.fn();
     render(
       <GuessGame
         database={database}
         initialSettings={{ rounds: 1, timeLimit: null, daily: true }}
+        onSeedGenerated={onSeedGenerated}
       />,
     );
 
     await screen.findByTestId("round");
-    expect(fetchGuessPhotosMock).toHaveBeenCalledWith(
-      expect.objectContaining({ seed: "daily-2026-07-14" }),
-    );
+    expect(onSeedGenerated).toHaveBeenCalledWith("daily-2026-07-14", expect.anything());
+  });
+
+  // Rows come back in the order the database scans them, which follows how the
+  // archive was indexed; a seed that shuffled that order dealt by accident.
+  it("deals a daily the same however the database orders its rows", async () => {
+    jest.useFakeTimers().setSystemTime(new Date(2026, 6, 14, 12, 0));
+    const pool = Array.from({ length: 30 }, (_, index) => ({
+      path: `../albums/pool/${String(index).padStart(2, "0")}.jpg`,
+      exif: "gps-one",
+      geocode: "",
+    }));
+    const dealt = async (rows: typeof pool) => {
+      fetchGuessPhotosMock.mockResolvedValue(rows);
+      const view = render(
+        <GuessGame
+          database={database}
+          initialSettings={{ rounds: 3, timeLimit: null, daily: true }}
+        />,
+      );
+      const paths: string[] = [];
+      for (let round = 0; round < 3; round++) {
+        paths.push((await screen.findByTestId("round")).getAttribute("data-path")!);
+        fireEvent.click(screen.getByRole("button", { name: "Complete mocked round" }));
+      }
+      view.unmount();
+      return paths;
+    };
+    const first = await dealt(pool);
+    expect(new Set(first).size).toBe(3);
+    expect(await dealt([...pool].reverse())).toEqual(first);
   });
 
   it("returns to the lobby when no usable GPS photos are available", async () => {
