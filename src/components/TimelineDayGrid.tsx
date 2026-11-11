@@ -1,3 +1,4 @@
+import { formatMediaCountOf } from "../util/mediaCount";
 import { Icon } from "./ui/Icon";
 import { AppLink as Link } from "./platform";
 import React from "react";
@@ -49,26 +50,36 @@ export const TimelineDayGrid = ({
 }) => {
   const mapLoadTargetRef = React.useRef<HTMLDivElement | null>(null);
   const [isMapVisible, setIsMapVisible] = React.useState(false);
-  const mappableEntries = entries.filter(
-    (entry): entry is TimelineEntry & { decLat: number; decLng: number } =>
-      entry.decLat !== null &&
-      entry.decLat !== undefined &&
-      entry.decLng !== null &&
-      entry.decLng !== undefined,
+  // Memoised on the day's entries: the map re-fits whenever this list changes
+  // identity, so rebuilt on every render it threw away the reader's pan and zoom.
+  const mapPhotos = React.useMemo(
+    (): MapWorldEntry[] =>
+      entries
+        .filter(
+          (entry): entry is TimelineEntry & { decLat: number; decLng: number } =>
+            entry.decLat !== null &&
+            entry.decLat !== undefined &&
+            entry.decLng !== null &&
+            entry.decLng !== undefined,
+        )
+        .map((entry) => ({
+          album: entry.album,
+          ...(entry.mediaKind
+            ? // The clip's own file, which its pin plays on hover as on /map.
+              { mediaKind: entry.mediaKind, clipPath: toSimilarSearchPath(entry.path) }
+            : {}),
+          src: entry.src,
+          decLat: entry.decLat,
+          decLng: entry.decLng,
+          date: entry.dateTimeOriginal,
+          dateOffset: entry.dateOffset ?? null,
+          href: entry.href,
+          placeholderColor: entry.placeholderColor,
+          placeholderWidth: entry.placeholderWidth,
+          placeholderHeight: entry.placeholderHeight,
+        })),
+    [entries],
   );
-  const mapPhotos: MapWorldEntry[] = mappableEntries.map((entry) => ({
-    album: entry.album,
-    ...(entry.mediaKind ? { mediaKind: entry.mediaKind } : {}),
-    src: entry.src,
-    decLat: entry.decLat,
-    decLng: entry.decLng,
-    date: entry.dateTimeOriginal,
-    dateOffset: entry.dateOffset ?? null,
-    href: entry.href,
-    placeholderColor: entry.placeholderColor,
-    placeholderWidth: entry.placeholderWidth,
-    placeholderHeight: entry.placeholderHeight,
-  }));
 
   // Without an observer there is no way to defer the map, so it loads at once.
   const unobservable = useIntersectionObserverMissing();
@@ -148,7 +159,7 @@ export const TimelineDayGrid = ({
           </Heading>
         </div>
         <Caption as="div" size="sm">
-          {entries.length} photo{entries.length === 1 ? "" : "s"}
+          {formatMediaCountOf(entries)}
         </Caption>
       </div>
 

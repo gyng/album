@@ -19,6 +19,7 @@ const trip = (over: Partial<Trip> = {}): Trip => ({
   endDate: "2016-11-26",
   dayCount: 14,
   photoCount: 167,
+  clipCount: 0,
   country: "Japan",
   places: ["Osaka"],
   albums: ["kansai"],
@@ -32,6 +33,7 @@ const trip = (over: Partial<Trip> = {}): Trip => ({
     {
       date: "2016-11-13",
       count: 1,
+      clipCount: 0,
       from: "09:00",
       to: "10:00",
       places: [],

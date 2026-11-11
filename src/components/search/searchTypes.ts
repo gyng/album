@@ -19,6 +19,10 @@ export type SearchResultRow = {
   /** "video" for a clip indexed through its poster frame; absent for photos and
    *  for databases built before videos were indexed. */
   mediaKind?: string | undefined;
+  /** A clip's camera-local wall clock from `metadata`; its EXIF text is empty. */
+  capturedAtLocal?: string | undefined;
+  /** Seconds into a clip where a keyword search matched its timeline. */
+  momentSeconds?: number | undefined;
   durationSeconds?: number | undefined;
   matchingColor?: [number, number, number] | undefined;
 };

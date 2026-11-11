@@ -448,6 +448,20 @@ describe("pickRemixCompanions", () => {
     expect(pick.companions[0]?.path).toBe("data/albums/b/1.jpg");
   });
 
+  // The index writes "city\nregion\nsubregion\ncountry". Read as the older
+  // "code, city, …" layout, the city came out as the region, so the whole of
+  // Hokkaido grouped — and was labelled — as one city.
+  test("reads city and region from a current four-line geocode", () => {
+    const seed: RandomPhotoRow = {
+      path: "a/1.jpg",
+      exif: "",
+      geocode: "Sapporo\nHokkaido\nSapporo-shi\nJapan",
+    };
+    expect(describeRemix("same-city", [seed])).toBe("Sapporo");
+    expect(describeRemix("same-region", [seed])).toBe("Hokkaido");
+    expect(describeRemix("same-country", [seed])).toBe("Japan");
+  });
+
   test("same-city strategy matches the city line of the geocode", () => {
     const seedTokyo: RandomPhotoRow = {
       path: "data/albums/japan/seed.jpg",

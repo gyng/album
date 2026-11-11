@@ -413,6 +413,16 @@ describe("database cache", () => {
     expect(global.fetch).toHaveBeenCalledTimes(1);
   });
 
+  // A dead worker's handle rejects every query; left in the cache it was
+  // handed back until a full reload.
+  it("reloads a database whose handle was evicted as dead", async () => {
+    const database = await databaseLoaderInternals.getDatabase("/dead.sqlite");
+    databaseLoaderInternals.evictDatabase(database);
+    const reloaded = await databaseLoaderInternals.getDatabase("/dead.sqlite");
+    expect(reloaded).not.toBe(database);
+    expect(global.fetch).toHaveBeenCalledTimes(2);
+  });
+
   it("promotes a refreshed catalogue only after both core and vectors finish", async () => {
     let finishVectors!: (value: typeof sqlite) => void;
     (sqlite3InitModule as jest.Mock).mockResolvedValueOnce(sqlite).mockImplementationOnce(

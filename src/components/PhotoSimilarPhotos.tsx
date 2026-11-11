@@ -13,7 +13,9 @@ export const PhotoSimilarPhotos: React.FC<{
   const pageSize = props.pageSize ?? 8;
   const initialVisibleCount = Math.max(pageSize - 1, 1);
   const [database, progress, , databaseError] = useDatabase();
-  const [embeddingsDatabase, embeddingsProgress] = useEmbeddingsDatabase(Boolean(props.path));
+  const [embeddingsDatabase, embeddingsProgress, , embeddingsError] = useEmbeddingsDatabase(
+    Boolean(props.path),
+  );
   const [results, setResults] = React.useState<SearchResultRow[]>([]);
   const [offset, setOffset] = React.useState(0);
   const [hasNextPage, setHasNextPage] = React.useState(false);
@@ -128,6 +130,8 @@ export const PhotoSimilarPhotos: React.FC<{
           Loading search index
           {progress > 0 ? ` (${Math.round(progress)}%)` : ""}…
         </p>
+      ) : embeddingsError && !embeddingsDatabase ? (
+        <p className={styles.similarPhotosStatus}>The similarity index could not be loaded.</p>
       ) : !embeddingsDatabase ? (
         <p className={styles.similarPhotosStatus}>
           Loading similarity index

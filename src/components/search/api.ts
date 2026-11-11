@@ -4,9 +4,15 @@ import { METADATA_FACETS, weatherFacetValue } from "../../util/metadataFacets";
 import { hashSeed, mulberry32 } from "../../util/seededRandom";
 import { weatherCondition } from "../../util/weather";
 import { Database } from "@sqlite.org/sqlite-wasm";
+import { matchTimelineMoment, withMoment } from "../../util/clipTimelineMatch";
 import { SearchResultRow } from "./searchTypes";
 import { RGB, deltaE, rgbToLab, parseColorPalette } from "../../util/colorDistance";
-import { clipPathOf, collapseSceneRanking, sceneSecondsOf } from "../../util/videoScenePath";
+import {
+  clipPathOf,
+  collapseSceneRanking,
+  isPathOrClipAllowed,
+  sceneSecondsOf,
+} from "../../util/videoScenePath";
 import { SearchFacetSelection } from "../../util/searchFacets";
 import { SimilarityOrder } from "./searchUtils";
 import {
@@ -200,6 +206,50 @@ const attachMediaMetadata = async <T extends { path: string }>(
   }
 };
 
+/**
+ * Point a keyword hit on a clip at the moment the words are in. The clip's
+ * timeline is searchable text, so a phrase said forty seconds in finds the
+ * clip; without this the result opened it at its first frame.
+ */
+const attachTimelineMoments = async <
+  T extends { path: string; mediaKind?: string | undefined; album_relative_path: string },
+>(
+  database: Database,
+  rows: T[],
+  query: string,
+): Promise<T[]> => {
+  const clips = rows.filter((row) => row.mediaKind === MEDIA_KIND_VIDEO);
+  if (clips.length === 0 || !searchMetadataColumns(database).has("timeline_json")) {
+    return rows;
+  }
+
+  try {
+    const result = await exec(
+      database,
+      `SELECT path, timeline_json FROM metadata
+        WHERE timeline_json IS NOT NULL AND path IN (${clips.map(() => "?").join(", ")})`,
+      clips.map((row) => row.path),
+    );
+    const timelines = new Map(
+      (result.data as unknown as any[][]).map((row) => [String(row[0]), row[1] as string | null]),
+    );
+    return rows.map((row) => {
+      const moment = matchTimelineMoment(timelines.get(row.path), query);
+      return moment
+        ? {
+            ...row,
+            album_relative_path: withMoment(row.album_relative_path, moment.start),
+            momentSeconds: moment.start,
+          }
+        : row;
+    });
+  } catch (err) {
+    // A deep link is not worth failing a search over.
+    console.error("Failed to read clip timelines", err);
+    return rows;
+  }
+};
+
 const EXIF_DATE_SQL = `CASE
   WHEN instr(images.exif, 'DateTimeOriginal:') > 0 THEN replace(
     substr(
@@ -341,7 +391,7 @@ const searchMetadataColumns = (db: Database): Set<string> => {
   const cached = metadataColumnCache.get(db);
   if (cached) return cached;
   const columns = new Set<string>();
-  for (const name of ["aspect_ratio", "orientation", "weather_json", "scene_of"]) {
+  for (const name of ["aspect_ratio", "orientation", "weather_json", "scene_of", "timeline_json"]) {
     try {
       db.exec({
         sql: `SELECT 1 FROM pragma_table_info('metadata') WHERE name = '${name}' LIMIT 1`,
@@ -1360,9 +1410,10 @@ export const fetchResults = async (opts: {
       },
     );
 
-    const withMedia = await attachMediaMetadata(
+    const withMedia = await attachTimelineMoments(
       database,
-      mapImageRows(result.data as unknown as any[][]),
+      await attachMediaMetadata(database, mapImageRows(result.data as unknown as any[][])),
+      query,
     );
     result.data = withMedia.map((row) => {
       const colorData = colorMap?.get(row.path);
@@ -1643,7 +1694,7 @@ export const fetchSemanticResults = async (opts: {
       modelId,
     });
     const filteredRankedPaths = allowedPaths
-      ? rankedPaths.filter((candidate) => allowedPaths.has(candidate.path))
+      ? rankedPaths.filter((candidate) => isPathOrClipAllowed(allowedPaths, candidate.path))
       : rankedPaths;
     const pageSlice = filteredRankedPaths.slice(page * pageSize, (page + 1) * pageSize);
     const details = await fetchResultsByPaths(
@@ -1663,7 +1714,8 @@ export const fetchSemanticResults = async (opts: {
         ...row,
         snippet: getResultSnippet(row),
         similarity: candidate.similarity,
-        matchingColor: colorMap?.get(candidate.path)?.matchingColor,
+        matchingColor: (colorMap?.get(candidate.path) ?? colorMap?.get(clipPathOf(candidate.path)))
+          ?.matchingColor,
       });
     }
 
@@ -1753,7 +1805,7 @@ export const fetchHybridResults = async (opts: {
       vectorResults,
     });
     const filteredResults = allowedPaths
-      ? fusedResults.filter((candidate) => allowedPaths.has(candidate.path))
+      ? fusedResults.filter((candidate) => isPathOrClipAllowed(allowedPaths, candidate.path))
       : fusedResults;
     const pageSlice = filteredResults.slice(page * pageSize, (page + 1) * pageSize);
     const details = await fetchResultsByPaths(
@@ -1775,7 +1827,8 @@ export const fetchHybridResults = async (opts: {
         bm25: candidate.bm25,
         similarity: candidate.similarity,
         rrfScore: candidate.rrfScore,
-        matchingColor: colorMap?.get(candidate.path)?.matchingColor,
+        matchingColor: (colorMap?.get(candidate.path) ?? colorMap?.get(clipPathOf(candidate.path)))
+          ?.matchingColor,
       });
     }
 
@@ -1829,6 +1882,10 @@ export const fetchRecentResults = async (opts: {
   pageSize: number;
 }): Promise<SearchResultRow[]> => {
   const { database, pageSize } = opts;
+  // Scenes are excluded in the query, not after it: dropped after the LIMIT, a
+  // recent long clip's sixty moments shortened the page, and callers read a
+  // short page as the end of the list.
+  const notScene = notSceneSql(searchMetadataColumns(database));
 
   try {
     const recentResults = await exec(
@@ -1836,7 +1893,7 @@ export const fetchRecentResults = async (opts: {
       `SELECT ${IMAGE_COLUMN_SELECTS.join(", ")}
         FROM images
         LEFT JOIN metadata m ON m.path = images.path
-        WHERE ${NORMALIZED_IMAGE_DATE_SQL} != ''
+        WHERE ${NORMALIZED_IMAGE_DATE_SQL} != ''${notScene ? ` AND ${notScene}` : ""}
         ORDER BY ${NORMALIZED_IMAGE_DATE_SQL} DESC
         LIMIT ?`,
       [pageSize],
@@ -1871,7 +1928,7 @@ export const fetchMemoryCandidates = async (opts: {
     const result = await exec(
       database,
       `SELECT ${IMAGE_COLUMN_SELECTS.join(", ")}, ${NORMALIZED_IMAGE_DATE_SQL} AS isoDate${
-        media ? ", m.media_kind, m.duration_seconds" : ""
+        media ? ", m.media_kind, m.duration_seconds, m.iso8601" : ""
       }
         FROM images
         LEFT JOIN metadata m ON m.path = images.path
@@ -1892,6 +1949,8 @@ export const fetchMemoryCandidates = async (opts: {
         const isoDate = String(row[IMAGE_COLUMNS.length] ?? "");
         const mediaKind = media ? row[IMAGE_COLUMNS.length + 1] : null;
         const durationSeconds = media ? row[IMAGE_COLUMNS.length + 2] : null;
+        // A clip's EXIF text is empty, so its tile reads the date from here.
+        const capturedAtLocal = media ? row[IMAGE_COLUMNS.length + 3] : null;
         return {
           ...(resolved as SearchResultRow),
           isoDate,
@@ -1900,6 +1959,9 @@ export const fetchMemoryCandidates = async (opts: {
             ? {
                 mediaKind: MEDIA_KIND_VIDEO,
                 ...(typeof durationSeconds === "number" ? { durationSeconds } : {}),
+                ...(typeof capturedAtLocal === "string" && capturedAtLocal
+                  ? { capturedAtLocal }
+                  : {}),
               }
             : {}),
         };
@@ -1920,11 +1982,19 @@ export const fetchRandomResults = async (opts: {
 
   try {
     const placeholders = excludePaths.map(() => "?").join(", ");
-    const whereClause = excludePaths.length > 0 ? `WHERE path NOT IN (${placeholders})` : "";
+    // Scenes are excluded in the query (see fetchRecentResults): one scene in a
+    // draw made a short page, which ended the random grid for good.
+    const notScene = notSceneSql(searchMetadataColumns(database));
+    const conditions = [
+      excludePaths.length > 0 ? `images.path NOT IN (${placeholders})` : "",
+      notScene,
+    ].filter(Boolean);
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
     const randomResults = await exec(
       database,
       `SELECT ${IMAGE_COLUMN_SELECTS.join(", ")}
         FROM images
+        ${notScene ? "LEFT JOIN metadata m ON m.path = images.path" : ""}
         ${whereClause}
         ORDER BY RANDOM()
         LIMIT ?`,

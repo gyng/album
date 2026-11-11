@@ -115,6 +115,34 @@ describe("SearchResultsGrid", () => {
     expect(screen.getByRole("status")).toHaveTextContent("Searching…");
   });
 
+  // The live region only ever said "Searching…": a screen-reader user heard a
+  // search start and never heard how it ended.
+  it("announces how a search ended", () => {
+    const view = render(
+      <SearchResultsGrid
+        {...baseProps}
+        searchInputValue="query"
+        results={[result("a.jpg"), result("b.jpg")]}
+        isSuccess
+      />,
+    );
+    expect(screen.getByRole("status")).toHaveTextContent("2 results");
+    view.rerender(
+      <SearchResultsGrid {...baseProps} searchInputValue="query" results={[]} isSuccess />,
+    );
+    expect(screen.getByRole("status")).toHaveTextContent("No results");
+    view.rerender(
+      <SearchResultsGrid
+        {...baseProps}
+        searchInputValue="query"
+        results={[result("a.jpg")]}
+        isSuccess
+        hasNextPage
+      />,
+    );
+    expect(screen.getByRole("status")).toHaveTextContent("1 result, more below");
+  });
+
   it("renders results, forwards actions, and distinguishes trail members", () => {
     const onSearchByColor = jest.fn();
     const { container } = render(

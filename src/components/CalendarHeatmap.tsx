@@ -1,3 +1,4 @@
+import { formatMediaCountOf } from "../util/mediaCount";
 import { AppLink as Link } from "./platform";
 import React from "react";
 import { getRelativeTimeString } from "../util/time";
@@ -152,7 +153,7 @@ const CalendarHeatmapYear = React.memo(
                     }
                     aria-label={
                       isInteractive
-                        ? `${formattedDate}: ${count} ${count === 1 ? "photo" : "photos"}`
+                        ? `${formattedDate}: ${formatMediaCountOf(dateEntries)}`
                         : `${formattedDate}: ${isFuture ? "future date" : "no photos"}`
                     }
                     aria-current={isToday ? "date" : undefined}

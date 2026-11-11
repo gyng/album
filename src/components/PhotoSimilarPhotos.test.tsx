@@ -55,6 +55,15 @@ describe("PhotoSimilarPhotos", () => {
     expect(screen.getByText("Loading similarity index…")).toBeInTheDocument();
   });
 
+  // The embeddings error was discarded, so a failed load read as loading forever.
+  it("says so when the similarity index fails to load", () => {
+    (useDatabase as jest.Mock).mockReturnValue([{ name: "db" }, 100]);
+    (useEmbeddingsDatabase as jest.Mock).mockReturnValue([null, 0, null, new Error("offline")]);
+    render(<PhotoSimilarPhotos path="photo.jpg" />);
+    expect(screen.queryByText(/Loading similarity index/)).not.toBeInTheDocument();
+    expect(screen.getByText(/similarity index could not be loaded/i)).toBeInTheDocument();
+  });
+
   it("does not load databases when no source path is available", () => {
     (useDatabase as jest.Mock).mockReturnValue([null, 0]);
     (useEmbeddingsDatabase as jest.Mock).mockReturnValue([null, 0]);

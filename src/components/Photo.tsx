@@ -6,6 +6,7 @@ import { License } from "../License";
 import { getDegLatLngFromExif } from "../util/dms2deg";
 import { HydratedRelativeTime } from "./HydratedRelativeTime";
 import { getPhotoAltText } from "../lib/alt";
+import { getGeocodeLabel } from "../util/geocode";
 import { FacetLinkIcon } from "./FacetLinkIcon";
 import { Heading } from "./ui";
 import { AppLink } from "./platform";
@@ -91,14 +92,7 @@ const ExifCoordinatesRow: React.FC<{ row: ExifCoordinatesRowProps }> = (props) =
               <FacetLinkIcon href={locationHref} label="Find photos from this place" />
             ) : null}
           </span>
-          {props.row.data.geocode ? (
-            <div>
-              {props.row.data.geocode
-                .split("\n")
-                .filter((v, i) => i === 1 || i > 4)
-                .join(", ")}
-            </div>
-          ) : null}
+          {props.row.data.geocode ? <div>{getGeocodeLabel(props.row.data.geocode)}</div> : null}
         </td>
       </tr>
       {props.row.options.showMap && decLng != null && decLat != null ? (

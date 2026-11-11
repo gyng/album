@@ -243,7 +243,8 @@ export const clusterStops = (stops: RouteStop[]): RouteMarker[] => {
       continue;
     }
     markers.push({
-      key: stop.date,
+      // Stops are per photograph, so a day alone repeats within a trip.
+      key: `${stop.date}:${markers.length}`,
       lat: stop.lat,
       lng: stop.lng,
       ...(stop.src ? { src: stop.src } : {}),

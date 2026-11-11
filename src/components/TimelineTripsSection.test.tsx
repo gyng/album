@@ -42,7 +42,7 @@ describe("TimelineTripsSection", () => {
       />,
     );
 
-    expect(screen.getByText(/3 days · 4 photos/)).toBeInTheDocument();
+    expect(screen.getByText(/3 days · 3 photos and 1 clip/)).toBeInTheDocument();
   });
 
   it("lists the journeys the entries contain", () => {

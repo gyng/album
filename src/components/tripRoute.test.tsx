@@ -14,6 +14,7 @@ import {
 const day = (over: Partial<Trip["days"][number]>): Trip["days"][number] => ({
   date: "2016-11-13",
   count: 1,
+  clipCount: 0,
   from: "09:00",
   to: "10:00",
   places: [],

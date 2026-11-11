@@ -29,6 +29,8 @@ export type TripPhoto = {
   lens?: string | null;
   /** Classifier tags for this photograph. */
   tags?: string[];
+  /** "video" for a clip, so counts can name clips as clips. */
+  mediaKind?: "video";
 };
 
 /** One piece of equipment and how many of a trip's frames it took. */
@@ -53,6 +55,8 @@ export type DistinctiveTag = {
 export type TripDay = {
   date: string;
   count: number;
+  /** How many of `count` are clips. */
+  clipCount: number;
   /** First and last wall-clock time of the day, "HH:MM". */
   from: string;
   to: string;
@@ -79,7 +83,10 @@ export type Trip = {
   startDate: string;
   endDate: string;
   dayCount: number;
+  /** Every dated piece of media, clips included. */
   photoCount: number;
+  /** How many of `photoCount` are clips. */
+  clipCount: number;
   country: string | null;
   places: string[];
   albums: string[];
@@ -382,6 +389,7 @@ export function computeTrips(photos: TripPhoto[]): Trip[] {
       return {
         date: key,
         count: items.length,
+        clipCount: items.filter((item) => item.mediaKind === "video").length,
         from: clockTime(items[0]?.date ?? ""),
         to: clockTime(items[items.length - 1]?.date ?? ""),
         places: placeSequence(items),
@@ -405,6 +413,7 @@ export function computeTrips(photos: TripPhoto[]): Trip[] {
       endDate: keys[keys.length - 1]!,
       dayCount: keys.length,
       photoCount: all.length,
+      clipCount: all.filter((photo) => photo.mediaKind === "video").length,
       country: dominantCountry(all),
       places: Array.from(new Set(placeSequence(all))),
       albums: Array.from(new Set(all.map((photo) => photo.album))).sort(),

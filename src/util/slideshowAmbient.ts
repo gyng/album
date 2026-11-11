@@ -1,5 +1,6 @@
 import { RandomPhotoRow } from "../components/search/api";
 import { extractRowCoords, extractRowDate } from "./extractExifFromDb";
+import { getGeocodeCity, getGeocodeCountry, getGeocodeRegion } from "./geocode";
 import { deltaE, parseColorPalette, rgbToLab } from "./colorDistance";
 
 /**
@@ -176,50 +177,19 @@ const lastNonNumericLine = (geocode: string): string => {
   return "";
 };
 
-// Geocode admin1 / region (e.g. "Hokkaido", "England"). reverse_geocode's
-// output places non-numeric lines in this order: country code, city, [admin1,
-// admin2], country. Pull the first interior line that isn't the city or the
-// country itself. Returns "" for city-states or geocodes that lack a distinct
-// admin1 level — so the strategy cleanly falls through to same-country.
-const extractAdmin1 = (geocode: string): string => {
-  if (!geocode) return "";
-  const nonNumeric = geocode
-    .split("\n")
-    .map((l) => l.trim())
-    .filter(Boolean)
-    .filter((line) => Number.isNaN(parseFloat(line)));
-  // Country code + city + admin1 + country = 4. Anything shorter doesn't
-  // confidently expose an admin1 level.
-  if (nonNumeric.length < 4) return "";
-  const city = nonNumeric[1];
-  const country = nonNumeric[nonNumeric.length - 1];
-  for (let i = 2; i < nonNumeric.length - 1; i += 1) {
-    const line = nonNumeric[i];
-    if (line && line !== country && line !== city) return line;
-  }
-  return "";
-};
+// City and region come from the shared geocode reader, which understands the
+// current "city, region, subregion, country" rows and the legacy blobs with
+// coordinates and a country code. A positional reader of the legacy layout
+// took the region for the city on current rows, so all of Hokkaido grouped —
+// and was labelled — as one city.
+const extractCity = (geocode: string): string => getGeocodeCity(geocode) ?? "";
 
-// Geocode line 0 is the ISO country code (e.g. "JP", "SG") and line 1 is the
-// city name (per reverse_geocode's output). Pull line 1 if it's present and
-// non-numeric; otherwise fall back to the first non-numeric line so we never
-// accidentally match cities on a coordinate value.
-const extractCity = (geocode: string): string => {
-  if (!geocode) return "";
-  const lines = geocode
-    .split("\n")
-    .map((l) => l.trim())
-    .filter(Boolean);
-  const secondLine = lines[1];
-  if (secondLine !== undefined && Number.isNaN(parseFloat(secondLine))) {
-    return secondLine;
-  }
-  for (const line of lines.slice(1)) {
-    if (Number.isNaN(parseFloat(line))) {
-      return line;
-    }
-  }
-  return "";
+// "" for city-states and geocodes without a distinct region, so the strategy
+// falls through to same-country.
+const extractAdmin1 = (geocode: string): string => {
+  const region = getGeocodeRegion(geocode);
+  if (!region || region === getGeocodeCountry(geocode)) return "";
+  return region;
 };
 
 // Dominant colour — the first entry in the palette serialised into `colors`.

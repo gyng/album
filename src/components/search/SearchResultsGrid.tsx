@@ -67,9 +67,20 @@ export const SearchResultsGrid: React.FC<Props> = ({
   // means screen readers miss the announcement. It is visually hidden and
   // taken out of flow so it never contributes a flex gap before the first
   // tile; the visible progress indicator below is purely decorative.
+  // How the search ended, for the same region: a count is only known for what
+  // has loaded, so a further page is named rather than counted.
+  const resultCount = results?.length ?? 0;
+  const settledAnnouncement =
+    !showResults || !isSuccess
+      ? ""
+      : resultCount === 0
+        ? "No results"
+        : `${resultCount} ${resultCount === 1 ? "result" : "results"}${
+            hasNextPage ? ", more below" : ""
+          }`;
   const statusItem = (
     <li className={styles.visuallyHidden} role="status" aria-live="polite">
-      {isSearching ? "Searching…" : ""}
+      {isSearching ? "Searching…" : settledAnnouncement}
     </li>
   );
 

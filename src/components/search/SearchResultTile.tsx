@@ -99,7 +99,9 @@ export const SearchResultTile = (props: {
   // plays. A scene result is a moment inside a clip, and the moment — not the
   // clip's full length — is what explains why this frame came back.
   const isVideo = result.mediaKind === "video";
-  const sceneSeconds = sceneSecondsOf(result.path);
+  // A scene row is a moment by name; a keyword hit inside a clip's timeline
+  // carries the moment it matched.
+  const sceneSeconds = sceneSecondsOf(result.path) ?? result.momentSeconds;
   const momentLabel = formatDuration(sceneSeconds);
   const durationLabel = momentLabel ?? formatDuration(result.durationSeconds);
   const videoLabel = momentLabel

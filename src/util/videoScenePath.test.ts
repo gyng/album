@@ -2,6 +2,7 @@ import {
   CLIP_EXTENSIONS,
   clipPathOf,
   collapseSceneRanking,
+  isPathOrClipAllowed,
   isPlayableClipPath,
   sceneSecondsOf,
 } from "./videoScenePath";
@@ -77,5 +78,15 @@ describe("isPlayableClipPath", () => {
     expect(isPlayableClipPath("../albums/x/dQw4w9WgXcQ.youtube")).toBe(false);
     expect(isPlayableClipPath("../albums/x/photo.jpg")).toBe(false);
     expect(isPlayableClipPath("")).toBe(false);
+  });
+});
+
+describe("isPathOrClipAllowed", () => {
+  it("lets a clip's moment through a filter that names the clip", () => {
+    const allowed = new Set(["../albums/a/clip.mov", "../albums/a/photo.jpg"]);
+    expect(isPathOrClipAllowed(allowed, "../albums/a/clip.mov@t120")).toBe(true);
+    expect(isPathOrClipAllowed(allowed, "../albums/a/clip.mov")).toBe(true);
+    expect(isPathOrClipAllowed(allowed, "../albums/a/photo.jpg")).toBe(true);
+    expect(isPathOrClipAllowed(allowed, "../albums/a/other.mov@t60")).toBe(false);
   });
 });

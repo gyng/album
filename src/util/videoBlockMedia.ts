@@ -107,6 +107,7 @@ const tripPhotoFromVideoBlock = (album: Content, block: Block): TripPhoto | null
     date: entry.capturedAtLocal,
     lat: entry.decLat,
     lng: entry.decLng,
+    mediaKind: "video",
   };
 };
 

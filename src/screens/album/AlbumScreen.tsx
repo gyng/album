@@ -1,3 +1,4 @@
+import { formatMediaCount } from "../../util/mediaCount";
 import {
   AppLink as Link,
   useAfterNavigation,
@@ -79,15 +80,7 @@ const AlbumScreen = ({ album }: AlbumScreenProps) => {
   // described as clips rather than as zero photos.
   const photoCount = album.blocks.filter((block) => block.kind === "photo").length;
   const clipCount = album.blocks.filter((block) => block.kind === "video").length;
-  const mediaCount =
-    clipCount === 0
-      ? `${photoCount + clipCount} photos`
-      : [
-          photoCount > 0 ? `${photoCount} ${photoCount === 1 ? "photo" : "photos"}` : null,
-          `${clipCount} ${clipCount === 1 ? "clip" : "clips"}`,
-        ]
-          .filter(Boolean)
-          .join(" and ");
+  const mediaCount = formatMediaCount(photoCount, clipCount);
 
   const cover = coverBlockOf(album.blocks);
 

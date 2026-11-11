@@ -65,13 +65,25 @@ const reducer = (state: UseDatabaseState, action: Action): UseDatabaseState => {
 const cachedDatabases = new Map<string, Database>();
 const databasePromises = new Map<string, Promise<Database>>();
 
+// A handle whose worker died rejects every query. Dropped from the cache, the
+// next load opens a fresh worker instead of handing the dead one back until
+// the page is reloaded.
+const evictDatabase = (database: Database): void => {
+  for (const [url, cached] of cachedDatabases) {
+    if (cached !== database) continue;
+    cachedDatabases.delete(url);
+    databasePromises.delete(url);
+  }
+};
+
 const fetchWithProgress: typeof import("./sqliteLoader").fetchWithProgress = async (...args) =>
   (await import("./sqliteLoader")).fetchWithProgress(...args);
 
 const initializeSQLite: typeof import("./sqliteLoader").initializeSQLite = async (...args) => {
   if (typeof window !== "undefined" && typeof Worker !== "undefined") {
     const { openWorkerDatabase } = await import("./sqliteWorkerClient");
-    return openWorkerDatabase(...args);
+    const [url, fallbackUrl, onProgress, forceRefresh] = args;
+    return openWorkerDatabase(url, fallbackUrl, onProgress, forceRefresh, evictDatabase);
   }
   return (await import("./sqliteLoader")).initializeSQLite(...args);
 };
@@ -85,6 +97,7 @@ export const databaseLoaderInternals = {
     setProgress?: (percent: number, details: ProgressDetails) => void,
     forceRefresh?: boolean,
   ) => getDatabase(url, fallbackUrl, setProgress, forceRefresh),
+  evictDatabase,
   resetForTesting: () => {
     cachedDatabases.clear();
     databasePromises.clear();

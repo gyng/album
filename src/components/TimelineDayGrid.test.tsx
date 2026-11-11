@@ -294,6 +294,33 @@ describe("TimelineDayGrid", () => {
     );
   });
 
+  // The map re-fits whenever its photo list changes identity, so a list rebuilt
+  // on every render threw away the reader's pan and zoom; and a clip's pin can
+  // only play on hover if the map is told which file it is.
+  it("keeps the map's photo list stable across renders and names a clip's file", () => {
+    mapProps.mockClear();
+    const dayEntries = [
+      entries[0]!,
+      {
+        ...entries[1]!,
+        decLat: 35.7,
+        decLng: 139.2,
+        mediaKind: "video" as const,
+        path: "/data/albums/tokyo/clip.mov",
+      },
+    ];
+    const view = render(<TimelineDayGrid date="2024-01-02" entries={dayEntries} />);
+    const first = mapProps.mock.calls.at(-1)![0].photos;
+    view.rerender(<TimelineDayGrid date="2024-01-02" entries={dayEntries} canGoOlder />);
+    expect(mapProps.mock.calls.at(-1)![0].photos).toBe(first);
+    expect(first).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ clipPath: "../albums/tokyo/clip.mov", mediaKind: "video" }),
+      ]),
+    );
+    expect(screen.getByText("1 photo and 1 clip")).toBeInTheDocument();
+  });
+
   it("waits until the map is near the viewport before loading MapLibre", () => {
     const originalIntersectionObserver = globalThis.IntersectionObserver;
     let notify!: IntersectionObserverCallback;

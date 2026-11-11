@@ -49,3 +49,13 @@ export const collapseSceneRanking = <T extends { path: string }>(ranked: T[]): T
   }
   return collapsed;
 };
+
+/**
+ * Whether a ranked row survives a path filter. A clip's colours and facets are
+ * on the clip's own row, while its best-ranked row is usually one of its
+ * moments ("clip.mov@t120") — so a moment answers to its clip's membership.
+ * Tested by path alone, a colour or facet filter dropped every clip whose best
+ * match was a moment.
+ */
+export const isPathOrClipAllowed = (allowed: ReadonlySet<string>, path: string): boolean =>
+  allowed.has(path) || allowed.has(clipPathOf(path));

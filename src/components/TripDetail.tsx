@@ -1,3 +1,4 @@
+import { formatMediaCount } from "../util/mediaCount";
 import React from "react";
 import { AppLink as Link, useClientComponents } from "./platform";
 import type { Trip, TripDay } from "../util/computeTrips";
@@ -242,7 +243,7 @@ export const TripDetail = ({ trip, headingLevel = 2 }: { trip: Trip; headingLeve
               {longDate(trip.startDate)}
             </Heading>
             <Caption as="span">
-              {trip.photoCount.toLocaleString("en")} photos
+              {formatMediaCount(trip.photoCount - trip.clipCount, trip.clipCount)}
               {only.from ? ` · ${only.from}–${only.to}` : ""}
               {trip.totalKm && trip.totalKm >= 1 ? ` · ${roundKm(trip.totalKm)} km` : ""}
               {trip.albums.length > 1 ? ` · from ${trip.albums.join(" and ")}` : ""}
@@ -274,7 +275,7 @@ export const TripDetail = ({ trip, headingLevel = 2 }: { trip: Trip; headingLeve
             {`${longDate(trip.startDate)} – ${longDate(trip.endDate)}`}
           </Heading>
           <Caption as="span">
-            {`${trip.dayCount} days · ${trip.photoCount.toLocaleString("en")} photos`}
+            {`${trip.dayCount} days · ${formatMediaCount(trip.photoCount - trip.clipCount, trip.clipCount)}`}
             {trip.totalKm && trip.totalKm >= 1 ? ` · ${roundKm(trip.totalKm)} km` : ""}
             {trip.albums.length > 1 ? ` · from ${trip.albums.join(" and ")}` : ""}
           </Caption>
@@ -331,7 +332,7 @@ export const TripDetail = ({ trip, headingLevel = 2 }: { trip: Trip; headingLeve
                     aria-hidden="true"
                   />
                 ) : null}
-                {day.count.toLocaleString("en")} {day.count === 1 ? "photo" : "photos"}
+                {formatMediaCount(day.count - day.clipCount, day.clipCount)}
                 {day.from ? ` · ${day.from}–${day.to}` : ""}
                 {day.coveredKm && day.coveredKm >= 1
                   ? ` · ${roundKm(day.coveredKm)} km covered`

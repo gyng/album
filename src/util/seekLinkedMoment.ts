@@ -7,8 +7,14 @@ export const seekLinkedMoment = (
   getSearchParam: (name: string) => string | null,
   hash: string = window.location.hash,
 ): void => {
-  const seconds = Number(getSearchParam("t"));
-  if (!Number.isFinite(seconds) || seconds <= 0) {
+  // Absent and empty are "no moment"; an explicit 0 is the clip's first moment,
+  // and must be able to take a clip that has played on back to its start.
+  const rawMoment = getSearchParam("t");
+  if (rawMoment === null || rawMoment.trim() === "") {
+    return;
+  }
+  const seconds = Number(rawMoment);
+  if (!Number.isFinite(seconds) || seconds < 0) {
     return;
   }
 

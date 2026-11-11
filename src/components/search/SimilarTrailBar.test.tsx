@@ -82,6 +82,19 @@ describe("SimilarTrailBar", () => {
     expect(container.textContent).not.toContain("→");
   });
 
+  // A scene row is named "clip.mov@t120": linked as written, the fragment
+  // matched no anchor and the moment was lost.
+  it("links a clip moment to the clip's anchor at that moment", () => {
+    const props = baseProps();
+    props.trail = [{ path: "../albums/one/clip.mov@t120" }, { path: "../albums/one/first.jpg" }];
+    render(<SimilarTrailBar {...props} />);
+    flushFrames();
+
+    expect(screen.getAllByRole("link").map((link) => link.getAttribute("href"))).toContain(
+      "/album/one?t=120#clip.mov",
+    );
+  });
+
   it("renders duplicate breadcrumb paths independently in reverse recency order", () => {
     const props = baseProps();
     props.trail = [

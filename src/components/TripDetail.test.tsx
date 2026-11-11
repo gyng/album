@@ -9,6 +9,7 @@ import { TripDetail } from "./TripDetail";
 const day = (over: Partial<Trip["days"][number]> = {}): Trip["days"][number] => ({
   date: "2016-11-16",
   count: 41,
+  clipCount: 0,
   from: "09:02",
   to: "20:04",
   places: ["Hida", "Nanto"],
@@ -27,6 +28,7 @@ const trip = (over: Partial<Trip> = {}): Trip => ({
   endDate: "2016-11-26",
   dayCount: 14,
   photoCount: 167,
+  clipCount: 0,
   country: "Japan",
   places: ["Osaka", "Takayama"],
   albums: ["hyouka", "kansai"],
@@ -97,6 +99,7 @@ describe("what the trip says about itself", () => {
       <TripDetail
         trip={trip({
           photoCount: 167,
+          clipCount: 0,
           gear: {
             cameras: [
               { name: "X100T", count: 153 },
@@ -121,6 +124,7 @@ describe("what the trip says about itself", () => {
       <TripDetail
         trip={trip({
           photoCount: 200,
+          clipCount: 0,
           gear: {
             cameras: [{ name: "X-T5", count: 200 }],
             lenses: [{ name: "XF27mmF2.8 R WR", count: 50 }],
@@ -209,12 +213,14 @@ describe("an outing is not a journey", () => {
       isOuting: true,
       dayCount: 1,
       photoCount: 2,
+      clipCount: 0,
       startDate: "2026-08-01",
       endDate: "2026-08-01",
       days: [
         day({
           date: "2026-08-01",
           count: 2,
+          clipCount: 0,
           point: { lat: 1.3, lng: 103.8 },
           photos: [
             { src: "/a.avif", href: "/album/x#a", label: "a" },
@@ -294,6 +300,7 @@ describe("a day's frames", () => {
           days: [
             day({
               count: 3,
+              clipCount: 0,
               photos: [
                 { src: "/a.avif", href: "/album/kansai#a", label: "a" },
                 { src: "/b.avif", href: "/album/kansai#b", label: "b" },

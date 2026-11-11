@@ -8,11 +8,15 @@ export const openWorkerDatabase = (
   fallbackUrl?: string,
   onProgress?: (percent: number, details: { loaded: number; total: number }) => void,
   forceRefresh = false,
+  // Called once if the worker dies after the handle was handed out: every later
+  // query on it rejects, so whoever cached it must let it go.
+  onDead?: (database: Database) => void,
 ): Promise<Database> =>
   new Promise((resolve, reject) => {
     const worker = new Worker(new URL("./sqlite.worker.ts", import.meta.url));
     let nextId = 0;
     let failed: Error | null = null;
+    let opened: Database | null = null;
     const pending = new Map<
       number,
       { resolve: (rows: unknown[][]) => void; reject: (error: Error) => void }
@@ -24,6 +28,7 @@ export const openWorkerDatabase = (
       reject(error);
       for (const request of pending.values()) request.reject(error);
       pending.clear();
+      if (opened) onDead?.(opened);
     };
     // Progress resets an inactivity deadline, allowing large databases to download.
     let deadline: ReturnType<typeof setTimeout>;
@@ -72,6 +77,7 @@ export const openWorkerDatabase = (
               send({ type: "exec", id, sql, bind });
             }),
         );
+        opened = database;
         resolve(database);
       } else if (response.type === "error" && response.id === undefined) {
         fail(new Error(response.message));

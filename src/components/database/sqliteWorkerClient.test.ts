@@ -77,6 +77,25 @@ it("keeps query errors isolated and rejects outstanding work if the worker dies"
   expect(worker.terminate).toHaveBeenCalled();
 });
 
+// A handle whose worker has died rejects every query from then on. Its owner
+// has to hear about it, or the handle stays cached until a full reload.
+it("reports a worker that dies after it was ready, and not one that never opened", async () => {
+  const onDead = jest.fn();
+  const opening = openWorkerDatabase("/core.sqlite", undefined, undefined, false, onDead);
+  const worker = FakeWorker.instances[0]!;
+  worker.reply({ type: "ready", metadataColumns: [] });
+  const database = await opening;
+  expect(onDead).not.toHaveBeenCalled();
+  worker.listeners.get("error")?.({});
+  expect(onDead).toHaveBeenCalledWith(database);
+
+  const neverOpened = jest.fn();
+  const failing = openWorkerDatabase("/core.sqlite", undefined, undefined, false, neverOpened);
+  FakeWorker.instances[1]!.listeners.get("error")?.({});
+  await expect(failing).rejects.toThrow("could not load");
+  expect(neverOpened).not.toHaveBeenCalled();
+});
+
 it("times out silent loads while allowing a download that continues to progress", async () => {
   const opening = openWorkerDatabase("/core.sqlite");
   const worker = FakeWorker.instances[0]!;

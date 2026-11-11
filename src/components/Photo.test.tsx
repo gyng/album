@@ -144,7 +144,7 @@ describe("PhotoBlockEl", () => {
         OffsetTime: "+09:00",
       },
       tags: {
-        geocode: "Tokyo\nJapan\nunused\nunused\nunused\nChiyoda\nKanto",
+        geocode: "Chiyoda\nTokyo\nChiyoda-ku\nJapan",
         tags: ["night", "street"],
         colors: [[12, 34, 56]],
         alt_text: "Lantern-lined Tokyo street",
@@ -177,14 +177,14 @@ describe("PhotoBlockEl", () => {
           element.textContent?.startsWith("5 April 2024 at 18:30 (+09:00)") === true,
       ),
     ).toBeTruthy();
-    expect(screen.getByText("Japan, Chiyoda, Kanto")).toBeTruthy();
+    expect(screen.getByText("Chiyoda, Tokyo, Chiyoda-ku, Japan")).toBeTruthy();
     expect(screen.getByTestId("photo-map")).toHaveAttribute(
       "data-marker-colour",
       "rgb(12, 34, 56)",
     );
     expect(screen.getByRole("link", { name: "Find photos from this place" })).toHaveAttribute(
       "href",
-      expect.stringContaining("location%3AKanto"),
+      expect.stringContaining("location%3AJapan"),
     );
     expect(screen.getByRole("link", { name: "Find photos at this ISO" })).toBeTruthy();
     expect(screen.getByRole("link", { name: "Find photos at this aperture" })).toBeTruthy();
@@ -312,7 +312,7 @@ describe("ExifTable", () => {
               GPSLatitude: [33, 52, 7.8],
               GPSLongitudeRef: "E",
               GPSLongitude: [151, 12, 33.2],
-              geocode: "Sydney\nAustralia\nunused\nunused\nunused\nNew South Wales",
+              geocode: "Sydney\nNew South Wales\nAustralia",
             },
             options: { showMap: false },
           },
@@ -321,7 +321,7 @@ describe("ExifTable", () => {
     );
 
     expect(screen.getByText("33° 52′ 8″ S 151° 12′ 33″ E")).toBeTruthy();
-    expect(screen.getByText("Australia, New South Wales")).toBeTruthy();
+    expect(screen.getByText("Sydney, New South Wales, Australia")).toBeTruthy();
     expect(container.querySelectorAll("tbody tr")).toHaveLength(1);
   });
 

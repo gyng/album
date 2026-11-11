@@ -1091,6 +1091,46 @@ describe("video results", () => {
     expect(results.data[1]?.durationSeconds).toBeUndefined();
   });
 
+  // A phrase said forty seconds into a clip finds the clip; the result should
+  // open it there, not at its first frame.
+  it("links a keyword hit inside a clip's timeline to the moment it matched", async () => {
+    const database = {
+      exec: ({ sql, callback }: ExecArgs) => {
+        if (sql.includes("pragma_table_info('metadata')")) {
+          if (sql.includes("media_kind") || sql.includes("timeline_json")) callback([1]);
+          return;
+        }
+        if (sql.includes("SELECT path, media_kind")) {
+          callback(["../albums/test-simple/clip.mov", "video", 60, null, null, null]);
+          return;
+        }
+        if (sql.includes("SELECT path, timeline_json")) {
+          callback([
+            "../albums/test-simple/clip.mov",
+            JSON.stringify([
+              { start: 0, end: 15, description: "A quiet street." },
+              { start: 45, end: 60, description: "Boats in the harbour." },
+            ]),
+          ]);
+          return;
+        }
+        if (sql.includes("FROM images") && sql.includes("ORDER BY rank")) {
+          callback(imageRow("../albums/test-simple/clip.mov"));
+        }
+      },
+    };
+
+    const results = await fetchResults({
+      database: database as any,
+      query: "harbour",
+      page: 0,
+      pageSize: 4,
+    });
+
+    expect(results.data[0]?.momentSeconds).toBe(45);
+    expect(results.data[0]?.album_relative_path).toMatch(/\?t=45#/);
+  });
+
   // Databases built before videos existed have no such columns; asking for them
   // would make every query fail rather than simply showing photos.
   it("reads a database without the media columns as photos", async () => {
@@ -1429,7 +1469,7 @@ describe("browse and slideshow queries", () => {
     ]);
 
     expect(calls.find(({ sql }) => sql.includes("FROM tags"))?.bind).toEqual([0, 20, 20]);
-    expect(calls.some(({ sql }) => sql.includes("WHERE path NOT IN (?)"))).toBe(true);
+    expect(calls.some(({ sql }) => sql.includes("WHERE images.path NOT IN (?)"))).toBe(true);
     expect(calls.filter(({ bind }) => bind?.includes("../albums/test-simple/%"))).toHaveLength(2);
   });
 
@@ -1442,9 +1482,29 @@ describe("browse and slideshow queries", () => {
     };
     await fetchRandomResults({ database: database as any, pageSize: 3 });
     await fetchSlideshowPhotos({ database: database as any });
-    expect(calls[0]?.sql).not.toContain("WHERE path NOT IN");
-    expect(calls[0]?.bind).toEqual([3]);
-    expect(calls[1]?.bind).toEqual(["../albums/%/%"]);
+    const random = calls.find(({ sql }) => sql.includes("ORDER BY RANDOM()"));
+    expect(random?.sql).not.toContain("NOT IN");
+    expect(random?.bind).toEqual([3]);
+    expect(calls.at(-1)?.bind).toEqual(["../albums/%/%"]);
+  });
+
+  // Dropped after the LIMIT, one scene row made a short page, and the browse
+  // grids read a short page as the end of the list.
+  it("excludes clip moments from the latest and random draws in the query itself", async () => {
+    const calls: Array<{ sql: string }> = [];
+    const database = {
+      exec: ({ sql, callback }: ExecArgs) => {
+        calls.push({ sql });
+        if (sql.includes("pragma_table_info('metadata')") && sql.includes("scene_of")) {
+          callback([1]);
+        }
+      },
+    };
+    await fetchRandomResults({ database: database as any, pageSize: 3 });
+    await fetchRecentResults({ database: database as any, pageSize: 3 });
+    const draws = calls.filter(({ sql }) => sql.includes("LIMIT ?"));
+    expect(draws).toHaveLength(2);
+    for (const { sql } of draws) expect(sql).toContain("m.scene_of IS NULL");
   });
 });
 

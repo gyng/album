@@ -27,9 +27,18 @@ describe("seekLinkedMoment", () => {
   it("does nothing without a moment, or with an unusable one", () => {
     const video = mountClip();
     seekLinkedMoment(param(null), "#clip.mov");
-    seekLinkedMoment(param("0"), "#clip.mov");
+    seekLinkedMoment(param(""), "#clip.mov");
     seekLinkedMoment(param("later"), "#clip.mov");
     seekLinkedMoment(param("-5"), "#clip.mov");
+    expect(video.currentTime).toBe(0);
+  });
+
+  // The first moment of a clip's timeline links to "?t=0". Treated as "no
+  // moment", it could not take a clip that had played on back to its start.
+  it("seeks back to the start for an explicit zero", () => {
+    const video = mountClip();
+    video.currentTime = 90;
+    seekLinkedMoment(param("0"), "#clip.mov");
     expect(video.currentTime).toBe(0);
   });
 

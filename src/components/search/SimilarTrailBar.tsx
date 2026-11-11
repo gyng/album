@@ -7,6 +7,7 @@ import sharedStyles from "./Search.module.css";
 import localStyles from "./SimilarTrailBar.module.css";
 import { getResizedAlbumImageSrc } from "../../util/getResizedAlbumImageSrc";
 import { forceDocumentNavigation, SimilarityOrder } from "./searchUtils";
+import { clipPathOf, sceneSecondsOf } from "../../util/videoScenePath";
 
 const styles = mergeCssModuleStyles(sharedStyles, localStyles, [
   "breadcrumbButton",
@@ -39,7 +40,6 @@ type BreadcrumbEntry = SimilarTrailItem & {
   idx: number;
   key: string;
 };
-
 const useSafeLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
 
 const getAlbumAnchorHref = (path: string): string => {
@@ -49,6 +49,13 @@ const getAlbumAnchorHref = (path: string): string => {
 
   if (!albumName || !filename) {
     return "/search";
+  }
+
+  // A scene row ("clip.mov@t120") is a moment inside a clip: its anchor is the
+  // clip's, and the moment travels as "?t=" for `seekLinkedMoment`.
+  const sceneSeconds = sceneSecondsOf(filename);
+  if (sceneSeconds !== undefined) {
+    return `/album/${albumName}?t=${Math.round(sceneSeconds)}#${clipPathOf(filename)}`;
   }
 
   return `/album/${albumName}#${filename}`;

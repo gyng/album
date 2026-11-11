@@ -1,9 +1,11 @@
+import { formatMediaCount } from "../util/mediaCount";
 import React from "react";
 import type { TimelineEntry } from "../util/pageDataTypes";
 import {
   computeTrips,
   markFirstVisits,
   markLaterReturns,
+  type Trip,
   type TripPhoto,
 } from "../util/computeTrips";
 import { formatExifWallClockDate } from "../util/exifTime";
@@ -46,6 +48,9 @@ const tripDates = (trip: { isOuting: boolean; startDate: string; endDate: string
     ? longDate(trip.startDate)
     : `${longDate(trip.startDate)} – ${longDate(trip.endDate)}`;
 
+const tripMediaCount = (trip: Trip): string =>
+  formatMediaCount(trip.photoCount - trip.clipCount, trip.clipCount);
+
 const toTripPhoto = (entry: TimelineEntry): TripPhoto => ({
   date: entry.dateTimeOriginal,
   album: entry.album,
@@ -57,6 +62,7 @@ const toTripPhoto = (entry: TimelineEntry): TripPhoto => ({
   lat: entry.decLat ?? null,
   lng: entry.decLng ?? null,
   ...(entry.placeholderColor ? { swatch: entry.placeholderColor } : {}),
+  ...(entry.mediaKind ? { mediaKind: entry.mediaKind } : {}),
 });
 
 /**
@@ -147,8 +153,8 @@ export const TimelineTripsSection = ({
                 </Link>
                 <span className={styles.stats}>
                   {trip.isOuting
-                    ? `${trip.photoCount.toLocaleString("en")} photos`
-                    : `${trip.dayCount} days · ${trip.photoCount.toLocaleString("en")} photos`}
+                    ? tripMediaCount(trip)
+                    : `${trip.dayCount} days · ${tripMediaCount(trip)}`}
                   {trip.totalKm && trip.totalKm >= 1
                     ? ` · ${Math.round(trip.totalKm).toLocaleString("en")} km`
                     : ""}
