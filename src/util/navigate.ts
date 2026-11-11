@@ -1,5 +1,8 @@
 export const navigateTo = (url: string) => window.location.assign(url);
 
+/** Go to another document without leaving this one in history. */
+export const replaceLocation = (url: string) => window.location.replace(url);
+
 /**
  * Reload the document, adding no history entry.
  *

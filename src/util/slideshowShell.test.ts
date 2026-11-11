@@ -7,6 +7,7 @@ import {
   MAX_RUNTIME_RELOAD_ATTEMPTS,
   planRuntimeReload,
   recordRuntimeReload,
+  shellRedirectForStandalone,
   RUNTIME_RELOAD_BASE_DELAY_MS,
   SLIDESHOW_EXIT_MESSAGE,
   SLIDESHOW_NAVIGATE_MESSAGE,
@@ -159,5 +160,33 @@ describe("slideshow shell protocol", () => {
         isSupported: true,
       }),
     ).toBe(false);
+  });
+});
+
+// An installed web app keeps the launch address it was installed with, and the
+// unmanaged /slideshow route reloads its whole document for a new build — which
+// drops the wake lock, and Safari grants a fresh one only under a gesture. An
+// installed app that lands there belongs in the shell, which updates its child.
+describe("shellRedirectForStandalone", () => {
+  it("sends a top-level slideshow in an installed app into the shell, keeping its settings", () => {
+    expect(
+      shellRedirectForStandalone({
+        isTopLevel: true,
+        isStandalone: true,
+        search: "?filter=japan&delay=60",
+      }),
+    ).toBe("/slideshow/shell?filter=japan&delay=60");
+    expect(shellRedirectForStandalone({ isTopLevel: true, isStandalone: true, search: "" })).toBe(
+      "/slideshow/shell",
+    );
+  });
+
+  it("leaves the shell's own frame and an ordinary browser tab alone", () => {
+    expect(
+      shellRedirectForStandalone({ isTopLevel: false, isStandalone: true, search: "?shell=1" }),
+    ).toBeNull();
+    expect(
+      shellRedirectForStandalone({ isTopLevel: true, isStandalone: false, search: "" }),
+    ).toBeNull();
   });
 });

@@ -119,6 +119,21 @@ export const buildSlideshowShellUrl = (search: string): string => {
   return `/slideshow/shell${query ? `?${query}` : ""}`;
 };
 
+// Where a slideshow document should go instead of running where it is, or null.
+//
+// The unmanaged /slideshow route reloads its whole document for a new build.
+// In a browser tab that is fine; in an installed web app it drops the screen
+// wake lock, and Safari grants a fresh one only under a gesture — so a kiosk
+// went dark after a deploy. An installed app keeps the launch address it was
+// installed with, so a manifest that now starts in the shell does not move an
+// older install there; this does.
+export const shellRedirectForStandalone = (input: {
+  isTopLevel: boolean;
+  isStandalone: boolean;
+  search: string;
+}): string | null =>
+  input.isTopLevel && input.isStandalone ? buildSlideshowShellUrl(input.search) : null;
+
 // A click the browser natively opens in a new tab/window (or is not a plain
 // primary-button click). Link handlers that call preventDefault must early-out
 // on these so cmd/ctrl/shift/alt-click and middle-click "open in new tab" keep

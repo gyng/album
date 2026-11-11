@@ -8,7 +8,7 @@
 // browser refuses — the slide falls back to the poster frame the clip started
 // from, rather than being skipped.
 
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 
 const mockUseDatabase = jest.fn();
 const mockUseEmbeddingsDatabase = jest.fn();
@@ -113,9 +113,11 @@ jest.mock("../../lib/buildVersion", () => ({
 jest.mock("../../util/navigate", () => ({
   navigateTo: jest.fn(),
   reloadCurrentPage: jest.fn(),
+  replaceLocation: jest.fn(),
 }));
 
 const SlideshowScreen = require("./SlideshowScreen").default;
+const mockReplaceLocation = jest.requireMock("../../util/navigate").replaceLocation as jest.Mock;
 
 const readyDatabase = { db: true };
 const readyEmbeddings = { embeddings: true };
@@ -188,6 +190,25 @@ describe("SlideshowScreen clip slides", () => {
     global.fetch = originalFetch;
     jest.useRealTimers();
     jest.restoreAllMocks();
+  });
+
+  // An installed app that lands on the unmanaged route would reload its whole
+  // document for a new build and lose the wake lock; it belongs in the shell.
+  it("moves into the shell when opened top-level in an installed app", async () => {
+    mockReplaceLocation.mockClear();
+    await startOn(still);
+    expect(mockReplaceLocation).not.toHaveBeenCalled();
+    cleanup();
+
+    mockMatchingQueries.push("(display-mode: standalone)");
+    try {
+      await startOn(still);
+      expect(mockReplaceLocation).toHaveBeenCalledWith(
+        expect.stringMatching(/^\/slideshow\/shell(\?|$)/),
+      );
+    } finally {
+      mockMatchingQueries.splice(mockMatchingQueries.indexOf("(display-mode: standalone)"), 1);
+    }
   });
 
   it("plays a clip as a video", async () => {

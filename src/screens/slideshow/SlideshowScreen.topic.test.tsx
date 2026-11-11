@@ -122,6 +122,7 @@ jest.mock("../../lib/buildVersion", () => ({
 jest.mock("../../util/navigate", () => ({
   navigateTo: jest.fn(),
   reloadCurrentPage: jest.fn(),
+  replaceLocation: jest.fn(),
 }));
 
 const SlideshowScreen = require("./SlideshowScreen").default;

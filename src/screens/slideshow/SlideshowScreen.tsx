@@ -32,7 +32,7 @@ import { isPlayableClipPath } from "../../util/videoScenePath";
 import { Seo } from "../../components/Seo";
 import { buildCollectionPageJsonLd, formatPageTitle } from "../../lib/seo";
 import { getPhotoAltText } from "../../lib/alt";
-import { navigateTo, reloadCurrentPage } from "../../util/navigate";
+import { navigateTo, reloadCurrentPage, replaceLocation } from "../../util/navigate";
 import { finishStalledSlideshowReveal, scheduleSlideshowFrame } from "../../util/slideshowFrame";
 import {
   chooseRecentSlideshowPhoto,
@@ -138,6 +138,7 @@ import {
 import {
   isModifiedClick,
   isSlideshowShellStateMessage,
+  shellRedirectForStandalone,
   SLIDESHOW_EXIT_MESSAGE,
   SLIDESHOW_NAVIGATE_MESSAGE,
   SLIDESHOW_RUNTIME_STATE_MESSAGE,
@@ -240,6 +241,22 @@ const SlideshowScreen = () => {
     setManagedCodeReload(
       window.parent !== window && new URLSearchParams(window.location.search).get("shell") === "1",
     );
+  }, []);
+
+  // An installed web app keeps the launch address it was installed with, so an
+  // older install still opens this route top-level — where a new build reloads
+  // the whole document and the wake lock goes with it. Hand it to the shell,
+  // which updates its child and keeps the lock.
+  useSafeLayoutEffect(() => {
+    const redirect = shellRedirectForStandalone({
+      isTopLevel: window.parent === window,
+      isStandalone:
+        (typeof window.matchMedia === "function" &&
+          window.matchMedia("(display-mode: standalone)").matches) ||
+        (navigator as Navigator & { standalone?: boolean }).standalone === true,
+      search: window.location.search,
+    });
+    if (redirect) replaceLocation(redirect);
   }, []);
 
   useEffect(() => {
