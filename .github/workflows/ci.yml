@@ -94,6 +94,9 @@ jobs:
         run: npm run build:e2e
       - name: Run Playwright tests
         run: npx playwright test --project=${{ matrix.browser }}
+      - name: Run frame-timing tests alone
+        if: matrix.browser == 'chromium'
+        run: npx playwright test --project=chromium-frame-timing --no-deps
       - name: Run iPad slideshow recovery tests
         if: matrix.browser == 'webkit'
         run: PLAYWRIGHT_SLIDESHOW_WEBKIT=1 npx playwright test --project=ipad-webkit

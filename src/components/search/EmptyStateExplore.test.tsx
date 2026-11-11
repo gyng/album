@@ -129,6 +129,35 @@ describe("EmptyStateExplore", () => {
     expect(screen.getByRole("heading", { name: "Random selection" })).toBeTruthy();
   });
 
+  // Memories can answer before the latest photos do. Rendered at once, "On this
+  // day" sat below the latest grid's placeholders and was pulled up into view
+  // when a small archive's grid shrank from them.
+  it("adds On this day only once the latest photos have answered", async () => {
+    let resolveRecent!: (value: any[]) => void;
+    mockRecent.mockReturnValueOnce(new Promise((resolve) => (resolveRecent = resolve)) as any);
+    mockClusters.mockReturnValue([
+      {
+        year: 2025,
+        yearsAgo: 1,
+        startDate: "2025-07-14",
+        endDate: "2025-07-14",
+        items: [row("memory-a")],
+      },
+    ] as any);
+
+    render(<EmptyStateExplore database={database} onStartSimilarSearch={jest.fn()} />);
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(screen.queryByRole("heading", { name: "On this day" })).toBeNull();
+
+    await act(async () => {
+      resolveRecent(rows("recent", 3));
+      await Promise.resolve();
+    });
+    expect(screen.getByRole("heading", { name: "On this day" })).toBeTruthy();
+  });
+
   // A small archive's latest page is shorter than its placeholders, so the
   // grid shrinks when it answers; a random section already below it moved up.
   it("adds the random section only once the latest photos have answered", async () => {

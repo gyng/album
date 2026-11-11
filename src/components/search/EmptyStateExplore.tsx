@@ -403,7 +403,11 @@ export const EmptyStateExplore: React.FC<Props> = ({
           ) : null}
         </section>
 
-        {visibleMemoryClusters.length > 0 ? (
+        {/* Not before the latest photos have answered: memories can answer
+            first, and this section then sat below the latest grid's
+            placeholders and was pulled up into view when a small archive's
+            grid shrank from them. Arriving is not moving. */}
+        {visibleMemoryClusters.length > 0 && !isRecentLoading ? (
           <section className={styles.sectionSurface}>
             <div className={styles.sectionHeader}>
               <Heading level={2} as="h3">

@@ -64,6 +64,9 @@ const workers =
 /**
  * See https://playwright.dev/docs/test-configuration.
  */
+/** Tag for tests that count painted frames; see the `chromium-frame-timing` project. */
+const FRAME_TIMING = /@frame-timing/;
+
 export default defineConfig({
   testDir: "./tests",
   testIgnore: ["**/screenshot.spec.ts"],
@@ -105,6 +108,20 @@ export default defineConfig({
     {
       name: "chromium",
       use: { ...devices["Desktop Chrome"] },
+      grepInvert: FRAME_TIMING,
+    },
+    // Tests that count painted animation frames measure real time, so they
+    // cannot share the CPU: beside other workers a 180ms nav move painted no
+    // intermediate frame at all and the test failed on a correct build. They
+    // run alone, on one worker, after the parallel suite has finished. CI runs
+    // one project per job, so its chromium job runs this one as a second step
+    // (`--no-deps`).
+    {
+      name: "chromium-frame-timing",
+      use: { ...devices["Desktop Chrome"] },
+      grep: FRAME_TIMING,
+      workers: 1,
+      dependencies: ["chromium"],
     },
 
     // Opt-in synthetic iPad coverage for the installed slideshow lifecycle.
