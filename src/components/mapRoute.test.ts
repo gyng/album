@@ -66,6 +66,32 @@ describe("mapRoute", () => {
     ).toBeNull();
   });
 
+  // Ordering goes through the shared wall-clock parser, never `new Date()`:
+  // that reads a naive string in the reader's zone (so a clock-change night
+  // sorts differently for different readers) and cannot read the EXIF form at
+  // all, which left these two in the order they were supplied.
+  it("orders by the camera's wall clock, including the EXIF timestamp form", () => {
+    const route = buildMapRoute([
+      makePhoto({
+        href: "/album/trip#later.jpg",
+        date: "2024:03:10 03:10:00",
+        decLat: 35.2,
+        decLng: 139.2,
+      }),
+      makePhoto({
+        href: "/album/trip#earlier.jpg",
+        date: "2024:03:10 02:30:00",
+        decLat: 35.1,
+        decLng: 139.1,
+      }),
+    ]);
+
+    expect(route.fullPoints.map((photo) => photo.href)).toEqual([
+      "/album/trip#earlier.jpg",
+      "/album/trip#later.jpg",
+    ]);
+  });
+
   it("sorts geotagged photos chronologically and marks endpoints", () => {
     const route = buildMapRoute([
       makePhoto({

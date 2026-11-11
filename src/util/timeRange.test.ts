@@ -6,19 +6,33 @@ import {
   msToPosition,
   formatRangeDate,
   formatDisplayDate,
+  formatRangeParam,
   parseRangeParam,
+  snapRangeToSeconds,
 } from "./timeRange";
+import { exifWallClockTimestamp } from "./exifTime";
 
 describe("parseTimestampSafe", () => {
-  it("parses ISO date strings", () => {
-    expect(parseTimestampSafe("2024-03-22T10:00:00Z")).toBe(
-      new Date("2024-03-22T10:00:00Z").valueOf(),
-    );
+  it("reads a naive ISO capture time as its wall clock", () => {
+    expect(parseTimestampSafe("2024-03-22T10:00:00")).toBe(Date.UTC(2024, 2, 22, 10, 0, 0));
   });
 
   it("parses EXIF colon-separated dates", () => {
-    const result = parseTimestampSafe("2024:03:22 10:00:00");
-    expect(result).toBe(new Date("2024-03-22 10:00:00").valueOf());
+    expect(parseTimestampSafe("2024:03:22 10:00:00")).toBe(Date.UTC(2024, 2, 22, 10, 0, 0));
+  });
+
+  // The filter reads `exifWallClockTimestamp`; an extent on the reader's own
+  // clock sat eight hours from it in UTC+8, so dragging one thumb set the other
+  // to an "end" that excluded the newest photos. Jest cannot change the zone
+  // mid-run, so this pins the coordinate itself: it fails on any machine that
+  // is not on UTC the moment the parse goes back through the reader's zone.
+  it("puts the extent on the filter's clock", () => {
+    expect(
+      computeDateExtent([{ date: "2024-03-01T08:00:00" }, { date: "2024-03-22T23:30:00" }]),
+    ).toEqual({
+      minMs: exifWallClockTimestamp("2024-03-01T08:00:00"),
+      maxMs: exifWallClockTimestamp("2024-03-22T23:30:00"),
+    });
   });
 
   it("returns null for null/undefined/empty", () => {
@@ -61,7 +75,7 @@ describe("computeDateExtent", () => {
   });
 
   it("returns null for fewer than 2 dated entries", () => {
-    expect(computeDateExtent([{ date: "2024-01-01" }])).toBeNull();
+    expect(computeDateExtent([{ date: "2024-01-01T00:00:00" }])).toBeNull();
     expect(computeDateExtent([])).toBeNull();
     expect(computeDateExtent([{ date: null }])).toBeNull();
   });
@@ -104,9 +118,9 @@ describe("computeSparklineBins", () => {
   });
 
   it("returns all zeros for a zero-width extent", () => {
-    expect(computeSparklineBins([{ date: "2024-01-01" }], { minMs: 10, maxMs: 10 }, 3)).toEqual([
-      0, 0, 0,
-    ]);
+    expect(
+      computeSparklineBins([{ date: "2024-01-01T00:00:00" }], { minMs: 10, maxMs: 10 }, 3),
+    ).toEqual([0, 0, 0]);
   });
 
   it("places the max-date entry in the last bin", () => {
@@ -160,11 +174,51 @@ describe("parseRangeParam", () => {
     expect(result).toBe(new Date("2024-03-22T23:59:59.999Z").valueOf());
   });
 
+  it("parses a bound that carries its time, whichever end it is", () => {
+    const expected = Date.UTC(2024, 2, 22, 14, 5, 9);
+    expect(parseRangeParam("2024-03-22T14:05:09")).toBe(expected);
+    expect(parseRangeParam("2024-03-22T14:05:09", { endOfDay: true })).toBe(expected);
+  });
+
   it("returns null for null/invalid formats", () => {
     expect(parseRangeParam(null)).toBeNull();
     expect(parseRangeParam("")).toBeNull();
     expect(parseRangeParam("2024-3-22")).toBeNull();
     expect(parseRangeParam("not-a-date")).toBeNull();
     expect(parseRangeParam("2024-99-99")).toBeNull();
+  });
+});
+
+describe("formatRangeParam", () => {
+  it("keeps the short form on a day boundary", () => {
+    expect(formatRangeParam(Date.UTC(2024, 2, 22))).toBe("2024-03-22");
+    expect(formatRangeParam(Date.UTC(2024, 2, 22, 23, 59, 59, 999), { endOfDay: true })).toBe(
+      "2024-03-22",
+    );
+  });
+
+  // A one-day album could not be narrowed: the URL held whole days only, and
+  // the range read back from it replaced the one just chosen.
+  it("round-trips a range narrower than a day", () => {
+    const { fromMs, toMs } = snapRangeToSeconds(
+      Date.UTC(2024, 2, 22, 9, 15, 0, 400),
+      Date.UTC(2024, 2, 22, 11, 45, 30, 600),
+    );
+    const from = formatRangeParam(fromMs);
+    const to = formatRangeParam(toMs, { endOfDay: true });
+
+    expect(from).toBe("2024-03-22T09:15:01");
+    expect(to).toBe("2024-03-22T11:45:30");
+    expect(parseRangeParam(from)).toBe(fromMs);
+    expect(parseRangeParam(to, { endOfDay: true })).toBe(toMs);
+  });
+});
+
+describe("snapRangeToSeconds", () => {
+  it("never moves a bound across a whole-second capture time", () => {
+    const photo = Date.UTC(2024, 2, 22, 9, 15, 1);
+    expect(snapRangeToSeconds(photo - 1, photo + 1)).toEqual({ fromMs: photo, toMs: photo });
+    expect(snapRangeToSeconds(photo + 1, photo + 5000).fromMs).toBeGreaterThan(photo);
+    expect(snapRangeToSeconds(photo - 5000, photo - 1).toMs).toBeLessThan(photo);
   });
 });

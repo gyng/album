@@ -1,5 +1,5 @@
 import type { MapWorldEntry } from "../util/pageDataTypes";
-import { exifDayKey } from "../util/exifTime";
+import { exifDayKey, exifWallClockTimestamp } from "../util/exifTime";
 import { unwrapLongitudes } from "../util/mapBounds";
 
 export const ROUTE_SIMPLIFY_THRESHOLD = 80;
@@ -37,9 +37,19 @@ type BuildMapRouteOptions = {
 const isFiniteCoordinate = (value: number | null | undefined): value is number =>
   typeof value === "number" && Number.isFinite(value);
 
+// Camera-local wall clock on a fixed anchor: the order of a journey and the
+// gaps within it must not depend on the zone of whoever is looking at it.
+// `new Date()` is only the fallback for a string the wall-clock parser cannot
+// read at all (an RFC date naming its own zone); every naive form the pipeline
+// writes is taken by the first branch and never reaches the reader's zone.
 const parseTimestamp = (value: string | null | undefined): number | null => {
   if (!value) {
     return null;
+  }
+
+  const wallClock = exifWallClockTimestamp(value);
+  if (wallClock !== null) {
+    return wallClock;
   }
 
   const timestamp = new Date(value).valueOf();
@@ -213,7 +223,8 @@ export const buildMapRoute = (
 
 const getSegmentKey = (date: string | null | undefined): string | null => {
   // EXIF timestamps are camera-local wall-clock time, so a route "day"
-  // splits at the photo's local midnight — not the build machine's
+  // splits at the photo's local midnight — not the build machine's, and not
+  // the reader's
   const dayKey = exifDayKey(date);
   if (dayKey) {
     return dayKey;

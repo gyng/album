@@ -64,6 +64,48 @@ describe("TimeRangeSlider", () => {
     expect(onCommit).toHaveBeenCalledWith(expect.any(Number), toMs);
   });
 
+  it("jumps a thumb to its limit with Home and End", () => {
+    const { onCommit } = renderSlider();
+    const minMs = exifWallClockTimestamp("2020-01-01T00:00:00")!;
+    const maxMs = exifWallClockTimestamp("2025-01-01T00:00:00")!;
+
+    fireEvent.keyDown(screen.getByRole("slider", { name: "Start date" }), { key: "Home" });
+    expect(onCommit).toHaveBeenLastCalledWith(minMs, toMs);
+    fireEvent.keyDown(screen.getByRole("slider", { name: "End date" }), { key: "End" });
+    expect(onCommit).toHaveBeenLastCalledWith(fromMs, maxMs);
+    // A thumb's far limit is the other thumb, not the far end of the track.
+    fireEvent.keyDown(screen.getByRole("slider", { name: "Start date" }), { key: "End" });
+    expect(onCommit).toHaveBeenLastCalledWith(toMs, toMs);
+  });
+
+  it("moves a thumb by a larger step with PageUp and PageDown", () => {
+    const { onCommit } = renderSlider();
+    const start = screen.getByRole("slider", { name: "Start date" });
+
+    fireEvent.keyDown(start, { key: "ArrowRight" });
+    const arrowStep = onCommit.mock.calls.at(-1)![0] - fromMs;
+    fireEvent.keyDown(start, { key: "PageUp" });
+    expect(onCommit.mock.calls.at(-1)![0] - fromMs).toBeCloseTo(arrowStep * 10, 0);
+    fireEvent.keyDown(start, { key: "PageDown" });
+    expect(fromMs - onCommit.mock.calls.at(-1)![0]).toBeCloseTo(arrowStep * 10, 0);
+  });
+
+  // The extent used to be read on the reader's own clock and the filter on the
+  // camera's, so the "end" a lone start-thumb drag supplied fell short of the
+  // newest photo for anyone east of UTC.
+  it("keeps the newest photo when only the start thumb is dragged", () => {
+    const { onDrag } = renderSlider({ fromMs: null, toMs: null });
+    const start = screen.getByRole("slider", { name: "Start date" });
+    const trackArea = start.parentElement!;
+    trackArea.getBoundingClientRect = () =>
+      ({ left: 0, width: 100, right: 100, top: 0, bottom: 20, height: 20 }) as DOMRect;
+
+    fireEvent.pointerDown(start, { clientX: 0 });
+    fireEvent.pointerMove(trackArea.parentElement!, { clientX: 30 });
+
+    expect(onDrag.mock.calls.at(-1)![1]).toBe(exifWallClockTimestamp("2025-01-01T00:00:00"));
+  });
+
   it("clears the active date filter", () => {
     const { onCommit } = renderSlider();
 
@@ -177,7 +219,7 @@ describe("TimeRangeSlider", () => {
       fireEvent.keyDown(end, { key });
     }
     const callsBeforeIgnoredKey = onCommit.mock.calls.length;
-    fireEvent.keyDown(start, { key: "Home" });
+    fireEvent.keyDown(start, { key: "Tab" });
 
     expect(onDrag).toHaveBeenCalled();
     expect(onCommit.mock.calls).toHaveLength(callsBeforeIgnoredKey);

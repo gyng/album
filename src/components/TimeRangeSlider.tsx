@@ -12,6 +12,8 @@ import type { MapWorldEntry } from "../util/pageDataTypes";
 import styles from "./TimeRangeSlider.module.css";
 
 const BIN_COUNT = 100;
+/** How many arrow-key steps PageUp and PageDown take. */
+const PAGE_STEPS = 10;
 
 const clampPosition = (position: number): number => Math.max(0, Math.min(1, position));
 
@@ -168,19 +170,28 @@ export const TimeRangeSlider: React.FC<TimeRangeSliderProps> = ({
 
   const handleKeyDown = (e: React.KeyboardEvent, thumb: "from" | "to") => {
     const step = (extent.maxMs - extent.minMs) / BIN_COUNT;
+    const current = thumb === "from" ? (fromMs ?? extent.minMs) : (toMs ?? extent.maxMs);
     let newMs: number | null = null;
 
+    // Home and End ask for the track's ends; the clamp below stops a thumb at
+    // the other one, which is its real limit.
     if (e.key === "ArrowLeft" || e.key === "ArrowDown") {
-      e.preventDefault();
-      const current = thumb === "from" ? (fromMs ?? extent.minMs) : (toMs ?? extent.maxMs);
-      newMs = Math.max(current - step, extent.minMs);
+      newMs = current - step;
     } else if (e.key === "ArrowRight" || e.key === "ArrowUp") {
-      e.preventDefault();
-      const current = thumb === "from" ? (fromMs ?? extent.minMs) : (toMs ?? extent.maxMs);
-      newMs = Math.min(current + step, extent.maxMs);
+      newMs = current + step;
+    } else if (e.key === "PageDown") {
+      newMs = current - step * PAGE_STEPS;
+    } else if (e.key === "PageUp") {
+      newMs = current + step * PAGE_STEPS;
+    } else if (e.key === "Home") {
+      newMs = extent.minMs;
+    } else if (e.key === "End") {
+      newMs = extent.maxMs;
     }
 
     if (newMs === null) return;
+    e.preventDefault();
+    newMs = Math.max(extent.minMs, Math.min(extent.maxMs, newMs));
 
     if (thumb === "from") {
       const clampedTo = toMs ?? extent.maxMs;
@@ -209,7 +220,7 @@ export const TimeRangeSlider: React.FC<TimeRangeSliderProps> = ({
       <Sparkline bins={bins} fromPos={fromPos} toPos={toPos} hasRange={hasRange} />
 
       {/* Click-to-position is a pointer shortcut; keyboard control lives on the
-          slider thumbs below (role="slider" with arrow-key handlers). */}
+          slider thumbs below (role="slider" with the usual slider keys). */}
       {/* oxlint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions */}
       <div ref={trackRef} className={styles.trackArea} onClick={handleTrackClick}>
         <div className={styles.track}>

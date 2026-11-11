@@ -1,3 +1,4 @@
+import { exifWallClockTimestamp } from "../util/exifTime";
 import { DataLayer, Marker, type PointFeature, useMap } from "./map";
 import { useMarkerDepth } from "./mapDepth";
 import type { PhotoWithStyle } from "./mapWorldViewModel";
@@ -54,7 +55,7 @@ const hasCoordinates = (photo: PhotoWithStyle): photo is LocatedPhoto =>
 const photoLabel = (photo: PhotoWithStyle): string => {
   const formattedDate = formatMapPhotoDate(photo.date);
 
-  return `Photo from ${photo.album}${formattedDate ? ` on ${formattedDate}` : ""}`;
+  return `${photo.mediaKind === "video" ? "Clip" : "Photo"} from ${photo.album}${formattedDate ? ` on ${formattedDate}` : ""}`;
 };
 
 /* -------------------------------------------------------------------------- */
@@ -138,20 +139,22 @@ const pinOpacity = (photo: LocatedPhoto, emphasisedHrefs: ReadonlySet<string> | 
  * also drives the DOM markers' `z-index`, which is a 32-bit integer — epoch
  * milliseconds overflow it, and an undated photo has no timestamp at all.
  *
- * Only relative order matters here, so the naive-ISO capture strings are
- * compared as-is: they are already camera-local wall clock, and parsing them
- * consistently orders them correctly even though the absolute instant is not
- * meaningful.
+ * Read through `exifWallClockTimestamp`, the clock the date filter and the
+ * route use: `new Date()` on a naive string answers in the reader's zone, so a
+ * clock-change night could stack differently for different readers.
  */
 const buildDateRanks = (photos: readonly LocatedPhoto[]): ReadonlyMap<string, number> => {
-  const undated = -1;
-  const ordered = [...photos].sort((left, right) => {
-    const leftTime = left.date ? new Date(left.date).valueOf() : undated;
-    const rightTime = right.date ? new Date(right.date).valueOf() : undated;
-    const leftSafe = Number.isNaN(leftTime) ? undated : leftTime;
-    const rightSafe = Number.isNaN(rightTime) ? undated : rightTime;
-    return leftSafe === rightSafe ? left.href.localeCompare(right.href) : leftSafe - rightSafe;
-  });
+  const undated = Number.NEGATIVE_INFINITY;
+  const ordered = photos
+    .map((photo) => ({ photo, time: exifWallClockTimestamp(photo.date) ?? undated }))
+    .sort((left, right) =>
+      left.time === right.time
+        ? left.photo.href.localeCompare(right.photo.href)
+        : left.time < right.time
+          ? -1
+          : 1,
+    )
+    .map(({ photo }) => photo);
 
   return new Map(ordered.map((photo, index) => [photo.href, index]));
 };

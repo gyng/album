@@ -132,6 +132,28 @@
   gap: var(--space-2);
 }
 
+/* "Choose dates" while a range is still filtering the map from a closed
+   panel: without a mark, nothing on screen says photos are being held back. */
+.datesFiltered {
+  border-color: var(--c-accent);
+}
+
+.datesFiltered::after {
+  content: "";
+  flex: none;
+  inline-size: var(--size-6);
+  block-size: var(--size-6);
+  margin-inline-start: var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--c-accent);
+}
+
+@media (forced-colors: active) {
+  .datesFiltered::after {
+    background: Highlight;
+  }
+}
+
 /* The search field with the journeys and dates beside it, pinned at the end of
    the nav row where the scrolling list cannot clip them. */
 .trailing {

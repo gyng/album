@@ -1,3 +1,4 @@
+import { formatMediaCountOf } from "../../util/mediaCount";
 import React from "react";
 import { MapWorldDeferred } from "../../components/MapWorldDeferred";
 import { GlobalNav } from "../../components/GlobalNav";
@@ -10,7 +11,12 @@ import { Seo } from "../../components/Seo";
 import { buildCollectionPageJsonLd, formatPageTitle } from "../../lib/seo";
 import { getDefaultRouteMode, RouteMode } from "../../components/mapRoute";
 import { TimeRangeSlider } from "../../components/TimeRangeSlider";
-import { parseRangeParam, formatRangeDate } from "../../util/timeRange";
+import {
+  formatDisplayDate,
+  formatRangeParam,
+  parseRangeParam,
+  snapRangeToSeconds,
+} from "../../util/timeRange";
 import { filterPhotosByQuery, isPhotoInTimeRange } from "../../components/mapWorldViewModel";
 import { fetchMapSearchIndex } from "../../util/mapSearchIndex";
 import { buttonStyles } from "../../components/ui";
@@ -54,7 +60,7 @@ const MapScreen = (props: MapScreenProps) => {
   const hasRouteState =
     filterAlbum != null ||
     hasCameraParams ||
-    (routeReady && (hasSearchParam("from") || hasSearchParam("to")));
+    (routeReady && (hasSearchParam("from") || hasSearchParam("to") || hasSearchParam("q")));
 
   // Album filtering (existing)
   const albumFilteredPhotos = React.useMemo(
@@ -63,10 +69,10 @@ const MapScreen = (props: MapScreenProps) => {
   );
 
   // Time range state — live during drag, committed on pointer up
-  const urlFrom = parseRangeParam(routeReady ? getSearchParam("from") : null);
-  const urlTo = parseRangeParam(routeReady ? getSearchParam("to") : null, {
-    endOfDay: true,
-  });
+  const urlFromParam = routeReady ? getSearchParam("from") : null;
+  const urlToParam = routeReady ? getSearchParam("to") : null;
+  const urlFrom = parseRangeParam(urlFromParam);
+  const urlTo = parseRangeParam(urlToParam, { endOfDay: true });
   const [timeRange, setTimeRange] = React.useState<TimeRange | null>(
     urlFrom !== null && urlTo !== null ? { fromMs: urlFrom, toMs: urlTo } : null,
   );
@@ -74,17 +80,32 @@ const MapScreen = (props: MapScreenProps) => {
     urlFrom !== null && urlTo !== null,
   );
   const urlSyncTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const queryUrlTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Sync from URL on navigation (back/forward): a new range in the URL replaces
   // the one on screen, and its arrival opens the slider.
+  //
+  // Except when it is this screen's own write coming back. The URL is written
+  // a beat after the range is chosen, and the reader may have moved a thumb
+  // again by the time the router reports it; adopting it then would pull the
+  // thumb back to where it was.
   const [urlRange, setUrlRange] = React.useState({ urlFrom, urlTo });
+  const [writtenRange, setWrittenRange] = React.useState<{
+    from: string | null;
+    to: string | null;
+  } | null>(null);
   if (urlRange.urlFrom !== urlFrom || urlRange.urlTo !== urlTo) {
     setUrlRange({ urlFrom, urlTo });
-    if (urlFrom !== null && urlTo !== null) {
-      setTimeRange({ fromMs: urlFrom, toMs: urlTo });
-      setShowTimeRangeSlider(true);
-    } else {
-      setTimeRange(null);
+    const isOwnWrite =
+      writtenRange !== null && writtenRange.from === urlFromParam && writtenRange.to === urlToParam;
+    if (!isOwnWrite) {
+      setWrittenRange(null);
+      if (urlFrom !== null && urlTo !== null) {
+        setTimeRange({ fromMs: urlFrom, toMs: urlTo });
+        setShowTimeRangeSlider(true);
+      } else {
+        setTimeRange(null);
+      }
     }
   }
 
@@ -93,12 +114,16 @@ const MapScreen = (props: MapScreenProps) => {
   }, []);
 
   const handleTimeRangeCommit = React.useCallback(
-    (fromMs: number | null, toMs: number | null) => {
-      if (fromMs !== null && toMs !== null) {
-        setTimeRange({ fromMs, toMs });
-      } else {
-        setTimeRange(null);
-      }
+    (rawFromMs: number | null, rawToMs: number | null) => {
+      // Whole seconds are what the URL carries, and capture times have no
+      // finer grain, so the committed range is exactly the one a reload or a
+      // shared link restores — with the same photos in it.
+      const snapped =
+        rawFromMs !== null && rawToMs !== null ? snapRangeToSeconds(rawFromMs, rawToMs) : null;
+      const range = snapped
+        ? { fromMs: snapped.fromMs, toMs: Math.max(snapped.fromMs, snapped.toMs) }
+        : null;
+      setTimeRange(range);
 
       // Debounced URL update. Derive the base query from the live
       // window.location.search rather than router.query: MMap writes the
@@ -108,13 +133,19 @@ const MapScreen = (props: MapScreenProps) => {
       if (urlSyncTimer.current) clearTimeout(urlSyncTimer.current);
       urlSyncTimer.current = setTimeout(() => {
         const params = new URLSearchParams(window.location.search);
-        if (fromMs !== null && toMs !== null) {
-          params.set("from", formatRangeDate(fromMs));
-          params.set("to", formatRangeDate(toMs));
+        // A bound on a day boundary keeps the short `YYYY-MM-DD` older links
+        // use; one inside a day carries its time, or a one-day album could
+        // never be narrowed — the URL would hand back the whole day.
+        const from = range ? formatRangeParam(range.fromMs) : null;
+        const to = range ? formatRangeParam(range.toMs, { endOfDay: true }) : null;
+        if (from !== null && to !== null) {
+          params.set("from", from);
+          params.set("to", to);
         } else {
           params.delete("from");
           params.delete("to");
         }
+        setWrittenRange({ from, to });
         replaceSearchParams(params);
       }, DEBOUNCE_URL_MS);
     },
@@ -126,6 +157,7 @@ const MapScreen = (props: MapScreenProps) => {
   React.useEffect(() => {
     return () => {
       if (urlSyncTimer.current) clearTimeout(urlSyncTimer.current);
+      if (queryUrlTimer.current) clearTimeout(queryUrlTimer.current);
     };
   }, []);
 
@@ -134,6 +166,41 @@ const MapScreen = (props: MapScreenProps) => {
   const [directorEnabled, setDirectorEnabled] = React.useState(false);
   const [directorSequenceLength, setDirectorSequenceLength] = React.useState(0);
   const [mapSearchQuery, setMapSearchQuery] = React.useState("");
+  // The search is part of the link (`q=`), beside the album, dates and camera.
+  // A query arriving in the URL fills the field — unless it is this screen's
+  // own write coming back, which by then may be a keystroke behind the field.
+  const urlQuery = routeReady ? (getSearchParam("q") ?? "") : "";
+  const [seenUrlQuery, setSeenUrlQuery] = React.useState("");
+  const [writtenQuery, setWrittenQuery] = React.useState<string | null>(null);
+  if (seenUrlQuery !== urlQuery) {
+    setSeenUrlQuery(urlQuery);
+    if (urlQuery !== writtenQuery) {
+      setWrittenQuery(null);
+      setMapSearchQuery(urlQuery);
+    }
+  }
+  // Once the reader has typed, the camera is theirs: neither a search nor
+  // clearing one may move it.
+  const [searchEdited, setSearchEdited] = React.useState(false);
+  const handleSearchChange = (nextQuery: string) => {
+    setMapSearchQuery(nextQuery);
+    setSearchEdited(true);
+
+    // Debounced, replace-style, and built from the live location for the same
+    // reason as the date range: the camera params never reach the router.
+    if (queryUrlTimer.current) clearTimeout(queryUrlTimer.current);
+    queryUrlTimer.current = setTimeout(() => {
+      const params = new URLSearchParams(window.location.search);
+      const query = nextQuery.trim();
+      if (query) {
+        params.set("q", query);
+      } else {
+        params.delete("q");
+      }
+      setWrittenQuery(query);
+      replaceSearchParams(params);
+    }, DEBOUNCE_URL_MS);
+  };
   // Bumped by the "Fit to results" control. Typing filters the markers in place
   // (auto-fit is off during a search); this lets the user reframe on demand.
   const [fitRequestId, setFitRequestId] = React.useState(0);
@@ -161,6 +228,13 @@ const MapScreen = (props: MapScreenProps) => {
       });
     mapSearchLoadRef.current = loading;
   }, [mapSearchIndex]);
+  // Typed or arrived in a link, a query needs the index.
+  const hasSearchQuery = Boolean(mapSearchQuery.trim());
+  React.useEffect(() => {
+    if (hasSearchQuery) {
+      loadMapSearchIndex();
+    }
+  }, [hasSearchQuery, loadMapSearchIndex]);
   const deferredMapSearchQuery = React.useDeferredValue(mapSearchQuery);
   // The tour reads as "play these results": clearing the query back to the
   // full library removes the only control that can stop it, so stop it here
@@ -219,7 +293,7 @@ const MapScreen = (props: MapScreenProps) => {
           : `No photos match “${trimmedQuery}”.`
         : trimmedQuery
           ? `${displayedPhotos.length} of ${dateFilteredAlbumPhotos.length} photos match`
-          : `${displayedPhotos.length} photos on the map`;
+          : `${formatMediaCountOf(displayedPhotos)} on the map`;
   const isPreviewableResultSet =
     Boolean(deferredMapSearchQuery.trim()) &&
     displayedPhotos.length > 0 &&
@@ -286,14 +360,31 @@ const MapScreen = (props: MapScreenProps) => {
     return () => observer.disconnect();
   }, [showTimeRangeSlider]);
 
+  // A closed panel hides the thumbs but not their effect, so the control that
+  // reopens it has to say a range is still narrowing the map.
+  const hiddenRange = showTimeRangeSlider ? null : timeRange;
+  const hiddenRangeFrom = hiddenRange ? formatDisplayDate(hiddenRange.fromMs) : null;
+  const hiddenRangeTo = hiddenRange ? formatDisplayDate(hiddenRange.toMs) : null;
   const dateControlsToggle = (
     <button
       type="button"
-      className={[buttonStyles.base, showTimeRangeSlider ? buttonStyles.active : ""]
+      className={[
+        buttonStyles.base,
+        showTimeRangeSlider ? buttonStyles.active : "",
+        hiddenRange ? styles.datesFiltered : "",
+      ]
         .filter(Boolean)
         .join(" ")}
       aria-expanded={showTimeRangeSlider}
       aria-controls="map-date-controls"
+      {...(hiddenRange
+        ? {
+            "aria-description":
+              hiddenRangeFrom === hiddenRangeTo
+                ? `Filtered to ${hiddenRangeFrom}`
+                : `Filtered to ${hiddenRangeFrom} – ${hiddenRangeTo}`,
+          }
+        : {})}
       onClick={() => {
         setShowTimeRangeSlider((current) => !current);
       }}
@@ -371,11 +462,7 @@ const MapScreen = (props: MapScreenProps) => {
                   value={mapSearchQuery}
                   onFocus={loadMapSearchIndex}
                   onChange={(event) => {
-                    const nextQuery = event.target.value;
-                    setMapSearchQuery(nextQuery);
-                    if (nextQuery.trim()) {
-                      loadMapSearchIndex();
-                    }
+                    handleSearchChange(event.target.value);
                   }}
                   placeholder="Search photos…"
                   aria-label="Search photos on the map"
@@ -475,13 +562,18 @@ const MapScreen = (props: MapScreenProps) => {
         // invariant: CSS module classes always resolve
         className={styles.map!}
         // Auto-fit only frames the initial view; a search filters in place
-        // rather than flying the map to the matches.
+        // rather than flying the map to the matches, and clearing one leaves
+        // the camera where the reader put it. The one search it does frame is
+        // a query that arrived in a link with no camera of its own — and only
+        // once the index can say what matched, so the map moves once.
         //
         // Gated on the route being readable, not merely on the camera params
         // being absent: until the renderer reports navigation ready they are
         // *always* absent, so a map that mounts in that window would frame every
         // photo and throw away the position a shared link asked for.
-        fitToPhotos={routeReady && !hasCameraParams && !deferredMapSearchQuery.trim()}
+        fitToPhotos={
+          routeReady && !hasCameraParams && !searchEdited && !(hasSearchQuery && !mapSearchIndex)
+        }
         fitRequestId={fitRequestId}
         showRoute={!filterAlbum && showAllRoutes}
         routeMode={filterAlbum ? defaultRouteMode : "simplified"}

@@ -755,6 +755,37 @@ describe("MapWorld", () => {
     }
   });
 
+  // A phosphor basemap redraws its pins in its own ramp; the single-album
+  // journey used to keep the spectral one, a line in a colour no pin had.
+  it("draws a single album's journey from the basemap's own ramp", () => {
+    const { recencyColor, recencyRampFor } =
+      require("../util/mapColor") as typeof import("../util/mapColor");
+    act(() => {
+      setMapStyleChoice("crt");
+    });
+    render(
+      <MMap
+        photos={[
+          photo,
+          {
+            ...photo,
+            href: "/album/kansai#two.jpg",
+            src: { src: "/photo-2.jpg", width: 100, height: 100 },
+            decLat: 35.8,
+            decLng: 139.8,
+          },
+        ]}
+        className="map"
+        showRoute
+        routeDisplayMode="always"
+      />,
+    );
+
+    const [line] = journeyLineProperties(JOURNEY_SOURCE_ID);
+    expect(line?.color).toBe(recencyColor(0.6, recencyRampFor("crt")));
+    expect(line?.color).not.toBe(recencyColor(0.6));
+  });
+
   it("renders a journey line layer when enabled", () => {
     render(
       <MMap

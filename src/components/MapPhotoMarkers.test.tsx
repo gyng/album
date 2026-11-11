@@ -322,6 +322,29 @@ describe("MapPhotoMarkers", () => {
       expect(byId.get("middle")).toBeLessThan(byId.get("newest")!);
     });
 
+    // Stacking reads the same wall-clock parser as the filter and the route.
+    // `new Date()` could not read the EXIF form, so this pair fell back to
+    // comparing hrefs, and it read a naive string in the reader's zone.
+    it("stacks by the camera's wall clock in either timestamp form", () => {
+      render(
+        <MapPhotoMarkers
+          photos={[
+            photo({ href: "a-later", date: "2024:03:10 03:10:00" }),
+            photo({ href: "b-earlier", date: "2024-03-10T02:30:00" }),
+          ]}
+          visiblePhotos={[]}
+          showMarkerImages={false}
+          emphasiseRoute={false}
+          activeRouteHrefSet={new Set()}
+          onSelect={jest.fn()}
+          onHover={jest.fn()}
+        />,
+      );
+
+      const byId = new Map(lastDataLayer().points.map((p) => [p.id, p.sortKey]));
+      expect(byId.get("b-earlier")).toBeLessThan(byId.get("a-later")!);
+    });
+
     // A faded off-route pin drawing over the highlighted one is the more
     // visible fault, so emphasis outranks recency rather than tying with it.
     it("lifts emphasised photos above every unemphasised one, newest or not", () => {

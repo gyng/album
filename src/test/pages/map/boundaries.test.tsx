@@ -130,7 +130,9 @@ describe("map page boundaries", () => {
       jest.advanceTimersByTime(300);
     });
     expect(replace).toHaveBeenLastCalledWith(
-      "/map?lat=1&lon=2&zoom=4&keep=yes&from=2024-01-02&to=2024-01-03",
+      // The committed end is midnight exactly, which a bare day would widen to
+      // the whole of the 3rd, so it travels with its time.
+      "/map?lat=1&lon=2&zoom=4&keep=yes&from=2024-01-02&to=2024-01-03T00%3A00%3A00",
       undefined,
       { shallow: true },
     );

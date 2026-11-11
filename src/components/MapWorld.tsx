@@ -1,6 +1,12 @@
 import React from "react";
 import type { MapWorldEntry, TimeRange } from "../util/pageDataTypes";
-import { mixHsl, pinHaloFor, recencyColor, recencyRampFor } from "../util/mapColor";
+import {
+  mixHsl,
+  pinHaloFor,
+  recencyColor,
+  recencyRampFor,
+  type RecencyRamp,
+} from "../util/mapColor";
 import { MapRecencyLegend } from "./MapRecencyLegend";
 import {
   type CameraView,
@@ -89,9 +95,11 @@ export type MapWorldProps = {
 
 // The single-album journey line is drawn in one solid colour: the recency
 // colour of whichever photo the route currently belongs to (mid-ramp by
-// default). Kept as a 3-stop shape for the callers that index into it.
-const getRouteColorStops = (relative: number) => {
-  const color = recencyColor(relative);
+// default), from the ramp the pins are drawn in — on a basemap that supplies its
+// own, a spectral line would be a colour no pin on the map has. Kept as a 3-stop
+// shape for the callers that index into it.
+const getRouteColorStops = (relative: number, ramp: RecencyRamp) => {
+  const color = recencyColor(relative, ramp);
   return [
     { offset: "0%", color },
     { offset: "55%", color },
@@ -498,8 +506,8 @@ export const MMap: React.FC<MapWorldProps> = ({
     [markerColorByHref],
   );
   const routeColorStops = React.useMemo(
-    () => getRouteColorStops(activeRoutePhoto?.relative ?? 0.6),
-    [activeRoutePhoto?.relative],
+    () => getRouteColorStops(activeRoutePhoto?.relative ?? 0.6, recencyRamp),
+    [activeRoutePhoto?.relative, recencyRamp],
   );
 
   React.useEffect(() => {
