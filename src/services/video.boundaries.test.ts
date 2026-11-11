@@ -189,6 +189,8 @@ describe("video process boundaries", () => {
     jest.spyOn(fs, "mkdirSync").mockImplementation(() => undefined);
     jest.spyOn(fs, "existsSync").mockReturnValueOnce(false).mockReturnValueOnce(true);
     jest.spyOn(fs, "statSync").mockReturnValue({ size: 10 } as fs.Stats);
+    jest.spyOn(fs, "renameSync").mockImplementation(() => undefined);
+    jest.spyOn(fs, "rmSync").mockImplementation(() => undefined);
     jest.spyOn(console, "log").mockImplementation(() => undefined);
 
     await expect(optimiseVideo("albums/trip/clip.mov", "public/data/albums")).resolves.toEqual({
@@ -200,6 +202,30 @@ describe("video process boundaries", () => {
       expect.arrayContaining(["-i", "albums/trip/clip.mov", "-preset", "medium", "-crf", "28"]),
       { stdio: "pipe" },
     );
+  });
+
+  // Page builds run in parallel workers, and two pages can render the same
+  // clip. Encoding straight into the cache path let a second worker find a
+  // half-written MP4 and probe it ("moov atom not found"), failing the build.
+  it("encodes into a temporary file and renames it into place", async () => {
+    scenarios.push((proc) => proc.emit("close", 0));
+    jest.spyOn(fs, "mkdirSync").mockImplementation(() => undefined);
+    jest.spyOn(fs, "existsSync").mockReturnValueOnce(false).mockReturnValueOnce(true);
+    jest.spyOn(fs, "statSync").mockReturnValue({ size: 10 } as fs.Stats);
+    const rename = jest.spyOn(fs, "renameSync").mockImplementation(() => undefined);
+    jest.spyOn(fs, "rmSync").mockImplementation(() => undefined);
+    jest.spyOn(console, "log").mockImplementation(() => undefined);
+
+    await optimiseVideo("albums/trip/clip.mov", "public/data/albums");
+
+    const final = "public/data/albums/trip/.resized_videos/clip.mov@1920-q28.mp4";
+    const args = mockSpawn.mock.calls[0]![1] as string[];
+    const written = args.at(-1)!;
+    expect(written).not.toBe(final);
+    // The in-flight suffix cleanup-optimised-media leaves alone.
+    expect(written).toMatch(/^public\/data\/albums\/trip\/\.resized_videos\/.*\.tmp-\d+-\d+$/);
+    expect(args.slice(-3, -1)).toEqual(["-f", "mp4"]);
+    expect(rename).toHaveBeenCalledWith(written, final);
   });
 
   it("surfaces ffmpeg spawn and non-zero-exit failures", async () => {
@@ -237,7 +263,9 @@ describe("video process boundaries", () => {
     );
   });
 
-  it("removes a corrupt production cache before re-encoding", async () => {
+  // Another build worker may be probing the cached file, so it is replaced by
+  // rename rather than deleted first.
+  it("replaces a corrupt production cache without deleting it first", async () => {
     (process.env as Record<string, string | undefined>).NODE_ENV = "production";
     scenarios.push(
       (proc) => proc.emit("close", 1),
@@ -247,12 +275,19 @@ describe("video process boundaries", () => {
     jest.spyOn(fs, "existsSync").mockReturnValue(true);
     jest.spyOn(fs, "statSync").mockReturnValue({ size: 10 } as fs.Stats);
     const unlink = jest.spyOn(fs, "unlinkSync").mockImplementation(() => undefined);
+    jest.spyOn(fs, "renameSync").mockImplementation(() => undefined);
+    jest.spyOn(fs, "rmSync").mockImplementation(() => undefined);
     jest.spyOn(console, "log").mockImplementation(() => undefined);
 
+    const rename = jest.spyOn(fs, "renameSync").mockImplementation(() => undefined);
     await expect(optimiseVideo("albums/trip/corrupt.mov", "public/data/albums")).resolves.toEqual(
       expect.objectContaining({ mimeType: "video/mp4" }),
     );
-    expect(unlink).toHaveBeenCalledTimes(1);
+    expect(unlink).not.toHaveBeenCalled();
+    expect(rename).toHaveBeenCalledWith(
+      expect.stringMatching(/\.tmp-\d+-\d+$/),
+      "public/data/albums/trip/.resized_videos/corrupt.mov@1920-q28.mp4",
+    );
   });
 
   it("treats validation process errors as a corrupt cache", async () => {
@@ -265,6 +300,8 @@ describe("video process boundaries", () => {
     jest.spyOn(fs, "existsSync").mockReturnValue(true);
     jest.spyOn(fs, "statSync").mockReturnValue({ size: 10 } as fs.Stats);
     jest.spyOn(fs, "unlinkSync").mockImplementation(() => undefined);
+    jest.spyOn(fs, "renameSync").mockImplementation(() => undefined);
+    jest.spyOn(fs, "rmSync").mockImplementation(() => undefined);
     jest.spyOn(console, "log").mockImplementation(() => undefined);
 
     await expect(
@@ -272,20 +309,19 @@ describe("video process boundaries", () => {
     ).resolves.toEqual(expect.objectContaining({ mimeType: "video/mp4" }));
   });
 
-  it("kills timed-out validation before re-encoding", async () => {
+  // A timeout says the machine is busy, not that the file is bad. Read as
+  // "corrupt", every build under load re-encoded clips it had just encoded,
+  // and the encodes were the load: 21 false verdicts in one build.
+  it("kills a timed-out validation and keeps the cached video", async () => {
     jest.useFakeTimers();
     (process.env as Record<string, string | undefined>).NODE_ENV = "production";
     let validationProcess: FakeProcess | undefined;
-    scenarios.push(
-      (proc) => {
-        validationProcess = proc;
-      },
-      (proc) => proc.emit("close", 0),
-    );
+    scenarios.push((proc) => {
+      validationProcess = proc;
+    });
     jest.spyOn(fs, "mkdirSync").mockImplementation(() => undefined);
     jest.spyOn(fs, "existsSync").mockReturnValue(true);
     jest.spyOn(fs, "statSync").mockReturnValue({ size: 10 } as fs.Stats);
-    jest.spyOn(fs, "unlinkSync").mockImplementation(() => undefined);
     jest.spyOn(console, "log").mockImplementation(() => undefined);
 
     const result = optimiseVideo("albums/trip/timeout.mov", "public/data/albums");
@@ -294,6 +330,8 @@ describe("video process boundaries", () => {
 
     await expect(result).resolves.toEqual(expect.objectContaining({ mimeType: "video/mp4" }));
     expect(validationProcess?.kill).toHaveBeenCalledWith("SIGKILL");
+    // Validation was the only process: nothing was re-encoded.
+    expect(mockSpawn).toHaveBeenCalledTimes(1);
     jest.useRealTimers();
   });
 });

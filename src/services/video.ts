@@ -189,9 +189,13 @@ const isValidCachedVideo = async (videoPath: string): Promise<boolean> => {
       { stdio: "pipe" },
     );
 
+    // A timeout is inconclusive, not a verdict: a busy machine is slow to
+    // start ffmpeg, while a corrupt file fails fast with a non-zero exit.
+    // Reading it as corrupt re-encoded good clips on every loaded build, and
+    // the re-encodes were the load.
     const timeout = setTimeout(() => {
       proc.kill("SIGKILL");
-      resolve(false);
+      resolve(true);
     }, VIDEO_VALIDATION_TIMEOUT_MS);
 
     proc.on("error", () => {
@@ -375,6 +379,8 @@ export const readVideoPoster = (
   }) as VideoPoster;
 };
 
+let temporaryVideoSequence = 0;
+
 export const optimiseVideo = async (
   videoPath: string,
   outputDirectory: string,
@@ -407,11 +413,18 @@ export const optimiseVideo = async (
     }
 
     console.log(`Detected corrupt cached video: ${outputFile}`);
+    // Not unlinked: another build worker may be reading it, and the encode
+    // below replaces it with an atomic rename.
     console.log(`Cached optimised video is invalid, re-encoding: ${outputFile}`);
-    fs.unlinkSync(outputFile);
   }
 
   console.log(`Optimising video with ffmpeg: ${videoPath} -> ${outputFile}`);
+
+  // Page builds run in parallel workers and two pages can render the same
+  // clip, so the cache path must only ever hold a finished file: a worker that
+  // found a half-written MP4 there probed it and failed the whole build.
+  // The suffix is the one cleanup-optimised-media recognises as in flight.
+  const temporaryFile = `${outputFile}.tmp-${process.pid}-${temporaryVideoSequence++}`;
 
   const ffmpegArgs = [
     "-y",
@@ -442,16 +455,23 @@ export const optimiseVideo = async (
     "-ar",
     "48000",
     ...videoExportFfmpegArgs(captureMetadata),
-    outputFile,
+    "-f",
+    "mp4",
+    temporaryFile,
   ];
 
-  await runFfmpeg(ffmpegArgs);
+  try {
+    await runFfmpeg(ffmpegArgs);
 
-  if (!fs.existsSync(outputFile) || fs.statSync(outputFile).size === 0) {
-    throw new Error(`ffmpeg produced empty output for ${videoPath}`);
+    if (!fs.existsSync(temporaryFile) || fs.statSync(temporaryFile).size === 0) {
+      throw new Error(`ffmpeg produced empty output for ${videoPath}`);
+    }
+
+    await ensureVideoExportMetadata(temporaryFile, captureMetadata);
+    fs.renameSync(temporaryFile, outputFile);
+  } finally {
+    fs.rmSync(temporaryFile, { force: true });
   }
-
-  await ensureVideoExportMetadata(outputFile, captureMetadata);
 
   console.log(`Optimised video ready: ${outputFile}`);
 
