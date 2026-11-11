@@ -165,6 +165,25 @@ describe("slideshow diagnostics page", () => {
     );
   });
 
+  // The bare shell URL dropped the album filter and the topic the reader had
+  // been watching.
+  it("returns to the slideshow it was opened from", () => {
+    window.history.replaceState(
+      {},
+      "",
+      "/slideshow/diagnostics?return=filter%3Djapan%26topic%3Dcat",
+    );
+    try {
+      render(<SlideshowDiagnosticsScreen />);
+      expect(screen.getByRole("link", { name: /back to the slideshow/i })).toHaveAttribute(
+        "href",
+        "/slideshow/shell?filter=japan&topic=cat",
+      );
+    } finally {
+      window.history.replaceState({}, "", "/");
+    }
+  });
+
   it("says so when the shell has never reported its state", () => {
     render(<SlideshowDiagnosticsScreen />);
     const wake = screen.getByRole("group", { name: "Screen wake lock" });

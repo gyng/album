@@ -15,6 +15,7 @@ import {
   type ShellLogEntry,
   type ShellStatusSnapshot,
 } from "../../util/shellDiagnosticsLog";
+import { resolveSlideshowReturnHref } from "../../util/slideshowUrl";
 import styles from "./SlideshowDiagnosticsScreen.module.css";
 import { formatPageTitle } from "../../lib/seo";
 import { useDiagnosticsClock } from "../../components/useDiagnosticsClock";
@@ -74,6 +75,11 @@ const setStatusPillVisible = (visible: boolean) => {
 const noSubscription = () => () => {};
 const browserCanShare = () => typeof navigator.share === "function";
 const off = () => false;
+// Where "Back to the slideshow" goes: the shell, with the query the slideshow
+// handed over in `return` (its album filter and topic live nowhere else).
+const BARE_SHELL_HREF = "/slideshow/shell";
+const readBackHref = () => resolveSlideshowReturnHref(window.location.search);
+const serverBackHref = () => BARE_SHELL_HREF;
 
 const ago = (at: number, now: number): string => `${formatGapDuration(Math.max(0, now - at))} ago`;
 
@@ -106,6 +112,7 @@ export const SlideshowDiagnosticsScreen = () => {
     off,
   );
   const canShare = React.useSyncExternalStore(noSubscription, browserCanShare, off);
+  const backHref = React.useSyncExternalStore(noSubscription, readBackHref, serverBackHref);
   const copiedTimerRef = React.useRef<number | null>(null);
 
   React.useEffect(
@@ -206,7 +213,7 @@ export const SlideshowDiagnosticsScreen = () => {
             : "The slideshow shell has not recorded anything on this device yet."}
         </Caption>
         <div className={styles.actions}>
-          <AppLink className={styles.backLink} href="/slideshow/shell">
+          <AppLink className={styles.backLink} href={backHref}>
             Back to the slideshow
           </AppLink>
           {canShare ? (

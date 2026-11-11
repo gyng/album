@@ -108,10 +108,15 @@ import {
 import { decidePoolReloadAction } from "../../util/slideshowPoolReload";
 import {
   applySlideshowUrlState,
+  buildSlideshowDiagnosticsHref,
   buildSlideshowPermalink,
   parseSlideshowSearchParams,
+  readStoredSlideshowMode,
   SlideshowMode,
+  stripAppliedSlideshowParams,
 } from "../../util/slideshowUrl";
+import { SlideshowClipChip } from "../../components/slideshow/SlideshowClipChip";
+import { canSetMediaVolume, rampMediaVolume } from "../../components/slideshow/clipAudio";
 import {
   advanceUserNavCount,
   clampTopicProgress,
@@ -153,6 +158,9 @@ const FALLBACK_RELOAD_MS = 7 * 86400000;
 // bytes per request), so 10 minutes is plenty responsive for a sideboard
 // without being chatty.
 const DB_POLL_MS = 600000;
+// The cross-fade's own length (`--fade-duration`, --t-medium): a clip's sound
+// fades with its picture.
+const CLIP_AUDIO_FADE_MS = 250;
 const useSafeLayoutEffect = typeof window === "undefined" ? useEffect : React.useLayoutEffect;
 
 type FullscreenDocument = Document & {
@@ -637,12 +645,15 @@ export const Slideshow: React.FC<{
   const [clipLoop, setClipLoop] = useLocalStorage("slideshow-loop", true, {
     initializeWithValue: false,
   });
+  // The mute toggle shared by the M key, the clip chip and the toolbar. It is
+  // defined with the playback code far below; the key handler reaches it here.
+  const toggleClipSoundRef = React.useRef<() => void>(() => {});
   const [poolStats, setPoolStats] = React.useState<PoolStats>(EMPTY_POOL_STATS);
   const [searchDbVersion, setSearchDbVersion] = React.useState<SearchDbVersion | null>(null);
   const [isCheckingSearchDbVersion, setIsCheckingSearchDbVersion] = React.useState(false);
   // When set, the next forward-advance ignores the dice roll and forces a
   // remix. Used by the dedicated "Remix now" action button so users can
-  // trigger a remix on demand instead of waiting for the 3% dice.
+  // trigger a remix on demand instead of waiting for the dice.
   const forceRemixRef = React.useRef(false);
   // Kiosk-extreme timing cadences (3h, 12h, 24h) are kept available but hidden
   // by default behind a "More" disclosure. Persisted so power users don't have
@@ -700,6 +711,7 @@ export const Slideshow: React.FC<{
     controlsHideProgress,
     isCoarsePointer,
     setIsPointerOverToolbar,
+    setKeyboardFocusInControls,
     extendControlsHideDeadline,
     showControlsForDesktop,
     hideDesktopControls,
@@ -892,6 +904,11 @@ export const Slideshow: React.FC<{
    * URL Search Parameters for Slideshow Configuration
    *
    * Boolean parameters (accept: 1, true, yes, on):
+   * Display and clip settings (clock, details, map, cover, time, remix, align,
+   * align_cadence, clips, muted, loop, volume) are applied ONCE: each is
+   * persisted and then removed from the live URL, so a reload keeps what the
+   * toolbar last set rather than what the link first said.
+   *
    *   - clock=1        Show clock display
    *   - details=1      Show photo details (location, date)
    *   - map=1          Show map when EXIF GPS coordinates are available
@@ -933,7 +950,14 @@ export const Slideshow: React.FC<{
   // util/slideshowUrl; this effect just fans the parsed values out to the
   // React setters/refs (applying each only when present — null means absent).
   useEffect(() => {
-    const parsed = parseSlideshowSearchParams(window.location.search, slideshowMode);
+    // The stored mode, not the hook's: that has not hydrated yet at mount.
+    let storedMode = slideshowMode;
+    try {
+      storedMode = readStoredSlideshowMode(window.localStorage, slideshowMode);
+    } catch {
+      // Storage can be denied outright; the default mode stands.
+    }
+    const parsed = parseSlideshowSearchParams(window.location.search, storedMode);
 
     if (parsed.filter) {
       setFilter(parsed.filter);
@@ -995,6 +1019,16 @@ export const Slideshow: React.FC<{
     }
     if (parsed.loop !== null) {
       setClipLoop(parsed.loop);
+    }
+
+    // Each of those settings is now in state and in storage, where the toolbar
+    // can change it. Left in the address it was applied again on every reload
+    // and every code handover — the shell's restart URL is this one — undoing
+    // whatever the reader had changed since. A copied link always carries the
+    // four clip settings, so opening one pinned them for good.
+    const appliedHref = stripAppliedSlideshowParams(window.location.toString());
+    if (appliedHref !== window.location.toString()) {
+      window.history.replaceState(window.history.state, "", appliedHref);
     }
 
     setHasParsedInitialUrl(true);
@@ -2117,11 +2151,13 @@ export const Slideshow: React.FC<{
         },
         togglePaused,
         exit: exitSlideshow,
+        toggleMute: () => toggleClipSoundRef.current(),
+        toggleLoop: () => setClipLoop((loop) => !loop),
       });
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [advanceToNextPhoto, exitSlideshow, goPrevious, togglePaused]);
+  }, [advanceToNextPhoto, exitSlideshow, goPrevious, togglePaused, setClipLoop]);
 
   useEffect(() => {
     const fullscreenDocument = document as FullscreenDocument;
@@ -2700,6 +2736,40 @@ export const Slideshow: React.FC<{
       previous.has(path) ? previous : new Set([...previous, path]),
     );
   }, []);
+  // "For the session" on a kiosk is weeks. A clip that failed while the
+  // network was away is given another chance when it comes back, as the photo
+  // outage window already is.
+  useEffect(() => {
+    const online = () => setUnplayableClips((previous) => (previous.size ? new Set() : previous));
+    window.addEventListener("online", online);
+    return () => window.removeEventListener("online", online);
+  }, []);
+  // Under reduced motion a clip is its poster, as a hover thumbnail refuses to
+  // arm there: a picture that starts moving by itself is the motion being
+  // asked not to happen.
+  const [prefersReducedMotion, setPrefersReducedMotion] = React.useState(false);
+  useEffect(() => {
+    const query = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const sync = () => setPrefersReducedMotion(query.matches);
+    sync();
+    query.addEventListener("change", sync);
+    return () => query.removeEventListener("change", sync);
+  }, []);
+  // iOS ignores a page-set volume, so the slider is not offered there and the
+  // cross-fade's volume ramp is skipped (it would only delay the pause).
+  const [volumeAdjustable, setVolumeAdjustable] = React.useState(true);
+  useEffect(() => {
+    setVolumeAdjustable(canSetMediaVolume());
+  }, []);
+  // A clip is only asked to play while the show is running in a visible
+  // document; the playback effect and the first-frame deadline both read this.
+  const [documentVisible, setDocumentVisible] = React.useState(true);
+  useEffect(() => {
+    const sync = () => setDocumentVisible(document.visibilityState === "visible");
+    sync();
+    document.addEventListener("visibilitychange", sync);
+    return () => document.removeEventListener("visibilitychange", sync);
+  }, []);
   // A clip that has played its once settles back to its poster for the rest of
   // its slide, through the same cross-fade a failed clip takes. It is the slide
   // that remembers, not the session: the mark goes as soon as the slide moves
@@ -2725,6 +2795,7 @@ export const Slideshow: React.FC<{
       // An external is indexed as a video but has no transcoded MP4.
       if (
         playClips &&
+        !prefersReducedMotion &&
         row.mediaKind === "video" &&
         isPlayableClipPath(row.path) &&
         !unplayableClips.has(row.path) &&
@@ -2743,6 +2814,7 @@ export const Slideshow: React.FC<{
     activePhotoSrc,
     remixCompanions,
     playClips,
+    prefersReducedMotion,
     unplayableClips,
     finishedClipRow,
   ]);
@@ -2967,6 +3039,10 @@ export const Slideshow: React.FC<{
     }
     const removed = videoElementsRef.current.get(key);
     videoElementsRef.current.delete(key);
+    if (removed) {
+      clipRampsRef.current.get(removed)?.cancel();
+      clipRampsRef.current.delete(removed);
+    }
     // An inline ref is detached and re-attached on every render, so only a
     // clip that has really left the page is released — otherwise a dropped
     // `preload="auto"` element keeps buffering until it is collected.
@@ -2977,38 +3053,155 @@ export const Slideshow: React.FC<{
       }
     });
   }, []);
+  // The slide whose unmuted autoplay the browser refused. The clip plays on
+  // muted, and this is what remembers that the mute was the browser's and not
+  // the reader's: the next gesture anywhere on the page — the only thing that
+  // can permit sound — takes it off again. It used to be written to the
+  // element and nowhere else, so the setting said sound and the clip stayed
+  // silent until the reader toggled Mute twice.
+  const [soundBlockedKey, setSoundBlockedKey] = React.useState<string | null>(null);
+  const soundBlocked = soundBlockedKey !== null && soundBlockedKey === slideKey;
+  const playClipElement = useCallback((key: string, element: HTMLVideoElement) => {
+    element.play().catch((error: unknown) => {
+      // An unmuted autoplay without a gesture — a reload or a kiosk restart
+      // after the reader unmuted — is refused. Play it muted rather than leave
+      // it on its first frame. Anything else is the clip failing, which its
+      // error handler shows as the poster.
+      if (error instanceof Error && error.name === "NotAllowedError" && !element.muted) {
+        element.muted = true;
+        setSoundBlockedKey(key);
+        element.play().catch(() => {});
+      }
+    });
+  }, []);
+  // Volume ramps in flight, by element. An outgoing clip fades out across the
+  // cross-fade and an incoming one stays silent until its layer is revealed,
+  // then fades in — only with sound on, and only where a volume can be set.
+  const clipRampsRef = React.useRef(
+    new Map<HTMLVideoElement, { phase: "in" | "out"; active: boolean; cancel: () => void }>(),
+  );
+  const cancelClipRamp = useCallback((element: HTMLVideoElement) => {
+    clipRampsRef.current.get(element)?.cancel();
+    clipRampsRef.current.delete(element);
+  }, []);
   useEffect(() => {
-    const applyPlayback = () => {
-      const visible = document.visibilityState === "visible";
-      for (const [key, element] of videoElementsRef.current) {
-        // React does not reliably manage a media element's volume property, so
-        // it is written here through the element ref: both the playing clip and
-        // one still fading out carry the setting while they are on screen.
-        element.volume = safeClipVolume;
-        // The incoming clip plays from the moment it is the top layer, not
-        // only once revealed: iOS fetches no media for a video until it is
-        // asked to play, so waiting for the first frame before playing waited
-        // forever. The outgoing clip pauses as the cross-fade starts.
-        if (key === slideKey && !isPaused && visible) {
-          element.play().catch((error: unknown) => {
-            // An unmuted autoplay without a gesture — a reload or a kiosk
-            // restart after the reader unmuted — is refused. Play it muted
-            // rather than leave it on its first frame. Anything else is the
-            // clip failing, which its error handler shows as the poster.
-            if (error instanceof Error && error.name === "NotAllowedError" && !element.muted) {
-              element.muted = true;
-              element.play().catch(() => {});
-            }
-          });
+    const ramps = clipRampsRef.current;
+    return () => {
+      for (const ramp of ramps.values()) ramp.cancel();
+      ramps.clear();
+    };
+  }, []);
+  const clipShouldPlay = !isPaused && documentVisible;
+  useEffect(() => {
+    const ramps = clipRampsRef.current;
+    const rampSound = !effectiveClipMuted && volumeAdjustable;
+    const startRamp = (
+      element: HTMLVideoElement,
+      phase: "in" | "out",
+      to: number,
+      onDone?: () => void,
+    ) => {
+      ramps.get(element)?.cancel();
+      const entry = { phase, active: true, cancel: () => {} };
+      ramps.set(element, entry);
+      entry.cancel = rampMediaVolume(element, to, CLIP_AUDIO_FADE_MS, () => {
+        entry.active = false;
+        onDone?.();
+      });
+    };
+    for (const [key, element] of videoElementsRef.current) {
+      const ramp = ramps.get(element);
+      if (key !== slideKey) {
+        // The outgoing clip. With sound it fades out under the cross-fade and
+        // pauses at the end; silent, it pauses as the cross-fade starts.
+        if (rampSound && !element.paused) {
+          if (ramp?.phase !== "out") startRamp(element, "out", 0, () => element.pause());
         } else {
+          cancelClipRamp(element);
           element.pause();
         }
+        continue;
       }
+      // React does not reliably manage a media element's volume property, so
+      // it is written here through the element ref.
+      if (!rampSound) {
+        cancelClipRamp(element);
+        element.volume = safeClipVolume;
+      } else if (!layers.some((layer) => layer.key === key && layer.loaded)) {
+        // Playing but not yet revealed: it must not be heard over the slide
+        // still on screen.
+        cancelClipRamp(element);
+        element.volume = 0;
+      } else if (ramp?.phase === "in" && !ramp.active) {
+        element.volume = safeClipVolume;
+      } else {
+        startRamp(element, "in", safeClipVolume);
+      }
+      // The incoming clip plays from the moment it is the top layer, not
+      // only once revealed: iOS fetches no media for a video until it is
+      // asked to play, so waiting for the first frame before playing waited
+      // forever.
+      if (clipShouldPlay) {
+        playClipElement(key, element);
+      } else {
+        element.pause();
+      }
+    }
+  }, [
+    layers,
+    slideKey,
+    clipShouldPlay,
+    safeClipVolume,
+    effectiveClipMuted,
+    volumeAdjustable,
+    playClipElement,
+    cancelClipRamp,
+  ]);
+
+  // Take the browser's mute off again. Called from inside a gesture, which is
+  // what makes the unmuted play() permissible.
+  const restoreClipSound = useCallback(() => {
+    setSoundBlockedKey(null);
+    for (const [key, element] of videoElementsRef.current) {
+      element.muted = false;
+      if (key === topKeyRef.current && clipShouldPlay) playClipElement(key, element);
+    }
+  }, [clipShouldPlay, playClipElement]);
+  useEffect(() => {
+    if (!soundBlocked) return;
+    if (effectiveClipMuted) {
+      // The reader muted in the meantime: there is no sound left to restore.
+      setSoundBlockedKey(null);
+      return;
+    }
+    const onGesture = (event: Event) => {
+      // The chip is a gesture too, and answers for itself.
+      if (event.target instanceof Element && event.target.closest("[data-clip-chip]")) return;
+      restoreClipSound();
     };
-    applyPlayback();
-    document.addEventListener("visibilitychange", applyPlayback);
-    return () => document.removeEventListener("visibilitychange", applyPlayback);
-  }, [layers, slideKey, isPaused, safeClipVolume]);
+    const gestures = ["pointerup", "keydown", "click"] as const;
+    for (const type of gestures) window.addEventListener(type, onGesture, true);
+    return () => {
+      for (const type of gestures) window.removeEventListener(type, onGesture, true);
+    };
+  }, [soundBlocked, effectiveClipMuted, restoreClipSound]);
+  // Mute, from the chip, the M key or the toolbar. Where the browser forced
+  // the mute, the press asks for the sound the setting already promises.
+  // Unmuting also writes the element here, inside the gesture, rather than
+  // waiting for the render that follows it.
+  const toggleClipSound = useCallback(() => {
+    if (!playClips) return;
+    if (soundBlocked && !clipMuted) {
+      restoreClipSound();
+      return;
+    }
+    if (clipMuted) {
+      const top = topKeyRef.current ? videoElementsRef.current.get(topKeyRef.current) : undefined;
+      if (top) top.muted = false;
+    }
+    setClipMuted(!clipMuted);
+  }, [playClips, soundBlocked, clipMuted, restoreClipSound, setClipMuted]);
+  toggleClipSoundRef.current = toggleClipSound;
 
   // A hung replacement must not erase the last good photograph. Skip/retry it
   // instead of fabricating a successful decode after the deadline.
@@ -3044,14 +3237,28 @@ export const Slideshow: React.FC<{
     const top = layersRef.current[layersRef.current.length - 1];
     if (top?.key === slideKey && top.loaded && decodedPresentationKey === slideKey) return;
     // A clip whose first frame has not come shows its poster instead; the
-    // poster is then a slide like any other, with its own deadline.
-    const hungClip = currentCells[0]?.mediaKind === "video" ? currentCells[0].path : null;
+    // poster is then a slide like any other, with its own deadline. A remix
+    // grid is stills whatever its seed is, so a slow grid is never a hung clip.
+    const hungClip =
+      !isRemix && currentCells[0]?.mediaKind === "video" ? currentCells[0].path : null;
+    // The deadline measures a clip that was asked to play. Paused or hidden it
+    // was not — and on iOS it fetches nothing until it is — so giving up then
+    // retired a clip that had done nothing wrong.
+    if (hungClip && !clipShouldPlay) return;
     const t = window.setTimeout(
       () => (hungClip ? showClipAsPoster(hungClip) : advanceCurrentSlideRef.current("app")),
       6000,
     );
     return () => window.clearTimeout(t);
-  }, [slideKey, layers, decodedPresentationKey, currentCells, showClipAsPoster]);
+  }, [
+    slideKey,
+    layers,
+    decodedPresentationKey,
+    currentCells,
+    showClipAsPoster,
+    isRemix,
+    clipShouldPlay,
+  ]);
 
   if (currentPhotoPath === null) {
     // Effective download progress for whichever database the current mode is
@@ -3138,6 +3345,13 @@ export const Slideshow: React.FC<{
   // Seed photo plus any remix companions, in render order. Consumed by
   // both the bottom-bar overlay and the image layer below.
   const slidePhotos = [currentPhotoPath, ...remixCompanions];
+  // Diagnostics is another document; it is told what to come back to.
+  const diagnosticsHref = buildSlideshowDiagnosticsHref(
+    new URLSearchParams({
+      ...(filter ? { filter } : {}),
+      ...(topic ? { topic } : {}),
+    }).toString(),
+  );
 
   return (
     <>
@@ -3313,11 +3527,15 @@ export const Slideshow: React.FC<{
           playClips={playClips}
           onTogglePlayClips={() => setPlayClips(!playClips)}
           clipMuted={clipMuted}
-          onToggleClipMuted={() => setClipMuted(!clipMuted)}
+          onToggleClipMuted={toggleClipSound}
           clipLoop={clipLoop}
           onToggleClipLoop={() => setClipLoop(!clipLoop)}
           clipVolume={clipVolume}
           onChangeClipVolume={setClipVolume}
+          volumeAdjustable={volumeAdjustable}
+          isClipSlide={currentPhotoPath.mediaKind === "video"}
+          diagnosticsHref={diagnosticsHref}
+          onKeyboardFocusChange={setKeyboardFocusInControls}
           onRemixNow={() => {
             forceRemixRef.current = true;
             advanceToNextPhoto();
@@ -3422,6 +3640,19 @@ export const Slideshow: React.FC<{
             Layer 2 has no blending; map cell is visibility:hidden, the
             text cells are visible. Net result: map blends with the photo,
             text/clock render with their full text-shadow intact. */}
+        {/* A clip slide's own mark: sound state, length, and the press that
+            changes the first. Outside the layer stack, so pressing it is not
+            the tap that advances. */}
+        {!isRemix && currentCells[0]?.mediaKind === "video" ? (
+          <SlideshowClipChip
+            muted={effectiveClipMuted || soundBlocked}
+            soundBlocked={soundBlocked}
+            durationSeconds={currentPhotoPath.durationSeconds}
+            controlsVisible={controlsVisible}
+            onToggle={toggleClipSound}
+          />
+        ) : null}
+
         <SlideshowBottomBar
           slidePhotos={slidePhotos}
           showDetails={showDetails}
@@ -3574,6 +3805,15 @@ export const Slideshow: React.FC<{
                                 markRemixCellLoaded(cell.path);
                                 if (isSeed) {
                                   scheduleImageErrorRetry();
+                                } else {
+                                  // The reveal also waits for every source to
+                                  // decode, which a broken one never will: it
+                                  // is settled, as an empty cell.
+                                  markDecoded(
+                                    layer.key,
+                                    cell.src,
+                                    layer.slide.cells.map((c) => c.src),
+                                  );
                                 }
                               },
                             }

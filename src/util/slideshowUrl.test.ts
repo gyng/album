@@ -1,7 +1,12 @@
 import {
   applySlideshowUrlState,
+  buildSlideshowDiagnosticsHref,
   buildSlideshowPermalink,
+  hasOneShotSlideshowParams,
+  resolveSlideshowReturnHref,
+  stripAppliedSlideshowParams,
   parseSlideshowSearchParams,
+  readStoredSlideshowMode,
   SlideshowMode,
 } from "./slideshowUrl";
 
@@ -260,5 +265,78 @@ describe("buildSlideshowPermalink", () => {
       photoPath: "../albums/japan/IMG_1.jpg",
     });
     expect(new URL(withoutTopic).searchParams.has("topic")).toBe(false);
+  });
+});
+
+// A setting given in the URL is applied once. Left in the address it was
+// re-applied on every reload, undoing whatever the toolbar had changed since.
+describe("stripAppliedSlideshowParams", () => {
+  it("drops the display and clip settings and keeps the state the URL owns", () => {
+    const out = new URL(
+      stripAppliedSlideshowParams(
+        "https://x.test/slideshow?shell=1&mode=similar&filter=japan&delay=60&topic=cat&photo=a%2Fb.jpg&shuffle=50&random=1" +
+          "&clock=1&details=1&map=1&cover=1&time=1&remix=0&align=left&align_cadence=0&clips=1&muted=0&loop=0&volume=0.25#x",
+      ),
+    );
+    expect([...out.searchParams.keys()]).toEqual([
+      "shell",
+      "mode",
+      "filter",
+      "delay",
+      "topic",
+      "photo",
+      "shuffle",
+      "random",
+    ]);
+    expect(out.hash).toBe("#x");
+  });
+
+  it("reports whether a search string still carries one", () => {
+    expect(hasOneShotSlideshowParams("?mode=similar&muted=0")).toBe(true);
+    expect(hasOneShotSlideshowParams("?mode=similar&filter=japan")).toBe(false);
+    expect(hasOneShotSlideshowParams("")).toBe(false);
+  });
+});
+
+// Diagnostics is a separate document; its way back used to be a bare shell
+// URL, which lost the album filter and the topic.
+describe("diagnostics round trip", () => {
+  it("carries the slideshow's query to diagnostics and back to the shell", () => {
+    const href = buildSlideshowDiagnosticsHref(
+      "?shell=1&shellVersion=abc&filter=japan&topic=a%20cat",
+    );
+    expect(href.startsWith("/slideshow/diagnostics?")).toBe(true);
+    expect(resolveSlideshowReturnHref(href.slice(href.indexOf("?")))).toBe(
+      "/slideshow/shell?filter=japan&topic=a+cat",
+    );
+  });
+
+  it("falls back to the bare shell and diagnostics URLs", () => {
+    expect(buildSlideshowDiagnosticsHref("")).toBe("/slideshow/diagnostics");
+    expect(resolveSlideshowReturnHref("")).toBe("/slideshow/shell");
+    // Only a query is accepted: nothing here can point the link elsewhere.
+    expect(resolveSlideshowReturnHref("?return=https%3A%2F%2Fevil.test%2F")).toBe(
+      "/slideshow/shell?https%3A%2F%2Fevil.test%2F=",
+    );
+  });
+});
+
+describe("readStoredSlideshowMode", () => {
+  const storage = (value: string | null) => ({ getItem: () => value });
+
+  it("reads the persisted mode so mode-gated params apply before the hook hydrates", () => {
+    const mode = readStoredSlideshowMode(storage('"similar"'), "weighted");
+    expect(mode).toBe("similar");
+    expect(parseSlideshowSearchParams("?shuffle=50&random=1", mode)).toMatchObject({
+      shuffleHistory: 50,
+      randomSimilar: true,
+    });
+  });
+
+  it("falls back on nothing stored, an unknown mode, unparseable text or no storage", () => {
+    expect(readStoredSlideshowMode(storage(null), "weighted")).toBe("weighted");
+    expect(readStoredSlideshowMode(storage('"sideways"'), "weighted")).toBe("weighted");
+    expect(readStoredSlideshowMode(storage("{"), "random")).toBe("random");
+    expect(readStoredSlideshowMode(null, "random")).toBe("random");
   });
 });

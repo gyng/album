@@ -144,6 +144,39 @@ describe("slideshow code shell", () => {
     unmount();
     confirm.mockRestore();
   });
+  // The shell's own address is what a reload of the shell boots the runtime
+  // from. Once the runtime has applied the one-shot settings and dropped them,
+  // the shell lets go of them too, or a reload undid the toolbar.
+  it("drops applied one-shot settings from its own address, and opens the report with a way back", async () => {
+    global.fetch = jest.fn(pendingVersionResponse);
+    window.history.replaceState({}, "", "/slideshow/shell?filter=test-simple&muted=0&clock=1");
+    const { unmount } = render(<SlideshowShellScreen />);
+    const frame = screen.getByTitle("Slideshow") as HTMLIFrameElement;
+    const report = (search: string) =>
+      act(() => {
+        window.dispatchEvent(
+          new MessageEvent("message", {
+            origin: window.location.origin,
+            source: frame.contentWindow,
+            data: { ...mountedMessage("new-build"), search },
+          }),
+        );
+      });
+
+    // Not yet applied by the runtime: the address stands.
+    report("?shell=1&filter=test-simple&muted=0&clock=1");
+    expect(window.location.search).toBe("?filter=test-simple&muted=0&clock=1");
+
+    report("?shell=1&filter=test-simple&mode=weighted&delay=60&photo=a%2Fb.jpg");
+    expect(window.location.search).toBe("?filter=test-simple");
+
+    fireEvent.click(screen.getByRole("button", { name: "Slideshow diagnostics" }));
+    fireEvent.click(screen.getByRole("link", { name: "Open full report" }));
+    expect(mockNavigateTo).toHaveBeenCalledWith(
+      "/slideshow/diagnostics?return=filter%3Dtest-simple%26mode%3Dweighted%26delay%3D60%26photo%3Da%252Fb.jpg",
+    );
+    unmount();
+  });
   it("recovers a runtime that presents a photo and then stops reporting health", async () => {
     jest.useFakeTimers();
     try {

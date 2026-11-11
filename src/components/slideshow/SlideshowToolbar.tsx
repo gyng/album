@@ -86,6 +86,9 @@ export type SlideshowToolbarProps = {
   // Container interaction
   onFocusCapture: () => void;
   onPointerOverToolbar: (over: boolean) => void;
+  // Keyboard focus (`:focus-visible`) entered or left the toolbar. A press with
+  // a finger or mouse focuses a button too, and must not hold the panel open.
+  onKeyboardFocusChange?: (within: boolean) => void;
 
   // Pool / context
   poolStats: PoolStats;
@@ -105,6 +108,8 @@ export type SlideshowToolbarProps = {
   playbackContextLabel: string;
   onExit: () => void;
   onNavigate: (href: string) => void;
+  // Where the diagnostics report lives, with the slideshow's query to return to.
+  diagnosticsHref?: string;
 
   // Playback
   slideshowMode: SlideshowMode;
@@ -128,6 +133,10 @@ export type SlideshowToolbarProps = {
   // Clip playback volume, 0..1. The control is a percentage.
   clipVolume: number;
   onChangeClipVolume: (volume: number) => void;
+  // False where the browser ignores a page-set volume (iOS): no slider then.
+  volumeAdjustable?: boolean;
+  // The slide on screen is a clip, for the wording of the copied link.
+  isClipSlide?: boolean;
   isPaused: boolean;
   onTogglePaused: () => void;
   canGoPrevious: boolean;
@@ -226,7 +235,21 @@ export const formatCountdown = (secondsLeft: number): string => {
   return `${Math.floor(secondsLeft)}s`;
 };
 
+// Focus that came from the keyboard. A browser without `:focus-visible` throws
+// on the selector; treating its focus as keyboard focus errs towards keeping
+// the controls up.
+const isKeyboardFocus = (target: EventTarget): boolean => {
+  if (!(target instanceof Element)) return false;
+  try {
+    return target.matches(":focus-visible");
+  } catch {
+    return true;
+  }
+};
+
 export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
+  const diagnosticsHref = props.diagnosticsHref ?? SLIDESHOW_DIAGNOSTICS_HREF;
+  const linkNoun = props.isClipSlide ? "clip" : "photo";
   // Only consulted by the phone layout; wider ones render the region regardless.
   const [moreSettingsOpen, setMoreSettingsOpen] = React.useState(false);
   const sessionStarted = spanSince(props.sessionStartedAt);
@@ -339,8 +362,17 @@ export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
     <div
       ref={toolbarRef}
       className={styles.toolbar}
-      onFocusCapture={props.onFocusCapture}
-      onBlur={() => props.onPointerOverToolbar(false)}
+      onFocusCapture={(event) => {
+        props.onFocusCapture();
+        if (isKeyboardFocus(event.target)) props.onKeyboardFocusChange?.(true);
+      }}
+      onBlur={(event) => {
+        props.onPointerOverToolbar(false);
+        const next = event.relatedTarget;
+        if (!(next instanceof Node) || !event.currentTarget.contains(next)) {
+          props.onKeyboardFocusChange?.(false);
+        }
+      }}
       onMouseEnter={() => props.onPointerOverToolbar(true)}
       onMouseLeave={() => props.onPointerOverToolbar(false)}
     >
@@ -451,12 +483,12 @@ export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
       <div className={styles.poolStats}>
         <Link
           className={styles.poolStatsLink}
-          href={SLIDESHOW_DIAGNOSTICS_HREF}
+          href={diagnosticsHref}
           aria-label={`Diagnostics · ${props.poolStats.count.toLocaleString("en-GB")} photos`}
           onClick={(event) => {
             if (isModifiedClick(event)) return;
             event.preventDefault();
-            props.onNavigate(SLIDESHOW_DIAGNOSTICS_HREF);
+            props.onNavigate(diagnosticsHref);
           }}
         >
           <span className={styles.poolStatsCount}>
@@ -595,7 +627,7 @@ export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
             <button
               type="button"
               className={buttonStyles.base}
-              title="Force the next advance to be a remix slide (ignores the 3% dice)"
+              title="Make the next slide a remix"
               onClick={props.onRemixNow}
             >
               ◫ Remix now
@@ -966,10 +998,11 @@ export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
                 buttonStyles.base,
               ].join(" ")}
               aria-pressed={props.clipMuted}
+              disabled={!props.playClips}
               title={
                 props.clipMuted
                   ? "Clips play silently. Press to play them with sound."
-                  : "Clips play with sound at the volume beside this button"
+                  : "Clips play with sound. Press to play them silently."
               }
               onClick={props.onToggleClipMuted}
             >
@@ -984,6 +1017,7 @@ export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
                 buttonStyles.base,
               ].join(" ")}
               aria-pressed={props.clipLoop}
+              disabled={!props.playClips}
               title={
                 props.clipLoop
                   ? "Clips repeat for as long as their slide lasts"
@@ -995,33 +1029,37 @@ export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
             </button>
           </div>
 
-          <div className={styles.controlMeta}>
-            {/* There is no slider component in the repo, and a native range
-                input brings its own keyboard and screen-reader behaviour for
-                free. The value is a percentage because that is what a person
-                sets; the page turns it back into 0..1. */}
-            <label className={styles.volumeControl}>
-              <span className={styles.volumeLabel}>Volume</span>
-              <input
-                className={styles.volumeSlider}
-                type="range"
-                min={0}
-                max={100}
-                step={5}
-                value={Math.round(props.clipVolume * 100)}
-                aria-label="Clip volume"
-                disabled={!props.playClips}
-                onChange={(event) => {
-                  const volume = Number(event.target.value) / 100;
-                  props.onChangeClipVolume(volume);
-                  // Clips start muted, so turning the volume up is the way to
-                  // hear one; a slider that waited for Mute first looked dead.
-                  if (props.clipMuted && volume > 0) props.onToggleClipMuted();
-                }}
-              />
-              <span className={styles.volumeValue}>{Math.round(props.clipVolume * 100)}%</span>
-            </label>
-          </div>
+          {/* Where the browser ignores a page-set volume (iOS keeps it for the
+              hardware buttons) the slider would move and change nothing. */}
+          {props.volumeAdjustable === false ? null : (
+            <div className={styles.controlMeta}>
+              {/* There is no slider component in the repo, and a native range
+                  input brings its own keyboard and screen-reader behaviour for
+                  free. The value is a percentage because that is what a person
+                  sets; the page turns it back into 0..1. */}
+              <label className={styles.volumeControl}>
+                <span className={styles.volumeLabel}>Volume</span>
+                <input
+                  className={styles.volumeSlider}
+                  type="range"
+                  min={0}
+                  max={100}
+                  step={5}
+                  value={Math.round(props.clipVolume * 100)}
+                  aria-label="Clip volume"
+                  disabled={!props.playClips}
+                  onChange={(event) => {
+                    const volume = Number(event.target.value) / 100;
+                    props.onChangeClipVolume(volume);
+                    // Clips start muted, so turning the volume up is the way to
+                    // hear one; a slider that waited for Mute first looked dead.
+                    if (props.clipMuted && volume > 0) props.onToggleClipMuted();
+                  }}
+                />
+                <span className={styles.volumeValue}>{Math.round(props.clipVolume * 100)}%</span>
+              </label>
+            </div>
+          )}
         </div>
 
         <div className={styles.controlGroup} role="group" aria-label="Current photo context">
@@ -1093,7 +1131,7 @@ export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
             </Link>
 
             <button className={buttonStyles.base} type="button" onClick={props.onCopyLink}>
-              {props.copiedPhotoLink ? "copied photo link" : "copy photo link"}
+              {props.copiedPhotoLink ? `copied ${linkNoun} link` : `copy ${linkNoun} link`}
             </button>
 
             <button

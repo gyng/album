@@ -20,15 +20,20 @@ const mockEncodeSearchText = jest.fn();
 const mockRefreshDatabase = jest.fn();
 const mockRetryEmbeddings = jest.fn();
 const mockSetPaused = jest.fn();
+// The cadence's paused flag, per test.
+let mockPaused = false;
+// Media queries that match, per test.
+let mockMatchingQueries: string[] = [];
 
-const row = (path: string, mediaKind?: string) => ({
+const row = (path: string, mediaKind?: string, durationSeconds?: number) => ({
   path,
   exif: "",
   geocode: "",
   colors: "",
   ...(mediaKind ? { mediaKind } : {}),
+  ...(durationSeconds ? { durationSeconds } : {}),
 });
-const clip = row("../albums/test-simple/clip.MOV", "video");
+const clip = row("../albums/test-simple/clip.MOV", "video", 42);
 const external = row("../albums/test-simple/abc123.youtube", "video");
 const still = row("../albums/test-simple/b.jpg");
 // Stored settings the screen reads through useLocalStorage, per test.
@@ -56,7 +61,7 @@ jest.mock("../../components/useSlideshowCadence", () => ({
   useSlideshowCadence: () => ({
     secondsLeft: 0,
     time: null,
-    isPaused: false,
+    isPaused: mockPaused,
     togglePaused: jest.fn(),
     setPaused: mockSetPaused,
     scheduleNextChange: jest.fn(),
@@ -140,6 +145,9 @@ describe("SlideshowScreen clip slides", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockStored.clear();
+    mockPaused = false;
+    mockMatchingQueries = [];
+    window.localStorage.clear();
     jest.spyOn(Math, "random").mockReturnValue(0.5);
     mockUseDatabase.mockReturnValue([readyDatabase, 100, null, null, mockRefreshDatabase]);
     mockUseEmbeddingsDatabase.mockReturnValue([
@@ -154,9 +162,9 @@ describe("SlideshowScreen clip slides", () => {
     mockEncodeSearchText.mockResolvedValue(new Float32Array([0.1, 0.2, 0.3]));
     Object.defineProperty(window, "matchMedia", {
       writable: true,
-      value: jest.fn().mockImplementation(() => ({
-        matches: false,
-        media: "",
+      value: jest.fn().mockImplementation((query: string) => ({
+        matches: mockMatchingQueries.includes(query),
+        media: query,
         onchange: null,
         addListener: jest.fn(),
         removeListener: jest.fn(),
@@ -290,5 +298,226 @@ describe("SlideshowScreen clip slides", () => {
     await flush();
     expect(slide()?.tagName).toBe("IMG");
     expect(slide()?.getAttribute("src")).toBe(poster);
+  });
+
+  // iOS fetches nothing for a clip until it is asked to play, and a paused or
+  // hidden slideshow does not ask. The first-frame deadline ran anyway and
+  // retired the clip to a still for the rest of the session.
+  it("does not give up on a clip that is waiting because the show is paused", async () => {
+    jest.useFakeTimers();
+    mockPaused = true;
+    await startOn(clip);
+    await act(async () => {
+      jest.advanceTimersByTime(20000);
+    });
+    await flush();
+    expect(slide()?.tagName).toBe("VIDEO");
+  });
+
+  it("does not give up on a clip while the document is hidden, and does once it is seen", async () => {
+    jest.useFakeTimers();
+    const visibility = jest.spyOn(document, "visibilityState", "get").mockReturnValue("hidden");
+    await startOn(clip);
+    await act(async () => {
+      jest.advanceTimersByTime(20000);
+    });
+    await flush();
+    expect(slide()?.tagName).toBe("VIDEO");
+
+    visibility.mockReturnValue("visible");
+    await act(async () => {
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+    await act(async () => {
+      jest.advanceTimersByTime(6100);
+    });
+    await flush();
+    expect(slide()?.tagName).toBe("IMG");
+  });
+
+  // The forced mute was written to the element and nowhere else, so nothing
+  // ever took it off again: the setting said sound, the clip stayed silent.
+  it("brings the sound back on the next gesture after a refused unmuted autoplay", async () => {
+    mockStored.set("slideshow-muted", false);
+    let allowSound = false;
+    play.mockImplementation(function (this: HTMLMediaElement) {
+      return this.muted || allowSound
+        ? Promise.resolve()
+        : Promise.reject(Object.assign(new Error("refused"), { name: "NotAllowedError" }));
+    });
+    await startOn(clip);
+    const video = slide() as HTMLVideoElement;
+    await flush();
+    expect(video.muted).toBe(true);
+    // The chip reports what is heard, not what the setting hoped for.
+    expect(screen.getByRole("button", { name: "Mute clip" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+
+    allowSound = true;
+    await act(async () => {
+      window.dispatchEvent(new Event("pointerup"));
+    });
+    await flush();
+
+    expect(video.muted).toBe(false);
+    expect(screen.getByRole("button", { name: "Mute clip" })).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
+  });
+
+  it("marks a clip slide with a chip that toggles the sound without advancing", async () => {
+    await startOn(clip);
+    const chip = screen.getByRole("button", { name: "Mute clip" });
+    expect(chip).toHaveAttribute("aria-pressed", "true");
+    expect(chip.textContent).toBe("0:42");
+    const fetchesBefore = mockFetchRandomPhoto.mock.calls.length;
+
+    fireEvent.pointerDown(chip);
+    fireEvent.pointerUp(chip);
+    fireEvent.click(chip);
+    await flush();
+
+    expect((slide() as HTMLVideoElement).muted).toBe(false);
+    expect(screen.getByRole("button", { name: "Mute clip" })).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
+    expect(slide()?.getAttribute("poster")).toMatch(/clip/);
+    expect(mockFetchRandomPhoto.mock.calls.length).toBe(fetchesBefore);
+  });
+
+  it("shows no clip chip on a photograph", async () => {
+    await startOn(still);
+    expect(screen.queryByRole("button", { name: "Mute clip" })).toBeNull();
+  });
+
+  it("toggles mute on M and loop on L", async () => {
+    await startOn(clip);
+    expect((slide() as HTMLVideoElement).muted).toBe(true);
+    expect((slide() as HTMLVideoElement).loop).toBe(true);
+
+    fireEvent.keyDown(window, { key: "m" });
+    fireEvent.keyDown(window, { key: "l" });
+    await flush();
+
+    expect((slide() as HTMLVideoElement).muted).toBe(false);
+    expect((slide() as HTMLVideoElement).loop).toBe(false);
+  });
+
+  // One Wi-Fi blip on a kiosk retired every clip it touched until the next
+  // reload, which can be weeks away.
+  it("gives a failed clip another chance when the connection comes back", async () => {
+    await startOn(clip);
+    fireEvent.error(slide()!);
+    await flush();
+    expect(slide()?.tagName).toBe("IMG");
+
+    await act(async () => {
+      window.dispatchEvent(new Event("online"));
+    });
+    await flush();
+
+    expect(slide()?.tagName).toBe("VIDEO");
+  });
+
+  it("shows a clip as its still under reduced motion", async () => {
+    mockMatchingQueries = ["(prefers-reduced-motion: reduce)"];
+    await startOn(clip);
+    expect(slide()?.tagName).toBe("IMG");
+    expect(screen.queryByRole("button", { name: "Mute clip" })).toBeNull();
+  });
+
+  // A setting given in the URL is applied once. Left in the address, a copied
+  // link's `muted=0` came back on every reload and undid the toolbar.
+  it("takes applied settings out of the live URL and keeps the state the URL owns", async () => {
+    window.history.replaceState(
+      window.history.state,
+      "",
+      "/slideshow?remix=0&muted=0&loop=0&volume=0.25&clock=1&filter=test-simple",
+    );
+    await startOn(clip);
+
+    expect((slide() as HTMLVideoElement).loop).toBe(false);
+    const params = new URLSearchParams(window.location.search);
+    for (const name of ["remix", "muted", "loop", "volume", "clock"]) {
+      expect(params.has(name)).toBe(false);
+    }
+    expect(params.get("filter")).toBe("test-simple");
+  });
+
+  it("does not offer the volume where the browser will not take one", async () => {
+    const volume = jest.spyOn(HTMLMediaElement.prototype, "volume", "get").mockReturnValue(1);
+    jest.spyOn(HTMLMediaElement.prototype, "volume", "set").mockImplementation(() => {});
+    await startOn(clip);
+    expect(screen.queryByRole("slider", { name: "Clip volume" })).toBeNull();
+    expect(volume).toHaveBeenCalled();
+  });
+
+  describe("a remix grid", () => {
+    const third = row("../albums/test-simple/c.jpg");
+    const grid = () => document.querySelector(".remixGrid") as HTMLElement | null;
+    const startGrid = async (seed: ReturnType<typeof row>) => {
+      Object.defineProperty(HTMLImageElement.prototype, "decode", {
+        configurable: true,
+        value: () => Promise.resolve(),
+      });
+      mockFetchSlideshowPhotos.mockResolvedValue([still, third, seed]);
+      mockFetchRandomPhoto.mockResolvedValue([still]);
+      render(<SlideshowScreen />);
+      await flush();
+      mockFetchRandomPhoto.mockResolvedValue([seed]);
+      fireEvent.click(screen.getByRole("button", { name: /Remix now/ }));
+      await flush();
+      await flush();
+      expect(grid()).not.toBeNull();
+      // The grid under test is the one this seed leads.
+      expect(grid()!.querySelector("img")?.getAttribute("src")).toContain(
+        seed.path.split("/").pop()!,
+      );
+      return Array.from(grid()!.querySelectorAll("img"));
+    };
+    afterEach(() => {
+      delete (HTMLImageElement.prototype as { decode?: unknown }).decode;
+    });
+
+    // One 404 among the companions used to keep the grid from ever showing:
+    // the cell was marked loaded but never decoded, and the slide was skipped.
+    it("shows with a broken companion instead of being skipped", async () => {
+      jest.useFakeTimers();
+      const [seedImage, ...companions] = await startGrid(row("../albums/test-simple/d.jpg"));
+      expect(companions.length).toBeGreaterThan(0);
+      const fetchesBefore = mockFetchRandomPhoto.mock.calls.length;
+
+      fireEvent.load(seedImage!);
+      for (const companion of companions) fireEvent.error(companion);
+      await flush();
+      await act(async () => {
+        jest.advanceTimersByTime(7000);
+      });
+      await flush();
+
+      expect(grid()).not.toBeNull();
+      expect(grid()!.className).not.toMatch(/layerHidden/);
+      expect(mockFetchRandomPhoto.mock.calls.length).toBe(fetchesBefore);
+    });
+
+    // The grid is stills by design, so a slow one says nothing about the clip.
+    it("passes over a slow grid seeded by a clip instead of blaming the clip", async () => {
+      jest.useFakeTimers();
+      await startGrid(clip);
+      await act(async () => {
+        jest.advanceTimersByTime(6100);
+      });
+      await flush();
+
+      await flush();
+
+      // Passed over like any slow slide. Blamed on the clip, the grid stayed
+      // where it was, hidden, and the clip was a still from then on.
+      expect(grid()).toBeNull();
+    });
   });
 });

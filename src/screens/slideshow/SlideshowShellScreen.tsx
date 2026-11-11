@@ -25,6 +25,7 @@ import {
 import {
   buildSlideshowRuntimeUrl,
   buildSlideshowShellUrl,
+  isModifiedClick,
   isSlideshowRuntimeMessage,
   planRuntimeReload,
   recordRuntimeReload,
@@ -35,6 +36,11 @@ import {
   SLIDESHOW_SHELL_STATE_MESSAGE,
   SLIDESHOW_WAKE_REQUEST_MESSAGE,
 } from "../../util/slideshowShell";
+import {
+  buildSlideshowDiagnosticsHref,
+  hasOneShotSlideshowParams,
+  stripAppliedSlideshowParams,
+} from "../../util/slideshowUrl";
 import styles from "./SlideshowShellScreen.module.css";
 import { formatPageTitle } from "../../lib/seo";
 import {
@@ -773,6 +779,16 @@ export const SlideshowShellScreen = () => {
       }
       if (typeof event.data.search === "string") {
         runtimeSearchRef.current = event.data.search;
+        // The runtime applies a display or clip setting from the URL once and
+        // drops it from its own address. This document's address is what a
+        // reload of the shell boots from, so it lets go of them too — or the
+        // reload would bring back a setting the toolbar has since changed.
+        if (!hasOneShotSlideshowParams(event.data.search)) {
+          const applied = stripAppliedSlideshowParams(window.location.href);
+          if (applied !== window.location.href) {
+            window.history.replaceState(window.history.state, "", applied);
+          }
+        }
       }
       runtimeVersionRef.current = nextVersion;
       setRuntimeVersion(nextVersion);
@@ -1041,7 +1057,17 @@ export const SlideshowShellScreen = () => {
                 </button>
                 {/* The same evidence at document size, for reading on a tablet
                   rather than squinting at this corner overlay. */}
-                <AppLink className={styles.reportLink} href="/slideshow/diagnostics">
+                <AppLink
+                  className={styles.reportLink}
+                  href="/slideshow/diagnostics"
+                  onClick={(event) => {
+                    if (isModifiedClick(event)) return;
+                    // Tell the report what to come back to: the album filter
+                    // and topic live only in the slideshow's query.
+                    event.preventDefault();
+                    navigateTo(buildSlideshowDiagnosticsHref(runtimeSearchRef.current));
+                  }}
+                >
                   Open full report
                 </AppLink>
               </div>

@@ -70,6 +70,22 @@ const parseVolume = (value: string | null): number | null => {
   return volume;
 };
 
+// The persisted mode, read straight from storage. The settings hook hydrates
+// after mount, so at the moment the URL is parsed its value is still the
+// default — and `shuffle=`/`random=`, which only apply in similar mode, were
+// dropped for a reader whose stored mode was similar.
+export const readStoredSlideshowMode = (
+  storage: Pick<Storage, "getItem"> | null | undefined,
+  fallback: SlideshowMode,
+): SlideshowMode => {
+  try {
+    const stored: unknown = JSON.parse(storage?.getItem("slideshow-mode") ?? "null");
+    return typeof stored === "string" && isMode(stored) ? stored : fallback;
+  } catch {
+    return fallback;
+  }
+};
+
 export const parseSlideshowSearchParams = (
   search: string,
   fallbackMode: SlideshowMode,
@@ -116,6 +132,61 @@ export const parseSlideshowSearchParams = (
     volume: parseVolume(params.get("volume")),
     topic: params.get("topic")?.trim() || null,
   };
+};
+
+// Settings a URL may give that the toolbar also owns and storage remembers.
+// Each is applied once: left in the address, it came back on every reload and
+// every code handover, undoing whatever the reader had changed since. The
+// rest — filter, mode, delay, topic, photo/seed, shuffle, random — is state
+// the URL itself holds, and stays.
+const ONE_SHOT_PARAMS = [
+  "clock",
+  "details",
+  "map",
+  "cover",
+  "time",
+  "remix",
+  "align",
+  "align_cadence",
+  "clips",
+  "muted",
+  "loop",
+  "volume",
+] as const;
+
+export const hasOneShotSlideshowParams = (search: string): boolean => {
+  const params = new URLSearchParams(search);
+  return ONE_SHOT_PARAMS.some((name) => params.has(name));
+};
+
+// The live URL once its one-shot settings have been applied and persisted.
+export const stripAppliedSlideshowParams = (currentHref: string): string => {
+  const url = new URL(currentHref);
+  for (const name of ONE_SHOT_PARAMS) {
+    url.searchParams.delete(name);
+  }
+  return url.toString();
+};
+
+// Diagnostics is a document of its own, so the slideshow's query (album
+// filter, topic, mode) travels there in `return` and comes back in the link
+// to the shell. Only ever a query string: it cannot name another destination.
+export const buildSlideshowDiagnosticsHref = (search: string): string => {
+  const params = new URLSearchParams(search);
+  params.delete("shell");
+  params.delete("shellVersion");
+  const query = params.toString();
+  return query
+    ? `/slideshow/diagnostics?${new URLSearchParams({ return: query }).toString()}`
+    : "/slideshow/diagnostics";
+};
+
+export const resolveSlideshowReturnHref = (diagnosticsSearch: string): string => {
+  const params = new URLSearchParams(new URLSearchParams(diagnosticsSearch).get("return") ?? "");
+  params.delete("shell");
+  params.delete("shellVersion");
+  const query = params.toString();
+  return `/slideshow/shell${query ? `?${query}` : ""}`;
 };
 
 // updateSlideshowUrl: rewrite the live URL in place — set mode and delay (as

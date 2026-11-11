@@ -106,29 +106,40 @@ export const toSimilarQueueRows = (input: {
 }): RandomPhotoRow[] => {
   const queued = new Set<string>();
   const rows: RandomPhotoRow[] = [];
+  const poolByPath = new Map(input.pool.map((photo) => [photo.path, photo]));
   for (const candidate of input.results) {
     const path = clipPathOf(candidate.path);
     if (queued.has(path)) continue;
     if (input.filter && !path.startsWith(`../albums/${input.filter}/`)) continue;
     if (input.recent.includes(path)) continue;
     queued.add(path);
-    const fromPool =
-      path === candidate.path ? undefined : input.pool.find((photo) => photo.path === path);
-    rows.push(
-      fromPool ?? {
-        path,
-        exif: candidate.exif,
-        geocode: candidate.geocode,
-        // Carry colours through: the next slide's remix uses the dominant
-        // colour of its seed, so dropping this silently disabled the
-        // dominant-colour remix strategy in similar mode.
-        ...(candidate.colors !== undefined ? { colors: candidate.colors } : {}),
-        ...(candidate.mediaKind !== undefined ? { mediaKind: candidate.mediaKind } : {}),
-        ...(candidate.durationSeconds !== undefined
-          ? { durationSeconds: candidate.durationSeconds }
-          : {}),
-      },
-    );
+    const pooled = poolByPath.get(path);
+    if (pooled && path !== candidate.path) {
+      rows.push(pooled);
+      continue;
+    }
+    // A clip's date and place are not in its EXIF text: they ride on the row,
+    // so a row rebuilt without them lost its date line and its map. The pool's
+    // copy fills in whatever the result did not bring.
+    const capturedAtLocal = candidate.capturedAtLocal ?? pooled?.capturedAtLocal;
+    const latDeg = candidate.latDeg ?? pooled?.latDeg;
+    const lngDeg = candidate.lngDeg ?? pooled?.lngDeg;
+    rows.push({
+      path,
+      exif: candidate.exif,
+      geocode: candidate.geocode,
+      // Carry colours through: the next slide's remix uses the dominant
+      // colour of its seed, so dropping this silently disabled the
+      // dominant-colour remix strategy in similar mode.
+      ...(candidate.colors !== undefined ? { colors: candidate.colors } : {}),
+      ...(candidate.mediaKind !== undefined ? { mediaKind: candidate.mediaKind } : {}),
+      ...(candidate.durationSeconds !== undefined
+        ? { durationSeconds: candidate.durationSeconds }
+        : {}),
+      ...(capturedAtLocal !== undefined ? { capturedAtLocal } : {}),
+      ...(latDeg !== undefined ? { latDeg } : {}),
+      ...(lngDeg !== undefined ? { lngDeg } : {}),
+    });
   }
   return rows;
 };

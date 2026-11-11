@@ -166,6 +166,36 @@ describe("useControlsAutoHide", () => {
     expect(result.current.controlsHideProgress).toBe(1);
   });
 
+  // A keyboard reader tabbing through the toolbar had it vanish from under the
+  // focus after three seconds: only a resting cursor held it open.
+  it("holds the controls open while keyboard focus is inside them, on any pointer", () => {
+    mockMatchMedia(true);
+    const { result } = renderHook(() => useControlsAutoHide());
+
+    act(() => result.current.setKeyboardFocusInControls(true));
+    act(() => {
+      jest.advanceTimersByTime(60000);
+    });
+    expect(result.current.controlsVisible).toBe(true);
+    expect(result.current.controlsHideProgress).toBe(1);
+
+    act(() => result.current.setKeyboardFocusInControls(false));
+    act(() => {
+      jest.advanceTimersByTime(31000);
+    });
+    expect(result.current.controlsVisible).toBe(false);
+  });
+
+  it("reveals hidden controls when keyboard focus lands in them", () => {
+    mockMatchMedia(true);
+    const { result } = renderHook(() => useControlsAutoHide());
+    act(() => result.current.dismissControls());
+
+    act(() => result.current.setKeyboardFocusInControls(true));
+
+    expect(result.current.controlsVisible).toBe(true);
+  });
+
   it("keeps counting down on a coarse pointer, which cannot leave the toolbar", () => {
     // iPadOS synthesises a mouse enter on the tap that presses a toolbar
     // button, and nothing sends the matching leave until a tap lands somewhere

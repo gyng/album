@@ -584,6 +584,69 @@ describe("SlideshowToolbar", () => {
     expect(slider()).toBeEnabled();
   });
 
+  // With clips off there is nothing for Mute or Loop to act on.
+  it("disables Mute and Loop while clips are not playing", () => {
+    const { rerender } = render(<SlideshowToolbar {...makeProps({ playClips: false })} />);
+    const clips = () => within(screen.getByRole("group", { name: "Clips" }));
+    expect(clips().getByRole("button", { name: "Mute" })).toBeDisabled();
+    expect(clips().getByRole("button", { name: "Loop" })).toBeDisabled();
+    expect(clips().getByRole("button", { name: "Play clips" })).toBeEnabled();
+
+    rerender(<SlideshowToolbar {...makeProps({ playClips: true })} />);
+    expect(clips().getByRole("button", { name: "Mute" })).toBeEnabled();
+    expect(clips().getByRole("button", { name: "Loop" })).toBeEnabled();
+  });
+
+  // iOS does not let a page set a media element's volume: the slider moved and
+  // nothing changed.
+  it("leaves out the volume slider where the browser ignores it, keeping Mute", () => {
+    render(<SlideshowToolbar {...makeProps({ volumeAdjustable: false })} />);
+    const clips = within(screen.getByRole("group", { name: "Clips" }));
+    expect(clips.queryByRole("slider", { name: "Clip volume" })).toBeNull();
+    expect(clips.getByRole("button", { name: "Mute" })).toBeInTheDocument();
+  });
+
+  it("names the link it copies after what is on the slide", () => {
+    const { rerender } = render(<SlideshowToolbar {...makeProps()} />);
+    expect(screen.getByRole("button", { name: "copy photo link" })).toBeInTheDocument();
+    rerender(<SlideshowToolbar {...makeProps({ isClipSlide: true })} />);
+    expect(screen.getByRole("button", { name: "copy clip link" })).toBeInTheDocument();
+    rerender(<SlideshowToolbar {...makeProps({ isClipSlide: true, copiedPhotoLink: true })} />);
+    expect(screen.getByRole("button", { name: "copied clip link" })).toBeInTheDocument();
+  });
+
+  it("opens diagnostics at the address it is given, which carries the way back", () => {
+    const onNavigate = jest.fn();
+    const href = "/slideshow/diagnostics?return=filter%3Djapan";
+    render(<SlideshowToolbar {...makeProps({ onNavigate, diagnosticsHref: href })} />);
+    const diagnostics = screen.getByRole("link", { name: /diagnostics/i });
+    expect(diagnostics).toHaveAttribute("href", href);
+    fireEvent.click(diagnostics);
+    expect(onNavigate).toHaveBeenCalledWith(href);
+  });
+
+  it("reports keyboard focus entering and leaving the toolbar", () => {
+    const onKeyboardFocusChange = jest.fn();
+    const { container } = render(
+      <>
+        <SlideshowToolbar {...makeProps({ onKeyboardFocusChange })} />
+        <button type="button">outside</button>
+      </>,
+    );
+    const root = container.firstElementChild as HTMLElement;
+    const mute = screen.getByRole("button", { name: "Mute" });
+    const loop = screen.getByRole("button", { name: "Loop" });
+
+    mute.focus();
+    expect(onKeyboardFocusChange).toHaveBeenLastCalledWith(true);
+    // Moving between two of its controls is not leaving.
+    fireEvent.blur(mute, { relatedTarget: loop });
+    expect(onKeyboardFocusChange).not.toHaveBeenCalledWith(false);
+    fireEvent.blur(loop, { relatedTarget: screen.getByRole("button", { name: "outside" }) });
+    expect(onKeyboardFocusChange).toHaveBeenLastCalledWith(false);
+    expect(root).toBeTruthy();
+  });
+
   it("submits a trimmed topic and shows a busy state while it encodes", () => {
     const onSubmitTopic = jest.fn();
     const { rerender } = render(<SlideshowToolbar {...makeProps({ onSubmitTopic })} />);

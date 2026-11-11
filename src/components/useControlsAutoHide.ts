@@ -11,6 +11,11 @@ export type UseControlsAutoHide = {
   controlsHideProgress: number;
   isCoarsePointer: boolean;
   setIsPointerOverToolbar: React.Dispatch<React.SetStateAction<boolean>>;
+  // Keyboard focus entered or left the controls. While it is inside, they stay
+  // up on any pointer type, and focus landing in hidden controls reveals them:
+  // the toolbar is hidden by opacity, so its buttons remain in the tab order,
+  // and that is the keyboard's way in.
+  setKeyboardFocusInControls: (within: boolean) => void;
   // Bump the auto-hide deadline forward (touch only) so interactions keep the
   // toolbar awake; desktop gets this via the pointer-over-toolbar branch.
   extendControlsHideDeadline: () => void;
@@ -42,6 +47,7 @@ export const useControlsAutoHide = (): UseControlsAutoHide => {
   }, []);
   const [isCoarsePointer, setIsCoarsePointer] = React.useState(false);
   const [isPointerOverToolbar, setIsPointerOverToolbar] = React.useState(false);
+  const [isKeyboardFocusInControls, setIsKeyboardFocusInControls] = React.useState(false);
   const controlsHideDeadlineRef = React.useRef<number | null>(null);
   const suppressDesktopShowUntilRef = React.useRef(0);
 
@@ -83,7 +89,11 @@ export const useControlsAutoHide = (): UseControlsAutoHide => {
     // lands elsewhere, so honouring the latch there stopped the clock for the
     // rest of the session — tapping "Keep screen awake" left the controls up.
     // Touch keeps the toolbar awake by extending the deadline instead.
-    if (isPointerOverToolbar && !isCoarsePointer) {
+    //
+    // Keyboard focus is different: it only arrives from a key press, and it
+    // does leave, so it holds the controls on any pointer type. Without it the
+    // toolbar vanished three seconds into tabbing through it.
+    if ((isPointerOverToolbar && !isCoarsePointer) || isKeyboardFocusInControls) {
       controlsHideDeadlineRef.current = null;
       setControlsHideProgress(1);
       return;
@@ -160,7 +170,18 @@ export const useControlsAutoHide = (): UseControlsAutoHide => {
       window.removeEventListener("focus", checkOnResume);
       document.removeEventListener("visibilitychange", checkOnResume);
     };
-  }, [controlsVisible, isCoarsePointer, isPointerOverToolbar, setControlsHideProgress]);
+  }, [
+    controlsVisible,
+    isCoarsePointer,
+    isPointerOverToolbar,
+    isKeyboardFocusInControls,
+    setControlsHideProgress,
+  ]);
+
+  const setKeyboardFocusInControls = useCallback((within: boolean) => {
+    setIsKeyboardFocusInControls(within);
+    if (within) setControlsVisible(true);
+  }, []);
 
   const showControlsForDesktop = useCallback(() => {
     if (isCoarsePointer) {
@@ -175,11 +196,15 @@ export const useControlsAutoHide = (): UseControlsAutoHide => {
   const hideDesktopControls = useCallback(() => {
     controlsHideDeadlineRef.current = null;
     suppressDesktopShowUntilRef.current = Date.now() + 700;
+    // Hide pressed from the keyboard leaves focus on the Hide button; that
+    // focus must not pin the toolbar open the next time it is shown.
+    setIsKeyboardFocusInControls(false);
     setControlsVisible(false);
   }, []);
 
   const dismissControls = useCallback(() => {
     controlsHideDeadlineRef.current = null;
+    setIsKeyboardFocusInControls(false);
     setControlsVisible(false);
   }, []);
 
@@ -189,6 +214,7 @@ export const useControlsAutoHide = (): UseControlsAutoHide => {
     controlsHideProgress,
     isCoarsePointer,
     setIsPointerOverToolbar,
+    setKeyboardFocusInControls,
     extendControlsHideDeadline,
     showControlsForDesktop,
     hideDesktopControls,

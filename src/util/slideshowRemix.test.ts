@@ -233,4 +233,22 @@ describe("toSimilarQueueRows", () => {
 
     expect(queue.map((item) => item.path)).toEqual(["../albums/a/3.jpg"]);
   });
+
+  // A clip has no date or GPS in its EXIF text; they ride on the row. Rebuilt
+  // without them, a clip in similar mode lost its date and its map.
+  it("carries a row's date and coordinates, from the pool when the result lacks them", () => {
+    const dated = { capturedAtLocal: "2024-03-01T10:00:00", latDeg: 35.6, lngDeg: 139.7 };
+    const queue = toSimilarQueueRows({
+      results: [
+        row("../albums/a/clip.mov", { mediaKind: "video", ...dated }),
+        row("../albums/a/other.mov", { mediaKind: "video" }),
+      ],
+      pool: [row("../albums/a/other.mov", { mediaKind: "video", ...dated })],
+      filter: null,
+      recent: [],
+    });
+
+    expect(queue[0]).toMatchObject(dated);
+    expect(queue[1]).toMatchObject(dated);
+  });
 });

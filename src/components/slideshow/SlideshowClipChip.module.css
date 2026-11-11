@@ -1,0 +1,60 @@
+/* The clip chip sits in the corner the toolbar opens over, so it steps aside
+   while the toolbar is up — the toolbar's own Mute is then under the same
+   thumb. Dark glass like the rest of the slideshow chrome, which is always on
+   a photograph. Quiet at rest; a finger still finds it, because its box is a
+   full tap target whatever its opacity. */
+.chip {
+  position: fixed;
+  inset-block-start: calc(env(safe-area-inset-top, 0) + var(--space-3));
+  inset-inline-start: calc(env(safe-area-inset-left, 0) + var(--space-3));
+  /* Above the desktop top-edge trigger, which would otherwise take the press. */
+  z-index: var(--z-fullscreen-toolbar);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  min-inline-size: var(--tap-target);
+  min-block-size: var(--tap-target);
+  padding: 0 var(--space-3);
+  border: var(--line-hairline) solid var(--c-border-on-dark);
+  border-radius: var(--radius-pill);
+  background-color: var(--c-overlay-dark);
+  color: var(--c-white);
+  font-size: var(--fs-s);
+  font-variant-numeric: tabular-nums;
+  line-height: var(--lh-label);
+  cursor: pointer;
+  opacity: 0.45;
+  transition: opacity var(--t-base) var(--ease-out);
+}
+
+.chip:hover,
+.chip:focus-visible {
+  opacity: 1;
+}
+
+/* Sound is on: say so a little louder than the muted default. */
+.chip[aria-pressed="false"] {
+  opacity: 0.8;
+}
+
+.chip[data-controls-visible="true"] {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.icon {
+  inline-size: var(--size-16);
+  block-size: var(--size-16);
+  flex: 0 0 auto;
+}
+
+.duration {
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chip {
+    transition: none;
+  }
+}
