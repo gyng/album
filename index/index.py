@@ -588,7 +588,13 @@ def read_poster_sidecar(
 # What the core stage reads from a clip's sidecar. A poster re-extracted from
 # the same clip is the same frame, so the stage's pixel digest cannot see a
 # corrected reading; these fields go into its version instead.
-CORE_SIDECAR_FIELDS = ("capturedAtLocal", "latDeg", "lngDeg", "durationSeconds")
+CORE_SIDECAR_FIELDS = (
+    "capturedAtLocal",
+    "latDeg",
+    "lngDeg",
+    "durationSeconds",
+    "camera",
+)
 
 
 def core_pipeline_version_for(path: str, media_root: str | None = None) -> str:
@@ -620,6 +626,63 @@ def sidecar_number(value: typing.Any) -> float | None:
         return None
     number = float(value)
     return number if math.isfinite(number) else None
+
+
+def _exif_number(value: float) -> str:
+    """A number as EXIF text reads for a photograph: "58", "2.8"."""
+    return f"{value:g}"
+
+
+def _exif_exposure(seconds: float) -> str:
+    """Seconds as a photograph's ExposureTime reads: "1/500", or "2"."""
+    if seconds >= 1:
+        return _exif_number(seconds)
+    return f"1/{round(1 / seconds)}"
+
+
+# A clip's camera, from its sidecar's keys to the EXIF keys a photograph's
+# indexed text uses (EXIF_SEARCH_FIELDS).
+_CLIP_CAMERA_TEXT = (
+    ("Make", "Image Make"),
+    ("Model", "Image Model"),
+    ("LensMake", "EXIF LensMake"),
+    ("LensModel", "EXIF LensModel"),
+)
+_CLIP_CAMERA_NUMBERS = (
+    ("FocalLength", "EXIF FocalLength", _exif_number),
+    ("FocalLengthIn35mmFormat", "EXIF FocalLengthIn35mmFilm", _exif_number),
+    ("FNumber", "EXIF FNumber", _exif_number),
+    ("ExposureTime", "EXIF ExposureTime", _exif_exposure),
+    ("ISO", "EXIF ISOSpeedRatings", _exif_number),
+)
+
+
+def clip_camera_exif(sidecar: Mapping[str, typing.Any] | None) -> dict[str, str]:
+    """A clip's camera as the EXIF text a photograph is indexed with.
+
+    A poster frame has no EXIF, so a clip's indexed text was empty: it sat out
+    of the camera and lens facets and never matched a photograph taken on the
+    same body. The poster prepass reads the camera from the clip's own EXIF
+    (src/services/movieExif.ts) into the sidecar; written here under a
+    photograph's keys and value shapes, every reader reads a clip like a photo.
+    Date and place are deliberately not written: they live in `metadata`, and
+    a second copy here could disagree with it.
+
+    Read defensively, like the rest of the sidecar: an unusable value costs the
+    clip that one field."""
+    camera = (sidecar or {}).get("camera")
+    if not isinstance(camera, Mapping):
+        return {}
+    exif: dict[str, str] = {}
+    for source, target in _CLIP_CAMERA_TEXT:
+        value = camera.get(source)
+        if isinstance(value, str) and value.strip():
+            exif[target] = value.strip()
+    for source, target, render in _CLIP_CAMERA_NUMBERS:
+        number = sidecar_number(camera.get(source))
+        if number is not None and number > 0:
+            exif[target] = render(number)
+    return exif
 
 
 def source_digests_for(
@@ -7187,6 +7250,9 @@ def analyse_image(
         # Every field is read defensively: a corrupt sidecar must cost this one
         # clip its metadata, never the run.
         duration_seconds = sidecar_number(sidecar.get("durationSeconds"))
+        # A scene is embedding-only and carries no searchable text of its own.
+        if scene_seconds is None:
+            exif = {**exif, **clip_camera_exif(sidecar)}
         sidecar_lat = sidecar_number(sidecar.get("latDeg"))
         sidecar_lng = sidecar_number(sidecar.get("lngDeg"))
         if sidecar_lat is not None and sidecar_lng is not None:

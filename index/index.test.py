@@ -36,6 +36,7 @@ from index import (
     cache_tokenizer_vocab,
     caption_pipeline_version,
     cli,
+    clip_camera_exif,
     compare_caption_payloads,
     complete_classifier_json_prefix,
     complete_json_object_end,
@@ -414,6 +415,90 @@ class TestMain(unittest.TestCase):
         # The clip is placed, so it is geocoded like any photo with coordinates.
         self.assertTrue(analysed["geocode"])
 
+    def test_analyse_image_reads_a_clips_camera_from_its_sidecar(self):
+        # A clip's indexed EXIF text was empty, so it sat out of the camera and
+        # lens facets and could never join a "same camera" slideshow remix. The
+        # sidecar knows what it was shot on; it is written with a photograph's
+        # own keys and value shapes, so every reader reads a clip like a photo.
+        with tempfile.TemporaryDirectory(dir=".") as root:
+            album_dir, poster_dir = self._make_media_album(root)
+            media_root = os.path.join(root, "src", "public", "data", "albums")
+            video = os.path.join(album_dir, "clip.mov")
+            open(video, "w").close()
+            poster = os.path.join(poster_dir, "clip.mov@poster.jpg")
+            shutil.copyfile("../albums/test-simple/DSCF0593.jpg", poster)
+            with open(os.path.join(poster_dir, "clip.mov@poster.json"), "w") as fh:
+                json.dump(
+                    {
+                        "mediaKind": "video",
+                        "capturedAtLocal": "2026-02-27T10:52:10",
+                        "durationSeconds": 13.013,
+                        "scenes": [60],
+                        "camera": {
+                            "Make": "FUJIFILM",
+                            "Model": "X-T5",
+                            "LensModel": "Helios 44-2 58mm f/2",
+                            "ExposureTime": 0.002,
+                            "FNumber": 2.8,
+                            "ISO": 12800,
+                            "FocalLength": 58,
+                            "FocalLengthIn35mmFormat": 87,
+                            "ExposureCompensation": -1,
+                            "LensInfo": [58, 58, 2, 2],
+                        },
+                    },
+                    fh,
+                )
+
+            def analyse(path):
+                with open(poster, "rb") as fh:
+                    return analyse_image(
+                        fh,
+                        path=path,
+                        pixel_path=poster,
+                        media_root=media_root,
+                        needs_core=True,
+                        precomputed_colors=[],
+                    )
+
+            clip = analyse(video)
+            scene = analyse(f"{video}@t60")
+
+        expected = {
+            "Image Make": "FUJIFILM",
+            "Image Model": "X-T5",
+            "EXIF LensModel": "Helios 44-2 58mm f/2",
+            "EXIF FocalLength": "58",
+            "EXIF FocalLengthIn35mmFilm": "87",
+            "EXIF FNumber": "2.8",
+            "EXIF ExposureTime": "1/500",
+            "EXIF ISOSpeedRatings": "12800",
+        }
+        # The stand-in poster here is a photograph with EXIF of its own; the
+        # clip's reading wins over whatever its frame happens to carry.
+        self.assertEqual(expected, {key: clip["exif"].get(key) for key in expected})
+        # A scene is embedding-only: it carries no searchable text of its own.
+        self.assertNotEqual("Helios 44-2 58mm f/2", scene["exif"].get("EXIF LensModel"))
+
+    def test_clip_camera_exif_ignores_unusable_values(self):
+        self.assertEqual({}, clip_camera_exif(None))
+        self.assertEqual({}, clip_camera_exif({"camera": "X-T5"}))
+        self.assertEqual(
+            {"Image Model": "X-T5", "EXIF ExposureTime": "2"},
+            clip_camera_exif(
+                {
+                    "camera": {
+                        "Make": "  ",
+                        "Model": "X-T5",
+                        "ISO": "high",
+                        "FNumber": float("nan"),
+                        "ExposureTime": 2,
+                        "FocalLength": 0,
+                    }
+                }
+            ),
+        )
+
     def test_metadata_edit_invalidates_weather_but_identical_metadata_preserves_it(
         self,
     ):
@@ -751,6 +836,7 @@ class TestMain(unittest.TestCase):
             self.assertNotEqual(
                 original, version_with(capturedAtLocal="2026-02-27T19:52:10")
             )
+            self.assertNotEqual(original, version_with(camera={"Model": "X-T5"}))
             # What core does not read does not invalidate it.
             self.assertEqual(original, version_with(width=1920, height=1080))
             # A scene is read through its clip's sidecar.
