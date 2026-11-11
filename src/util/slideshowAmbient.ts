@@ -1,5 +1,5 @@
 import { RandomPhotoRow } from "../components/search/api";
-import { extractDateFromExifString, extractGPSFromExifString } from "./extractExifFromDb";
+import { extractRowCoords, extractRowDate } from "./extractExifFromDb";
 import { deltaE, parseColorPalette, rgbToLab } from "./colorDistance";
 
 /**
@@ -68,7 +68,7 @@ export const timeAwareShufflePhotos = (
   now: Date = new Date(),
 ): RandomPhotoRow[] => {
   const scored = photos.map((photo) => {
-    const photoDate = extractDateFromExifString(photo.exif);
+    const photoDate = extractRowDate(photo);
     const score = photoDate ? getTimeAffinityScore(photoDate, now) : 0.1;
     const weight = score ** TIME_AWARE_WEIGHT_EXPONENT;
     const randomValue = Math.max(Math.random(), Number.EPSILON);
@@ -278,12 +278,12 @@ const strategyFilters: Record<
     return pool.filter((p) => p.path !== seed.path && albumOfPath(p.path) === seedAlbum);
   },
   "same-year": (seed, pool) => {
-    const seedDate = extractDateFromExifString(seed.exif);
+    const seedDate = extractRowDate(seed);
     if (!seedDate) return [];
     const seedYear = seedDate.getFullYear();
     return pool.filter((p) => {
       if (p.path === seed.path) return false;
-      const d = extractDateFromExifString(p.exif);
+      const d = extractRowDate(p);
       return d?.getFullYear() === seedYear;
     });
   },
@@ -314,14 +314,14 @@ const strategyFilters: Record<
   // than `anniversary` (which is ±3 days): this is the exact same date you
   // were standing somewhere, years apart.
   "same-day-of-year": (seed, pool) => {
-    const seedDate = extractDateFromExifString(seed.exif);
+    const seedDate = extractRowDate(seed);
     if (!seedDate) return [];
     const seedMonth = seedDate.getMonth();
     const seedDay = seedDate.getDate();
     const seedYear = seedDate.getFullYear();
     return pool.filter((p) => {
       if (p.path === seed.path) return false;
-      const d = extractDateFromExifString(p.exif);
+      const d = extractRowDate(p);
       if (!d) return false;
       if (d.getFullYear() === seedYear) return false;
       return d.getMonth() === seedMonth && d.getDate() === seedDay;
@@ -348,14 +348,14 @@ const strategyFilters: Record<
   // Evocative for slideshows on a sideboard: a memory from this exact week
   // years ago, sitting next to today.
   anniversary: (seed, pool) => {
-    const seedDate = extractDateFromExifString(seed.exif);
+    const seedDate = extractRowDate(seed);
     if (!seedDate) return [];
     const seedDoy = Math.floor(
       (seedDate.getTime() - new Date(seedDate.getFullYear(), 0, 0).getTime()) / 86400000,
     );
     return pool.filter((p) => {
       if (p.path === seed.path) return false;
-      const d = extractDateFromExifString(p.exif);
+      const d = extractRowDate(p);
       if (!d) return false;
       // Different year required so it's a real anniversary, not the same day.
       if (d.getFullYear() === seedDate.getFullYear()) return false;
@@ -368,12 +368,12 @@ const strategyFilters: Record<
   // Same decade as seed — broader temporal grouping than same-year. E.g.,
   // an early-2020s remix mixes 2021 and 2024 photos.
   "same-decade": (seed, pool) => {
-    const seedDate = extractDateFromExifString(seed.exif);
+    const seedDate = extractRowDate(seed);
     if (!seedDate) return [];
     const seedDecade = Math.floor(seedDate.getFullYear() / 10);
     return pool.filter((p) => {
       if (p.path === seed.path) return false;
-      const d = extractDateFromExifString(p.exif);
+      const d = extractRowDate(p);
       if (!d) return false;
       // Exclude same-year to keep the strategy distinct from same-year.
       if (d.getFullYear() === seedDate.getFullYear()) return false;
@@ -385,7 +385,7 @@ const strategyFilters: Record<
   // instead of fanning across the full 50km radius. The outer cap keeps the
   // pool sane on big cities; the inner top-N keeps the picks visually local.
   proximity: (seed, pool) => {
-    const seedCoords = extractGPSFromExifString(seed.exif);
+    const seedCoords = extractRowCoords(seed);
     if (!seedCoords) return [];
     const [seedLat, seedLng] = seedCoords;
     const PROXIMITY_KM = 50;
@@ -394,7 +394,7 @@ const strategyFilters: Record<
     const withDistance: Array<{ photo: RandomPhotoRow; distance: number }> = [];
     for (const candidate of pool) {
       if (candidate.path === seed.path) continue;
-      const coords = extractGPSFromExifString(candidate.exif);
+      const coords = extractRowCoords(candidate);
       if (!coords) continue;
       const distance = haversineKm(seedLat, seedLng, coords[0], coords[1]);
       if (distance > PROXIMITY_KM) continue;
@@ -408,13 +408,13 @@ const strategyFilters: Record<
   // or sunset (5-7pm). Both seed and candidate must be in the band, so a
   // golden-hour remix is a colour-temperature mood piece.
   "golden-hour": (seed, pool) => {
-    const seedDate = extractDateFromExifString(seed.exif);
+    const seedDate = extractRowDate(seed);
     if (!seedDate) return [];
     const inGoldenHour = (hour: number) => (hour >= 5 && hour <= 7) || (hour >= 17 && hour <= 19);
     if (!inGoldenHour(seedDate.getHours())) return [];
     return pool.filter((p) => {
       if (p.path === seed.path) return false;
-      const d = extractDateFromExifString(p.exif);
+      const d = extractRowDate(p);
       if (!d) return false;
       return inGoldenHour(d.getHours());
     });
@@ -491,7 +491,7 @@ const computeMaxPairwiseKm = (photos: ReadonlyArray<RandomPhotoRow | null>): num
   const coords: Array<[number, number]> = [];
   for (const photo of photos) {
     if (!photo) continue;
-    const gps = extractGPSFromExifString(photo.exif);
+    const gps = extractRowCoords(photo);
     if (gps) coords.push(gps);
   }
   if (coords.length < 2) return null;
@@ -518,7 +518,7 @@ const collectDates = (photos: ReadonlyArray<RandomPhotoRow | null>): Date[] => {
   const dates: Date[] = [];
   for (const photo of photos) {
     if (!photo) continue;
-    const d = extractDateFromExifString(photo.exif);
+    const d = extractRowDate(photo);
     if (d) dates.push(d);
   }
   return dates;

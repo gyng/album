@@ -116,7 +116,11 @@ const createArchiveWithClip = () => ({
       callback([1]);
       return;
     }
-    if (sql.includes("SELECT path, media_kind, duration_seconds FROM metadata")) {
+    if (
+      sql.includes(
+        "SELECT path, media_kind, duration_seconds, iso8601, lat_deg, lng_deg FROM metadata",
+      )
+    ) {
       callback(["../albums/trip/clip.mp4", "video", 42.5]);
       callback(["../albums/trip/clip.mp4@t60", "video", 42.5]);
       callback(["../albums/trip/a.jpg", "photo", null]);

@@ -1010,9 +1010,13 @@ export const SlideshowToolbar: React.FC<SlideshowToolbarProps> = (props) => {
                 step={5}
                 value={Math.round(props.clipVolume * 100)}
                 aria-label="Clip volume"
-                disabled={!props.playClips || props.clipMuted}
+                disabled={!props.playClips}
                 onChange={(event) => {
-                  props.onChangeClipVolume(Number(event.target.value) / 100);
+                  const volume = Number(event.target.value) / 100;
+                  props.onChangeClipVolume(volume);
+                  // Clips start muted, so turning the volume up is the way to
+                  // hear one; a slider that waited for Mute first looked dead.
+                  if (props.clipMuted && volume > 0) props.onToggleClipMuted();
                 }}
               />
               <span className={styles.volumeValue}>{Math.round(props.clipVolume * 100)}%</span>

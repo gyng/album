@@ -1,5 +1,5 @@
 import { RandomPhotoRow } from "../components/search/api";
-import { extractDateFromExifString } from "./extractExifFromDb";
+import { extractRowDate } from "./extractExifFromDb";
 import { encodePublicAssetPath } from "./encodePublicAssetPath";
 
 // Prevent the same photo showing twice in a row when one shuffled queue/pass
@@ -47,7 +47,7 @@ export const weightedShufflePhotos = (
   let minTimestamp = Infinity;
   let maxTimestamp = -Infinity;
   const stamped = photos.map((photo) => {
-    const timestamp = extractDateFromExifString(photo.exif)?.getTime() ?? null;
+    const timestamp = extractRowDate(photo)?.getTime() ?? null;
     if (timestamp !== null) {
       if (timestamp < minTimestamp) minTimestamp = timestamp;
       if (timestamp > maxTimestamp) maxTimestamp = timestamp;
@@ -84,7 +84,7 @@ export const EMPTY_POOL_STATS: PoolStats = { count: 0, newestDate: null };
 export const computePoolStats = (photos: RandomPhotoRow[]): PoolStats => {
   let newest: Date | null = null;
   for (const photo of photos) {
-    const date = extractDateFromExifString(photo.exif);
+    const date = extractRowDate(photo);
     if (date && (newest === null || date.getTime() > newest.getTime())) {
       newest = date;
     }

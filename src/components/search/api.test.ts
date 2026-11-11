@@ -1049,8 +1049,19 @@ describe("video results", () => {
           callback([1]);
           return;
         }
-        if (sql.includes("SELECT path, media_kind, duration_seconds FROM metadata")) {
-          callback(["../albums/test-simple/clip.mov", "video", 13.013]);
+        if (
+          sql.includes(
+            "SELECT path, media_kind, duration_seconds, iso8601, lat_deg, lng_deg FROM metadata",
+          )
+        ) {
+          callback([
+            "../albums/test-simple/clip.mov",
+            "video",
+            13.013,
+            "2025-12-01T20:15:51",
+            35.66,
+            139.7,
+          ]);
           callback(["../albums/test-simple/a.jpg", "photo", null]);
           return;
         }
@@ -1070,6 +1081,12 @@ describe("video results", () => {
 
     expect(results.data[0]?.mediaKind).toBe("video");
     expect(results.data[0]?.durationSeconds).toBeCloseTo(13.013, 3);
+    // A clip's EXIF text is empty; its wall clock and place ride on the row.
+    expect(results.data[0]).toMatchObject({
+      capturedAtLocal: "2025-12-01T20:15:51",
+      latDeg: 35.66,
+      lngDeg: 139.7,
+    });
     expect(results.data[1]?.mediaKind).toBeUndefined();
     expect(results.data[1]?.durationSeconds).toBeUndefined();
   });

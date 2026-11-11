@@ -120,3 +120,29 @@ export const extractDateFromExifString = (exifString: string): Date | null => {
   // zone the wall clock is already expressed in.
   return new Date(dt.year, dt.month - 1, dt.day, dt.hour, dt.minute, dt.second);
 };
+
+/** What the helpers below need of an indexed row. */
+export type ExifRow = {
+  exif: string;
+  /** `metadata.iso8601`: camera-local wall clock, naive ISO. */
+  capturedAtLocal?: string | undefined;
+  latDeg?: number | undefined;
+  lngDeg?: number | undefined;
+};
+
+// A photograph's date and place are in its EXIF text. A clip's EXIF text is
+// empty — its wall clock and coordinates live only in the index's metadata,
+// which the query attaches to the row — so reading the text alone gave every
+// clip no date and no place.
+export const extractRowDate = (row: ExifRow): Date | null => {
+  const fromExif = extractDateFromExifString(row.exif);
+  if (fromExif) return fromExif;
+  const dt = parseExifLocalDateTime(row.capturedAtLocal);
+  return dt ? new Date(dt.year, dt.month - 1, dt.day, dt.hour, dt.minute, dt.second) : null;
+};
+
+export const extractRowCoords = (row: ExifRow): [number, number] | null =>
+  extractGPSFromExifString(row.exif) ??
+  (typeof row.latDeg === "number" && typeof row.lngDeg === "number"
+    ? [row.latDeg, row.lngDeg]
+    : null);

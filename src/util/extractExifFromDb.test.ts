@@ -1,4 +1,9 @@
-import { extractDateFromExifString, extractGPSFromExifString } from "./extractExifFromDb";
+import {
+  extractDateFromExifString,
+  extractGPSFromExifString,
+  extractRowCoords,
+  extractRowDate,
+} from "./extractExifFromDb";
 
 const gpsExif = (latitude: string, longitude: string, latRef = "N", lngRef = "E") =>
   [
@@ -63,5 +68,34 @@ describe("extractDateFromExifString", () => {
     expect(extractDateFromExifString("")).toBeNull();
     expect(extractDateFromExifString("EXIF Make: Camera")).toBeNull();
     expect(extractDateFromExifString("EXIF DateTimeOriginal: not-a-date")).toBeNull();
+  });
+});
+
+// A clip's EXIF text is empty: its wall clock and place live only in the
+// index's metadata, which the query attaches to the row. Without the fallback
+// a clip's slide showed no date and no map.
+describe("rows whose EXIF text is empty", () => {
+  it("reads a clip's date from its metadata wall clock, as wall clock", () => {
+    const date = extractRowDate({ exif: "{}", capturedAtLocal: "2025-12-01T20:15:51" });
+    expect(date?.getFullYear()).toBe(2025);
+    expect(date?.getMonth()).toBe(11);
+    expect(date?.getDate()).toBe(1);
+    expect(date?.getHours()).toBe(20);
+    expect(date?.getMinutes()).toBe(15);
+  });
+
+  it("prefers the EXIF text when it has a date, and is null with neither", () => {
+    const date = extractRowDate({
+      exif: "EXIF DateTimeOriginal: 2024:03:22 18:30:05",
+      capturedAtLocal: "2025-12-01T20:15:51",
+    });
+    expect(date?.getFullYear()).toBe(2024);
+    expect(extractRowDate({ exif: "{}" })).toBeNull();
+  });
+
+  it("reads a clip's place from its metadata coordinates", () => {
+    expect(extractRowCoords({ exif: "{}", latDeg: 35.66, lngDeg: 139.7 })).toEqual([35.66, 139.7]);
+    expect(extractRowCoords({ exif: "{}", latDeg: 35.66 })).toBeNull();
+    expect(extractRowCoords({ exif: "{}" })).toBeNull();
   });
 });

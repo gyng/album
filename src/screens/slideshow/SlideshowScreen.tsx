@@ -623,8 +623,8 @@ export const Slideshow: React.FC<{
   // photo; these four decide what its slide does with it. Clips play by
   // default, muted — an unmuted autoplay is refused by every modern browser
   // anyway, so a kiosk that never touches these still shows a moving slide —
-  // and once: a slide lasts minutes and a clip seconds, so a looped clip jumped
-  // back to its start every few seconds for the whole slide.
+  // and looping, so a clip keeps moving for the whole slide rather than
+  // settling on its poster after a few seconds. Loop off plays it once.
   const [playClips, setPlayClips] = useLocalStorage("slideshow-play-clips", true, {
     initializeWithValue: false,
   });
@@ -634,7 +634,7 @@ export const Slideshow: React.FC<{
   const [clipVolume, setClipVolume] = useLocalStorage("slideshow-volume", 0.5, {
     initializeWithValue: false,
   });
-  const [clipLoop, setClipLoop] = useLocalStorage("slideshow-loop", false, {
+  const [clipLoop, setClipLoop] = useLocalStorage("slideshow-loop", true, {
     initializeWithValue: false,
   });
   const [poolStats, setPoolStats] = React.useState<PoolStats>(EMPTY_POOL_STATS);
@@ -916,8 +916,8 @@ export const Slideshow: React.FC<{
    *   - clips=1                  Play a clip's video in place of its poster frame (default on;
    *                              clips=0 shows the still, which is what every slide did before)
    *   - muted=1                  Start clips muted (default on; an unmuted autoplay is refused)
-   *   - loop=1                   Loop a clip for its whole slide (default off: it plays once,
-   *                              then rests on its poster)
+   *   - loop=1                   Loop a clip for its whole slide (default on; loop=0 plays it
+   *                              once, then rests on its poster)
    *   - volume=<0..1>            Clip playback volume (default 0.5)
    *
    * Examples:

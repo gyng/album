@@ -535,6 +535,25 @@ describe("SlideshowToolbar", () => {
     expect(off.getByText("80%")).toBeTruthy();
   });
 
+  // Clips start muted, so a slider that only worked unmuted was a dead control
+  // on every fresh kiosk. Turning it up is asking to hear the clip.
+  it("lets the volume be set while muted, and unmutes when it is raised", () => {
+    const onToggleClipMuted = jest.fn();
+    const onChangeClipVolume = jest.fn();
+    render(
+      <SlideshowToolbar
+        {...makeProps({ clipMuted: true, clipVolume: 0.5, onToggleClipMuted, onChangeClipVolume })}
+      />,
+    );
+    const volume = within(screen.getByRole("group", { name: "Clips" })).getByRole("slider", {
+      name: "Clip volume",
+    });
+    expect(volume).toBeEnabled();
+    fireEvent.change(volume, { target: { value: "70" } });
+    expect(onChangeClipVolume).toHaveBeenCalledWith(0.7);
+    expect(onToggleClipMuted).toHaveBeenCalledTimes(1);
+  });
+
   it("offers looping clips beside the mute and reports a change", () => {
     const onToggleClipLoop = jest.fn();
     const { rerender } = render(<SlideshowToolbar {...makeProps({ onToggleClipLoop })} />);
@@ -551,10 +570,9 @@ describe("SlideshowToolbar", () => {
     ).toHaveAttribute("aria-pressed", "true");
   });
 
-  // A slider that moves while nothing can be heard looks like it does nothing.
-  it("disables the volume while clips are muted or not playing", () => {
+  it("disables the volume only while clips are not playing", () => {
     const { rerender } = render(
-      <SlideshowToolbar {...makeProps({ playClips: true, clipMuted: true })} />,
+      <SlideshowToolbar {...makeProps({ playClips: false, clipMuted: false })} />,
     );
     const slider = () =>
       within(screen.getByRole("group", { name: "Clips" })).getByRole("slider", {
@@ -562,10 +580,7 @@ describe("SlideshowToolbar", () => {
       });
     expect(slider()).toBeDisabled();
 
-    rerender(<SlideshowToolbar {...makeProps({ playClips: false, clipMuted: false })} />);
-    expect(slider()).toBeDisabled();
-
-    rerender(<SlideshowToolbar {...makeProps({ playClips: true, clipMuted: false })} />);
+    rerender(<SlideshowToolbar {...makeProps({ playClips: true, clipMuted: true })} />);
     expect(slider()).toBeEnabled();
   });
 

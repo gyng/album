@@ -283,7 +283,7 @@ test.describe("Slideshow clips", () => {
     expect(media.src).toBe(clipVideoSrc);
     expect(media.poster).toBe(clipPosterSrc);
     expect(media.muted).toBe(true);
-    expect(media.loop).toBe(false);
+    expect(media.loop).toBe(true);
     expect(media.playsInline).toBe(true);
     expect(media.controls).toBe(false);
 
@@ -297,8 +297,8 @@ test.describe("Slideshow clips", () => {
   // Played once, a clip ends on its poster: the frame chosen to stand for it,
   // for the rest of a slide that lasts minutes. The 24h cadence means nothing
   // else can change the slide.
-  test("a clip that has played once settles back to its poster", async ({ page }) => {
-    await gotoHydrated(page, clipUrl());
+  test("with loop=0 a clip that has played once settles back to its poster", async ({ page }) => {
+    await gotoHydrated(page, clipUrl("&loop=0"));
     await waitForSlideshow(page);
 
     const slide = page.locator(slideshowSlide).first();
@@ -314,15 +314,6 @@ test.describe("Slideshow clips", () => {
     const settled = page.locator(slideshowSlide).first();
     await expect(settled).toHaveAttribute("data-media-kind", "photo");
     await expect(settled).toHaveAttribute("src", clipPosterSrc);
-  });
-
-  test("loop=1 keeps a clip playing for its whole slide", async ({ page }) => {
-    await gotoHydrated(page, clipUrl("&loop=1"));
-    await waitForSlideshow(page);
-
-    const slide = page.locator(slideshowSlide).first();
-    await expect(slide).toHaveAttribute("data-media-kind", "video");
-    expect(await slide.evaluate((element) => (element as HTMLVideoElement).loop)).toBe(true);
   });
 
   test("clips=0 shows the clip as its poster still with no video element", async ({ page }) => {

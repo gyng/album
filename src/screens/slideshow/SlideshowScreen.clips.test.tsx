@@ -187,10 +187,15 @@ describe("SlideshowScreen clip slides", () => {
     expect(slide()?.tagName).toBe("VIDEO");
   });
 
-  // A slide lasts minutes and a clip seconds: looped, a ten-second clip jumped
-  // back to its start ninety times a slide. It plays once and settles back to
-  // its poster, the frame chosen to stand for it, without costing the slide.
-  it("plays a clip once, then settles back to its poster", async () => {
+  it("loops a clip by default", async () => {
+    await startOn(clip);
+    expect((slide() as HTMLVideoElement).loop).toBe(true);
+  });
+
+  // With looping off, a clip plays once and settles back to its poster, the
+  // frame chosen to stand for it, without costing the slide.
+  it("plays a clip once when looping is off, then settles back to its poster", async () => {
+    mockStored.set("slideshow-loop", false);
     await startOn(clip);
     const video = slide() as HTMLVideoElement;
     expect(video.loop).toBe(false);
@@ -207,6 +212,7 @@ describe("SlideshowScreen clip slides", () => {
 
   // "Previous" back to a clip that has finished is asking to see it again.
   it("plays a finished clip again when the reader comes back to it", async () => {
+    mockStored.set("slideshow-loop", false);
     await startOn(clip);
     fireEvent.ended(slide()!);
     await flush();
@@ -222,12 +228,6 @@ describe("SlideshowScreen clip slides", () => {
     await flush();
 
     expect(slide()?.tagName).toBe("VIDEO");
-  });
-
-  it("loops a clip when the reader has asked for it", async () => {
-    mockStored.set("slideshow-loop", true);
-    await startOn(clip);
-    expect((slide() as HTMLVideoElement).loop).toBe(true);
   });
 
   // A clip the browser cannot play — a codec it lacks, no network for an

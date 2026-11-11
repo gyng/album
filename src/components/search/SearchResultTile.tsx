@@ -5,7 +5,7 @@ import { Thumb, OverlayButton, HoverPlayClip } from "../ui";
 import common from "../../styles/common.module.css";
 import styles from "./SearchResultTile.module.css";
 import { HydratedRelativeTime } from "../HydratedRelativeTime";
-import { extractDateFromExifString } from "../../util/extractExifFromDb";
+import { extractRowDate } from "../../util/extractExifFromDb";
 import { SearchResultRow } from "./searchTypes";
 import { RGB, rgbToString, parseColorPalette } from "../../util/colorDistance";
 import { getResizedAlbumImageSrc } from "../../util/getResizedAlbumImageSrc";
@@ -47,7 +47,7 @@ export const SearchResultTile = (props: {
 
   const resized = getResizedAlbumImageSrc(result.path);
   const albumName = result.path.split("/").at(-2);
-  const dateTimeOriginal = extractDateFromExifString(result.exif);
+  const dateTimeOriginal = extractRowDate(result);
   const snippet = stripHtml(result.snippet || result.alt_text || result.subject || result.tags);
   const imageAlt =
     snippet || stripHtml(result.alt_text) || stripHtml(result.subject) || stripHtml(result.tags);

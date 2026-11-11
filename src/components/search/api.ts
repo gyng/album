@@ -154,7 +154,7 @@ const attachMediaMetadata = async <T extends { path: string }>(
   try {
     const result = await exec(
       database,
-      `SELECT path, media_kind, duration_seconds FROM metadata
+      `SELECT path, media_kind, duration_seconds, iso8601, lat_deg, lng_deg FROM metadata
         WHERE path IN (${rows.map(() => "?").join(", ")})`,
       rows.map((row) => row.path),
     );
@@ -162,7 +162,13 @@ const attachMediaMetadata = async <T extends { path: string }>(
     const byPath = new Map(
       (result.data as unknown as any[][]).map((row) => [
         String(row[0]),
-        { mediaKind: row[1] as string | null, durationSeconds: row[2] as number | null },
+        {
+          mediaKind: row[1] as string | null,
+          durationSeconds: row[2] as number | null,
+          capturedAtLocal: row[3] as string | null,
+          latDeg: row[4] as number | null,
+          lngDeg: row[5] as number | null,
+        },
       ]),
     );
 
@@ -176,6 +182,14 @@ const attachMediaMetadata = async <T extends { path: string }>(
         mediaKind: media.mediaKind,
         ...(typeof media.durationSeconds === "number"
           ? { durationSeconds: media.durationSeconds }
+          : {}),
+        // A clip's EXIF text is empty, so its wall clock and place travel with
+        // the row; `extractRowDate`/`extractRowCoords` read them.
+        ...(typeof media.capturedAtLocal === "string" && media.capturedAtLocal
+          ? { capturedAtLocal: media.capturedAtLocal }
+          : {}),
+        ...(typeof media.latDeg === "number" && typeof media.lngDeg === "number"
+          ? { latDeg: media.latDeg, lngDeg: media.lngDeg }
           : {}),
       };
     });
@@ -1940,6 +1954,8 @@ export type RandomPhotoRow = {
   /** "video" for a clip, whose slide is the poster frame extracted from it. */
   mediaKind?: string | undefined;
   durationSeconds?: number | undefined;
+  /** When it was taken, from `metadata`: a clip has no date in its EXIF text. */
+  capturedAtLocal?: string | undefined;
   /** Where it was taken, from `metadata`: a clip has no GPS in its EXIF text. */
   latDeg?: number | undefined;
   lngDeg?: number | undefined;

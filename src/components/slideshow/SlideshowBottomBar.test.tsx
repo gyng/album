@@ -4,7 +4,7 @@
 
 import { render, screen } from "@testing-library/react";
 import type { RandomPhotoRow } from "../search/api";
-import { extractDateFromExifString, extractGPSFromExifString } from "../../util/extractExifFromDb";
+import { extractRowCoords, extractRowDate } from "../../util/extractExifFromDb";
 import {
   describeRemix,
   getRemixSwatchRgb,
@@ -22,11 +22,11 @@ jest.mock("../Map", () => ({
   },
 }));
 jest.mock("../../util/extractExifFromDb", () => ({
-  extractDateFromExifString: jest.fn((value: string) =>
-    value.includes("date") ? new Date(2024, 0, 2, 10, 0, 0) : null,
+  extractRowDate: jest.fn(({ exif }: { exif: string }) =>
+    exif.includes("date") ? new Date(2024, 0, 2, 10, 0, 0) : null,
   ),
-  extractGPSFromExifString: jest.fn((value: string) =>
-    value.includes("coords1") ? [1, 103] : value.includes("coords2") ? [2, 104] : null,
+  extractRowCoords: jest.fn(({ exif }: { exif: string }) =>
+    exif.includes("coords1") ? [1, 103] : exif.includes("coords2") ? [2, 104] : null,
   ),
 }));
 jest.mock("../../util/time", () => ({
@@ -38,8 +38,8 @@ jest.mock("../../util/slideshowAmbient", () => ({
   getTimeAffinityScore: jest.fn(() => 0.876),
 }));
 
-const extractDate = jest.mocked(extractDateFromExifString);
-const extractGps = jest.mocked(extractGPSFromExifString);
+const extractDate = jest.mocked(extractRowDate);
+const extractGps = jest.mocked(extractRowCoords);
 const describeRemixMock = jest.mocked(describeRemix);
 const swatch = jest.mocked(getRemixSwatchRgb);
 const affinity = jest.mocked(getTimeAffinityScore);

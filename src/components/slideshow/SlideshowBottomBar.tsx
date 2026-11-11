@@ -12,7 +12,7 @@ import {
   getTimeAffinityScore,
   RemixStrategy,
 } from "../../util/slideshowAmbient";
-import { extractDateFromExifString, extractGPSFromExifString } from "../../util/extractExifFromDb";
+import { extractRowCoords, extractRowDate } from "../../util/extractExifFromDb";
 import { getRelativeTimeString } from "../../util/time";
 
 const styles = mergeCssModuleStyles(
@@ -123,9 +123,9 @@ export const SlideshowBottomBar: React.FC<SlideshowBottomBarProps> = (props) => 
     () =>
       slidePhotos.map((photo) => ({
         path: photo.path,
-        date: extractDateFromExifString(photo.exif),
+        date: extractRowDate(photo),
         geocode: extractGeocodeLabel(photo.geocode),
-        coords: extractGPSFromExifString(photo.exif),
+        coords: extractRowCoords(photo),
       })),
     // slidePhotos is a fresh array each tick; slideKey captures its content.
     // eslint-disable-next-line react-hooks/exhaustive-deps
