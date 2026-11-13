@@ -458,6 +458,11 @@ test.describe("Responsive UI", () => {
     expect(rightEdgeOffset).toBeGreaterThanOrEqual(0);
     expect(rightEdgeOffset).toBeLessThanOrEqual(48);
     expect(summaryBox!.y + summaryBox!.height).toBeLessThanOrEqual(imageBox!.y);
+    // A phone gives the photograph the whole width; the control keeps the gutter.
+    expect(photoBox!.x).toBeCloseTo(0, 0);
+    expect(imageBox!.x).toBeCloseTo(0, 0);
+    expect(imageBox!.width).toBeCloseTo(photoBox!.width, 0);
+    expect(rightEdgeOffset).toBeGreaterThan(0);
   });
 
   test("album detail disclosures sit beside wide photos", async ({ page }) => {

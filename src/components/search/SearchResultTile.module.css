@@ -109,6 +109,31 @@
   .actionButtons {
     opacity: 1;
     pointer-events: auto;
+    /* Shown on every tile, so it sits in the picture's corner and draws only
+       a small disc; the whole tap target stays, transparent around it. */
+    inset-inline-end: 0;
+    inset-block-end: var(--space-5);
+  }
+
+  .similarButton {
+    inline-size: var(--tap-target);
+    padding: 0;
+    border-color: transparent;
+    background-color: transparent;
+  }
+
+  .similarButton:hover {
+    background-color: transparent;
+  }
+
+  .similarButton .similarButtonIcon {
+    display: grid;
+    place-items: center;
+    inline-size: var(--size-28);
+    block-size: var(--size-28);
+    border-radius: var(--radius-pill);
+    background-color: var(--c-overlay-dark);
+    font-size: var(--fs-s);
   }
 }
 

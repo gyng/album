@@ -15,6 +15,23 @@
   inline-size: 100%;
 }
 
+/* As a photograph does on a phone: the clip takes the whole width, its details
+   control sits in a strip above it rather than over the picture, and keeps the
+   page's gutter. */
+@media (max-width: 720px) {
+  .youtubeIframe {
+    inline-size: min(100%, calc(90svh * (var(--clip-aspect))));
+  }
+
+  .youtubeWrapper {
+    padding-block-start: var(--tap-target);
+  }
+
+  .details {
+    margin-inline-end: var(--page-gutter);
+  }
+}
+
 .youtubeWrapper {
   grid-column: 1;
   grid-row: 1;

@@ -161,6 +161,7 @@ export const SearchResultTile = (props: {
             <OverlayButton
               aria-label="Find similar photos"
               title="Find similar photos"
+              className={styles.similarButton}
               onClick={(event) => {
                 event.preventDefault();
                 event.stopPropagation();

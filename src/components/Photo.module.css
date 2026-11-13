@@ -238,10 +238,13 @@
     padding-block-start: var(--tap-target);
   }
 
+  /* A phone gives the photograph the whole width: a gutter either side of a
+     picture already narrower than the hand holding it only shrinks it. The
+     controls and the words keep the page's gutter. */
   .block:where(:not(.immersive)) {
+    padding: 0;
     /* No side control on narrow screens, so the clearance term drops out. */
     --photo-render-width: min(
-      90svw,
       100%,
       calc(90svh * var(--photo-aspect, 1)),
       var(--photo-intrinsic-width, 100%)
@@ -249,7 +252,11 @@
   }
 
   .block:where(:not(.immersive)) .details {
-    margin-inline-end: 0;
+    margin-inline-end: var(--page-gutter);
+  }
+
+  .block:where(:not(.immersive)) .overlayHeader {
+    padding-inline: var(--page-gutter);
   }
 
   .title {

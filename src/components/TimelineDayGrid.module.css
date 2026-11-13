@@ -90,6 +90,33 @@
   filter: grayscale(100%);
 }
 
+/* On a touch screen the button is on every tile, so it draws only a small disc
+   in the picture's corner; the whole tap target stays, transparent around it. */
+@media (hover: none), (pointer: coarse) {
+  .similarButton {
+    inset-block-end: 0;
+    inset-inline-end: 0;
+    inline-size: var(--tap-target);
+    padding: 0;
+    border-color: transparent;
+    background-color: transparent;
+  }
+
+  .similarButton:hover {
+    background-color: transparent;
+  }
+
+  .similarButtonIcon {
+    display: grid;
+    place-items: center;
+    inline-size: var(--size-28);
+    block-size: var(--size-28);
+    border-radius: var(--radius-pill);
+    background-color: var(--c-overlay-dark);
+    font-size: var(--fs-s);
+  }
+}
+
 .emptyState {
   display: grid;
   justify-items: start;

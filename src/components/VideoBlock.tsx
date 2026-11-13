@@ -366,7 +366,10 @@ const VideoDetailsPanel: React.FC<{
   );
 
   return (
-    <div id={props.id ?? props.src} className={commonStyles.mediaDetails}>
+    <div
+      id={props.id ?? props.src}
+      className={[commonStyles.mediaDetails, styles.details].filter(Boolean).join(" ")}
+    >
       <details
         className={commonStyles.disclosure}
         onToggle={(event) => setIsOpen(event.currentTarget.open)}
