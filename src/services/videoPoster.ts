@@ -175,7 +175,7 @@ const toNaiveLocalIso = (raw: string | undefined): string | undefined => {
   return `${year}-${month}-${day}T${hour}:${minute}:${second}`;
 };
 
-const readRotation = (stream: FfprobeStream): number => {
+export const readRotation = (stream: FfprobeStream): number => {
   const fromSideData = stream.side_data_list?.find(
     (entry) => entry.side_data_type === "Display Matrix",
   )?.rotation;

@@ -7,7 +7,7 @@ import ffprobePath from "ffprobe-static";
 import { stripPublicFromPath } from "./photo";
 import { encodePublicAssetPath } from "../util/encodePublicAssetPath";
 import imageOptimisationConfig from "./imageOptimisationConfig.json";
-import { posterPathsFor, readVideoPosterSidecar } from "./videoPoster";
+import { posterPathsFor, readRotation, readVideoPosterSidecar } from "./videoPoster";
 import type { OptimisedPhoto } from "./types";
 import type { MovieCamera } from "./movieExif";
 import videoEncoding from "../util/videoEncoding.json";
@@ -113,6 +113,11 @@ export const buildOriginalVideoTechnicalData = (
   );
   const bitrateRaw = videoStream.bit_rate ?? format.bit_rate;
   const durationRaw = videoStream.duration ?? format.duration;
+  // A phone stores portrait as landscape pixels plus a display matrix. The
+  // player is boxed from these, so report the shape the clip is shown in.
+  const quarterTurned = Math.abs(readRotation(videoStream)) % 180 === 90;
+  const storedWidth = videoStream.width ? Number(videoStream.width) : undefined;
+  const storedHeight = videoStream.height ? Number(videoStream.height) : undefined;
 
   return omitUndefined({
     originalDate,
@@ -122,8 +127,8 @@ export const buildOriginalVideoTechnicalData = (
     bitrateKbps: bitrateRaw ? Math.round(Number(bitrateRaw) / 1000) : undefined,
     fileSizeBytes,
     durationSeconds: durationRaw ? Number(Number(durationRaw).toFixed(3)) : undefined,
-    width: videoStream.width ? Number(videoStream.width) : undefined,
-    height: videoStream.height ? Number(videoStream.height) : undefined,
+    width: quarterTurned ? storedHeight : storedWidth,
+    height: quarterTurned ? storedWidth : storedHeight,
     audioCodec: audioStream.codec_name,
     container: format.format_name,
   });

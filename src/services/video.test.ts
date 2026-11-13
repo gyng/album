@@ -52,6 +52,28 @@ describe("video utilities", () => {
     });
   });
 
+  it("reports a quarter-turned clip in the shape it is displayed", () => {
+    // A Pixel records portrait as landscape pixels plus a display matrix; the
+    // player box is sized from these, so the raw pair made it 16:9.
+    const parsed = {
+      streams: [
+        {
+          codec_type: "video",
+          width: 1920,
+          height: 1080,
+          side_data_list: [{ side_data_type: "Display Matrix", rotation: -90 }],
+        },
+      ],
+    };
+
+    expect(buildOriginalVideoTechnicalData(parsed)).toMatchObject({ width: 1080, height: 1920 });
+    expect(
+      buildOriginalVideoTechnicalData({
+        streams: [{ codec_type: "video", width: 1920, height: 1080, tags: { rotate: "270" } }],
+      }),
+    ).toMatchObject({ width: 1080, height: 1920 });
+  });
+
   it("omits fields absent from ffprobe metadata (no undefined in SSG props)", () => {
     // A WhatsApp / screen-recording export: no creation_time, no bit_rate,
     // no duration, no profile — exactly what broke `next build` (H5).
