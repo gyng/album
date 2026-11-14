@@ -245,11 +245,15 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  inline-size: var(--size-28);
-  block-size: var(--size-28);
+  inline-size: var(--size-22);
+  block-size: var(--size-22);
   border-radius: var(--radius-pill);
-  background: color-mix(in oklch, var(--c-bg-contrast-light) 10%, transparent);
-  transition: background-color var(--t-fast);
+  /* Beside every photograph, so it stays a faint outline until it is wanted;
+     the summary around it keeps the full tap target. */
+  opacity: 0.5;
+  transition:
+    opacity var(--t-fast),
+    background-color var(--t-fast);
 }
 
 .mediaDetailsGlyph svg {
@@ -263,8 +267,11 @@
   stroke-width: var(--size-1-5);
 }
 
-.mediaDetails summary:hover .mediaDetailsGlyph {
-  background: color-mix(in oklch, var(--c-bg-contrast-light) 26%, transparent);
+.mediaDetails summary:hover .mediaDetailsGlyph,
+.mediaDetails summary:focus-visible .mediaDetailsGlyph,
+.mediaDetails details[open] > summary .mediaDetailsGlyph {
+  opacity: 1;
+  background: color-mix(in oklch, var(--c-bg-contrast-light) 18%, transparent);
 }
 
 .mediaDetailsContent {

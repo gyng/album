@@ -562,7 +562,14 @@ export const LocalVideoBlockEl: React.FC<LocalVideoBlockElProps> = (props) => {
   return (
     // The id is on the details panel below (it is the page anchor), so the block
     // carries it too — that is how a "?t=" deep link finds the element to seek.
-    <div className={styles.block} data-testid="videoblockel" data-media-id={props.id}>
+    <div
+      className={styles.block}
+      data-testid="videoblockel"
+      data-media-id={props.id}
+      // The clip's own shape, so a portrait clip is not boxed as 16:9; on the
+      // block, because the details control is placed from it too.
+      {...(clipAspect ? { style: { "--clip-aspect": clipAspect } as React.CSSProperties } : {})}
+    >
       <div className={styles.youtubeWrapper}>
         <video
           ref={videoRef}
@@ -574,8 +581,6 @@ export const LocalVideoBlockEl: React.FC<LocalVideoBlockElProps> = (props) => {
           preload="metadata"
           src={props.src}
           {...(props.posterSrc ? { poster: props.posterSrc } : {})}
-          // The clip's own shape, so a portrait clip is not boxed as 16:9.
-          {...(clipAspect ? { style: { "--clip-aspect": clipAspect } as React.CSSProperties } : {})}
           // A <video> has no alt: it is named for what it shows, as a
           // photograph is by its alt text.
           aria-label={props.reading?.tags?.alt_text ?? props.id ?? "Video"}

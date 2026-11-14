@@ -70,3 +70,11 @@
 .link:hover .title {
   color: var(--c-accent);
 }
+
+/* A phone's photographs run edge to edge; the links keep the page gutter. */
+@media (max-width: 720px) {
+  .list {
+    inline-size: auto;
+    margin-inline: var(--page-gutter);
+  }
+}

@@ -1,26 +1,40 @@
 /* Sized by its own shape: as wide as the row allows, but never taller than the
    screen, so on a wide, short screen it narrows instead of overflowing. The
    width carries the cap, not a box around it, which is what keeps the picture
-   centred on the page like a photograph. */
-.youtubeIframe {
+   centred on the page like a photograph. --clip-render-width is the one source
+   of that width, so the details control can sit just outside the clip's
+   top-right corner as a photograph's does, leaving room for it either side. */
+.block {
   --clip-aspect: 16 / 9;
+  --clip-render-width: min(
+    90%,
+    calc(100% - (var(--tap-target) + var(--space-2)) * 2),
+    calc(90svh * (var(--clip-aspect)))
+  );
 
+  display: grid;
+  inline-size: 100%;
+}
+
+.youtubeIframe {
   aspect-ratio: var(--clip-aspect);
-  inline-size: min(90%, calc(90svh * (var(--clip-aspect))));
+  inline-size: var(--clip-render-width);
   block-size: auto;
 }
 
-.block {
-  display: grid;
-  inline-size: 100%;
+.details {
+  margin-block-start: 0;
+  margin-inline-end: calc(
+    (100% - var(--clip-render-width)) / 2 - var(--tap-target) - var(--space-2)
+  );
 }
 
 /* As a photograph does on a phone: the clip takes the whole width, its details
    control sits in a strip above it rather than over the picture, and keeps the
    page's gutter. */
 @media (max-width: 720px) {
-  .youtubeIframe {
-    inline-size: min(100%, calc(90svh * (var(--clip-aspect))));
+  .block {
+    --clip-render-width: min(100%, calc(90svh * (var(--clip-aspect))));
   }
 
   .youtubeWrapper {
