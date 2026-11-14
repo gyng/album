@@ -465,6 +465,23 @@ test.describe("Responsive UI", () => {
     expect(rightEdgeOffset).toBeGreaterThan(0);
   });
 
+  // The shared details rule pulls its control up by a negative margin; a clip
+  // that lost the override to bundle order put its control above its own block.
+  test("a clip's details control sits in the strip above it, as a photograph's", async ({
+    page,
+  }) => {
+    await gotoHydrated(page, "/album/test-simple");
+
+    const clip = page.getByTestId("videoblockel").first();
+    const [blockBox, videoBox, summaryBox] = await Promise.all([
+      clip.boundingBox(),
+      clip.locator("video").boundingBox(),
+      clip.getByLabel("Video details").boundingBox(),
+    ]);
+    expect(summaryBox!.y).toBeGreaterThanOrEqual(blockBox!.y);
+    expect(summaryBox!.y + summaryBox!.height).toBeLessThanOrEqual(videoBox!.y);
+  });
+
   test("album detail disclosures sit beside wide photos", async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 900 });
     await gotoHydrated(page, "/album/test-simple");

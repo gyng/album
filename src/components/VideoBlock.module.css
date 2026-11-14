@@ -22,7 +22,9 @@
   block-size: auto;
 }
 
-.details {
+/* Scoped under .block so it outranks the shared .mediaDetails rule, whose
+   negative top margin otherwise wins whenever the bundle orders it later. */
+.block .details {
   margin-block-start: 0;
   margin-inline-end: calc(
     (100% - var(--clip-render-width)) / 2 - var(--tap-target) - var(--space-2)
@@ -41,7 +43,7 @@
     padding-block-start: var(--tap-target);
   }
 
-  .details {
+  .block .details {
     margin-inline-end: var(--page-gutter);
   }
 }
